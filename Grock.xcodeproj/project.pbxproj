@@ -10,9 +10,23 @@
 		4C07F7B82E88245000B46866 /* Grock.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Grock.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		4C17E3F82E8A713700D57F3F /* Exceptions for "Grock" folder in "Grock" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Fonts/Lexend/OFL.txt,
+				Info.plist,
+			);
+			target = 4C07F7B72E88245000B46866 /* Grock */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		4C07F7BA2E88245000B46866 /* Grock */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				4C17E3F82E8A713700D57F3F /* Exceptions for "Grock" folder in "Grock" target */,
+			);
 			path = Grock;
 			sourceTree = "<group>";
 		};
@@ -256,6 +270,7 @@
 				DEVELOPMENT_TEAM = 23C886DGJJ;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Grock/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -284,6 +299,7 @@
 				DEVELOPMENT_TEAM = 23C886DGJJ;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Grock/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
