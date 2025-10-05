@@ -26,19 +26,15 @@ class OnboardingViewModel {
         // Ensure Vault exists with default categories
         let vault = ensureVault(context: context)
 
-        // Create store
-        let store = Store(name: storeName)
-        context.insert(store)
-
         // Create price per unit
         let pricePerUnit = PricePerUnit(
             priceValue: itemPrice ?? 0,
             unit: unit.isEmpty ? "unit" : unit
         )
 
-        // Create price option
+        // Create price option - store is just a STRING now!
         let priceOption = PriceOption(
-            store: store.name,
+            store: storeName,  // ← Direct string, no Store entity!
             pricePerUnit: pricePerUnit
         )
 

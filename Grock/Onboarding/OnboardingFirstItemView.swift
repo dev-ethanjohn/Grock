@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import SwiftData
 
 enum GroceryCategory: String, CaseIterable, Identifiable {
     case freshProduce
@@ -238,7 +239,6 @@ struct OnboardingFirstItemView: View {
 }
 
 // MARK: - Subviews
-
 struct NavigationHeader: View {
     let onBack: () -> Void
     
@@ -350,7 +350,7 @@ struct ItemNameInput: View {
                                 )
                             }
                         }
-                        .brightness(-0.03)
+                            .brightness(-0.03)
                     )
                     .cornerRadius(40)
                     .focused(itemNameFieldIsFocused)
@@ -648,12 +648,13 @@ struct PriceInput: View {
             HStack(spacing: 4) {
                 Text("₱")
                     .font(.system(size: 16))
+                    .foregroundColor(priceString.isEmpty ? .gray : .black)
                 
                 // Display text that looks like the input
                 Text(priceString.isEmpty ? "0" : priceString)
+                    .foregroundColor(priceString.isEmpty ? .gray : .black)
                     .font(.subheadline)
                     .bold()
-                    .foregroundColor(priceString.isEmpty ? .gray : .primary)
                     .multilineTextAlignment(.trailing)
                     .overlay(
                         // Hidden TextField that becomes visible when focused
@@ -935,5 +936,144 @@ extension UIColor {
                        green: max(g - CGFloat(percentage), 0.0),
                        blue: max(b - CGFloat(percentage), 0.0),
                        alpha: a)
+    }
+}
+
+
+
+// MARK: - StoreNameDisplay for Vault/AddItemPopover (Dropdown with SwiftData)
+struct StoreNameDisplayForVault: View {
+    @Binding var storeName: String
+    @State private var showAddStoreSheet = false
+    @State private var newStoreName = ""
+    
+    // Fetch ALL items from vault to get unique store names
+    @Query private var vaults: [Vault]
+    @Environment(\.modelContext) private var modelContext
+    
+    // Get unique store names from ALL items in the vault
+    private var availableStores: [String] {
+        guard let vault = vaults.first else { return [] }
+        
+        let allStores = vault.categories.flatMap { category in
+            category.items.flatMap { item in
+                item.priceOptions.map { $0.store }
+            }
+        }
+        
+        return Array(Set(allStores)).sorted()
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            
+            // Dropdown Menu
+            Menu {
+                // Add New Store option
+                Button(action: {
+                    newStoreName = ""
+                    showAddStoreSheet = true
+                }) {
+                    Label("Add New Store", systemImage: "plus.circle.fill")
+                }
+                
+                Divider()
+                
+                // Existing stores
+                ForEach(availableStores, id: \.self) { store in
+                    Button(action: {
+                        storeName = store
+                    }) {
+                        HStack {
+                            Text(store)
+                            if storeName == store {
+                                Image(systemName: "checkmark")
+                                    .foregroundColor(.blue)
+                            }
+                        }
+                    }
+                }
+            } label: {
+                HStack {
+                    Text(storeName.isEmpty ? "Select Store" : storeName)
+                        .font(storeName.isEmpty ? .footnote : .subheadline)
+                        .bold(storeName.isEmpty ? false : true)
+                        .foregroundColor(storeName.isEmpty ? .gray : .primary)
+                    
+                    Spacer()
+                    
+                    Image(systemName: "chevron.down")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, storeName.isEmpty ? 12 : 10)
+                .background(Color(.systemGray6))
+                .cornerRadius(12)
+            }
+        }
+        .sheet(isPresented: $showAddStoreSheet) {
+            AddStoreSheet(
+                storeName: $newStoreName,
+                isPresented: $showAddStoreSheet,
+                onSave: { newStore in
+                    // When adding new store, it will be saved when the item is saved
+                    storeName = newStore
+                    showAddStoreSheet = false
+                }
+            )
+        }
+    }
+}
+
+// Add this to your OnboardingFirstItemView.swift file, at the end before the #Preview
+
+// MARK: - AddStoreSheet (for Vault version)
+struct AddStoreSheet: View {
+    @Binding var storeName: String
+    @Binding var isPresented: Bool
+    var onSave: ((String) -> Void)?
+    
+    @FocusState private var isFocused: Bool
+    
+    private var isSaveDisabled: Bool {
+        storeName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+    
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 20) {
+                TextField("Enter store name", text: $storeName)
+                    .font(.subheadline)
+                    .bold()
+                    .padding(12)
+                    .background(Color(.systemGray6))
+                    .cornerRadius(8)
+                    .focused($isFocused)
+                    .onAppear {
+                        isFocused = true
+                    }
+                
+                Spacer()
+            }
+            .padding()
+            .navigationTitle("Add New Store")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        isPresented = false
+                    }
+                }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Save") {
+                        let trimmedName = storeName.trimmingCharacters(in: .whitespacesAndNewlines)
+                        onSave?(trimmedName)
+                    }
+                    .disabled(isSaveDisabled)
+                }
+            }
+        }
     }
 }

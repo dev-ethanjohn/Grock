@@ -163,19 +163,17 @@ struct HomeView: View {
         if isGuided { isGuided = false }
     }
     
-    // MARK: - Reset App (for testing)
     private func resetApp() {
-        // 1. Delete all vaults
+        // Delete vaults (stores are now part of the vault hierarchy)
         let vaults = try? context.fetch(FetchDescriptor<Vault>())
         vaults?.forEach { context.delete($0) }
 
         try? context.save()
 
-        // 2. Reset onboarding flag
+        // Reset onboarding flag
         UserDefaults.standard.hasCompletedOnboarding = false
 
-        // 3. (Optional) Print for debugging
-        print("✅ Reset done: Vault cleared, onboarding will show next app launch.")
+        print("✅ Reset done: Vault cleared (stores are now strings within items)")
     }
 }
 

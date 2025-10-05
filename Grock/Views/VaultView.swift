@@ -13,17 +13,55 @@ struct VaultView: View {
     @State private var selectedCategory: GroceryCategory?
     @State private var selectedStore: String? = nil
     @State private var toolbarAppeared = false
+    @State private var showAddItemPopover = false
+    @State private var createCartButtonVisible = true
     
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
     var onCreateCart: (() -> Void)? // Callback for creating cart
     
     var body: some View {
         ZStack(alignment: .bottom) {
             VStack(spacing: 0) {
+                
+                HStack {
+                    Button(action: {}) {
+                        Image("search")
+                            .resizable()
+                            .frame(width: 24, height: 24)
+                    }
+                    .scaleEffect(toolbarAppeared ? 1 : 0)
+                    .animation(.spring(response: 0.4, dampingFraction: 0.7, blendDuration: 0).delay(0.15), value: toolbarAppeared)
+                    
+                    Spacer()
+                    
+                    Text("vault")
+                        .font(.fuzzyBold_18)
+                    
+                    Spacer()
+                    
+                    Button(action: {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            showAddItemPopover = true
+                        }
+                    }) {
+                        Text("Add")
+                            .font(.fuzzyBold_13)
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4)
+                            .background(Color.black)
+                            .cornerRadius(20)
+                    }
+                    .scaleEffect(toolbarAppeared ? 1 : 0)
+                    .animation(.spring(response: 0.4, dampingFraction: 0.7, blendDuration: 0).delay(0.2), value: toolbarAppeared)
+                }
+                .padding()
+                
                 // Category title
                 HStack {
                     Text(selectedCategory?.title ?? "Select Category")
-                        .font(.fuzzyBold_16)
+                        .font(.fuzzyBold_15)
                     Spacer()
                 }
                 .padding(.horizontal)
@@ -45,9 +83,8 @@ struct VaultView: View {
                 itemsListView
             }
             
-            // Floating Create Cart Button
             Button(action: {
-                onCreateCart?() // Trigger the callback
+                onCreateCart?()
             }) {
                 Text("Create cart")
                     .font(.fuzzyBold_16)
@@ -56,48 +93,129 @@ struct VaultView: View {
                     .padding(.vertical, 12)
                     .background(Color.black)
                     .cornerRadius(25)
-                    .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
             }
             .padding(.bottom, 20)
-        }
-        .navigationBarBackButtonHidden(true)
-        .navigationTitle("vault")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                Button(action: {}) {
-                    Image("search")
-                        .resizable()
-                }
-                .scaleEffect(toolbarAppeared ? 1 : 0)
-                .animation(.spring(response: 0.4, dampingFraction: 0.7, blendDuration: 0).delay(0.15), value: toolbarAppeared)
-            }
+            .scaleEffect(createCartButtonVisible ? 1 : 0)
+            .animation(.spring(response: 0.3, dampingFraction: 0.8, blendDuration: 0), value: createCartButtonVisible)
+            .opacity(createCartButtonVisible ? 1 : 0)
             
-            ToolbarItem(placement: .navigationBarTrailing) {
-                 
-                    
-                    Button(action: {}) {
-                        Text("Add")
-                            .font(.fuzzyBold_13)
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 4)
-                            .background(Color.black)
-                            .cornerRadius(20)
+            if showAddItemPopover {
+                AddItemPopover(
+                    isPresented: $showAddItemPopover,
+                    onSave: { itemName, category, store, portion, unit, price in
+                        saveNewItem(
+                            name: itemName,
+                            category: category,
+                            store: store,
+                            portion: portion,
+                            unit: unit,
+                            price: price
+                        )
+                        showCreateCartButton()
+                    },
+                    onDismiss: {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                            showCreateCartButton()
+                        }
                     }
-                    .scaleEffect(toolbarAppeared ? 1 : 0)
-                    .animation(.spring(response: 0.4, dampingFraction: 0.7, blendDuration: 0).delay(0.2), value: toolbarAppeared)
+                )
+                .transition(.opacity) 
+                .zIndex(1)
+                .onAppear {
+                    createCartButtonVisible = false
+                }
             }
         }
+        // ADD ITEM POPOVER - MOVED TO OVERLAY TO COVER ENTIRE SCREEN
+        
+        
+      
+
+//        .navigationBarBackButtonHidden(true)
+        .toolbar(.hidden)
+//        .navigationBarTitleDisplayMode(.inline)
+//        .toolbar {
+//            ToolbarItem(placement: .navigationBarLeading) {
+//                Button(action: {}) {
+//                    Image("search")
+//                        .resizable()
+//                }
+//                .scaleEffect(toolbarAppeared ? 1 : 0)
+//                .animation(.spring(response: 0.4, dampingFraction: 0.7, blendDuration: 0).delay(0.15), value: toolbarAppeared)
+//            }
+//            
+//            ToolbarItem(placement: .principal) {
+//                Text("vault")
+//                    .font(.fuzzyBold_18)
+//            }
+//            
+//            ToolbarItem(placement: .navigationBarTrailing) {
+//                Button(action: {
+//                    withAnimation(.easeInOut(duration: 0.2)) {
+//                        showAddItemPopover = true
+//                    }
+//                }) {
+//                    Text("Add")
+//                        .font(.fuzzyBold_13)
+//                        .foregroundColor(.white)
+//                        .padding(.horizontal, 10)
+//                        .padding(.vertical, 4)
+//                        .background(Color.black)
+//                        .cornerRadius(20)
+//                }
+//                .scaleEffect(toolbarAppeared ? 1 : 0)
+//                .animation(.spring(response: 0.4, dampingFraction: 0.7, blendDuration: 0).delay(0.2), value: toolbarAppeared)
+//            }
+//        }
         .onAppear {
             if selectedCategory == nil {
                 selectedCategory = firstCategoryWithItems ?? GroceryCategory.allCases.first
             }
             
-            // Trigger toolbar animation
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 toolbarAppeared = true
             }
+        }
+    }
+    
+    // Save new item to vault
+    private func saveNewItem(name: String, category: GroceryCategory, store: String, portion: Double, unit: String, price: Double) {
+        guard let vault = vaults.first else { return }
+        
+        // Find or create the category
+        var targetCategory = vault.categories.first(where: { $0.name == category.title })
+        
+        if targetCategory == nil {
+            // Create new category if it doesn't exist
+            let newCategory = Category(name: category.title)
+            vault.categories.append(newCategory)
+            targetCategory = newCategory
+        }
+        
+        // Create new item
+        let newItem = Item(name: name)
+        
+        // Create price per unit
+        let pricePerUnit = PricePerUnit(priceValue: price, unit: unit)
+        
+        // Create price option with store and pricePerUnit
+        let priceOption = PriceOption(store: store, pricePerUnit: pricePerUnit)
+        newItem.priceOptions.append(priceOption)
+        
+        // Add item to category
+        targetCategory?.items.append(newItem)
+        
+        // Save context
+        try? modelContext.save()
+        
+        // Switch to the newly added item's category
+        selectedCategory = category
+    }
+    
+    // Helper function to show create cart button with animation
+    private func showCreateCartButton() {
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.7, blendDuration: 0)) {
+            createCartButtonVisible = true
         }
     }
     
@@ -190,7 +308,12 @@ struct VaultView: View {
                 if foundCategory.items.isEmpty {
                     emptyCategoryView
                 } else {
-                    itemsList(items: filteredItems)
+                    // This should use VaultItemsListView instead of itemsList
+                    VaultItemsListView(
+                        items: filteredItems,
+                        availableStores: availableStores,
+                        selectedStore: $selectedStore
+                    )
                 }
             } else {
                 emptyCategoryView
@@ -227,50 +350,19 @@ struct VaultView: View {
     
     private func itemsList(items: [Item]) -> some View {
         ScrollView {
+            
             VStack(spacing: 0) {
-                // Store filter buttons
-                if !availableStores.isEmpty {
-                    storeFilterScrollView
-                        .padding(.bottom, 16)
-                }
-                
-                // Items list
-                VStack(spacing: 0) {
-                    ForEach(items) { item in
-                        ItemRowWithMultipleStores(item: item)
-                        
-                        if item.id != items.last?.id {
-                            Divider()
-                                .padding(.leading, 16)
-                        }
+                ForEach(items) { item in
+                    MarketPriceListView(item: item)
+                    
+                    if item.id != items.last?.id {
+                        Divider()
+                            .padding(.leading, 16)
                     }
                 }
+                
             }
             .padding()
-        }
-    }
-    
-    private var storeFilterScrollView: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 12) {
-                // "All Stores" button
-                StoreFilterButton(
-                    storeName: "All Stores",
-                    isSelected: selectedStore == nil
-                ) {
-                    selectedStore = nil
-                }
-                
-                // Individual store buttons
-                ForEach(availableStores, id: \.self) { store in
-                    StoreFilterButton(
-                        storeName: store,
-                        isSelected: selectedStore == store
-                    ) {
-                        selectedStore = store
-                    }
-                }
-            }
         }
     }
 }
@@ -285,54 +377,6 @@ struct StoreFilterButton: View {
             Text(storeName)
                 .foregroundColor(isSelected ? .black : .gray)
         }
-    }
-}
-
-struct ItemRowWithMultipleStores: View {
-    let item: Item
-    
-    var body: some View {
-        HStack(alignment: .center) {
-            VStack(alignment: .leading, spacing: 8) {
-                // Item name
-                Text(item.name)
-                    .fontWeight(.medium)
-                    .foregroundColor(.primary)
-                
-                // Price options from different stores
-                VStack(alignment: .leading, spacing: 4) {
-                    ForEach(item.priceOptions, id: \.store) { option in
-                        HStack(spacing: 8) {
-                            Text(option.store)
-                                .font(.caption)
-                                .fontWeight(.medium)
-                                .foregroundColor(.gray)
-                                .frame(width: 80, alignment: .leading)
-                            
-                            Text("₱\(option.pricePerUnit.priceValue, specifier: "%.2f")")
-                                .font(.subheadline)
-                                .fontWeight(.semibold)
-                                .foregroundColor(.primary)
-                            
-                            Text("/ \(option.pricePerUnit.unit)")
-                                .font(.caption)
-                                .foregroundColor(.gray)
-                        }
-                    }
-                }
-            }
-            
-            Spacer()
-            
-            Button(action: {
-                // TODO: Add to cart action
-            }) {
-                Image(systemName: "plus")
-                    .foregroundColor(.gray)
-                    .font(.title3)
-            }
-        }
-        .padding(.vertical, 12)
     }
 }
 
