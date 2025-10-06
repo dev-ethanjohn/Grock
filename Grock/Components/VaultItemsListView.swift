@@ -19,7 +19,7 @@ struct VaultItemsListView: View {
             }
         }
         .listStyle(PlainListStyle())
-        .listSectionSpacing(0) // Remove spacing between sections
+        .listSectionSpacing(0)
     }
     
     private func itemsForStore(_ store: String) -> [Item] {
@@ -63,13 +63,12 @@ struct StoreSection: View {
                         }
                     )
                     
-                    // Add divider between items (except after the last one)
                     if index < items.count - 1 {
                         DashedLine()
                             .stroke(style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
                             .frame(height: 1)
                             .foregroundColor(Color(hex: "ddd"))
-                            .padding(.horizontal, 16) // Adjust this padding as needed
+                            .padding(.horizontal, 16)
                             .padding(.leading, 14)    // Adjust this to align with your content
                     }
                 }

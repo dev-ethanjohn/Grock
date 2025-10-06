@@ -15,11 +15,17 @@ struct VaultView: View {
     @State private var toolbarAppeared = false
     @State private var showAddItemPopover = false
     @State private var createCartButtonVisible = true
+    
+    @Environment(CartViewModel.self) private var cartViewModel 
 
     
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
-    var onCreateCart: (() -> Void)? 
+    var onCreateCart: (() -> Void)?
+    
+    private var hasActiveItems: Bool {
+         !cartViewModel.activeCartItems.isEmpty
+     }
     
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -57,6 +63,8 @@ struct VaultView: View {
             .scaleEffect(createCartButtonVisible ? 1 : 0)
             .animation(.spring(response: 0.3, dampingFraction: 0.8, blendDuration: 0), value: createCartButtonVisible)
             .opacity(createCartButtonVisible ? 1 : 0)
+            .opacity(hasActiveItems ? 1 : 0.5) 
+            
             
             if showAddItemPopover {
                 AddItemPopover(
@@ -223,7 +231,14 @@ struct VaultView: View {
     private func getItemCount(for category: GroceryCategory) -> Int {
         guard let vault = vaults.first else { return 0 }
         guard let foundCategory = vault.categories.first(where: { $0.name == category.title }) else { return 0 }
-        return foundCategory.items.count
+        
+        // Count only active items (items that are in the current cart)
+        let activeItemsCount = foundCategory.items.reduce(0) { count, item in
+            let isActive = (cartViewModel.activeCartItems[item.id] ?? 0) > 0
+            return count + (isActive ? 1 : 0)
+        }
+        
+        return activeItemsCount
     }
     
     private func hasItems(in category: GroceryCategory) -> Bool {
@@ -325,7 +340,7 @@ struct CategoryFramePreference: PreferenceKey {
 #Preview {
     NavigationStack {
         VaultView()
-            .modelContainer(for: [Vault.self, Store.self, Item.self])
+            .modelContainer(for: [Vault.self, Item.self])
     }
 }
 

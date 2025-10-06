@@ -21,10 +21,15 @@ class OnboardingViewModel {
     var categoryName: String = ""
     var portion: Double?
 
-    // Save onboarding data into SwiftData
     func saveInitialData(context: ModelContext) {
-        // Ensure Vault exists with default categories
-        let vault = ensureVault(context: context)
+        // Check if vault exists, if not create one
+        let vault: Vault
+        if let existingVault = try? context.fetch(FetchDescriptor<Vault>()).first {
+            vault = existingVault
+        } else {
+            vault = Vault()
+            context.insert(vault)
+        }
 
         // Create price per unit
         let pricePerUnit = PricePerUnit(
@@ -32,9 +37,9 @@ class OnboardingViewModel {
             unit: unit.isEmpty ? "unit" : unit
         )
 
-        // Create price option - store is just a STRING now!
+        // Create price option
         let priceOption = PriceOption(
-            store: storeName,  // ← Direct string, no Store entity!
+            store: storeName,
             pricePerUnit: pricePerUnit
         )
 
@@ -46,7 +51,10 @@ class OnboardingViewModel {
         if let category = vault.categories.first(where: { $0.name == categoryName }) {
             category.items.append(item)
         } else {
-            vault.categories.first?.items.append(item)
+            // Create the category if it doesn't exist
+            let newCategory = Category(name: categoryName)
+            newCategory.items.append(item)
+            vault.categories.append(newCategory)
         }
 
         try? context.save()

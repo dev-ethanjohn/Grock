@@ -948,11 +948,6 @@ struct StoreNameDisplayForVault: View {
         return Array(Set(allStores)).sorted()
     }
     
-    // Get the first store to use as default display
-    private var defaultStoreDisplay: String {
-        availableStores.first ?? ""
-    }
-    
     var body: some View {
         Menu {
             // Add New Store option
@@ -975,7 +970,7 @@ struct StoreNameDisplayForVault: View {
                 }) {
                     HStack {
                         Text(store)
-                        if storeName == store || (storeName.isEmpty && store == availableStores.first) {
+                        if storeName == store {
                             Image(systemName: "checkmark")
                                 .foregroundColor(.blue)
                         }
@@ -988,10 +983,10 @@ struct StoreNameDisplayForVault: View {
                     .font(.footnote)
                     .foregroundColor(.gray)
                 Spacer()
-                Text(storeName.isEmpty ? defaultStoreDisplay : storeName)
+                Text(storeName.isEmpty ? "Select Store" : storeName)
                     .font(.subheadline)
                     .bold()
-                    .foregroundStyle(.black)
+                    .foregroundStyle(storeName.isEmpty ? .gray : .black)
                 Image(systemName: "chevron.down")
                     .font(.system(size: 12))
                     .foregroundColor(.gray)
@@ -1009,6 +1004,18 @@ struct StoreNameDisplayForVault: View {
                     showAddStoreSheet = false
                 }
             )
+        }
+        .onAppear {
+            // Automatically select the first available store if storeName is empty
+            if storeName.isEmpty, let firstStore = availableStores.first {
+                storeName = firstStore
+            }
+        }
+        .onChange(of: availableStores) { oldStores, newStores in
+            // If storeName becomes empty (maybe due to data changes) and we have stores, auto-select first one
+            if storeName.isEmpty, let firstStore = newStores.first {
+                storeName = firstStore
+            }
         }
     }
 }

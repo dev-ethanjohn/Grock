@@ -3,7 +3,16 @@ import SwiftUI
 struct VaultItemRow: View {
     let item: Item
     let category: GroceryCategory?
+    @Environment(CartViewModel.self) private var cartViewModel
     var onDelete: (() -> Void)?
+    
+    private var currentQuantity: Int {
+        cartViewModel.activeCartItems[item.id] ?? 0
+    }
+    
+    private var isActive: Bool {
+        currentQuantity > 0
+    }
     
     var body: some View {
         HStack(alignment: .top, spacing: 4) {
@@ -34,14 +43,32 @@ struct VaultItemRow: View {
             
             Spacer()
             
-            Button(action: {}) {
-                Image(systemName: "plus")
-                    .foregroundColor(.gray)
-                    .font(.footnote)
-                    .bold()
-                    .padding(6)
-                    .background(Color(hex: "fff"))
-                    .clipShape(Circle())
+            //stepper TODO: change position later
+            if isActive {
+                Stepper(value: Binding(
+                    get: { currentQuantity },
+                    set: { newValue in
+                        cartViewModel.updateActiveItem(itemId: item.id, quantity: newValue)
+                    }
+                ), in: 0...100) {
+                    Text("\(currentQuantity)")
+                        .font(.fuzzyBold_16)
+                        .foregroundColor(.black)
+                        .frame(minWidth: 20)
+                }
+                .fixedSize()
+            } else {
+                Button(action: {
+                    cartViewModel.updateActiveItem(itemId: item.id, quantity: 1)
+                }) {
+                    Image(systemName: "plus")
+                        .foregroundColor(.gray)
+                        .font(.footnote)
+                        .bold()
+                        .padding(6)
+                        .background(Color(hex: "fff"))
+                        .clipShape(Circle())
+                }
             }
         }
         .padding(.bottom, 4)
@@ -62,7 +89,6 @@ struct VaultItemRow: View {
             }
             
             Button {
-                // Edit action
                 print("Edit item: \(item.name)")
             } label: {
                 Label("Edit", systemImage: "pencil")
@@ -71,3 +97,4 @@ struct VaultItemRow: View {
         .background(.white)
     }
 }
+

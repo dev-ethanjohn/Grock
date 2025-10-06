@@ -10,11 +10,14 @@ import SwiftData
 
 @main
 struct GrockApp: App {
+    @State private var cartViewModel = CartViewModel()
     var body: some Scene {
+        
         WindowGroup {
             if UserDefaults.standard.hasCompletedOnboarding {
                 HomeView()
                     .environment(\.font, .custom("Lexend", size: 16))
+                    .environment(cartViewModel)
             } else {
                 OnboardingContainer()
                     .environment(\.font, .custom("Lexend", size: 16))
@@ -27,8 +30,7 @@ struct GrockApp: App {
             PriceOption.self,
             PricePerUnit.self,
             Cart.self,
-            CartItem.self,
-            Store.self
+            CartItem.self
         ])
     }
 }

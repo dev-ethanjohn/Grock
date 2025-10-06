@@ -1,0 +1,87 @@
+//
+//  CartViewModel.swift
+//  Grock
+//
+//  Created by Ethan John Paguntalan on 10/6/25.
+//
+
+import Foundation
+import SwiftData
+import Observation
+
+@Observable
+class CartViewModel {
+    var cartName: String = ""
+    var budget: Double = 0.0
+    
+    // Track items that are currently in the cart (active items)
+    var activeCartItems: [String: Int] = [:] // [itemId: quantity]
+    
+    // Add this method to update active items
+    func updateActiveItem(itemId: String, quantity: Int) {
+        if quantity > 0 {
+            activeCartItems[itemId] = quantity
+        } else {
+            activeCartItems.removeValue(forKey: itemId)
+        }
+    }
+    
+    
+    func createCart(
+        context: ModelContext,
+        itemsWithQuantities: [String: Int],
+        vault: Vault
+    ) -> Cart? {
+        // Filter out items with quantity 0
+        let selectedItems = itemsWithQuantities.filter { $0.value > 0 }
+        
+        guard !selectedItems.isEmpty else { return nil }
+        
+        // Create cart items
+        var cartItems: [CartItem] = []
+        var totalSpent: Double = 0.0
+        
+        for (itemId, quantity) in selectedItems {
+            // Find the item in the vault
+            guard let item = findItemInVault(itemId: itemId, vault: vault),
+                  let priceOption = item.priceOptions.first else { continue }
+            
+            let totalPrice = priceOption.pricePerUnit.priceValue * Double(quantity)
+            totalSpent += totalPrice
+            
+            let cartItem = CartItem(
+                itemId: itemId,
+                priceOptionStore: priceOption.store,
+                quantity: Double(quantity),
+                totalPrice: totalPrice
+            )
+            cartItems.append(cartItem)
+        }
+        
+        // Create the cart
+        let cart = Cart(
+            name: cartName.isEmpty ? "New Cart" : cartName,
+            budget: budget,
+            totalSpent: totalSpent,
+            fulfillmentStatus: 0.0
+        )
+        cart.cartItems = cartItems
+        
+        // Add cart to vault
+        vault.carts.append(cart)
+        
+        // Save context
+        try? context.save()
+        
+        return cart
+    }
+    
+    private func findItemInVault(itemId: String, vault: Vault) -> Item? {
+        for category in vault.categories {
+            if let item = category.items.first(where: { $0.id == itemId }) {
+                return item
+            }
+        }
+        return nil
+    }
+}

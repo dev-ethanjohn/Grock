@@ -8,7 +8,6 @@
 import Foundation
 import SwiftData
 
-// MARK: - Vault
 @Model
 class Vault {
     @Attribute(.unique) var uid: String
@@ -20,7 +19,6 @@ class Vault {
     }
 }
 
-// MARK: - Category
 @Model
 class Category {
     @Attribute(.unique) var uid: String
@@ -33,7 +31,6 @@ class Category {
     }
 }
 
-// MARK: - Item
 @Model
 class Item {
     @Attribute(.unique) var id: String
@@ -46,7 +43,6 @@ class Item {
     }
 }
 
-// MARK: - PriceOption
 @Model
 class PriceOption {
     var store: String
@@ -58,7 +54,6 @@ class PriceOption {
     }
 }
 
-// MARK: - PricePerUnit
 @Model
 class PricePerUnit {
     var priceValue: Double
@@ -70,7 +65,6 @@ class PricePerUnit {
     }
 }
 
-// MARK: - Cart
 @Model
 class Cart {
     @Attribute(.unique) var id: String
@@ -95,7 +89,6 @@ class Cart {
     }
 }
 
-// MARK: - CartItem
 @Model
 class CartItem {
     var itemId: String
@@ -119,22 +112,3 @@ class CartItem {
     }
 }
 
-// MARK: - Vault Helper
-func ensureVault(context: ModelContext) -> Vault {
-    if let vault = try? context.fetch(FetchDescriptor<Vault>()).first {
-        return vault
-    }
-
-    let vault = Vault()
-
-    let meats = Category(name: "Meats & Seafood")
-    let fresh = Category(name: "Fresh Produce")
-    let frozen = Category(name: "Frozen")
-
-    vault.categories = [meats, fresh, frozen]
-
-    context.insert(vault)
-    try? context.save()
-
-    return vault
-}

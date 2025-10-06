@@ -28,14 +28,12 @@ struct OnboardingContainer: View {
 
     var body: some View {
         ZStack {
-            // Main content layers
             if step == .welcome {
                 OnboardingWelcomeView {
                     withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
                         step = .lastStore
                     }
                     
-                    // Animate indicator in separately with delay
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                         withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
                             showPageIndicator = true
@@ -74,7 +72,6 @@ struct OnboardingContainer: View {
                         viewModel.saveInitialData(context: context)
                         UserDefaults.standard.hasCompletedOnboarding = true
                         
-                        // Hide indicator before transitioning to done
                         withAnimation(.easeOut(duration: 0.2)) {
                             showPageIndicator = false
                         }
@@ -90,8 +87,8 @@ struct OnboardingContainer: View {
                     },
                 )
                 .transition(.asymmetric(
-                    insertion: .move(edge: .leading), // FirstItem moves in from the left
-                    removal: .move(edge: .leading) // FirstItem moves out to the left when going back
+                    insertion: .move(edge: .leading),
+                    removal: .move(edge: .leading)
                 ))
             }
 
@@ -123,27 +120,3 @@ struct OnboardingContainer: View {
     }
 }
 
-// MARK: - Page Indicator Component
-struct PageIndicator: View {
-    let currentStep: OnboardingStep
-    
-    private var currentIndex: Int {
-        switch currentStep {
-        case .lastStore: return 0
-        case .firstItem: return 1
-        default: return 0
-        }
-    }
-    
-    var body: some View {
-        HStack(spacing: 8) {
-            ForEach(0..<2, id: \.self) { index in
-                Circle()
-                    .fill(index == currentIndex ? Color.primary : Color.primary.opacity(0.25))
-                    .frame(width: 8, height: 8)
-                    .scaleEffect(index == currentIndex ? 1.3 : 1.0)
-            }
-            .padding(.top, 8)
-        }
-    }
-}

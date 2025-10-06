@@ -17,8 +17,7 @@ struct AddItemPopover: View {
     @State private var selectedCategory: GroceryCategory?
     
     @FocusState private var itemNameFieldIsFocused: Bool
-    
-    // Animation states
+
     @State private var overlayOpacity: Double = 0
     @State private var contentScale: CGFloat = 0.8
     
@@ -35,14 +34,13 @@ struct AddItemPopover: View {
     
     var body: some View {
         ZStack {
-            // Darkened background overlay - only opacity animation
             Color.black.opacity(0.4 * overlayOpacity)
                 .ignoresSafeArea()
                 .onTapGesture {
                     dismissPopover()
                 }
             
-            // Popover content - only scale animation
+            //MARK: POPOVER container
             VStack(spacing: 8) {
                 HStack {
                     Text("Add new item to vault")
@@ -61,7 +59,7 @@ struct AddItemPopover: View {
                 }
                 .padding(.bottom)
                 
-                // Form content
+                //MARK: FORM
                 VStack(spacing: 12) {
                     ItemNameInput(
                         itemName: $itemName,
@@ -79,16 +77,11 @@ struct AddItemPopover: View {
                     
                     StoreNameDisplayForVault(storeName: $storeName)
                     
-                    // Unit and Price in HStack
                     HStack(spacing: 12) {
                         UnitButton(unit: $unit)
-                        
                         PriceInput(itemPrice: $itemPrice)
                     }
                 }
-                
-                // Footer with done button
-                
                 
                 Button(action: {
                     if isFormValid,
@@ -118,7 +111,7 @@ struct AddItemPopover: View {
             .background(Color.white)
             .cornerRadius(20)
             .padding(.horizontal, UIScreen.main.bounds.width * 0.038)
-            .offset(y: 68)
+            .offset(y: 58)
             .scaleEffect(contentScale)
         }
         .onAppear {
@@ -131,6 +124,7 @@ struct AddItemPopover: View {
             }
         }
     }
+    
     private func dismissPopover() {
         itemNameFieldIsFocused = false
         isPresented = false
