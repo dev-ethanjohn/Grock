@@ -31,7 +31,7 @@ struct VaultItemRow: View {
             // Content
             HStack(alignment: .top, spacing: 4) {
                 Circle()
-                    .fill(category?.pastelColor ?? Color.primary)
+                    .fill(category?.pastelColor.saturated(by: 1).darker(by: 0.2) ?? Color.primary)
                     .frame(width: 8, height: 8)
                     .padding(.top, 10)
                 

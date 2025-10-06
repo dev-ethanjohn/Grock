@@ -15,10 +15,11 @@ struct VaultView: View {
     @State private var toolbarAppeared = false
     @State private var showAddItemPopover = false
     @State private var createCartButtonVisible = true
+
     
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
-    var onCreateCart: (() -> Void)? // Callback for creating cart
+    var onCreateCart: (() -> Void)? 
     
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -60,16 +61,14 @@ struct VaultView: View {
             if showAddItemPopover {
                 AddItemPopover(
                     isPresented: $showAddItemPopover,
-                    onSave: { itemName, category, store, portion, unit, price in
+                    onSave: { itemName, category, store, unit, price in
                         saveNewItem(
                             name: itemName,
                             category: category,
                             store: store,
-                            portion: portion,
                             unit: unit,
                             price: price
                         )
-                        showCreateCartButton()
                     },
                     onDismiss: {
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
@@ -97,7 +96,7 @@ struct VaultView: View {
     }
     
     // Save new item to vault
-    private func saveNewItem(name: String, category: GroceryCategory, store: String, portion: Double, unit: String, price: Double) {
+    private func saveNewItem(name: String, category: GroceryCategory, store: String, unit: String, price: Double) {
         guard let vault = vaults.first else { return }
         
         // Find or create the category
@@ -176,26 +175,51 @@ struct VaultView: View {
             item.priceOptions.contains { $0.store == store }
         }
     }
-    
+
     private var categoryScrollView: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 2) {
-                ForEach(GroceryCategory.allCases) { category in
-                    VaultCategoryIcon(
-                        category: category,
-                        isSelected: selectedCategory == category,
-                        itemCount: getItemCount(for: category),
-                        hasItems: hasItems(in: category)
-                    ) {
-                        selectedCategory = category
-                        selectedStore = nil // Reset store filter when category changes
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                ZStack(alignment: .leading) {
+                    // Sliding selection indicator
+                    if let selectedCategory = selectedCategory,
+                       let selectedIndex = GroceryCategory.allCases.firstIndex(of: selectedCategory) {
+                        RoundedRectangle(cornerRadius: 10)
+                            .strokeBorder(Color.black, lineWidth: 2)
+                            .frame(width: 50, height: 50)
+                            .offset(x: CGFloat(selectedIndex) * 51) // 50 width + 1 spacing
+                            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: selectedCategory)
+                    }
+                    
+                    // Category icons
+                    HStack(spacing: 1) {
+                        ForEach(GroceryCategory.allCases) { category in
+                            VaultCategoryIcon(
+                                category: category,
+                                isSelected: selectedCategory == category,
+                                itemCount: getItemCount(for: category),
+                                hasItems: hasItems(in: category),
+                                action: {
+                                    // Only update if different category is selected
+                                    guard selectedCategory != category else { return }
+                                    
+                                    selectedStore = nil
+                                    
+                                    // Use a single animation context
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                        selectedCategory = category
+                                        proxy.scrollTo(category.id, anchor: .center)
+                                    }
+                                }
+                            )
+                            .frame(width: 50, height: 50)
+                            .id(category.id)
+                        }
                     }
                 }
+                .padding(.horizontal)
             }
-            .padding(.horizontal)
         }
     }
-    
     private func getItemCount(for category: GroceryCategory) -> Int {
         guard let vault = vaults.first else { return 0 }
         guard let foundCategory = vault.categories.first(where: { $0.name == category.title }) else { return 0 }
@@ -284,9 +308,22 @@ struct VaultView: View {
 
 }
 
+struct CategoryFramePreference: PreferenceKey {
+    static var defaultValue: [GroceryCategory.ID: CGRect] = [:]
+    
+    static func reduce(value: inout [GroceryCategory.ID: CGRect], nextValue: () -> [GroceryCategory.ID: CGRect]) {
+        value.merge(nextValue()) { $1 }
+    }
+}
+
+
+
+
 #Preview {
     NavigationStack {
         VaultView()
             .modelContainer(for: [Vault.self, Store.self, Item.self])
     }
 }
+
+

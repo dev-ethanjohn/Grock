@@ -33,3 +33,28 @@ extension Color {
         )
     }
 }
+
+
+extension Color {
+    func saturated(by percentage: Double) -> Color {
+        UIColor(self).saturated(by: percentage).map(Color.init) ?? self
+    }
+    
+    func darker(by percentage: Double) -> Color {
+        UIColor(self).darker(by: percentage).map(Color.init) ?? self
+    }
+}
+
+extension UIColor {
+    func saturated(by percentage: Double) -> UIColor? {
+        var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        guard self.getHue(&h, saturation: &s, brightness: &b, alpha: &a) else { return nil }
+        return UIColor(hue: h, saturation: min(s + CGFloat(percentage), 1.0), brightness: b, alpha: a)
+    }
+    
+    func darker(by percentage: Double) -> UIColor? {
+        var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        guard self.getHue(&h, saturation: &s, brightness: &b, alpha: &a) else { return nil }
+        return UIColor(hue: h, saturation: s, brightness: max(b - CGFloat(percentage), 0.0), alpha: a)
+    }
+}

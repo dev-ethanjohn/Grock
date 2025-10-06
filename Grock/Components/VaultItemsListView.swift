@@ -60,7 +60,7 @@ struct StoreSection: View {
                     .foregroundStyle(.white)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 3)
-                    .background(.black)
+                    .background(category?.pastelColor.saturated(by: 0.3).darker(by: 0.5) ?? Color.primary)
                     .clipShape(RoundedRectangle(cornerRadius: 6))
                 Spacer()
             }

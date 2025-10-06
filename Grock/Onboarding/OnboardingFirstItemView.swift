@@ -922,22 +922,6 @@ struct DashedLine: Shape {
 }
 
 
-extension Color {
-    func darker(by percentage: Double = 0.2) -> Color {
-        UIColor(self).darker(by: percentage).map(Color.init) ?? self
-    }
-}
-
-extension UIColor {
-    func darker(by percentage: Double = 0.2) -> UIColor? {
-        var r: CGFloat=0, g: CGFloat=0, b: CGFloat=0, a: CGFloat=0
-        guard self.getRed(&r, green: &g, blue: &b, alpha: &a) else { return nil }
-        return UIColor(red: max(r - CGFloat(percentage), 0.0),
-                       green: max(g - CGFloat(percentage), 0.0),
-                       blue: max(b - CGFloat(percentage), 0.0),
-                       alpha: a)
-    }
-}
 
 
 
@@ -964,60 +948,63 @@ struct StoreNameDisplayForVault: View {
         return Array(Set(allStores)).sorted()
     }
     
+    // Get the first store to use as default display
+    private var defaultStoreDisplay: String {
+        availableStores.first ?? ""
+    }
+    
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        Menu {
+            // Add New Store option
+            Button(action: {
+                newStoreName = ""
+                showAddStoreSheet = true
+            }) {
+                Label("Add New Store", systemImage: "plus.circle.fill")
+            }
             
-            // Dropdown Menu
-            Menu {
-                // Add New Store option
-                Button(action: {
-                    newStoreName = ""
-                    showAddStoreSheet = true
-                }) {
-                    Label("Add New Store", systemImage: "plus.circle.fill")
-                }
-                
+            // Only show divider if there are existing stores
+            if !availableStores.isEmpty {
                 Divider()
-                
-                // Existing stores
-                ForEach(availableStores, id: \.self) { store in
-                    Button(action: {
-                        storeName = store
-                    }) {
-                        HStack {
-                            Text(store)
-                            if storeName == store {
-                                Image(systemName: "checkmark")
-                                    .foregroundColor(.blue)
-                            }
+            }
+            
+            // Existing stores
+            ForEach(availableStores, id: \.self) { store in
+                Button(action: {
+                    storeName = store
+                }) {
+                    HStack {
+                        Text(store)
+                        if storeName == store || (storeName.isEmpty && store == availableStores.first) {
+                            Image(systemName: "checkmark")
+                                .foregroundColor(.blue)
                         }
                     }
                 }
-            } label: {
-                HStack {
-                    Text(storeName.isEmpty ? "Select Store" : storeName)
-                        .font(storeName.isEmpty ? .footnote : .subheadline)
-                        .bold(storeName.isEmpty ? false : true)
-                        .foregroundColor(storeName.isEmpty ? .gray : .primary)
-                    
-                    Spacer()
-                    
-                    Image(systemName: "chevron.down")
-                        .font(.caption)
-                        .foregroundColor(.gray)
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, storeName.isEmpty ? 12 : 10)
-                .background(Color(.systemGray6))
-                .cornerRadius(12)
             }
+        } label: {
+            HStack {
+                Text("Store")
+                    .font(.footnote)
+                    .foregroundColor(.gray)
+                Spacer()
+                Text(storeName.isEmpty ? defaultStoreDisplay : storeName)
+                    .font(.subheadline)
+                    .bold()
+                    .foregroundStyle(.black)
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 12))
+                    .foregroundColor(.gray)
+            }
+            .padding(12)
+            .background(Color(.systemGray6))
+            .cornerRadius(12)
         }
         .sheet(isPresented: $showAddStoreSheet) {
             AddStoreSheet(
                 storeName: $newStoreName,
                 isPresented: $showAddStoreSheet,
                 onSave: { newStore in
-                    // When adding new store, it will be saved when the item is saved
                     storeName = newStore
                     showAddStoreSheet = false
                 }
