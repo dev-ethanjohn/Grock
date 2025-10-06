@@ -648,11 +648,11 @@ struct PriceInput: View {
             HStack(spacing: 4) {
                 Text("₱")
                     .font(.system(size: 16))
-                    .foregroundColor(priceString.isEmpty ? .gray : .black)
+                    .foregroundStyle(priceString.isEmpty ? .gray : .black)
                 
                 // Display text that looks like the input
                 Text(priceString.isEmpty ? "0" : priceString)
-                    .foregroundColor(priceString.isEmpty ? .gray : .black)
+                    .foregroundStyle(priceString.isEmpty ? .gray : .black)
                     .font(.subheadline)
                     .bold()
                     .multilineTextAlignment(.trailing)

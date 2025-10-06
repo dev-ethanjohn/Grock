@@ -138,7 +138,6 @@ struct AddItemPopover: View {
         }
         .onAppear {
             itemNameFieldIsFocused = true
-            // Animate both properties independently
             withAnimation(.easeOut(duration: 0.2)) {
                 overlayOpacity = 1
             }
@@ -149,7 +148,6 @@ struct AddItemPopover: View {
     }
     
     private func dismissPopover() {
-        // Animate out - overlay fades, content scales down
         withAnimation(.easeIn(duration: 0.1)) {
             overlayOpacity = 0
         }
@@ -157,10 +155,7 @@ struct AddItemPopover: View {
             contentScale = 0.8
         }
         
-        // Delay dismissal to allow animation to complete
-//        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
             isPresented = false
             onDismiss?()
-//        }
     }
 }

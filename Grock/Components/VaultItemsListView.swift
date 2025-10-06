@@ -11,20 +11,33 @@ struct VaultItemsListView: View {
     let items: [Item]
     let availableStores: [String]
     @Binding var selectedStore: String?
+    let category: GroceryCategory?
+    var onDeleteItem: ((Item) -> Void)?
+    
+    @State private var swipedItemId: String? = nil // Changed to String
     
     var body: some View {
         ScrollView {
             LazyVStack(spacing: 24) {
                 // Show all stores with their items
                 ForEach(availableStores, id: \.self) { store in
-                    StoreSection(storeName: store, items: itemsForStore(store))
+                    StoreSection(
+                        storeName: store,
+                        items: itemsForStore(store),
+                        category: category,
+                        swipedItemId: $swipedItemId,
+                        onDeleteItem: onDeleteItem
+                    )
                 }
             }
-            .padding()
+            .padding(.vertical)
+        }
+        .onTapGesture {
+            // Close any swiped item when tapping on empty space
+            swipedItemId = nil
         }
     }
     
-    // Get items for a specific store
     private func itemsForStore(_ store: String) -> [Item] {
         items.filter { item in
             item.priceOptions.contains { $0.store == store }
@@ -32,10 +45,12 @@ struct VaultItemsListView: View {
     }
 }
 
-// Store Section Component
 struct StoreSection: View {
     let storeName: String
     let items: [Item]
+    let category: GroceryCategory?
+    @Binding var swipedItemId: String? // Changed to String
+    var onDeleteItem: ((Item) -> Void)?
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -49,52 +64,41 @@ struct StoreSection: View {
                     .clipShape(RoundedRectangle(cornerRadius: 6))
                 Spacer()
             }
+            .padding(.horizontal)
+            .padding(.bottom, 4)
             
-            LazyVStack(spacing: 0) {
-                ForEach(items) { item in
-                    MarketPriceListView(item: item)
-                    
-                    if item.id != items.last?.id {
-                        Divider()
-                            .padding(.leading, 16)
+            ScrollView {
+                LazyVStack(spacing: 0, pinnedViews: []) {
+                    ForEach(items) { item in
+                        VaultItemRow(
+                            item: item,
+                            category: category,
+                            isSwiped: Binding(
+                                get: { swipedItemId == item.id },
+                                set: { isSwiped in
+                                    if isSwiped {
+                                        swipedItemId = item.id
+                                    } else if swipedItemId == item.id {
+                                        swipedItemId = nil
+                                    }
+                                }
+                            ),
+                            onDelete: {
+                                onDeleteItem?(item)
+                            }
+                        )
+                        
+                        if item.id != items.last?.id {
+                            DashedLine()
+                                .stroke(style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
+                                .frame(height: 1)
+                                .foregroundColor(Color(hex: "ddd"))
+                                .padding(.horizontal)
+                                .padding(.leading)
+                        }
                     }
                 }
             }
         }
     }
-}
-
-#Preview {
-    // Create sample items for SaveMore (5 items)
-    let saveMoreItems = [
-        createPreviewItem(name: "Monterey Beef Tapa 250g", store: "SaveMore", price: 112.20, unit: "pc"),
-        createPreviewItem(name: "ground beef", store: "SaveMore", price: 358.0, unit: "kg"),
-        createPreviewItem(name: "Purefoods corned beef 120g", store: "SaveMore", price: 87.25, unit: "can"),
-        createPreviewItem(name: "whole chicken", store: "SaveMore", price: 198.0, unit: "kg"),
-        createPreviewItem(name: "chicken breast", store: "SaveMore", price: 234.0, unit: "kg")
-    ]
-    
-    // Create sample items for Public Market (1 item)
-    let publicMarketItems = [
-        createPreviewItem(name: "chicken breast", store: "Public Market", price: 210.0, unit: "kg")
-    ]
-    
-    // Combine all items
-    let allItems = saveMoreItems + publicMarketItems
-    let allStores = ["SaveMore", "Public Market"]
-    
-    return VaultItemsListView(
-        items: allItems,
-        availableStores: allStores,
-        selectedStore: .constant(nil)
-    )
-}
-
-// Helper function for previews
-private func createPreviewItem(name: String, store: String, price: Double, unit: String) -> Item {
-    let item = Item(name: name)
-    let pricePerUnit = PricePerUnit(priceValue: price, unit: unit)
-    let priceOption = PriceOption(store: store, pricePerUnit: pricePerUnit)
-    item.priceOptions = [priceOption]
-    return item
 }

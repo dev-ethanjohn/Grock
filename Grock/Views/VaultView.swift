@@ -24,61 +24,19 @@ struct VaultView: View {
         ZStack(alignment: .bottom) {
             VStack(spacing: 0) {
                 
-                HStack {
-                    Button(action: {}) {
-                        Image("search")
-                            .resizable()
-                            .frame(width: 24, height: 24)
-                    }
-                    .scaleEffect(toolbarAppeared ? 1 : 0)
-                    .animation(.spring(response: 0.4, dampingFraction: 0.7, blendDuration: 0).delay(0.15), value: toolbarAppeared)
-                    
-                    Spacer()
-                    
-                    Text("vault")
-                        .font(.fuzzyBold_18)
-                    
-                    Spacer()
-                    
-                    Button(action: {
+                // TODO: Put it ist own view
+                VaultToolbarView(
+                    toolbarAppeared: $toolbarAppeared,
+                    onAddTapped: {
                         withAnimation(.easeInOut(duration: 0.2)) {
                             showAddItemPopover = true
                         }
-                    }) {
-                        Text("Add")
-                            .font(.fuzzyBold_13)
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 4)
-                            .background(Color.black)
-                            .cornerRadius(20)
                     }
-                    .scaleEffect(toolbarAppeared ? 1 : 0)
-                    .animation(.spring(response: 0.4, dampingFraction: 0.7, blendDuration: 0).delay(0.2), value: toolbarAppeared)
-                }
-                .padding()
+                )
                 
-                // Category title
-                HStack {
-                    Text(selectedCategory?.title ?? "Select Category")
-                        .font(.fuzzyBold_15)
-                    Spacer()
+                VaultCategorySectionView(selectedCategory: selectedCategory) {
+                    categoryScrollView
                 }
-                .padding(.horizontal)
-                .padding(.top, 8)
-                .padding(.bottom, 4)
-                
-                categoryScrollView
-                    .padding(.bottom, 10)
-                    .background(
-                        Rectangle()
-                            .fill(.white)
-                            .shadow(color: Color.black.opacity(0.16), radius: 6, x: 0, y: 1)
-                            .mask(
-                                Rectangle()
-                                    .padding(.bottom, -20)
-                            )
-                    )
                 
                 itemsListView
             }
@@ -119,54 +77,14 @@ struct VaultView: View {
                         }
                     }
                 )
-                .transition(.opacity) 
+                .transition(.opacity)
                 .zIndex(1)
                 .onAppear {
                     createCartButtonVisible = false
                 }
             }
         }
-        // ADD ITEM POPOVER - MOVED TO OVERLAY TO COVER ENTIRE SCREEN
-        
-        
-      
-
-//        .navigationBarBackButtonHidden(true)
         .toolbar(.hidden)
-//        .navigationBarTitleDisplayMode(.inline)
-//        .toolbar {
-//            ToolbarItem(placement: .navigationBarLeading) {
-//                Button(action: {}) {
-//                    Image("search")
-//                        .resizable()
-//                }
-//                .scaleEffect(toolbarAppeared ? 1 : 0)
-//                .animation(.spring(response: 0.4, dampingFraction: 0.7, blendDuration: 0).delay(0.15), value: toolbarAppeared)
-//            }
-//            
-//            ToolbarItem(placement: .principal) {
-//                Text("vault")
-//                    .font(.fuzzyBold_18)
-//            }
-//            
-//            ToolbarItem(placement: .navigationBarTrailing) {
-//                Button(action: {
-//                    withAnimation(.easeInOut(duration: 0.2)) {
-//                        showAddItemPopover = true
-//                    }
-//                }) {
-//                    Text("Add")
-//                        .font(.fuzzyBold_13)
-//                        .foregroundColor(.white)
-//                        .padding(.horizontal, 10)
-//                        .padding(.vertical, 4)
-//                        .background(Color.black)
-//                        .cornerRadius(20)
-//                }
-//                .scaleEffect(toolbarAppeared ? 1 : 0)
-//                .animation(.spring(response: 0.4, dampingFraction: 0.7, blendDuration: 0).delay(0.2), value: toolbarAppeared)
-//            }
-//        }
         .onAppear {
             if selectedCategory == nil {
                 selectedCategory = firstCategoryWithItems ?? GroceryCategory.allCases.first
@@ -212,7 +130,6 @@ struct VaultView: View {
         selectedCategory = category
     }
     
-    // Helper function to show create cart button with animation
     private func showCreateCartButton() {
         withAnimation(.spring(response: 0.4, dampingFraction: 0.7, blendDuration: 0)) {
             createCartButtonVisible = true
@@ -302,17 +219,20 @@ struct VaultView: View {
     }
     
     private func categoryItemsList(vault: Vault) -> some View {
-        Group {
+        ZStack {
             if let category = selectedCategory,
                let foundCategory = vault.categories.first(where: { $0.name == category.title }) {
                 if foundCategory.items.isEmpty {
                     emptyCategoryView
                 } else {
-                    // This should use VaultItemsListView instead of itemsList
                     VaultItemsListView(
                         items: filteredItems,
                         availableStores: availableStores,
-                        selectedStore: $selectedStore
+                        selectedStore: $selectedStore,
+                        category: selectedCategory,
+                        onDeleteItem: { item in
+                            deleteItem(item)
+                        }
                     )
                 }
             } else {
@@ -320,6 +240,20 @@ struct VaultView: View {
             }
         }
     }
+    
+    private func deleteItem(_ item: Item) {
+        guard let vault = vaults.first else { return }
+        
+        // Find the category that contains this item
+        for category in vault.categories {
+            if let index = category.items.firstIndex(where: { $0.id == item.id }) {
+                category.items.remove(at: index)
+                try? modelContext.save()
+                break
+            }
+        }
+    }
+
     
     private var noCategorySelectedView: some View {
         VStack {
@@ -347,37 +281,7 @@ struct VaultView: View {
             Spacer()
         }
     }
-    
-    private func itemsList(items: [Item]) -> some View {
-        ScrollView {
-            
-            VStack(spacing: 0) {
-                ForEach(items) { item in
-                    MarketPriceListView(item: item)
-                    
-                    if item.id != items.last?.id {
-                        Divider()
-                            .padding(.leading, 16)
-                    }
-                }
-                
-            }
-            .padding()
-        }
-    }
-}
 
-struct StoreFilterButton: View {
-    let storeName: String
-    let isSelected: Bool
-    let action: () -> Void
-    
-    var body: some View {
-        Button(action: action) {
-            Text(storeName)
-                .foregroundColor(isSelected ? .black : .gray)
-        }
-    }
 }
 
 #Preview {
