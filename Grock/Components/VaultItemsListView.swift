@@ -1,10 +1,3 @@
-//
-//  VaultItemsListView.swift
-//  Grock
-//
-//  Created by Ethan John Paguntalan on 10/3/25.
-//
-
 import SwiftUI
 
 struct VaultItemsListView: View {
@@ -14,28 +7,19 @@ struct VaultItemsListView: View {
     let category: GroceryCategory?
     var onDeleteItem: ((Item) -> Void)?
     
-    @State private var swipedItemId: String? = nil // Changed to String
-    
     var body: some View {
-        ScrollView {
-            LazyVStack(spacing: 24) {
-                // Show all stores with their items
-                ForEach(availableStores, id: \.self) { store in
-                    StoreSection(
-                        storeName: store,
-                        items: itemsForStore(store),
-                        category: category,
-                        swipedItemId: $swipedItemId,
-                        onDeleteItem: onDeleteItem
-                    )
-                }
+        List {
+            ForEach(availableStores, id: \.self) { store in
+                StoreSection(
+                    storeName: store,
+                    items: itemsForStore(store),
+                    category: category,
+                    onDeleteItem: onDeleteItem
+                )
             }
-            .padding(.vertical)
         }
-        .onTapGesture {
-            // Close any swiped item when tapping on empty space
-            swipedItemId = nil
-        }
+        .listStyle(PlainListStyle())
+        .listSectionSpacing(0) // Remove spacing between sections
     }
     
     private func itemsForStore(_ store: String) -> [Item] {
@@ -49,55 +33,48 @@ struct StoreSection: View {
     let storeName: String
     let items: [Item]
     let category: GroceryCategory?
-    @Binding var swipedItemId: String? // Changed to String
     var onDeleteItem: ((Item) -> Void)?
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                Text(storeName)
-                    .font(.fuzzyBold_11)
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 3)
-                    .background(category?.pastelColor.saturated(by: 0.3).darker(by: 0.5) ?? Color.primary)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
-                Spacer()
-            }
-            .padding(.horizontal)
-            .padding(.bottom, 4)
+        Section(
+            header:
+                HStack {
+                    Text(storeName)
+                        .font(.fuzzyBold_11)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
+                        .background(category?.pastelColor.saturated(by: 0.3).darker(by: 0.5) ?? Color.primary)
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                    Spacer()
+                }
+                .padding(.leading)
+                .padding(.bottom, 4)
+                .listRowInsets(EdgeInsets())
             
-            ScrollView {
-                LazyVStack(spacing: 0, pinnedViews: []) {
-                    ForEach(items) { item in
-                        VaultItemRow(
-                            item: item,
-                            category: category,
-                            isSwiped: Binding(
-                                get: { swipedItemId == item.id },
-                                set: { isSwiped in
-                                    if isSwiped {
-                                        swipedItemId = item.id
-                                    } else if swipedItemId == item.id {
-                                        swipedItemId = nil
-                                    }
-                                }
-                            ),
-                            onDelete: {
-                                onDeleteItem?(item)
-                            }
-                        )
-                        
-                        if item.id != items.last?.id {
-                            DashedLine()
-                                .stroke(style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
-                                .frame(height: 1)
-                                .foregroundColor(Color(hex: "ddd"))
-                                .padding(.horizontal)
-                                .padding(.leading)
+        ) {
+            ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                VStack(spacing: 0) {
+                    VaultItemRow(
+                        item: item,
+                        category: category,
+                        onDelete: {
+                            onDeleteItem?(item)
                         }
+                    )
+                    
+                    // Add divider between items (except after the last one)
+                    if index < items.count - 1 {
+                        DashedLine()
+                            .stroke(style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
+                            .frame(height: 1)
+                            .foregroundColor(Color(hex: "ddd"))
+                            .padding(.horizontal, 16) // Adjust this padding as needed
+                            .padding(.leading, 14)    // Adjust this to align with your content
                     }
                 }
+                .listRowInsets(EdgeInsets())
+                .listRowSeparator(.hidden) // Hide row separators
             }
         }
     }

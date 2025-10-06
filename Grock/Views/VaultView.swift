@@ -242,6 +242,9 @@ struct VaultView: View {
         }
     }
     
+    // In VaultView, remove the @State private var swipedItemId: String? = nil
+    // And update the categoryItemsList to remove the swipe state binding:
+
     private func categoryItemsList(vault: Vault) -> some View {
         ZStack {
             if let category = selectedCategory,
