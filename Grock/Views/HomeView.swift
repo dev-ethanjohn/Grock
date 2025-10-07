@@ -7,6 +7,9 @@ struct HomeView: View {
     @State private var showCartPage: Bool = false
     @Environment(\.modelContext) private var context
     @State private var isGuided: Bool = true
+    
+    //vault is presented as a sheet, sheets make new envi context. so need access the existing environment object
+    @Environment(CartViewModel.self) private var cartViewModel
 
     var body: some View {
         NavigationStack {
@@ -143,16 +146,16 @@ struct HomeView: View {
     private var vaultSheet: some View {
         NavigationStack {
             VaultView(onCreateCart: {
-                showVault = false // Dismiss vault sheet
+                showVault = false
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    showCartPage = true // Open cart page as independent page
+                    showCartPage = true
                 }
             })
+            .environment(cartViewModel)
         }
     }
     
     // MARK: - Actions
-    
     private func handleCreateCart() {
         showVault = true
         if isGuided { isGuided = false }
@@ -177,7 +180,7 @@ struct HomeView: View {
     }
 }
 
-// MARK: - Finger Pointer Animation Component
+
 struct FingerPointer: View {
     @State private var animateOffset: CGFloat = 0
     
@@ -228,6 +231,7 @@ struct TutorialOverlay: View {
 // MARK: - Cart Page View
 struct CartPageView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(CartViewModel.self) private var cartViewModel
     
     var body: some View {
         VStack {

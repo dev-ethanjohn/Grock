@@ -16,8 +16,7 @@ struct VaultView: View {
     @State private var showAddItemPopover = false
     @State private var createCartButtonVisible = true
     
-    @Environment(CartViewModel.self) private var cartViewModel 
-
+    @Environment(CartViewModel.self) private var cartViewModel
     
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -31,7 +30,6 @@ struct VaultView: View {
         ZStack(alignment: .bottom) {
             VStack(spacing: 0) {
                 
-                // TODO: Put it ist own view
                 VaultToolbarView(
                     toolbarAppeared: $toolbarAppeared,
                     onAddTapped: {
@@ -63,7 +61,7 @@ struct VaultView: View {
             .scaleEffect(createCartButtonVisible ? 1 : 0)
             .animation(.spring(response: 0.3, dampingFraction: 0.8, blendDuration: 0), value: createCartButtonVisible)
             .opacity(createCartButtonVisible ? 1 : 0)
-            .opacity(hasActiveItems ? 1 : 0.5) 
+            .opacity(hasActiveItems ? 1 : 0.5)
             
             
             if showAddItemPopover {
@@ -228,6 +226,7 @@ struct VaultView: View {
             }
         }
     }
+    
     private func getItemCount(for category: GroceryCategory) -> Int {
         guard let vault = vaults.first else { return 0 }
         guard let foundCategory = vault.categories.first(where: { $0.name == category.title }) else { return 0 }
@@ -256,9 +255,6 @@ struct VaultView: View {
             }
         }
     }
-    
-    // In VaultView, remove the @State private var swipedItemId: String? = nil
-    // And update the categoryItemsList to remove the swipe state binding:
 
     private func categoryItemsList(vault: Vault) -> some View {
         ZStack {
@@ -323,7 +319,6 @@ struct VaultView: View {
             Spacer()
         }
     }
-
 }
 
 struct CategoryFramePreference: PreferenceKey {
@@ -334,14 +329,9 @@ struct CategoryFramePreference: PreferenceKey {
     }
 }
 
-
-
-
 #Preview {
     NavigationStack {
         VaultView()
             .modelContainer(for: [Vault.self, Item.self])
     }
 }
-
-

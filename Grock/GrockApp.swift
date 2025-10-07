@@ -21,6 +21,7 @@ struct GrockApp: App {
             } else {
                 OnboardingContainer()
                     .environment(\.font, .custom("Lexend", size: 16))
+                    .environment(cartViewModel)
             }
         }
         .modelContainer(for: [

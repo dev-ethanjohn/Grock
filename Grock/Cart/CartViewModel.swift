@@ -15,10 +15,10 @@ class CartViewModel {
     var budget: Double = 0.0
     
     // Track items that are currently in the cart (active items)
-    var activeCartItems: [String: Int] = [:] // [itemId: quantity]
+    var activeCartItems: [String: Double] = [:] // [itemId: quantity]
     
     // Add this method to update active items
-    func updateActiveItem(itemId: String, quantity: Int) {
+    func updateActiveItem(itemId: String, quantity: Double) {
         if quantity > 0 {
             activeCartItems[itemId] = quantity
         } else {
@@ -29,7 +29,7 @@ class CartViewModel {
     
     func createCart(
         context: ModelContext,
-        itemsWithQuantities: [String: Int],
+        itemsWithQuantities: [String: Double],
         vault: Vault
     ) -> Cart? {
         // Filter out items with quantity 0
@@ -46,13 +46,13 @@ class CartViewModel {
             guard let item = findItemInVault(itemId: itemId, vault: vault),
                   let priceOption = item.priceOptions.first else { continue }
             
-            let totalPrice = priceOption.pricePerUnit.priceValue * Double(quantity)
+            let totalPrice = priceOption.pricePerUnit.priceValue * quantity
             totalSpent += totalPrice
             
             let cartItem = CartItem(
                 itemId: itemId,
                 priceOptionStore: priceOption.store,
-                quantity: Double(quantity),
+                quantity: quantity,
                 totalPrice: totalPrice
             )
             cartItems.append(cartItem)
