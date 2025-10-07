@@ -89,6 +89,7 @@ struct VaultView: View {
                 }
             }
         }
+        .ignoresSafeArea(.keyboard)
         .toolbar(.hidden)
         .onAppear {
             if selectedCategory == nil {

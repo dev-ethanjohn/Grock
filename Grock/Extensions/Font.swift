@@ -19,4 +19,5 @@ extension Font {
     static let fuzzyBold_11 = Font.custom("FuzzyBubbles-Bold", size: 11)
     static let fuzzyRegular_18 = Font.custom("FuzzyBubbles-Regular", size: 18)
     
+    static let lexendMedium_12 = Font.custom("Lexend-Medium", size: 12)
 }

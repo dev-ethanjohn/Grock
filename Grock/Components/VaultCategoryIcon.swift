@@ -19,17 +19,20 @@ struct VaultCategoryIcon: View {
                     .frame(width: 42, height: 42)
                 
                 // Show count only for items added to cart (quantity > 0)
-                 if itemCount > 0 {
-                     Text("\(itemCount)")
-                         .padding(.horizontal, 4)
-                         .padding(.vertical, 1)
-                         .font(.caption2)
-                         .fontWeight(.black)
-                         .foregroundColor(.black)
-                         .offset(x: 2, y: -2)
-                         .background(.white)
-                         .clipShape(Capsule())
-                 }
+                if itemCount > 0 {
+                    Text("\(itemCount)")
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 1)
+                        .font(.caption2)
+                        .fontWeight(.black)
+                        .foregroundColor(.black)
+                        .offset(x: 2, y: -2)
+                        .background(.white)
+                        .clipShape(Capsule())
+                        .scaleEffect(itemCount > 0 ? 1 : 0)
+                        .contentTransition(.numericText()) 
+                        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: itemCount)
+                }
             }
             .padding(4)
         }

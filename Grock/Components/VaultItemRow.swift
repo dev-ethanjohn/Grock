@@ -1,157 +1,5 @@
 import SwiftUI
 
-
-import SwiftUI
-
-struct MyStepper: View {
-    @Binding var value: Double
-    let range: ClosedRange<Double>
-    let step: Double
-    
-    @State private var textValue: String = ""
-    @FocusState private var isFocused: Bool
-    
-    var body: some View {
-        HStack(spacing: 4) {
-            Button {
-                handleMinus()
-            } label: {
-                Image(systemName: "minus")
-                    .font(.footnote).bold()
-                    .foregroundColor(Color(hex: "1E2A36"))
-                    .frame(width: 24, height: 24)
-                    .background(Color(hex: "F2F2F2"))
-                    .clipShape(Circle())
-            }
-            .buttonStyle(.plain)
-            .contentShape(Rectangle())
-            .disabled(value <= range.lowerBound)
-            .opacity(value <= range.lowerBound ? 0.5 : 1)
-            
-            TextField("", text: $textValue)
-                .font(.system(size: 16, weight: .bold))
-                .foregroundColor(Color(hex: "2C3E50"))
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 6)
-                .background(
-                    RoundedRectangle(cornerRadius: 6)
-                        .stroke(Color.gray.opacity(0.6), lineWidth: 1)
-                )
-                .frame(minWidth: 40)
-                .frame(maxWidth: 80)
-                .fixedSize(horizontal: true, vertical: false)
-                .keyboardType(.decimalPad)
-                .focused($isFocused)
-                .onSubmit { commitTextField() }
-                .onChange(of: isFocused) { _, focused in
-                    if !focused { commitTextField() }
-                }
-                .onAppear {
-                    textValue = formatValue(value)
-                }
-                .onChange(of: value) { _, newValue in
-                    if !isFocused {
-                        textValue = formatValue(newValue)
-                    }
-                }
-                .onChange(of: textValue) {_, newText in
-                    if let number = Double(newText), number > 100 {
-                        textValue = "100"
-                    }
-                }
-            
-            Button {
-                handlePlus()
-            } label: {
-                Image(systemName: "plus")
-                    .font(.footnote).bold()
-                    .foregroundColor(Color(hex: "1E2A36"))
-                    .frame(width: 24, height: 24)
-                    .background(Color(hex: "F2F2F2"))
-                    .clipShape(Circle())
-            }
-            .contentShape(Circle())
-            .buttonStyle(.plain)
-            .disabled(value >= range.upperBound)
-            .opacity(value >= range.upperBound ? 0.5 : 1)
-        }
-        .toolbar {
-            ToolbarItemGroup(placement: .keyboard) {
-                Spacer()
-                Button("Done") {
-                    isFocused = false
-                    commitTextField()
-                }
-            }
-        }
-    }
-    
-    // MARK: - Logic
-    private func handlePlus() {
-        let newValue: Double
-        
-        // Check if current value is decimal
-        if value.truncatingRemainder(dividingBy: 1) != 0 {
-            // If decimal → round up first
-            newValue = ceil(value)
-        } else {
-            // Otherwise just add step
-            newValue = value + step
-        }
-        
-        value = min(newValue, range.upperBound)
-        textValue = formatValue(value)
-    }
-    
-    private func handleMinus() {
-        let newValue: Double
-        
-        // Check if current value is decimal
-        if value.truncatingRemainder(dividingBy: 1) != 0 {
-            // If decimal → round down first
-            newValue = floor(value)
-        } else {
-            // Otherwise just subtract step
-            newValue = value - step
-        }
-        
-        value = max(newValue, range.lowerBound)
-        textValue = formatValue(value)
-    }
-    
-    private func commitTextField() {
-        // Convert text to double, using current locale
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .decimal
-        
-        if let number = formatter.number(from: textValue) {
-            let doubleValue = number.doubleValue
-            let clamped = min(max(doubleValue, range.lowerBound), range.upperBound)
-            value = clamped
-            
-            if doubleValue != clamped {
-                textValue = formatValue(clamped)
-            } else {
-                textValue = textValue.trimmingCharacters(in: .whitespacesAndNewlines)
-            }
-        } else {
-            textValue = formatValue(value)
-        }
-    }
-    
-    private func formatValue(_ val: Double) -> String {
-        if val.truncatingRemainder(dividingBy: 1) == 0 {
-            return String(format: "%.0f", val)
-        } else {
-            var result = String(format: "%.2f", val)
-            while result.last == "0" { result.removeLast() }
-            if result.last == "." { result.removeLast() }
-            return result
-        }
-    }
-}
-
-
 struct VaultItemRow: View {
     let item: Item
     let category: GroceryCategory?
@@ -166,74 +14,155 @@ struct VaultItemRow: View {
         currentQuantity > 0
     }
     
+    @State private var textValue: String = ""
+    @FocusState private var isFocused: Bool
+    
     var body: some View {
         HStack(alignment: .top, spacing: 4) {
             Circle()
-                .fill(category?.pastelColor.saturated(by: 1).darker(by: 0.2) ?? Color.primary)
+                .fill(isActive ? (category?.pastelColor.saturated(by: 1).darker(by: 0.2) ?? Color.primary) : .clear)
                 .frame(width: 8, height: 8)
                 .padding(.top, 10)
+                .scaleEffect(isActive ? 1 : 0)
+                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isActive)
             
             VStack(alignment: .leading, spacing: 0) {
                 Text(item.name)
-                    .foregroundColor(Color(hex: "888"))
+                    .foregroundColor(isActive ? .black : Color(hex: "999"))
                 + Text(" >")
                     .font(.fuzzyBold_20)
-                    .foregroundStyle(Color(hex: "bbb"))
+                    .foregroundStyle(Color(hex: "CCCCCC"))
                 
                 if let priceOption = item.priceOptions.first {
                     HStack(spacing: 4) {
                         Text("₱\(priceOption.pricePerUnit.priceValue, specifier: "%.2f")")
                         Text("/ \(priceOption.pricePerUnit.unit)")
-                            .font(.caption)
+                            .font(.lexendMedium_12)
                         Spacer()
                     }
-                    .font(.caption)
-                    .fontWeight(.medium)
-                    .foregroundColor(Color(hex: "888"))
+                    .font(.lexendMedium_12)
+                    .foregroundColor(isActive ? .black : Color(hex: "999"))
                 }
             }
+            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isActive)
             
             Spacer()
             
-            if isActive {
-                MyStepper(
-                    value: Binding(
-                        get: { currentQuantity },
-                        set: { newValue in
-                            cartViewModel.updateActiveItem(itemId: item.id, quantity: newValue)
+            // Smooth transition between plus button and stepper
+            HStack(spacing: 8) {
+                // Minus button (scales individually)
+                Button {
+                    handleMinus()
+                } label: {
+                    Image(systemName: "minus")
+                        .font(.footnote).bold()
+                        .foregroundColor(Color(hex: "1E2A36"))
+                        .frame(width: 24, height: 24)
+                        .background(Color(hex: "F2F2F2"))
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .contentShape(Rectangle())
+                .disabled(currentQuantity <= 0)
+                .opacity(currentQuantity <= 0 ? 0.5 : 1)
+                .scaleEffect(isActive ? 1 : 0)
+                .frame(width: isActive ? 24 : 0)
+                
+                ZStack {
+                    Text(textValue)
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundColor(Color(hex: "2C3E50"))
+                        .multilineTextAlignment(.center)
+                        .contentTransition(.numericText())
+                        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: textValue)
+                    
+                    // hidden
+                    TextField("", text: $textValue)
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundColor(.clear)
+                        .multilineTextAlignment(.center)
+                        .keyboardType(.decimalPad)
+                        .focused($isFocused)
+                        .onChange(of: isFocused) { _, focused in
+                            if !focused { commitTextField() }
                         }
-                    ),
-                    range: 0...100,
-                    step: 1
+                        .onChange(of: textValue) { _, newText in
+                            if let number = Double(newText), number > 100 {
+                                textValue = "100"
+                            }
+                        }
+                }
+                .padding(.horizontal, 6)
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(Color(hex: "F2F2F2").darker(by: 0.1), lineWidth: 1)
                 )
-            } else {
+                .frame(minWidth: 40)
+                .frame(maxWidth: 80)
+                .fixedSize(horizontal: true, vertical: false)
+                .toolbar {
+                    ToolbarItemGroup(placement: .keyboard) {
+                        if isFocused {
+                            Spacer()
+                            Button("Done") {
+                                isFocused = false
+                            }
+                        }
+                    }
+                }
+                .scaleEffect(isActive ? 1 : 0)
+                .frame(width: isActive ? nil : 0)
+                .onAppear {
+                    textValue = formatValue(currentQuantity)
+                }
+                .onChange(of: currentQuantity) { _, newValue in
+                    if !isFocused {
+                        textValue = formatValue(newValue)
+                    }
+                }
+                
                 Button(action: {
-                    cartViewModel.updateActiveItem(itemId: item.id, quantity: 1)
+                    if isActive {
+                        handlePlus()
+                    } else {
+                        // Add to cart when inactive
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                            cartViewModel.updateActiveItem(itemId: item.id, quantity: 1)
+                        }
+                    }
                 }) {
                     Image(systemName: "plus")
                         .font(.footnote)
                         .bold()
-                        .foregroundColor(Color(hex: "888888"))
+                        .foregroundColor(isActive ? Color(hex: "1E2A36") : Color(hex: "888888"))
                 }
                 .frame(width: 24, height: 24)
+                .background(isActive ? Color(hex: "F2F2F2") : .clear)
                 .clipShape(Circle())
                 .contentShape(Circle())
                 .buttonStyle(.plain)
             }
+            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isActive)
         }
         .padding(.bottom, 4)
         .padding(.horizontal)
         .padding(.vertical, 12)
+        .background(.white)
+        .animation(.spring(response: 0.4, dampingFraction: 0.7), value: isActive)
         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
             Button(role: .destructive) {
-                onDelete?()
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    onDelete?()
+                }
             } label: {
                 Label("Delete", systemImage: "trash")
             }
         }
         .contextMenu {
             Button(role: .destructive) {
-                onDelete?()
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    onDelete?()
+                }
             } label: {
                 Label("Delete", systemImage: "trash")
             }
@@ -244,6 +173,76 @@ struct VaultItemRow: View {
                 Label("Edit", systemImage: "pencil")
             }
         }
-        .background(.white)
+        .onChange(of: currentQuantity) { _, newValue in
+            if !isFocused {
+                textValue = formatValue(newValue)
+            }
+        }
+    }
+    
+    // MARK: - Stepper Logic (from MyStepper)
+    private func handlePlus() {
+        let newValue: Double
+        
+        // Check if current value is decimal
+        if currentQuantity.truncatingRemainder(dividingBy: 1) != 0 {
+            // If decimal → round up first
+            newValue = ceil(currentQuantity)
+        } else {
+            // Otherwise just add step
+            newValue = currentQuantity + 1
+        }
+        
+        let clamped = min(newValue, 100)
+        cartViewModel.updateActiveItem(itemId: item.id, quantity: clamped)
+        textValue = formatValue(clamped)
+    }
+    
+    private func handleMinus() {
+        let newValue: Double
+        
+        // Check if current value is decimal
+        if currentQuantity.truncatingRemainder(dividingBy: 1) != 0 {
+            // If decimal → round down first
+            newValue = floor(currentQuantity)
+        } else {
+            // Otherwise just subtract step
+            newValue = currentQuantity - 1
+        }
+        
+        let clamped = max(newValue, 0)
+        cartViewModel.updateActiveItem(itemId: item.id, quantity: clamped)
+        textValue = formatValue(clamped)
+    }
+    
+    private func commitTextField() {
+        // Convert text to double, using current locale (from MyStepper)
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        
+        if let number = formatter.number(from: textValue) {
+            let doubleValue = number.doubleValue
+            let clamped = min(max(doubleValue, 0), 100)
+            cartViewModel.updateActiveItem(itemId: item.id, quantity: clamped)
+            
+            if doubleValue != clamped {
+                textValue = formatValue(clamped)
+            } else {
+                textValue = textValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+        } else {
+            textValue = formatValue(currentQuantity)
+        }
+    }
+    
+    private func formatValue(_ val: Double) -> String {
+        if val.truncatingRemainder(dividingBy: 1) == 0 {
+            return String(format: "%.0f", val)
+        } else {
+            var result = String(format: "%.2f", val)
+            while result.last == "0" { result.removeLast() }
+            if result.last == "." { result.removeLast() }
+            return result
+        }
     }
 }

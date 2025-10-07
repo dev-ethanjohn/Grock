@@ -33,7 +33,7 @@ struct AddItemPopover: View {
     }
     
     var body: some View {
-        ZStack {
+        ZStack(alignment: .top) {
             Color.black.opacity(0.4 * overlayOpacity)
                 .ignoresSafeArea()
                 .onTapGesture {
@@ -111,7 +111,7 @@ struct AddItemPopover: View {
             .background(Color.white)
             .cornerRadius(20)
             .padding(.horizontal, UIScreen.main.bounds.width * 0.038)
-            .offset(y: 58)
+            .offset(y: UIScreen.main.bounds.height * 0.15)
             .scaleEffect(contentScale)
         }
         .onAppear {
