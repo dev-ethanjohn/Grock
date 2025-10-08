@@ -23,6 +23,8 @@ struct OnboardingLastStoreView: View {
     @State private var shakeOffset: CGFloat = 0
     @State private var showError = false
     
+    
+    
     var body: some View {
         VStack {
             

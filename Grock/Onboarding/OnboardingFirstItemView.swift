@@ -148,8 +148,11 @@ enum GroceryCategory: String, CaseIterable, Identifiable {
 }
 
 
+
 struct OnboardingFirstItemView: View {
     @Bindable var viewModel: OnboardingViewModel
+    @Environment(VaultService.self) private var vaultService
+    
     var onFinish: () -> Void
     var onBack: () -> Void
     
@@ -202,20 +205,19 @@ struct OnboardingFirstItemView: View {
                 HStack {
                     TotalDisplay(calculatedTotal: calculatedTotal)
                     
-                    
                     Spacer()
                     
                     FinishButton(isFormValid: isFormValid) {
                         if let category = selectedCategory {
                             viewModel.categoryName = category.title
                         }
+                        saveInitialData()
                         UserDefaults.standard.hasCompletedOnboarding = true
                         onFinish()
                     }
                 }
                 .padding(.vertical, 8)
                 .padding(.horizontal)
-                
             }
         }
         .sheet(isPresented: $showUnitPicker) {
@@ -236,9 +238,23 @@ struct OnboardingFirstItemView: View {
             }
         }
     }
+    
+    private func saveInitialData() {
+        guard let category = selectedCategory,
+              let price = viewModel.itemPrice else { return }
+        
+        vaultService.addItem(
+            name: viewModel.itemName,
+            to: category,
+            store: viewModel.storeName,
+            price: price,
+            unit: viewModel.unit
+        )
+    }
 }
 
-// MARK: - Subviews
+// MARK: - Subviews (Keep all your existing subviews exactly as they were)
+
 struct NavigationHeader: View {
     let onBack: () -> Void
     
@@ -296,7 +312,6 @@ struct FormContent: View {
             )
             
             PriceInput(itemPrice: $viewModel.itemPrice)
-            
             
             Spacer()
                 .frame(height: 80)
@@ -454,8 +469,6 @@ struct CategoryButton: View {
                                 )
                         )
                     
-                    
-                    
                     if selectedCategory == nil {
                         Image(systemName: "plus")
                             .font(.system(size: 18))
@@ -521,6 +534,7 @@ struct PortionAndUnitInput: View {
         }
     }
 }
+
 struct PortionInput: View {
     @Binding var portion: Double?
     @State private var portionString: String = ""
@@ -585,13 +599,11 @@ struct UnitButton: View {
                     Button(action: {
                         unit = unitOption.abbr
                     }) {
-                        
                         if unitOption.full.isEmpty {
                             Text(unitOption.abbr)
                         } else {
                             Text("\(unitOption.abbr) - \(unitOption.full)")
                         }
-                        
                     }
                 }
             }
@@ -633,6 +645,7 @@ struct UnitButton: View {
         }
     }
 }
+
 struct PriceInput: View {
     @Binding var itemPrice: Double?
     @State private var priceString: String = ""
@@ -721,7 +734,6 @@ struct TotalDisplay: View {
     }
 }
 
-
 struct FinishButton: View {
     let isFormValid: Bool
     let action: () -> Void
@@ -805,6 +817,15 @@ struct FinishButton: View {
             }
         }
     }
+}
+
+#Preview {
+    OnboardingFirstItemView(
+        viewModel: OnboardingViewModel(),
+        onFinish: {},
+        onBack: {}
+    )
+    .environment(VaultService(modelContext: try! ModelContainer(for: Vault.self, Category.self, Item.self).mainContext))
 }
 
 // Unit Picker Sheet

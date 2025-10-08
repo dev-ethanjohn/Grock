@@ -18,13 +18,13 @@ enum OnboardingStep {
 struct OnboardingContainer: View {
     @State private var step: OnboardingStep = .welcome
     @Environment(\.modelContext) private var context
+    @Environment(VaultService.self) private var vaultService // This is non-optional
     @State private var storeFieldAnimated = false
-
 
     @State private var viewModel = OnboardingViewModel()
     @Namespace private var animationNamespace
     @State private var showPageIndicator = false
-    @State private var  hasShownInfoDropdown = false
+    @State private var hasShownInfoDropdown = false
 
     var body: some View {
         ZStack {
@@ -49,14 +49,15 @@ struct OnboardingContainer: View {
             if step == .lastStore {
                 OnboardingLastStoreView(
                     viewModel: viewModel,
-                    storeFieldAnimated: $storeFieldAnimated, hasShownInfoDropdown: $hasShownInfoDropdown
+                    storeFieldAnimated: $storeFieldAnimated,
+                    hasShownInfoDropdown: $hasShownInfoDropdown
                 ) {
-                    withAnimation(.spring(response: 0.5 , dampingFraction: 0.9)) {
-                    step = .firstItem
+                    withAnimation(.spring(response: 0.5, dampingFraction: 0.9)) {
+                        step = .firstItem
                     }
                 } onSkip: {
-                    withAnimation(.spring(response: 0.5 , dampingFraction: 1)) {
-                    step = .firstItem
+                    withAnimation(.spring(response: 0.5, dampingFraction: 1)) {
+                        step = .firstItem
                     }
                 }
                 .transition(.asymmetric(
@@ -69,7 +70,8 @@ struct OnboardingContainer: View {
                 OnboardingFirstItemView(
                     viewModel: viewModel,
                     onFinish: {
-                        viewModel.saveInitialData(context: context)
+                        // Remove the optional binding - vaultService is guaranteed to be there
+                        viewModel.saveInitialData(vaultService: vaultService)
                         UserDefaults.standard.hasCompletedOnboarding = true
                         
                         withAnimation(.easeOut(duration: 0.2)) {
@@ -84,7 +86,7 @@ struct OnboardingContainer: View {
                         withAnimation(.spring(response: 0.5, dampingFraction: 1)) {
                             step = .lastStore
                         }
-                    },
+                    }
                 )
                 .transition(.asymmetric(
                     insertion: .move(edge: .leading),
@@ -119,4 +121,3 @@ struct OnboardingContainer: View {
         }
     }
 }
-

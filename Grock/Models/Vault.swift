@@ -18,16 +18,19 @@ class Vault {
         self.uid = uid
     }
 }
-
 @Model
 class Category {
-    @Attribute(.unique) var uid: String
+    var uid: String
     var name: String
+    var sortOrder: Int // ADD THIS
+    
+    @Relationship(deleteRule: .cascade)
     var items: [Item] = []
     
-    init(uid: String = UUID().uuidString, name: String) {
-        self.uid = uid
+    init(name: String) {
+        self.uid = UUID().uuidString
         self.name = name
+        self.sortOrder = 0 // Will be set properly later
     }
 }
 
