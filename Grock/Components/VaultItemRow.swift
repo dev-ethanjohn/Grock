@@ -24,7 +24,7 @@ struct VaultItemRow: View {
                 .frame(width: 8, height: 8)
                 .padding(.top, 10)
                 .scaleEffect(isActive ? 1 : 0)
-                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isActive)
+                .animation(.spring(response: 0.3, dampingFraction: 0.5), value: isActive)
             
             VStack(alignment: .leading, spacing: 0) {
                 Text(item.name)
@@ -125,7 +125,6 @@ struct VaultItemRow: View {
                     if isActive {
                         handlePlus()
                     } else {
-                        // Add to cart when inactive
                         withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
                             cartViewModel.updateActiveItem(itemId: item.id, quantity: 1)
                         }
@@ -142,7 +141,7 @@ struct VaultItemRow: View {
                 .contentShape(Circle())
                 .buttonStyle(.plain)
             }
-            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isActive)
+            .animation(.spring(response: 0.2, dampingFraction: 0.7), value: isActive)
         }
         .padding(.bottom, 4)
         .padding(.horizontal)
@@ -180,7 +179,6 @@ struct VaultItemRow: View {
         }
     }
     
-    // MARK: - Stepper Logic (from MyStepper)
     private func handlePlus() {
         let newValue: Double
         

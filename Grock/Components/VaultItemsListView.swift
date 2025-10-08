@@ -1,5 +1,7 @@
 import SwiftUI
 
+import SwiftUI
+
 struct VaultItemsListView: View {
     let items: [Item]
     let availableStores: [String]
@@ -69,11 +71,11 @@ struct StoreSection: View {
                             .frame(height: 1)
                             .foregroundColor(Color(hex: "ddd"))
                             .padding(.horizontal, 16)
-                            .padding(.leading, 14)    // Adjust this to align with your content
+                            .padding(.leading, 14)
                     }
                 }
                 .listRowInsets(EdgeInsets())
-                .listRowSeparator(.hidden) // Hide row separators
+                .listRowSeparator(.hidden)
             }
         }
     }

@@ -39,3 +39,4 @@ struct VaultCategoryIcon: View {
         .buttonStyle(PlainButtonStyle())
     }
 }
+

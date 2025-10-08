@@ -1,30 +1,22 @@
-//
-//  VaultView.swift
-//  Grock
-//
-//  Created by Ethan John Paguntalan on 9/28/25.
-//
-
 import SwiftUI
 import SwiftData
 
 struct VaultView: View {
     @Query var vaults: [Vault]
     @State private var selectedCategory: GroceryCategory?
-    @State private var selectedStore: String? = nil
     @State private var toolbarAppeared = false
     @State private var showAddItemPopover = false
     @State private var createCartButtonVisible = true
+    @State private var scrollProxy: ScrollViewProxy?
     
     @Environment(CartViewModel.self) private var cartViewModel
-    
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     var onCreateCart: (() -> Void)?
     
     private var hasActiveItems: Bool {
-         !cartViewModel.activeCartItems.isEmpty
-     }
+        !cartViewModel.activeCartItems.isEmpty
+    }
     
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -43,7 +35,7 @@ struct VaultView: View {
                     categoryScrollView
                 }
                 
-                itemsListView
+                categoryContentScrollView
             }
             
             Button(action: {
@@ -62,7 +54,7 @@ struct VaultView: View {
             .animation(.spring(response: 0.3, dampingFraction: 0.8, blendDuration: 0), value: createCartButtonVisible)
             .opacity(createCartButtonVisible ? 1 : 0)
             .opacity(hasActiveItems ? 1 : 0.5)
-            
+            .disabled(!hasActiveItems)
             
             if showAddItemPopover {
                 AddItemPopover(
@@ -102,7 +94,124 @@ struct VaultView: View {
         }
     }
     
-    // Save new item to vault
+    private var categoryScrollView: some View {
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                ZStack(alignment: .leading) {
+                    if let selectedCategory = selectedCategory,
+                       let selectedIndex = GroceryCategory.allCases.firstIndex(of: selectedCategory) {
+                        RoundedRectangle(cornerRadius: 10)
+                            .strokeBorder(Color.black, lineWidth: 2)
+                            .frame(width: 50, height: 50)
+                            .offset(x: CGFloat(selectedIndex) * 51)
+                            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: selectedCategory)
+                    }
+                    
+                    HStack(spacing: 1) {
+                        ForEach(GroceryCategory.allCases, id: \.self) { category in
+                            VaultCategoryIcon(
+                                category: category,
+                                isSelected: selectedCategory == category,
+                                itemCount: getItemCount(for: category),
+                                hasItems: hasItems(in: category),
+                                action: {
+                                    selectCategory(category, proxy: proxy)
+                                }
+                            )
+                            .frame(width: 50, height: 50)
+                            .id(category.id)
+                        }
+                    }
+                }
+                .padding(.horizontal)
+            }
+        }
+    }
+
+    private var categoryContentScrollView: some View {
+        GeometryReader { geometry in
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(spacing: 0) {
+                    ForEach(GroceryCategory.allCases, id: \.self) { category in
+                        CategoryItemsView(
+                            category: category,
+                            vaults: vaults,
+                            onDeleteItem: deleteItem
+                        )
+                        .frame(width: geometry.size.width, height: geometry.size.height)
+                        .id(category.id)
+                    }
+                }
+                .scrollTargetLayout()
+            }
+            .scrollPosition(id: $selectedCategory)
+            .scrollTargetBehavior(.paging)
+            .onAppear {
+                if selectedCategory == nil {
+                    selectedCategory = firstCategoryWithItems ?? GroceryCategory.allCases.first
+                }
+            }
+        }
+    }
+
+    private func selectCategory(_ category: GroceryCategory, proxy: ScrollViewProxy) {
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.88)) {
+            selectedCategory = category
+        }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                proxy.scrollTo(category.id, anchor: .center)
+            }
+        }
+    }
+    
+    struct CategoryItemsView: View {
+        let category: GroceryCategory
+        let vaults: [Vault]
+        let onDeleteItem: (Item) -> Void
+        
+        private var categoryItems: [Item] {
+            guard let vault = vaults.first,
+                  let foundCategory = vault.categories.first(where: { $0.name == category.title })
+            else { return [] }
+            return foundCategory.items
+        }
+        
+        private var availableStores: [String] {
+            let allStores = categoryItems.flatMap { item in
+                item.priceOptions.map { $0.store }
+            }
+            return Array(Set(allStores)).sorted()
+        }
+        
+        var body: some View {
+            Group {
+                if categoryItems.isEmpty {
+                    emptyCategoryView
+                } else {
+                    VaultItemsListView(
+                        items: categoryItems,
+                        availableStores: availableStores,
+                        selectedStore: .constant(nil),
+                        category: category,
+                        onDeleteItem: onDeleteItem
+                    )
+                }
+            }
+        }
+        
+        private var emptyCategoryView: some View {
+            VStack {
+                Spacer()
+                Text("No items yet in this category")
+                    .foregroundColor(.gray)
+                Spacer()
+            }
+        }
+    }
+    
+    // Rest of your existing methods remain the same...
     private func saveNewItem(name: String, category: GroceryCategory, store: String, unit: String, price: Double) {
         guard let vault = vaults.first else { return }
         
@@ -157,77 +266,6 @@ struct VaultView: View {
         return nil
     }
     
-    // Get current category items
-    private var currentCategoryItems: [Item] {
-        guard let category = selectedCategory,
-              let vault = vaults.first,
-              let foundCategory = vault.categories.first(where: { $0.name == category.title })
-        else { return [] }
-        return foundCategory.items
-    }
-    
-    // Get all unique stores from price options in current category
-    private var availableStores: [String] {
-        let allStores = currentCategoryItems.flatMap { item in
-            item.priceOptions.map { $0.store }
-        }
-        return Array(Set(allStores)).sorted()
-    }
-    
-    // Get items filtered by selected store (if any)
-    private var filteredItems: [Item] {
-        guard let store = selectedStore else { return currentCategoryItems }
-        
-        return currentCategoryItems.filter { item in
-            item.priceOptions.contains { $0.store == store }
-        }
-    }
-
-    private var categoryScrollView: some View {
-        ScrollViewReader { proxy in
-            ScrollView(.horizontal, showsIndicators: false) {
-                ZStack(alignment: .leading) {
-                    // Sliding selection indicator
-                    if let selectedCategory = selectedCategory,
-                       let selectedIndex = GroceryCategory.allCases.firstIndex(of: selectedCategory) {
-                        RoundedRectangle(cornerRadius: 10)
-                            .strokeBorder(Color.black, lineWidth: 2)
-                            .frame(width: 50, height: 50)
-                            .offset(x: CGFloat(selectedIndex) * 51) // 50 width + 1 spacing
-                            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: selectedCategory)
-                    }
-                    
-                    // Category icons
-                    HStack(spacing: 1) {
-                        ForEach(GroceryCategory.allCases) { category in
-                            VaultCategoryIcon(
-                                category: category,
-                                isSelected: selectedCategory == category,
-                                itemCount: getItemCount(for: category),
-                                hasItems: hasItems(in: category),
-                                action: {
-                                    // Only update if different category is selected
-                                    guard selectedCategory != category else { return }
-                                    
-                                    selectedStore = nil
-                                    
-                                    // Use a single animation context
-                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                        selectedCategory = category
-                                        proxy.scrollTo(category.id, anchor: .center)
-                                    }
-                                }
-                            )
-                            .frame(width: 50, height: 50)
-                            .id(category.id)
-                        }
-                    }
-                }
-                .padding(.horizontal)
-            }
-        }
-    }
-    
     private func getItemCount(for category: GroceryCategory) -> Int {
         guard let vault = vaults.first else { return 0 }
         guard let foundCategory = vault.categories.first(where: { $0.name == category.title }) else { return 0 }
@@ -245,41 +283,6 @@ struct VaultView: View {
         getItemCount(for: category) > 0
     }
     
-    private var itemsListView: some View {
-        Group {
-            if selectedCategory == nil {
-                noCategorySelectedView
-            } else if let vault = vaults.first {
-                categoryItemsList(vault: vault)
-            } else {
-                emptyVaultView
-            }
-        }
-    }
-
-    private func categoryItemsList(vault: Vault) -> some View {
-        ZStack {
-            if let category = selectedCategory,
-               let foundCategory = vault.categories.first(where: { $0.name == category.title }) {
-                if foundCategory.items.isEmpty {
-                    emptyCategoryView
-                } else {
-                    VaultItemsListView(
-                        items: filteredItems,
-                        availableStores: availableStores,
-                        selectedStore: $selectedStore,
-                        category: selectedCategory,
-                        onDeleteItem: { item in
-                            deleteItem(item)
-                        }
-                    )
-                }
-            } else {
-                emptyCategoryView
-            }
-        }
-    }
-    
     private func deleteItem(_ item: Item) {
         guard let vault = vaults.first else { return }
         
@@ -291,42 +294,6 @@ struct VaultView: View {
                 break
             }
         }
-    }
-
-    
-    private var noCategorySelectedView: some View {
-        VStack {
-            Spacer()
-            Text("Please select a category")
-                .foregroundColor(.gray)
-            Spacer()
-        }
-    }
-    
-    private var emptyCategoryView: some View {
-        VStack {
-            Spacer()
-            Text("No items yet in this category")
-                .foregroundColor(.gray)
-            Spacer()
-        }
-    }
-    
-    private var emptyVaultView: some View {
-        VStack {
-            Spacer()
-            Text("No vault yet.")
-                .foregroundColor(.gray)
-            Spacer()
-        }
-    }
-}
-
-struct CategoryFramePreference: PreferenceKey {
-    static var defaultValue: [GroceryCategory.ID: CGRect] = [:]
-    
-    static func reduce(value: inout [GroceryCategory.ID: CGRect], nextValue: () -> [GroceryCategory.ID: CGRect]) {
-        value.merge(nextValue()) { $1 }
     }
 }
 
