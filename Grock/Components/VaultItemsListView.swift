@@ -23,7 +23,6 @@ struct VaultItemsListView: View {
         .listStyle(PlainListStyle())
         .listSectionSpacing(0)
     }
-    
     private func itemsForStore(_ store: String) -> [Item] {
         items.filter { item in
             item.priceOptions.contains { $0.store == store }

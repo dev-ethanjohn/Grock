@@ -8,6 +8,20 @@
 import Foundation
 import SwiftData
 
+
+@Model
+class User {
+    var id: String
+    var name: String
+    var userVault: Vault
+    
+    init(id: String = UUID().uuidString, name: String = "Default User") {
+        self.id = id
+        self.name = name
+        self.userVault = Vault()
+    }
+}
+
 @Model
 class Vault {
     @Attribute(.unique) var uid: String
@@ -22,7 +36,7 @@ class Vault {
 class Category {
     var uid: String
     var name: String
-    var sortOrder: Int // ADD THIS
+    var sortOrder: Int
     
     @Relationship(deleteRule: .cascade)
     var items: [Item] = []
@@ -30,7 +44,7 @@ class Category {
     init(name: String) {
         self.uid = UUID().uuidString
         self.name = name
-        self.sortOrder = 0 // Will be set properly later
+        self.sortOrder = 0
     }
 }
 

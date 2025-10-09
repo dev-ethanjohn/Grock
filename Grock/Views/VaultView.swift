@@ -41,7 +41,6 @@ struct VaultView: View {
                 }
             }
             
-            // Create Cart Button
             if vaultService.vault != nil {
                 Button(action: {
                     onCreateCart?()
@@ -61,8 +60,7 @@ struct VaultView: View {
                 .opacity(hasActiveItems ? 1 : 0.5)
                 .disabled(!hasActiveItems)
             }
-            
-            // Add Item Popover
+
             if showAddItemPopover {
                 AddItemPopover(
                     isPresented: $showAddItemPopover,
@@ -91,26 +89,42 @@ struct VaultView: View {
         .ignoresSafeArea(.keyboard)
         .toolbar(.hidden)
         .onAppear {
-            printVaultStructure()
-            
-//            vaultService.migrateCategoriesWithSortOrder()
-            
-            // Set initial category if needed
-            if selectedCategory == nil {
-                selectedCategory = firstCategoryWithItems ?? GroceryCategory.allCases.first
-            }
-            
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                toolbarAppeared = true
-            }
-        }
+                 printVaultStructure()
+                 
+                 // Set initial category if needed
+                 if selectedCategory == nil {
+                     selectedCategory = firstCategoryWithItems ?? GroceryCategory.allCases.first
+                 }
+                 
+                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                     toolbarAppeared = true
+                 }
+                 
+                 //Add notification observer for category changes
+                 NotificationCenter.default.addObserver(
+                     forName: NSNotification.Name("ItemCategoryChanged"),
+                     object: nil,
+                     queue: .main
+                 ) { notification in
+                     if let newCategory = notification.userInfo?["newCategory"] as? GroceryCategory {
+                         withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                             selectedCategory = newCategory
+                         }
+                         print("🔄 Auto-switched to category: \(newCategory.title)")
+                     }
+                 }
+             }
+             .onDisappear {
+                 //Clean up observer
+                 NotificationCenter.default.removeObserver(self)
+             }
         .onChange(of: vaultService.vault) { oldValue, newValue in
-            // Update selected category when vault loads
+            //update selected category when vault loads
             if selectedCategory == nil {
                 selectedCategory = firstCategoryWithItems ?? GroceryCategory.allCases.first
             }
             
-            // Print when vault changes (like after adding an item)
+            //print when vault changes (like after adding an item)
             if newValue != oldValue {
                 print("🔄 Vault changed - reprinting structure:")
                 printVaultStructure()
@@ -118,7 +132,7 @@ struct VaultView: View {
         }
         .onChange(of: showAddItemPopover) { oldValue, newValue in
             if !newValue {
-                // Just closed add item popover, print updated structure
+                //closed add item popover, print updated structure
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                     print("📝 After adding item - updated vault structure:")
                     printVaultStructure()
@@ -142,21 +156,18 @@ struct VaultView: View {
         if vault.categories.isEmpty {
             print("📭 Vault is empty - no categories found")
         } else {
-            // DEBUG: Print raw array order first
             print("\n🔍 RAW ARRAY ORDER (as stored in SwiftData):")
             for categoryIndex in 0..<vault.categories.count {
                 let category = vault.categories[categoryIndex]
                 print("  [\(categoryIndex)]: '\(category.name)' (Sort Order: \(category.sortOrder))")
             }
             
-            // Print sorted order for clarity
             let sortedCategories = vault.categories.sorted { $0.sortOrder < $1.sortOrder }
             print("\n🔍 SORTED ORDER (by sortOrder property):")
             for (sortedIndex, category) in sortedCategories.enumerated() {
                 print("  [\(sortedIndex)]: '\(category.name)' (Sort Order: \(category.sortOrder))")
             }
             
-            // Now print the detailed structure using SORTED order
             print("\n📋 DETAILED CATEGORY STRUCTURE (SORTED):")
             for (categoryIndex, category) in sortedCategories.enumerated() {
                 print("\n  📁 Category \(categoryIndex + 1) (Sort Order: \(category.sortOrder)):")
@@ -183,8 +194,6 @@ struct VaultView: View {
                                 print("           Unit: '\(priceOption.pricePerUnit.unit)'")
                             }
                         }
-                        
-                        // Print cart activity status
                         let isActive = (cartViewModel.activeCartItems[item.id] ?? 0) > 0
                         let quantity = cartViewModel.activeCartItems[item.id] ?? 0
                         print("        🛍️ Cart Status: \(isActive ? "ACTIVE (qty: \(quantity))" : "inactive")")
@@ -192,12 +201,9 @@ struct VaultView: View {
                 }
             }
         }
-        
-        // Print available stores across all categories
         let allStores = getAllStores()
         print("\n  🏪 All available stores: \(allStores)")
         
-        // Print cart summary
         print("\n  🛒 Cart Summary:")
         print("     Active items: \(cartViewModel.activeCartItems.count)")
         for (itemId, quantity) in cartViewModel.activeCartItems {
@@ -233,8 +239,6 @@ struct VaultView: View {
         }
         return nil
     }
-    
-    // MARK: - Subviews
     
     private var emptyVaultView: some View {
         VStack(spacing: 20) {
@@ -302,6 +306,24 @@ struct VaultView: View {
                 }
                 .padding(.horizontal)
             }
+            //auto-scroll when selectedCategory changes
+            .onChange(of: selectedCategory) { oldValue, newValue in
+                if let newCategory = newValue {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        proxy.scrollTo(newCategory.id, anchor: .center)
+                    }
+                }
+            }
+            //scroll to initial category on appear
+            .onAppear {
+                if let initialCategory = selectedCategory ?? firstCategoryWithItems ?? GroceryCategory.allCases.first {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                            proxy.scrollTo(initialCategory.id, anchor: .center)
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -322,6 +344,7 @@ struct VaultView: View {
             }
             .scrollPosition(id: $selectedCategory)
             .scrollTargetBehavior(.paging)
+            .animation(.spring(response: 0.35, dampingFraction: 0.9), value: selectedCategory)
             .onAppear {
                 if selectedCategory == nil {
                     selectedCategory = firstCategoryWithItems ?? GroceryCategory.allCases.first

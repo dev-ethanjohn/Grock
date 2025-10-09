@@ -98,7 +98,7 @@ class CartViewModel {
     var currentCart: Cart?
     var isLoading = false
     var error: Error?
-    var activeCartItems: [String: Double] = [:] // [itemId: quantity]
+    var activeCartItems: [String: Double] = [:]
     
         func updateActiveItem(itemId: String, quantity: Double) {
             if quantity > 0 {
@@ -116,7 +116,6 @@ class CartViewModel {
     }
     
     func loadCarts() {
-        // Implementation to load carts from vaultService
         if let vault = vaultService.vault {
             self.carts = vault.carts
         }

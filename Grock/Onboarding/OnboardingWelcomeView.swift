@@ -1,11 +1,3 @@
-//
-//  OnboardingWelcomeView.swift
-//  Grock
-//
-//  Created by Ethan John Paguntalan on 9/28/25.
-//
-
-
 import SwiftUI
 
 struct OnboardingWelcomeView: View {
@@ -36,8 +28,6 @@ struct OnboardingWelcomeView: View {
             .foregroundStyle(.gray)
             .multilineTextAlignment(.center)
       
-
-            
             Spacer()
             
             Button("Get Started") {
@@ -49,10 +39,8 @@ struct OnboardingWelcomeView: View {
             .padding(.horizontal, 24)
             .background(.black)
             .clipShape(RoundedRectangle(cornerRadius: 20))
-            
         }
         .padding()
-        
     }
 }
 

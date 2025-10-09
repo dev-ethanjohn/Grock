@@ -14,48 +14,52 @@ import Observation
 class VaultService {
     private let modelContext: ModelContext
     
-    // Current state
-    var vault: Vault?
+    // Current state - now using User
+    var currentUser: User?
+    var vault: Vault? { currentUser?.userVault } // This stays the same
+    
     var isLoading = false
     var error: Error?
     
     init(modelContext: ModelContext) {
         self.modelContext = modelContext
-        loadVault()
+        loadUserAndVault()
     }
     
-    // In VaultService, add this computed property
     var sortedCategories: [Category] {
         vault?.categories.sorted { $0.sortOrder < $1.sortOrder } ?? []
     }
     
-    func loadVault() {
+    // In VaultService.swift - update loadUserAndVault method
+    func loadUserAndVault() {
         isLoading = true
         defer { isLoading = false }
         
         do {
-            let descriptor = FetchDescriptor<Vault>()
-            let vaults = try modelContext.fetch(descriptor)
+            // First try to load existing user
+            let userDescriptor = FetchDescriptor<User>()
+            let users = try modelContext.fetch(userDescriptor)
             
-            if let existingVault = vaults.first {
-                self.vault = existingVault
-                
+            if let existingUser = users.first {
+                self.currentUser = existingUser
+                print("✅ Loaded existing user: \(existingUser.name)")
                 // Ensure all categories exist in existing vault
-                ensureAllCategoriesExist(in: existingVault)
+                ensureAllCategoriesExist(in: existingUser.userVault)
             } else {
-                // Create new vault for user
-                let newVault = Vault()
-                modelContext.insert(newVault)
+                // Create new user with vault
+                let newUser = User(name: "Default User")
+                modelContext.insert(newUser)
                 
                 // Pre-populate with all categories
-                prePopulateCategories(in: newVault)
+                prePopulateCategories(in: newUser.userVault)
                 
                 try modelContext.save()
-                self.vault = newVault
+                self.currentUser = newUser
+                print("✅ Created new user with vault: \(newUser.name)")
             }
         } catch {
             self.error = error
-            print("❌ Failed to load vault: \(error)")
+            print("❌ Failed to load user and vault: \(error)")
         }
     }
 
@@ -95,17 +99,6 @@ class VaultService {
             print("✅ Categories ordered with sort indexes")
         }
     }
-    
-//    func migrateCategoriesWithSortOrder() {
-//        guard let vault = vault else { return }
-//        
-//        for (index, category) in vault.categories.enumerated() {
-//            category.sortOrder = index
-//        }
-//        
-//        saveContext()
-//        print("✅ Migrated categories with sort order")
-//    }
 
     private func prePopulateCategories(in vault: Vault) {
         // Clear any existing categories
@@ -117,6 +110,12 @@ class VaultService {
             category.sortOrder = index
             vault.categories.append(category)
         }
+    }
+    
+    // MARK: - User Operations
+    func updateUserName(_ newName: String) {
+        currentUser?.name = newName
+        saveContext()
     }
     
     // MARK: - Category Operations
@@ -201,7 +200,52 @@ class VaultService {
             try modelContext.save()
         } catch {
             self.error = error
-            print("❌ Failed to save vault: \(error)")
+            print("❌ Failed to save: \(error)")
         }
+    }
+    
+    func updateItem(
+        item: Item,
+        newName: String,
+        newCategory: GroceryCategory,
+        newStore: String,
+        newPrice: Double,
+        newUnit: String
+    ) {
+        guard let vault = vault else { return }
+        
+        // 1. Update item name
+        item.name = newName
+        
+        // 2. Update price options (assuming single price option for now)
+        if let priceOption = item.priceOptions.first {
+            priceOption.store = newStore
+            priceOption.pricePerUnit = PricePerUnit(priceValue: newPrice, unit: newUnit)
+        } else {
+            // Create new price option if none exists
+            let newPriceOption = PriceOption(
+                store: newStore,
+                pricePerUnit: PricePerUnit(priceValue: newPrice, unit: newUnit)
+            )
+            item.priceOptions = [newPriceOption]
+        }
+        
+        // 3. Move to new category if changed
+        let currentCategory = vault.categories.first { $0.items.contains(where: { $0.id == item.id }) }
+        let targetCategory = getCategory(newCategory) ?? Category(name: newCategory.title)
+        
+        if currentCategory?.name != targetCategory.name {
+            // Remove from current category
+            currentCategory?.items.removeAll { $0.id == item.id }
+            
+            // Add to new category (create if needed)
+            if !vault.categories.contains(where: { $0.name == targetCategory.name }) {
+                vault.categories.append(targetCategory)
+            }
+            targetCategory.items.append(item)
+        }
+        
+        saveContext()
+        print("🔄 Updated item: \(newName) in \(newCategory.title)")
     }
 }

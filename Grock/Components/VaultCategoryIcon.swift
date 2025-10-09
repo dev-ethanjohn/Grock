@@ -18,7 +18,6 @@ struct VaultCategoryIcon: View {
                     .font(.system(size: 24))
                     .frame(width: 42, height: 42)
                 
-                // Show count only for items added to cart (quantity > 0)
                 if itemCount > 0 {
                     Text("\(itemCount)")
                         .padding(.horizontal, 4)

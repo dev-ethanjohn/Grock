@@ -40,10 +40,22 @@ struct GrockApp: App {
     
     init() {
         do {
-            // ✅ DEVELOPMENT: In-memory database (resets on app close)
-            let config = ModelConfiguration(isStoredInMemoryOnly: true)
-            container = try ModelContainer(for: Vault.self, Category.self, Item.self, configurations: config)
-            print("✅ Development: Using in-memory database")
+            // MARK: *DEV
+            // Always start with fresh database during development
+            let schema = Schema([
+                User.self, Vault.self, Category.self, Item.self,
+                PriceOption.self, PricePerUnit.self, Cart.self, CartItem.self
+            ])
+            let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+            
+            // 🔥 DELETE EXISTING DATABASE TO FIX MIGRATION
+            if FileManager.default.fileExists(atPath: config.url.path) {
+                try FileManager.default.removeItem(at: config.url)
+                print("🗑️ Deleted old database to fix migration issues")
+            }
+            
+            container = try ModelContainer(for: schema, configurations: config)
+            print("✅ Created fresh persistent database")
         } catch {
             fatalError("Could not create ModelContainer: \(error)")
         }
@@ -57,7 +69,6 @@ struct GrockApp: App {
     }
 }
 
-// Helper view to get the modelContext
 struct ContentViewWrapper: View {
     @Environment(\.modelContext) private var modelContext
     

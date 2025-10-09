@@ -1,10 +1,14 @@
 import SwiftUI
 
+
 struct VaultItemRow: View {
     let item: Item
     let category: GroceryCategory?
     @Environment(CartViewModel.self) private var cartViewModel
+    @Environment(VaultService.self) private var vaultService
     var onDelete: (() -> Void)?
+    
+    @State private var showEditSheet = false
     
     private var currentQuantity: Double {
         cartViewModel.activeCartItems[item.id] ?? 0
@@ -48,9 +52,7 @@ struct VaultItemRow: View {
             
             Spacer()
             
-            // Smooth transition between plus button and stepper
             HStack(spacing: 8) {
-                // Minus button (scales individually)
                 Button {
                     handleMinus()
                 } label: {
@@ -76,7 +78,6 @@ struct VaultItemRow: View {
                         .contentTransition(.numericText())
                         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: textValue)
                     
-                    // hidden
                     TextField("", text: $textValue)
                         .font(.system(size: 15, weight: .bold))
                         .foregroundColor(.clear)
@@ -148,6 +149,20 @@ struct VaultItemRow: View {
         .padding(.vertical, 12)
         .background(.white)
         .animation(.spring(response: 0.4, dampingFraction: 0.7), value: isActive)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            showEditSheet = true
+        }
+        .sheet(isPresented: $showEditSheet) {
+            EditItemSheet(
+                item: item,
+                isPresented: $showEditSheet,
+                onSave: { updatedItem in
+                    print("✅ Updated item: \(updatedItem.name)")
+                }
+            )
+            .environment(vaultService)
+        }
         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
             Button(role: .destructive) {
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
@@ -167,7 +182,7 @@ struct VaultItemRow: View {
             }
             
             Button {
-                print("Edit item: \(item.name)")
+                showEditSheet = true
             } label: {
                 Label("Edit", systemImage: "pencil")
             }
@@ -181,7 +196,6 @@ struct VaultItemRow: View {
     
     private func handlePlus() {
         let newValue: Double
-        
         // Check if current value is decimal
         if currentQuantity.truncatingRemainder(dividingBy: 1) != 0 {
             // If decimal → round up first
@@ -244,3 +258,5 @@ struct VaultItemRow: View {
         }
     }
 }
+
+

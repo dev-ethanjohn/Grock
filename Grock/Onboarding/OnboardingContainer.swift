@@ -18,7 +18,7 @@ enum OnboardingStep {
 struct OnboardingContainer: View {
     @State private var step: OnboardingStep = .welcome
     @Environment(\.modelContext) private var context
-    @Environment(VaultService.self) private var vaultService // This is non-optional
+    @Environment(VaultService.self) private var vaultService
     @State private var storeFieldAnimated = false
 
     @State private var viewModel = OnboardingViewModel()
@@ -70,7 +70,7 @@ struct OnboardingContainer: View {
                 OnboardingFirstItemView(
                     viewModel: viewModel,
                     onFinish: {
-                        // Remove the optional binding - vaultService is guaranteed to be there
+                        //*vaultService is guaranteed to be available
                         viewModel.saveInitialData(vaultService: vaultService)
                         UserDefaults.standard.hasCompletedOnboarding = true
                         
@@ -96,10 +96,15 @@ struct OnboardingContainer: View {
 
             if step == .done {
                 HomeView()
+                    .environment(vaultService)
+                    .environment(CartViewModel(vaultService: vaultService))
                     .transition(.opacity)
+                    .onAppear {
+                        printOnboardingCompletion()
+                    }
             }
             
-            // Page indicator overlay - only show for lastStore and firstItem
+
             if (step == .lastStore || step == .firstItem) && showPageIndicator {
                 VStack {
                     PageIndicator(currentStep: step)
@@ -116,6 +121,34 @@ struct OnboardingContainer: View {
             if newValue == .welcome || newValue == .done {
                 withAnimation(.easeOut(duration: 0.1)) {
                     showPageIndicator = false
+                }
+            }
+        }
+    }
+    
+    private func printOnboardingCompletion() {
+        print("\n🎯 ONBOARDING COMPLETE - DATA CHECK")
+        
+        print("📝 NEW ITEM DATA:")
+        print("   Name: '\(viewModel.itemName)'")
+        print("   Category: '\(viewModel.categoryName)'")
+        print("   Store: '\(viewModel.storeName)'")
+        print("   Price: ₱\(viewModel.itemPrice ?? 0)")
+        print("   Unit: \(viewModel.unit)")
+        
+        if let vault = vaultService.vault {
+            print("\n📦 VAULT SUMMARY:")
+            print("   Categories: \(vault.categories.count)")
+            
+            let totalItems = vault.categories.reduce(0) { $0 + $1.items.count }
+            print("   Total Items: \(totalItems)")
+            
+            for category in vault.categories {
+                if !category.items.isEmpty {
+                    print("   📁 \(category.name): \(category.items.count) items")
+                    for item in category.items {
+                        print("      🛒 \(item.name)")
+                    }
                 }
             }
         }

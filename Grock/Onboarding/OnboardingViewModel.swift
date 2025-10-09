@@ -12,7 +12,7 @@ import Observation
 @MainActor
 @Observable
 class OnboardingViewModel {
-    // Form data
+    //form data
     var storeName: String = ""
     var itemName: String = ""
     var itemPrice: Double?

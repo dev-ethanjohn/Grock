@@ -40,7 +40,6 @@ struct AddItemPopover: View {
                     dismissPopover()
                 }
             
-            //MARK: POPOVER container
             VStack(spacing: 8) {
                 HStack {
                     Text("Add new item to vault")
@@ -59,7 +58,6 @@ struct AddItemPopover: View {
                 }
                 .padding(.bottom)
                 
-                //MARK: FORM
                 VStack(spacing: 12) {
                     ItemNameInput(
                         itemName: $itemName,

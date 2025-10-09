@@ -211,7 +211,7 @@ struct OnboardingFirstItemView: View {
                         if let category = selectedCategory {
                             viewModel.categoryName = category.title
                         }
-                        saveInitialData()
+
                         UserDefaults.standard.hasCompletedOnboarding = true
                         onFinish()
                     }
@@ -495,29 +495,27 @@ struct StoreNameDisplay: View {
                 .foregroundColor(.gray)
             Spacer()
             
-            // Display text that looks like the input
             Text(storeName.isEmpty ? "Enter store name" : storeName)
                 .font(.subheadline)
                 .bold()
                 .foregroundColor(storeName.isEmpty ? .gray : .primary)
                 .multilineTextAlignment(.trailing)
                 .overlay(
-                    // Hidden TextField that becomes visible when focused
                     TextField("Enter store name", text: $storeName)
                         .font(.subheadline)
                         .bold()
                         .foregroundColor(.black)
                         .multilineTextAlignment(.trailing)
                         .focused($isFocused)
-                        .opacity(isFocused ? 1 : 0) // Only show when focused
+                        .opacity(isFocused ? 1 : 0)
                 )
         }
         .padding(12)
         .background(Color(.systemGray6))
         .cornerRadius(12)
-        .contentShape(Rectangle()) // Makes entire area tappable
+        .contentShape(Rectangle())
         .onTapGesture {
-            isFocused = true // Focus the TextField when tapped anywhere
+            isFocused = true
         }
     }
 }
@@ -564,9 +562,9 @@ struct PortionInput: View {
         .padding(12)
         .background(Color(.systemGray6))
         .cornerRadius(12)
-        .contentShape(Rectangle()) // Makes entire area tappable
+        .contentShape(Rectangle())
         .onTapGesture {
-            isFocused = true // Focus the TextField when tapped anywhere
+            isFocused = true
         }
     }
 }
@@ -631,7 +629,7 @@ struct UnitButton: View {
                     .font(.footnote)
                     .foregroundColor(.gray)
                 Spacer()
-                Text(unit.isEmpty ? "" : unit) // Show "Select" when empty
+                Text(unit.isEmpty ? "" : unit)
                     .font(.subheadline)
                     .bold()
                     .foregroundStyle(unit.isEmpty ? .gray : .black)
@@ -662,15 +660,13 @@ struct PriceInput: View {
                 Text("₱")
                     .font(.system(size: 16))
                     .foregroundStyle(priceString.isEmpty ? .gray : .black)
-                
-                // Display text that looks like the input
+
                 Text(priceString.isEmpty ? "0" : priceString)
                     .foregroundStyle(priceString.isEmpty ? .gray : .black)
                     .font(.subheadline)
                     .bold()
                     .multilineTextAlignment(.trailing)
                     .overlay(
-                        // Hidden TextField that becomes visible when focused
                         TextField("0", text: $priceString)
                             .multilineTextAlignment(.trailing)
                             .keyboardType(.decimalPad)
@@ -681,9 +677,8 @@ struct PriceInput: View {
                             .font(.subheadline)
                             .bold()
                             .focused($isFocused)
-                            .opacity(isFocused ? 1 : 0) // Only show when focused
+                            .opacity(isFocused ? 1 : 0)
                             .onChange(of: priceString) { _, newValue in
-                                // Convert to Double for SwiftData
                                 let numberString = newValue.replacingOccurrences(
                                     of: Locale.current.decimalSeparator ?? ".",
                                     with: "."
@@ -691,7 +686,6 @@ struct PriceInput: View {
                                 itemPrice = Double(numberString)
                             }
                             .onAppear {
-                                // Initialize with current value
                                 if let price = itemPrice {
                                     let formatter = NumberFormatter()
                                     formatter.numberStyle = .decimal
@@ -706,9 +700,9 @@ struct PriceInput: View {
         .padding(12)
         .background(Color(.systemGray6))
         .cornerRadius(12)
-        .contentShape(Rectangle()) // Makes entire area tappable
+        .contentShape(Rectangle())
         .onTapGesture {
-            isFocused = true // Focus the TextField when tapped anywhere
+            isFocused = true
         }
     }
 }
@@ -777,14 +771,12 @@ struct FinishButton: View {
         .onChange(of: isFormValid) { oldValue, newValue in
             if newValue {
                 if !oldValue {
-                    // Just became valid
                     withAnimation(.spring(duration: 0.4)) {
                         fillAnimation = 1.0
                     }
                     startButtonBounce()
                 }
             } else {
-                // Became invalid
                 withAnimation(.easeInOut(duration: 0.3)) {
                     fillAnimation = 0.0
                     buttonScale = 1.0
@@ -792,7 +784,6 @@ struct FinishButton: View {
             }
         }
         .onAppear {
-            // Check if already valid on appear
             if isFormValid {
                 fillAnimation = 1.0
                 buttonScale = 1.0
@@ -828,7 +819,6 @@ struct FinishButton: View {
     .environment(VaultService(modelContext: try! ModelContainer(for: Vault.self, Category.self, Item.self).mainContext))
 }
 
-// Unit Picker Sheet
 struct UnitPickerView: View {
     @Binding var selectedUnit: String
     @Environment(\.dismiss) private var dismiss

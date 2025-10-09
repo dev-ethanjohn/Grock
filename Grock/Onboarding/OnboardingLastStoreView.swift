@@ -23,8 +23,6 @@ struct OnboardingLastStoreView: View {
     @State private var shakeOffset: CGFloat = 0
     @State private var showError = false
     
-    
-    
     var body: some View {
         VStack {
             
@@ -65,8 +63,6 @@ struct OnboardingLastStoreView: View {
                 .padding(.horizontal, 60)
                 .padding(.top, 28)
             
-            
-            // Character requirement hint
             if showError {
                 Text("Store name needs at least 2 characters")
                     .font(.caption)
@@ -76,7 +72,6 @@ struct OnboardingLastStoreView: View {
                     .transition(.move(edge: .trailing).combined(with: .opacity))
                     .animation(.easeInOut(duration: 0.25), value: showError)
             }
-
             
             Spacer()
         }
@@ -117,7 +112,6 @@ struct OnboardingLastStoreView: View {
                         .offset(x: 12, y: -120)
                         .transition(.asymmetric(
                                insertion: .scale(scale: 0.85, anchor: .topLeading)
-//                                   .combined(with: .opacity)
                                    .animation(.spring(response: 0.35, dampingFraction: 0.65)),
                                removal: .scale(scale: 0.95, anchor: .topLeading)
                                    .combined(with: .opacity)
@@ -161,30 +155,26 @@ struct OnboardingLastStoreView: View {
             .padding(.horizontal)
         }
         .onAppear {
-            // animate only if it hasn't animated yet in this session
             if !storeFieldAnimated {
                 showTextField = false
                 showNextButton = false
                 withAnimation(.spring(response: 0.6, dampingFraction: 0.9)) {
                     showTextField = true
                 }
-                // Delay the next button animation slightly
                 withAnimation(.spring(response: 0.4, dampingFraction: 0.8).delay(0.2)) {
                     showNextButton = true
                 }
                 storeFieldIsFocused = true
-                storeFieldAnimated = true // mark as animated
+                storeFieldAnimated = true
             } else {
-                // just show field immediately without animation
                 showTextField = true
                 showNextButton = true
                 storeFieldIsFocused = true
             }
             
-            // NEW: Check if text exists and restore fill animation
             if !viewModel.storeName.isEmpty {
                 fillAnimation = 1.0
-                startButtonBounce() // Start bounce if text already exists
+                startButtonBounce()
             }
             
             if !hasShownInfoDropdown {
@@ -204,34 +194,27 @@ struct OnboardingLastStoreView: View {
         .onChange(of: viewModel.storeName) { oldValue, newValue in
             if newValue.count >= 2 {
                 if oldValue.count < 2 {
-                    // Just reached requirement
                     withAnimation(.spring(duration: 0.4)) {
                         fillAnimation = 1.0
                     }
                     startButtonBounce()
                 }
-                // Always hide error once valid
                 showError = false
             } else {
-                // Just reset visuals (not error display!)
                 withAnimation(.easeInOut(duration: 0.3)) {
                     fillAnimation = 0.0
                     buttonScale = 1.0
                 }
-                // ❌ Do NOT set showError = true here
             }
         }
 
     }
     
-    // Bounce animation function
     private func startButtonBounce() {
-        // Start immediately without the 0.2s delay
         withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {
             buttonScale = 0.95
         }
         
-        // Then scale up to 1.1 with bounce
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
             withAnimation(.spring(response: 0.3, dampingFraction: 0.5)) {
                 buttonScale = 1.1
@@ -245,16 +228,12 @@ struct OnboardingLastStoreView: View {
         }
     }
     
-    // Error feedback with shake and haptic
     private func triggerError() {
-        // Haptic feedback
         let generator = UINotificationFeedbackGenerator()
         generator.notificationOccurred(.error)
         
-        // Show error state
         showError = true
         
-        // Visual shake animation
         let shakeSequence = [0, -8, 8, -6, 6, -4, 4, 0]
         for (index, offset) in shakeSequence.enumerated() {
             DispatchQueue.main.asyncAfter(deadline: .now() + Double(index) * 0.05) {
@@ -264,7 +243,6 @@ struct OnboardingLastStoreView: View {
             }
         }
         
-        // Hide error after 2 seconds
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
             withAnimation(.easeInOut(duration: 0.3)) {
                 showError = false
