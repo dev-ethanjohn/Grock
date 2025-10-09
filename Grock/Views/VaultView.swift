@@ -309,7 +309,7 @@ struct VaultView: View {
             //auto-scroll when selectedCategory changes
             .onChange(of: selectedCategory) { oldValue, newValue in
                 if let newCategory = newValue {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.95)) {
                         proxy.scrollTo(newCategory.id, anchor: .center)
                     }
                 }
@@ -318,7 +318,7 @@ struct VaultView: View {
             .onAppear {
                 if let initialCategory = selectedCategory ?? firstCategoryWithItems ?? GroceryCategory.allCases.first {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
                             proxy.scrollTo(initialCategory.id, anchor: .center)
                         }
                     }

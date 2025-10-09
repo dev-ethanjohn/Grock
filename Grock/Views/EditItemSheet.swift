@@ -1,11 +1,5 @@
-//
-//  EditItemSheet.swift
-//  Grock
-//
-//  Created by Ethan John Paguntalan on 10/9/25.
-//
-
 import SwiftUI
+import SwiftData
 
 struct EditItemSheet: View {
     let item: Item
@@ -15,92 +9,91 @@ struct EditItemSheet: View {
     @Environment(VaultService.self) private var vaultService
     @Environment(\.dismiss) private var dismiss
     
-    // Form state - initialize with default values first
+    // Form state
     @State private var itemName: String = ""
-    @State private var selectedCategory: GroceryCategory = .freshProduce
+    @State private var selectedCategory: GroceryCategory? = nil
     @State private var storeName: String = ""
     @State private var price: String = ""
     @State private var unit: String = "g"
     @State private var showUnitPicker = false
     
-    // Remove the custom initializer and use onAppear instead
-    init(item: Item, isPresented: Binding<Bool>, onSave: ((Item) -> Void)? = nil) {
-        self.item = item
-        self._isPresented = isPresented
-        self.onSave = onSave
+    @FocusState private var itemNameFieldIsFocused: Bool
+    
+    private var selectedCategoryEmoji: String {
+        selectedCategory?.emoji ?? "plus.circle.fill"
     }
     
     private var isFormValid: Bool {
         !itemName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        selectedCategory != nil &&
         !storeName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
         Double(price) != nil
     }
     
     var body: some View {
         NavigationView {
-            Form {
-                Section(header: Text("Item Details")) {
-                    TextField("Item Name", text: $itemName)
-                    
-                    Picker("Category", selection: $selectedCategory) {
-                        ForEach(GroceryCategory.allCases) { category in
-                            HStack {
-                                Text(category.emoji)
-                                Text(category.title)
-                            }
-                            .tag(category)
+            VStack {
+                ScrollView {
+                    VStack {
+                        Spacer()
+                            .frame(height: 20)
+                        
+                        // Item Name with Category
+                        ItemNameInput(
+                            itemName: $itemName,
+                            itemNameFieldIsFocused: $itemNameFieldIsFocused,
+                            selectedCategory: $selectedCategory,
+                            selectedCategoryEmoji: selectedCategoryEmoji
+                        )
+                        
+                        DashedLine()
+                            .stroke(style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
+                            .frame(height: 1)
+                            .foregroundColor(Color(hex: "ddd"))
+                            .padding(.vertical, 2)
+                            .padding(.horizontal)
+                        
+                        // Store
+                        StoreNameComponent(storeName: $storeName)
+                        
+                        // Unit and Price
+                        HStack(spacing: 8) {
+                            UnitButtonForEdit(unit: $unit, showUnitPicker: $showUnitPicker)
+                            PriceInputForEdit(price: $price)
                         }
+                        
+                        Spacer()
+                            .frame(height: 80)
                     }
+                    .padding()
                 }
                 
-                Section(header: Text("Pricing")) {
-                    TextField("Store", text: $storeName)
-                    
-                    HStack {
-                        Text("Price")
-                        TextField("0.00", text: $price)
-                            .keyboardType(.decimalPad)
-                            .multilineTextAlignment(.trailing)
-                    }
-                    
-                    Button(action: {
-                        showUnitPicker = true
-                    }) {
-                        HStack {
-                            Text("Unit")
-                            Spacer()
-                            Text(unit)
-                                .foregroundColor(.gray)
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 14))
-                                .foregroundColor(.gray)
-                        }
+                // Save Button
+                HStack {
+                    Spacer()
+                    SaveButton(isFormValid: isFormValid) {
+                        saveChanges()
                     }
                 }
+                .padding(.horizontal)
+                .padding(.bottom, 20)
             }
             .navigationTitle("Edit Item")
             .navigationBarTitleDisplayMode(.inline)
-            .onAppear {
-                // Initialize form values here, when environment is available
-                initializeFormValues()
-            }
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") {
                         isPresented = false
                     }
                 }
-                
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Save") {
-                        saveChanges()
-                    }
-                    .disabled(!isFormValid)
-                }
             }
         }
         .sheet(isPresented: $showUnitPicker) {
             UnitPickerView(selectedUnit: $unit)
+        }
+        .onAppear {
+            initializeFormValues()
+            itemNameFieldIsFocused = true
         }
     }
     
@@ -120,24 +113,9 @@ struct EditItemSheet: View {
         }
     }
     
-//    private func saveChanges() {
-//        guard let priceValue = Double(price) else { return }
-//        
-//        // Update the item in the vault
-//        vaultService.updateItem(
-//            item: item,
-//            newName: itemName.trimmingCharacters(in: .whitespacesAndNewlines),
-//            newCategory: selectedCategory,
-//            newStore: storeName.trimmingCharacters(in: .whitespacesAndNewlines),
-//            newPrice: priceValue,
-//            newUnit: unit
-//        )
-//        
-//        onSave?(item)
-//        isPresented = false
-//    }
     private func saveChanges() {
-        guard let priceValue = Double(price) else { return }
+        guard let priceValue = Double(price),
+              let selectedCategory = selectedCategory else { return }
         
         // Store the old category for comparison
         let oldCategoryName = vaultService.vault?.categories.first(where: { $0.items.contains(where: { $0.id == item.id }) })?.name
@@ -157,7 +135,6 @@ struct EditItemSheet: View {
         
         // Notify about category change if needed
         if oldCategoryName != selectedCategory.title {
-            // Send notification that category changed
             NotificationCenter.default.post(
                 name: NSNotification.Name("ItemCategoryChanged"),
                 object: nil,
@@ -166,6 +143,160 @@ struct EditItemSheet: View {
                     "itemId": item.id
                 ]
             )
+        }
+    }
+}
+
+// MARK: - Custom Components for Edit Sheet
+
+struct UnitButtonForEdit: View {
+    @Binding var unit: String
+    @Binding var showUnitPicker: Bool
+    
+    var body: some View {
+        Button(action: {
+            showUnitPicker = true
+        }) {
+            HStack {
+                Text("Unit")
+                    .font(.footnote)
+                    .foregroundColor(.gray)
+                Spacer()
+                Text(unit.isEmpty ? "Select" : unit)
+                    .font(.subheadline)
+                    .bold()
+                    .foregroundStyle(unit.isEmpty ? .gray : .black)
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 12))
+                    .foregroundColor(.gray)
+            }
+            .padding(12)
+            .background(Color(.systemGray6))
+            .cornerRadius(12)
+        }
+    }
+}
+
+struct PriceInputForEdit: View {
+    @Binding var price: String
+    @FocusState private var isFocused: Bool
+    
+    var body: some View {
+        HStack {
+            Text("Price/unit")
+                .font(.footnote)
+                .foregroundColor(.gray)
+            Spacer()
+            
+            HStack(spacing: 4) {
+                Text("₱")
+                    .font(.system(size: 16))
+                    .foregroundStyle(price.isEmpty ? .gray : .black)
+                
+                Text(price.isEmpty ? "0" : price)
+                    .foregroundStyle(price.isEmpty ? .gray : .black)
+                    .font(.subheadline)
+                    .bold()
+                    .multilineTextAlignment(.trailing)
+                    .overlay(
+                        TextField("0", text: $price)
+                            .multilineTextAlignment(.trailing)
+                            .keyboardType(.decimalPad)
+                            .fixedSize(horizontal: true, vertical: false)
+                            .autocorrectionDisabled(true)
+                            .textInputAutocapitalization(.never)
+                            .numbersOnly($price, includeDecimal: true)
+                            .font(.subheadline)
+                            .bold()
+                            .focused($isFocused)
+                            .opacity(isFocused ? 1 : 0)
+                    )
+            }
+        }
+        .padding(12)
+        .background(Color(.systemGray6))
+        .cornerRadius(12)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            isFocused = true
+        }
+    }
+}
+
+struct SaveButton: View {
+    let isFormValid: Bool
+    let action: () -> Void
+    
+    @State private var fillAnimation: CGFloat = 0.0
+    @State private var buttonScale: CGFloat = 1.0
+    
+    var body: some View {
+        Button(action: action) {
+            Text("Save")
+                .font(.fuzzyBold_16)
+                .foregroundStyle(.white)
+                .fontWeight(.semibold)
+                .padding(.vertical, 4)
+                .padding(.horizontal, 24)
+                .background(
+                    Capsule()
+                        .fill(
+                            isFormValid
+                            ? RadialGradient(
+                                colors: [Color.black, Color.gray.opacity(0.3)],
+                                center: .center,
+                                startRadius: 0,
+                                endRadius: fillAnimation * 80
+                            )
+                            : RadialGradient(
+                                colors: [Color.gray.opacity(0.3), Color.gray.opacity(0.3)],
+                                center: .center,
+                                startRadius: 0,
+                                endRadius: 0
+                            )
+                        )
+                )
+                .scaleEffect(buttonScale)
+        }
+        .disabled(!isFormValid)
+        .onChange(of: isFormValid) { oldValue, newValue in
+            if newValue {
+                if !oldValue {
+                    withAnimation(.spring(duration: 0.4)) {
+                        fillAnimation = 1.0
+                    }
+                    startButtonBounce()
+                }
+            } else {
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    fillAnimation = 0.0
+                    buttonScale = 1.0
+                }
+            }
+        }
+        .onAppear {
+            if isFormValid {
+                fillAnimation = 1.0
+                buttonScale = 1.0
+            }
+        }
+    }
+    
+    private func startButtonBounce() {
+        withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {
+            buttonScale = 0.95
+        }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.5)) {
+                buttonScale = 1.1
+            }
+        }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                buttonScale = 1.0
+            }
         }
     }
 }

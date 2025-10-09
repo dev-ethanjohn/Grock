@@ -73,7 +73,7 @@ struct AddItemPopover: View {
                         .padding(.vertical, 2)
                         .padding(.horizontal)
                     
-                    StoreNameDisplayForVault(storeName: $storeName)
+                    StoreNameComponent(storeName: $storeName)
                     
                     HStack(spacing: 12) {
                         UnitButton(unit: $unit)
@@ -86,6 +86,15 @@ struct AddItemPopover: View {
                        let category = selectedCategory,
                        let priceValue = itemPrice {
                         onSave?(itemName, category, storeName, unit, priceValue)
+                        
+                        NotificationCenter.default.post(
+                            name: NSNotification.Name("ItemCategoryChanged"),
+                            object: nil,
+                            userInfo: [
+                                "newCategory": category
+                            ]
+                        )
+                        
                         dismissPopover()
                     }
                 }) {
@@ -127,6 +136,5 @@ struct AddItemPopover: View {
         itemNameFieldIsFocused = false
         isPresented = false
         onDismiss?()
-        
     }
 }

@@ -303,7 +303,7 @@ struct FormContent: View {
                 .padding(.vertical, 2)
                 .padding(.horizontal)
             
-            StoreNameDisplay(storeName: $viewModel.storeName)
+            StoreNameComponent(storeName: $viewModel.storeName)
             
             PortionAndUnitInput(
                 portion: $viewModel.portion,
@@ -484,9 +484,18 @@ struct CategoryButton: View {
     }
 }
 
-struct StoreNameDisplay: View {
+// Unified StoreNameComponent that works everywhere
+// Unified StoreNameComponent that works everywhere
+struct StoreNameComponent: View {
     @Binding var storeName: String
+    @Environment(VaultService.self) private var vaultService
     @FocusState private var isFocused: Bool
+    @State private var showAddStoreSheet = false
+    @State private var newStoreName = ""
+    
+    private var availableStores: [String] {
+        vaultService.getAllStores()
+    }
     
     var body: some View {
         HStack {
@@ -495,27 +504,72 @@ struct StoreNameDisplay: View {
                 .foregroundColor(.gray)
             Spacer()
             
-            Text(storeName.isEmpty ? "Enter store name" : storeName)
-                .font(.subheadline)
-                .bold()
-                .foregroundColor(storeName.isEmpty ? .gray : .primary)
-                .multilineTextAlignment(.trailing)
-                .overlay(
-                    TextField("Enter store name", text: $storeName)
-                        .font(.subheadline)
-                        .bold()
-                        .foregroundColor(.black)
-                        .multilineTextAlignment(.trailing)
-                        .focused($isFocused)
-                        .opacity(isFocused ? 1 : 0)
-                )
+            if availableStores.isEmpty {
+                // Text field when no stores exist
+                TextField("Enter store name", text: $storeName)
+                    .font(.subheadline)
+                    .bold()
+                    .foregroundColor(.black)
+                    .multilineTextAlignment(.trailing)
+                    .focused($isFocused)
+            } else {
+                // Dropdown when stores exist
+                Menu {
+                    // Add New Store option - NOW PRESENTS SHEET
+                    Button(action: {
+                        newStoreName = ""
+                        showAddStoreSheet = true
+                    }) {
+                        Label("Add New Store", systemImage: "plus.circle.fill")
+                    }
+                    
+                    Divider()
+                    
+                    // Existing stores
+                    ForEach(availableStores, id: \.self) { store in
+                        Button(action: {
+                            storeName = store
+                        }) {
+                            HStack {
+                                Text(store)
+                                if storeName == store {
+                                    Image(systemName: "checkmark")
+                                        .foregroundColor(.blue)
+                                }
+                            }
+                        }
+                    }
+                } label: {
+                    HStack {
+                        Text(storeName.isEmpty ? "Select Store" : storeName)
+                            .font(.subheadline)
+                            .bold()
+                            .foregroundStyle(storeName.isEmpty ? .gray : .black)
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 12))
+                            .foregroundColor(.gray)
+                    }
+                }
+            }
         }
         .padding(12)
         .background(Color(.systemGray6))
         .cornerRadius(12)
-        .contentShape(Rectangle())
-        .onTapGesture {
-            isFocused = true
+        .sheet(isPresented: $showAddStoreSheet) {
+            AddStoreSheet(
+                storeName: $newStoreName,
+                isPresented: $showAddStoreSheet,
+                onSave: { newStore in
+                    storeName = newStore
+                    showAddStoreSheet = false
+                }
+            )
+        }
+        .onAppear {
+            // Auto-select first store if available and current is empty
+            if storeName.isEmpty, let firstStore = availableStores.first {
+                storeName = firstStore
+            }
         }
     }
 }
