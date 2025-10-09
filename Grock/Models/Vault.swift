@@ -22,16 +22,32 @@ class User {
     }
 }
 
+
+
 @Model
 class Vault {
     @Attribute(.unique) var uid: String
     var categories: [Category] = []
     var carts: [Cart] = []
+    var stores: [Store] = []
     
     init(uid: String = UUID().uuidString) {
         self.uid = uid
     }
 }
+
+@Model
+class Store {
+    var name: String
+    var createdAt: Date
+    
+    init(name: String) {
+        self.name = name
+        self.createdAt = Date()
+    }
+}
+
+
 @Model
 class Category {
     var uid: String

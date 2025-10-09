@@ -223,6 +223,7 @@ struct VaultItemRow: View {
                    }
                )
                .environment(vaultService)
+               .presentationDetents([.medium, .fraction(0.75)])
            }
            .contextMenu {
                Button(role: .destructive) {

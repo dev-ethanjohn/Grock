@@ -211,7 +211,7 @@ struct OnboardingFirstItemView: View {
                         if let category = selectedCategory {
                             viewModel.categoryName = category.title
                         }
-
+                        
                         UserDefaults.standard.hasCompletedOnboarding = true
                         onFinish()
                     }
@@ -484,8 +484,7 @@ struct CategoryButton: View {
     }
 }
 
-// Unified StoreNameComponent that works everywhere
-// Unified StoreNameComponent that works everywhere
+
 struct StoreNameComponent: View {
     @Binding var storeName: String
     @Environment(VaultService.self) private var vaultService
@@ -515,7 +514,7 @@ struct StoreNameComponent: View {
             } else {
                 // Dropdown when stores exist
                 Menu {
-                    // Add New Store option - NOW PRESENTS SHEET
+                    // Add New Store option
                     Button(action: {
                         newStoreName = ""
                         showAddStoreSheet = true
@@ -560,13 +559,17 @@ struct StoreNameComponent: View {
                 storeName: $newStoreName,
                 isPresented: $showAddStoreSheet,
                 onSave: { newStore in
+                    
+                    vaultService.addStore(newStore)
+                    
+                    
                     storeName = newStore
                     showAddStoreSheet = false
-                }
-            )
+                    
+                    print("➕ New store added and persisted: \(newStore)")
+                }            )
         }
         .onAppear {
-            // Auto-select first store if available and current is empty
             if storeName.isEmpty, let firstStore = availableStores.first {
                 storeName = firstStore
             }
@@ -714,7 +717,7 @@ struct PriceInput: View {
                 Text("₱")
                     .font(.system(size: 16))
                     .foregroundStyle(priceString.isEmpty ? .gray : .black)
-
+                
                 Text(priceString.isEmpty ? "0" : priceString)
                     .foregroundStyle(priceString.isEmpty ? .gray : .black)
                     .font(.subheadline)
@@ -1015,20 +1018,17 @@ struct StoreNameDisplayForVault: View {
     
     var body: some View {
         Menu {
-            // Add New Store option
             Button(action: {
                 newStoreName = ""
                 showAddStoreSheet = true
             }) {
                 Label("Add New Store", systemImage: "plus.circle.fill")
             }
-            
-            // Only show divider if there are existing stores
+
             if !availableStores.isEmpty {
                 Divider()
             }
             
-            // Existing stores
             ForEach(availableStores, id: \.self) { store in
                 Button(action: {
                     storeName = store
@@ -1071,13 +1071,11 @@ struct StoreNameDisplayForVault: View {
             )
         }
         .onAppear {
-            // Automatically select the first available store if storeName is empty
             if storeName.isEmpty, let firstStore = availableStores.first {
                 storeName = firstStore
             }
         }
         .onChange(of: availableStores) { oldStores, newStores in
-            // If storeName becomes empty (maybe due to data changes) and we have stores, auto-select first one
             if storeName.isEmpty, let firstStore = newStores.first {
                 storeName = firstStore
             }
@@ -1085,7 +1083,6 @@ struct StoreNameDisplayForVault: View {
     }
 }
 
-// Add this to your OnboardingFirstItemView.swift file, at the end before the #Preview
 
 // MARK: - AddStoreSheet (for Vault version)
 struct AddStoreSheet: View {

@@ -93,7 +93,6 @@ struct EditItemSheet: View {
         }
         .onAppear {
             initializeFormValues()
-            itemNameFieldIsFocused = true
         }
     }
     

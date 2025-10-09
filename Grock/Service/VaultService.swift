@@ -110,6 +110,18 @@ class VaultService {
             category.sortOrder = index
             vault.categories.append(category)
         }
+        
+    //MARK: FOR LATER if needed
+//        // Add default stores
+//        let defaultStores = ["SM Supermarket", "Puregold", "Robinsons", "Metro Market"]
+//        for storeName in defaultStores {
+//            if !vault.stores.contains(where: { $0.name == storeName }) {
+//                let store = Store(name: storeName)
+//                vault.stores.append(store)
+//            }
+//        }
+        
+        vault.stores.sort { $0.name < $1.name }
     }
     
     // MARK: - User Operations
@@ -174,16 +186,39 @@ class VaultService {
     }
     
     // MARK: - Store Operations
+    func addStore(_ storeName: String) {
+        guard let vault = vault else { return }
+        
+        let trimmedStore = storeName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedStore.isEmpty else { return }
+        
+        // Check if store already exists
+        if !vault.stores.contains(where: { $0.name == trimmedStore }) {
+            let newStore = Store(name: trimmedStore)
+            vault.stores.append(newStore)
+            
+            // Sort stores by name
+            vault.stores.sort { $0.name < $1.name }
+            saveContext()
+            print("➕ Added new store to vault: \(trimmedStore)")
+        }
+    }
+    
     func getAllStores() -> [String] {
         guard let vault = vault else { return [] }
         
-        let allStores = vault.categories.flatMap { category in
+        // Get stores from Store objects
+        let vaultStores = vault.stores.map { $0.name }
+        
+        // Combine with stores from existing items
+        let itemStores = vault.categories.flatMap { category in
             category.items.flatMap { item in
                 item.priceOptions.map { $0.store }
             }
         }
         
-        return Array(Set(allStores)).sorted()
+        let allStores = Array(Set(itemStores + vaultStores)).sorted()
+        return allStores
     }
     
     // MARK: - Cart Operations
@@ -230,15 +265,12 @@ class VaultService {
             item.priceOptions = [newPriceOption]
         }
         
-        // 3. Move to new category if changed
         let currentCategory = vault.categories.first { $0.items.contains(where: { $0.id == item.id }) }
         let targetCategory = getCategory(newCategory) ?? Category(name: newCategory.title)
         
         if currentCategory?.name != targetCategory.name {
-            // Remove from current category
             currentCategory?.items.removeAll { $0.id == item.id }
             
-            // Add to new category (create if needed)
             if !vault.categories.contains(where: { $0.name == targetCategory.name }) {
                 vault.categories.append(targetCategory)
             }
