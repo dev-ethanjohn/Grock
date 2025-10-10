@@ -58,7 +58,7 @@ struct EditItemSheet: View {
                         
                         // Unit and Price
                         HStack(spacing: 8) {
-                            UnitButtonForEdit(unit: $unit, showUnitPicker: $showUnitPicker)
+                            UnitButton(unit: $unit)
                             PriceInputForEdit(price: $price)
                         }
                         
@@ -88,9 +88,6 @@ struct EditItemSheet: View {
                 }
             }
         }
-        .sheet(isPresented: $showUnitPicker) {
-            UnitPickerView(selectedUnit: $unit)
-        }
         .onAppear {
             initializeFormValues()
         }
@@ -102,7 +99,7 @@ struct EditItemSheet: View {
         // Set initial values
         itemName = item.name
         storeName = priceOption?.store ?? ""
-        price = String(format: "%.2f", priceOption?.pricePerUnit.priceValue ?? 0)
+        price = String(priceOption?.pricePerUnit.priceValue ?? 0) 
         unit = priceOption?.pricePerUnit.unit ?? "g"
         
         // Find the current category
@@ -204,7 +201,7 @@ struct PriceInputForEdit: View {
                             .fixedSize(horizontal: true, vertical: false)
                             .autocorrectionDisabled(true)
                             .textInputAutocapitalization(.never)
-                            .numbersOnly($price, includeDecimal: true)
+                            .numbersOnly($price, includeDecimal: true, maxDigits: 5)
                             .font(.subheadline)
                             .bold()
                             .focused($isFocused)

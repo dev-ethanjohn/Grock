@@ -9,7 +9,10 @@ struct VaultView: View {
     @State private var selectedCategory: GroceryCategory?
     @State private var toolbarAppeared = false
     @State private var showAddItemPopover = false
+    
     @State private var createCartButtonVisible = true
+    @State private var cartBadgeVisible = false
+    
     @State private var scrollProxy: ScrollViewProxy?
     
     var onCreateCart: (() -> Void)?
@@ -42,25 +45,57 @@ struct VaultView: View {
             }
             
             if vaultService.vault != nil {
-                Button(action: {
-                    onCreateCart?()
-                }) {
-                    Text("Create cart")
-                        .font(.fuzzyBold_16)
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 24)
-                        .padding(.vertical, 12)
-                        .background(Color.black)
-                        .cornerRadius(25)
+                ZStack(alignment: .topLeading) {
+                    Button(action: {
+                        onCreateCart?()
+                    }) {
+                        Text("Create cart")
+                            .font(.fuzzyBold_16)
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 24)
+                            .padding(.vertical, 12)
+                            .background(Color.black)
+                            .cornerRadius(25)
+                    }
+                    .padding(.bottom, 20)
+                    .scaleEffect(createCartButtonVisible ? 1 : 0)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.8, blendDuration: 0), value: createCartButtonVisible)
+                    .opacity(createCartButtonVisible ? 1 : 0)
+                    .opacity(hasActiveItems ? 1 : 0.5)
+                    .disabled(!hasActiveItems)
+                    
+                    if hasActiveItems {
+                        Text("\(cartViewModel.activeCartItems.count)")
+                            .font(.fuzzyBold_16)
+                            .contentTransition(.numericText())
+                            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: cartViewModel.activeCartItems.count)
+                            .foregroundColor(.black)
+                            .frame(width: 25, height: 25)
+                            .background(Color.white)
+                            .clipShape(Circle())
+                            .overlay(
+                                Circle()
+                                    .stroke(Color.black, lineWidth: 2)
+                            )
+                            .offset(x: -8, y: -4)
+                            .scaleEffect(cartBadgeVisible ? 1 : 0)
+                            // Use different animations for scale-in (with delay) and scale-out (immediate)
+                            .animation(
+                                cartBadgeVisible ?
+                                    .spring(response: 0.3, dampingFraction: 0.5, blendDuration: 0).delay(0.35) :
+                                    .spring(response: 0.3, dampingFraction: 0.8, blendDuration: 0), // No delay for scale-out
+                                value: cartBadgeVisible
+                            )
+                    }
                 }
-                .padding(.bottom, 20)
-                .scaleEffect(createCartButtonVisible ? 1 : 0)
-                .animation(.spring(response: 0.3, dampingFraction: 0.8, blendDuration: 0), value: createCartButtonVisible)
-                .opacity(createCartButtonVisible ? 1 : 0)
-                .opacity(hasActiveItems ? 1 : 0.5)
-                .disabled(!hasActiveItems)
+                .onChange(of: createCartButtonVisible) { oldValue, newValue in
+                    // Both scale-out and scale-in happen immediately for the state
+                    // The delay is handled in the animation modifier above
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        cartBadgeVisible = newValue
+                    }
+                }
             }
-
             if showAddItemPopover {
                 AddItemPopover(
                     isPresented: $showAddItemPopover,
@@ -74,9 +109,7 @@ struct VaultView: View {
                         )
                     },
                     onDismiss: {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
                             showCreateCartButton()
-                        }
                     }
                 )
                 .transition(.opacity)
@@ -462,9 +495,27 @@ struct VaultView: View {
         return activeItemsCount
     }
     
-    private func hasItems(in category: GroceryCategory) -> Bool {
-        getItemCount(for: category) > 0
+    // NEW METHOD: Count all items in category (regardless of cart status)
+    private func getTotalItemCount(for category: GroceryCategory) -> Int {
+        guard let vault = vaultService.vault else { return 0 }
+        guard let foundCategory = vault.categories.first(where: { $0.name == category.title }) else { return 0 }
+        
+        return foundCategory.items.count
     }
+
+    private func hasItems(in category: GroceryCategory) -> Bool {
+        // Choose which count to use:
+        
+        // Option 1: Use active items only (current behavior)
+        // return getItemCount(for: category) > 0
+        
+        // Option 2: Use total items (recommended for opacity)
+        return getTotalItemCount(for: category) > 0
+    }
+
+//    private func hasItems(in category: GroceryCategory) -> Bool {
+//        getItemCount(for: category) > 0
+//    }
     
     private func deleteItem(_ item: Item) {
         print("🗑️ Deleting item: '\(item.name)'")

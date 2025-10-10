@@ -925,60 +925,54 @@ struct UnitPickerView: View {
 
 import Combine
 
-struct NumbersOnlyViewModifier: ViewModifier {
-    @Binding var text: String
-    var includeDecimal: Bool
-    
-    func body(content: Content) -> some View {
-        content
+extension View {
+    func numbersOnly(_ text: Binding<String>, includeDecimal: Bool, maxDigits: Int = 5) -> some View {
+        self
             .keyboardType(includeDecimal ? .decimalPad : .numberPad)
             .autocorrectionDisabled(true)
             .textInputAutocapitalization(.never)
-            .onReceive(Just(text)) { newValue in
-                var numbers = "0123456789"
-                let decimalSeparator: String = Locale.current.decimalSeparator ?? "."
+            .onChange(of: text.wrappedValue) { oldValue, newValue in
+                var filtered = newValue.filter { "0123456789".contains($0) }
                 
                 if includeDecimal {
-                    numbers += decimalSeparator
-                }
-                
-                // Check for multiple decimal separators
-                if newValue.components(separatedBy: decimalSeparator).count - 1 > 1 {
-                    // Remove the last character if multiple decimal separators
-                    let filtered = newValue
-                    self.text = String(filtered.dropLast())
-                }
-                // Check decimal places limit
-                else if let decimalIndex = newValue.firstIndex(of: Character(decimalSeparator)) {
-                    let decimalPart = newValue[decimalIndex...].dropFirst()
-                    if decimalPart.count > 2 {
-                        // Remove last character if more than 2 decimal places
-                        let filtered = newValue
-                        self.text = String(filtered.dropLast())
-                    } else {
-                        // Filter out non-numeric characters
-                        let filtered = newValue.filter { numbers.contains($0) }
-                        if filtered != newValue {
-                            self.text = filtered
-                        }
+                    // Allow decimal point - use unique variable name
+                    let initialComponents = newValue.components(separatedBy: ".")
+                    if initialComponents.count > 1 {
+                        filtered = initialComponents[0] + "." + initialComponents[1...].joined()
+                    }
+                    
+                    // Ensure only one decimal point exists
+                    let decimalCount = newValue.components(separatedBy: ".").count - 1
+                    if decimalCount > 1 {
+                        let parts = newValue.split(separator: ".")
+                        filtered = String(parts[0]) + "." + parts.dropFirst().joined()
+                    }
+                    
+                    // Apply 5-digit limit to integer part - use unique variable name
+                    let filteredComponents = filtered.components(separatedBy: ".")
+                    if filteredComponents[0].count > maxDigits {
+                        let limitedInteger = String(filteredComponents[0].prefix(maxDigits))
+                        filtered = filteredComponents.count > 1 ? limitedInteger + "." + filteredComponents[1] : limitedInteger
+                    }
+                    
+                    // Apply 2-digit limit to decimal part
+                    if filteredComponents.count > 1 && filteredComponents[1].count > 2 {
+                        let limitedDecimal = String(filteredComponents[1].prefix(2))
+                        filtered = filteredComponents[0] + "." + limitedDecimal
                     }
                 } else {
-                    // Filter out non-numeric characters
-                    let filtered = newValue.filter { numbers.contains($0) }
-                    if filtered != newValue {
-                        self.text = filtered
+                    // No decimals allowed - just limit digits
+                    if filtered.count > maxDigits {
+                        filtered = String(filtered.prefix(maxDigits))
                     }
+                }
+                
+                if filtered != newValue {
+                    text.wrappedValue = filtered
                 }
             }
     }
 }
-
-extension View {
-    func numbersOnly(_ text: Binding<String>, includeDecimal: Bool = false) -> some View {
-        self.modifier(NumbersOnlyViewModifier(text: text, includeDecimal: includeDecimal))
-    }
-}
-
 
 struct DashedLine: Shape {
     func path(in rect: CGRect) -> Path {

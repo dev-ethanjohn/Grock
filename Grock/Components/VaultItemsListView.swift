@@ -21,7 +21,8 @@ struct VaultItemsListView: View {
             }
         }
         .listStyle(PlainListStyle())
-        .listSectionSpacing(0)
+        .listSectionSpacing(16)
+        
     }
     private func itemsForStore(_ store: String) -> [Item] {
         items.filter { item in
@@ -43,14 +44,13 @@ struct StoreSection: View {
                     Text(storeName)
                         .font(.fuzzyBold_11)
                         .foregroundStyle(.white)
-                        .padding(.horizontal, 6)
+                        .padding(.horizontal, 8)
                         .padding(.vertical, 3)
                         .background(category?.pastelColor.saturated(by: 0.3).darker(by: 0.5) ?? Color.primary)
                         .clipShape(RoundedRectangle(cornerRadius: 6))
                     Spacer()
                 }
                 .padding(.leading)
-                .padding(.bottom, 4)
                 .listRowInsets(EdgeInsets())
             
         ) {

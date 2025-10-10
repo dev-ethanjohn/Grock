@@ -53,9 +53,9 @@ struct VaultItemRow: View {
                
                HStack(alignment: .top, spacing: 4) {
                    Circle()
-                       .fill(isActive ? (category?.pastelColor.saturated(by: 1).darker(by: 0.2) ?? Color.primary) : .clear)
-                       .frame(width: 8, height: 8)
-                       .padding(.top, 10)
+                       .fill(isActive ? (category?.pastelColor.saturated(by: 0.3).darker(by: 0.5) ?? Color.primary) : .clear)
+                       .frame(width: 9, height: 9)
+                       .padding(.top, 8)
                        .scaleEffect(isActive ? 1 : 0)
                        .animation(.spring(response: 0.3, dampingFraction: 0.5), value: isActive)
                    
@@ -67,9 +67,9 @@ struct VaultItemRow: View {
                            .foregroundStyle(Color(hex: "CCCCCC"))
                        
                        if let priceOption = item.priceOptions.first {
-                           HStack(spacing: 4) {
-                               Text("₱\(priceOption.pricePerUnit.priceValue, specifier: "%.2f")")
-                               Text("/ \(priceOption.pricePerUnit.unit)")
+                           HStack(spacing: 0) {
+                               Text("₱\(priceOption.pricePerUnit.priceValue, specifier: "%g")")
+                               Text("/\(priceOption.pricePerUnit.unit)")
                                    .font(.lexendMedium_12)
                                Spacer()
                            }
@@ -89,7 +89,7 @@ struct VaultItemRow: View {
                                .font(.footnote).bold()
                                .foregroundColor(Color(hex: "1E2A36"))
                                .frame(width: 24, height: 24)
-                               .background(Color(hex: "F2F2F2"))
+                               .background(.white)
                                .clipShape(Circle())
                        }
                        .buttonStyle(.plain)
@@ -166,23 +166,23 @@ struct VaultItemRow: View {
                                .foregroundColor(isActive ? Color(hex: "1E2A36") : Color(hex: "888888"))
                        }
                        .frame(width: 24, height: 24)
-                       .background(isActive ? Color(hex: "F2F2F2") : .clear)
+                       .background(.white)
                        .clipShape(Circle())
                        .contentShape(Circle())
                        .buttonStyle(.plain)
                    }
                    .animation(.spring(response: 0.2, dampingFraction: 0.7), value: isActive)
+                   .padding(.top, 6)
                }
                .padding(.bottom, 4)
                .padding(.horizontal)
-               .padding(.vertical, 12)
+               .padding(.vertical, 8)
                .background(.white)
                .animation(.spring(response: 0.4, dampingFraction: 0.7), value: isActive)
                .offset(x: offset)
                .gesture(
                    DragGesture()
                        .onChanged { value in
-                           // Only allow left swiping (negative translation)
                            if value.translation.width < 0 {
                                offset = value.translation.width
                            }
@@ -190,11 +190,9 @@ struct VaultItemRow: View {
                        .onEnded { value in
                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                                if value.translation.width < -100 {
-                                   // Swiped enough to reveal delete button
                                    offset = -80
                                    isSwiped = true
                                } else {
-                                   // Not enough swipe, reset
                                    offset = 0
                                    isSwiped = false
                                }
