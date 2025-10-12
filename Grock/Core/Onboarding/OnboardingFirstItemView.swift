@@ -603,7 +603,7 @@ struct PortionInput: View {
             Spacer()
             TextField("0", text: $portionString)
                 .multilineTextAlignment(.trailing)
-                .numbersOnly($portionString, includeDecimal: true)
+                .numbersOnly($portionString, includeDecimal: true, maxDigits: 5)
                 .font(.subheadline)
                 .bold()
                 .fixedSize(horizontal: true, vertical: false)
@@ -730,7 +730,7 @@ struct PriceInput: View {
                             .fixedSize(horizontal: true, vertical: false)
                             .autocorrectionDisabled(true)
                             .textInputAutocapitalization(.never)
-                            .numbersOnly($priceString, includeDecimal: true)
+                            .numbersOnly($priceString, includeDecimal: true, maxDigits: 5)
                             .font(.subheadline)
                             .bold()
                             .focused($isFocused)
@@ -926,7 +926,7 @@ struct UnitPickerView: View {
 import Combine
 
 extension View {
-    func numbersOnly(_ text: Binding<String>, includeDecimal: Bool, maxDigits: Int = 5) -> some View {
+    func numbersOnly(_ text: Binding<String>, includeDecimal: Bool, maxDigits: Int) -> some View {
         self
             .keyboardType(includeDecimal ? .decimalPad : .numberPad)
             .autocorrectionDisabled(true)
@@ -948,7 +948,7 @@ extension View {
                         filtered = String(parts[0]) + "." + parts.dropFirst().joined()
                     }
                     
-                    // Apply 5-digit limit to integer part - use unique variable name
+                    // Apply digit limit to integer part - use unique variable name
                     let filteredComponents = filtered.components(separatedBy: ".")
                     if filteredComponents[0].count > maxDigits {
                         let limitedInteger = String(filteredComponents[0].prefix(maxDigits))

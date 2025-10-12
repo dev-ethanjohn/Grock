@@ -14,6 +14,7 @@ struct VaultView: View {
     @State private var cartBadgeVisible = false
     
     @State private var scrollProxy: ScrollViewProxy?
+    @State private var showCartConfirmationPopover = false
     
     var onCreateCart: (() -> Void)?
     
@@ -47,7 +48,9 @@ struct VaultView: View {
             if vaultService.vault != nil {
                 ZStack(alignment: .topLeading) {
                     Button(action: {
-                        onCreateCart?()
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            showCartConfirmationPopover = true
+                        }
                     }) {
                         Text("Create cart")
                             .font(.fuzzyBold_16)
@@ -79,23 +82,21 @@ struct VaultView: View {
                             )
                             .offset(x: -8, y: -4)
                             .scaleEffect(cartBadgeVisible ? 1 : 0)
-                            // Use different animations for scale-in (with delay) and scale-out (immediate)
                             .animation(
                                 cartBadgeVisible ?
                                     .spring(response: 0.3, dampingFraction: 0.5, blendDuration: 0).delay(0.35) :
-                                    .spring(response: 0.3, dampingFraction: 0.8, blendDuration: 0), // No delay for scale-out
+                                    .spring(response: 0.3, dampingFraction: 0.8, blendDuration: 0),
                                 value: cartBadgeVisible
                             )
                     }
                 }
                 .onChange(of: createCartButtonVisible) { oldValue, newValue in
-                    // Both scale-out and scale-in happen immediately for the state
-                    // The delay is handled in the animation modifier above
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                         cartBadgeVisible = newValue
                     }
                 }
             }
+            
             if showAddItemPopover {
                 AddItemPopover(
                     isPresented: $showAddItemPopover,
@@ -109,7 +110,7 @@ struct VaultView: View {
                         )
                     },
                     onDismiss: {
-                            showCreateCartButton()
+                        showCreateCartButton()
                     }
                 )
                 .transition(.opacity)
@@ -118,46 +119,83 @@ struct VaultView: View {
                     createCartButtonVisible = false
                 }
             }
+            
+            if showCartConfirmationPopover {
+                Color.black.opacity(0.4)
+                    .ignoresSafeArea()
+                    .transition(.opacity)
+                    .zIndex(2)
+                    .onTapGesture {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            showCartConfirmationPopover = false
+                        }
+                    }
+                
+                CartConfirmationPopover(
+                    isPresented: $showCartConfirmationPopover,
+                    activeCartItems: cartViewModel.activeCartItems,
+                    vaultService: vaultService,
+                    onConfirm: { title, budget in
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            showCartConfirmationPopover = false
+                        }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            // Pass the title and budget to your cart creation logic
+                            print("Creating cart with title: '\(title)' and budget: ₱\(budget)")
+                            onCreateCart?()
+                        }
+                    },
+                    onCancel: {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            showCartConfirmationPopover = false
+                        }
+                    }
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                .transition(.opacity)
+                .zIndex(3)
+                .onAppear {
+                    createCartButtonVisible = false
+                }
+                .onDisappear {
+                    showCreateCartButton()
+                }
+            }
         }
         .ignoresSafeArea(.keyboard)
         .toolbar(.hidden)
         .onAppear {
-                 printVaultStructure()
-                 
-                 // Set initial category if needed
-                 if selectedCategory == nil {
-                     selectedCategory = firstCategoryWithItems ?? GroceryCategory.allCases.first
-                 }
-                 
-                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                     toolbarAppeared = true
-                 }
-                 
-                 //Add notification observer for category changes
-                 NotificationCenter.default.addObserver(
-                     forName: NSNotification.Name("ItemCategoryChanged"),
-                     object: nil,
-                     queue: .main
-                 ) { notification in
-                     if let newCategory = notification.userInfo?["newCategory"] as? GroceryCategory {
-                         withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                             selectedCategory = newCategory
-                         }
-                         print("🔄 Auto-switched to category: \(newCategory.title)")
-                     }
-                 }
-             }
-             .onDisappear {
-                 //Clean up observer
-                 NotificationCenter.default.removeObserver(self)
-             }
-        .onChange(of: vaultService.vault) { oldValue, newValue in
-            //update selected category when vault loads
+            printVaultStructure()
+            
             if selectedCategory == nil {
                 selectedCategory = firstCategoryWithItems ?? GroceryCategory.allCases.first
             }
             
-            //print when vault changes (like after adding an item)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                toolbarAppeared = true
+            }
+            
+            NotificationCenter.default.addObserver(
+                forName: NSNotification.Name("ItemCategoryChanged"),
+                object: nil,
+                queue: .main
+            ) { notification in
+                if let newCategory = notification.userInfo?["newCategory"] as? GroceryCategory {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                        selectedCategory = newCategory
+                    }
+                    print("🔄 Auto-switched to category: \(newCategory.title)")
+                }
+            }
+        }
+        .onDisappear {
+            NotificationCenter.default.removeObserver(self)
+        }
+        .onChange(of: vaultService.vault) { oldValue, newValue in
+            if selectedCategory == nil {
+                selectedCategory = firstCategoryWithItems ?? GroceryCategory.allCases.first
+            }
+            
             if newValue != oldValue {
                 print("🔄 Vault changed - reprinting structure:")
                 printVaultStructure()
@@ -165,7 +203,6 @@ struct VaultView: View {
         }
         .onChange(of: showAddItemPopover) { oldValue, newValue in
             if !newValue {
-                //closed add item popover, print updated structure
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                     print("📝 After adding item - updated vault structure:")
                     printVaultStructure()
@@ -339,7 +376,6 @@ struct VaultView: View {
                 }
                 .padding(.horizontal)
             }
-            //auto-scroll when selectedCategory changes
             .onChange(of: selectedCategory) { oldValue, newValue in
                 if let newCategory = newValue {
                     withAnimation(.spring(response: 0.4, dampingFraction: 0.95)) {
@@ -347,7 +383,6 @@ struct VaultView: View {
                     }
                 }
             }
-            //scroll to initial category on appear
             .onAppear {
                 if let initialCategory = selectedCategory ?? firstCategoryWithItems ?? GroceryCategory.allCases.first {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
@@ -422,7 +457,6 @@ struct VaultView: View {
                 }
             }
             .onAppear {
-                // Debug print when category view appears
                 print("📱 CategoryItemsView appeared for: '\(category.title)'")
                 print("   Items count: \(categoryItems.count)")
                 print("   Available stores: \(availableStores)")
@@ -452,7 +486,6 @@ struct VaultView: View {
             }
         }
         
-        // Debug print when category is selected
         print("🎯 Selected category: '\(category.title)'")
         if let vault = vaultService.vault,
            let foundCategory = vault.categories.first(where: { $0.name == category.title }) {
@@ -471,10 +504,8 @@ struct VaultView: View {
     private var firstCategoryWithItems: GroceryCategory? {
         guard let vault = vaultService.vault else { return nil }
         
-        // Find the first category that has items
         for category in vault.categories {
             if !category.items.isEmpty {
-                // Convert category name to GroceryCategory
                 return GroceryCategory.allCases.first { $0.title == category.name }
             }
         }
@@ -486,7 +517,6 @@ struct VaultView: View {
         guard let vault = vaultService.vault else { return 0 }
         guard let foundCategory = vault.categories.first(where: { $0.name == category.title }) else { return 0 }
         
-        // Count only active items (items that are in the current cart)
         let activeItemsCount = foundCategory.items.reduce(0) { count, item in
             let isActive = (cartViewModel.activeCartItems[item.id] ?? 0) > 0
             return count + (isActive ? 1 : 0)
@@ -495,7 +525,6 @@ struct VaultView: View {
         return activeItemsCount
     }
     
-    // NEW METHOD: Count all items in category (regardless of cart status)
     private func getTotalItemCount(for category: GroceryCategory) -> Int {
         guard let vault = vaultService.vault else { return 0 }
         guard let foundCategory = vault.categories.first(where: { $0.name == category.title }) else { return 0 }
@@ -504,27 +533,159 @@ struct VaultView: View {
     }
 
     private func hasItems(in category: GroceryCategory) -> Bool {
-        // Choose which count to use:
-        
-        // Option 1: Use active items only (current behavior)
-        // return getItemCount(for: category) > 0
-        
-        // Option 2: Use total items (recommended for opacity)
         return getTotalItemCount(for: category) > 0
     }
-
-//    private func hasItems(in category: GroceryCategory) -> Bool {
-//        getItemCount(for: category) > 0
-//    }
     
     private func deleteItem(_ item: Item) {
         print("🗑️ Deleting item: '\(item.name)'")
         vaultService.deleteItem(item)
         
-        // Print updated structure after deletion
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             print("🔄 After deletion - updated vault structure:")
             printVaultStructure()
         }
     }
 }
+
+
+
+// MARK: - Cart Confirmation Popover
+//struct CartConfirmationPopover: View {
+//    @Binding var isPresented: Bool
+//    let activeCartItems: [String: Double]
+//    let vaultService: VaultService
+//    let onConfirm: () -> Void
+//    let onCancel: () -> Void
+//    
+//    private var activeItemsWithDetails: [(item: Item, quantity: Double)] {
+//        activeCartItems.compactMap { itemId, quantity in
+//            guard let item = findItemById(itemId) else { return nil }
+//            return (item, quantity)
+//        }
+//    }
+//    
+//    private func findItemById(_ itemId: String) -> Item? {
+//        guard let vault = vaultService.vault else { return nil }
+//        
+//        for category in vault.categories {
+//            if let item = category.items.first(where: { $0.id == itemId }) {
+//                return item
+//            }
+//        }
+//        return nil
+//    }
+//    
+//    var body: some View {
+//        VStack(spacing: 0) {
+//            // Header
+//            HStack {
+//                Text("Cart Preview")
+//                    .font(.fuzzyBold_18)
+//                    .foregroundColor(.black)
+//                
+//                Spacer()
+//                
+//                Button(action: onCancel) {
+//                    Image(systemName: "xmark")
+//                        .font(.system(size: 16, weight: .medium))
+//                        .foregroundColor(.black)
+//                        .frame(width: 24, height: 24)
+//                }
+//            }
+//            .padding(.horizontal, 20)
+//            .padding(.top, 20)
+//            .padding(.bottom, 16)
+//            
+//            // Items List
+//            if activeItemsWithDetails.isEmpty {
+//                VStack(spacing: 12) {
+//                    Image(systemName: "cart")
+//                        .font(.system(size: 40))
+//                        .foregroundColor(.gray)
+//                    Text("No items selected")
+//                        .font(.fuzzyBold_16)
+//                        .foregroundColor(.gray)
+//                }
+//                .frame(height: 120)
+//                .padding(.horizontal, 20)
+//            } else {
+//                ScrollView {
+//                    LazyVStack(spacing: 12) {
+//                        ForEach(activeItemsWithDetails, id: \.item.id) { item, quantity in
+//                            HStack(spacing: 12) {
+//                                // Item icon/placeholder
+//                                RoundedRectangle(cornerRadius: 8)
+//                                    .fill(Color.gray.opacity(0.2))
+//                                    .frame(width: 40, height: 40)
+//                                    .overlay(
+//                                        Text(item.name.prefix(1))
+//                                            .font(.fuzzyBold_16)
+//                                            .foregroundColor(.black)
+//                                    )
+//                                
+//                                VStack(alignment: .leading, spacing: 4) {
+//                                    Text(item.name)
+//                                        .font(.fuzzyBold_16)
+//                                        .foregroundColor(.black)
+//                                        .lineLimit(1)
+//                                    
+//                                    if let firstPrice = item.priceOptions.first {
+//                                        Text("₱\(firstPrice.pricePerUnit.priceValue, specifier: "%.2f") • \(firstPrice.store)")
+//                                            .font(.system(size: 12))
+//                                            .foregroundColor(.gray)
+//                                    }
+//                                }
+//                                
+//                                Spacer()
+//                                
+//                                Text("×\(Int(quantity))")
+//                                    .font(.fuzzyBold_16)
+//                                    .foregroundColor(.black)
+//                                    .padding(.horizontal, 8)
+//                                    .padding(.vertical, 4)
+//                                    .background(Color.black.opacity(0.1))
+//                                    .cornerRadius(6)
+//                            }
+//                            .padding(.horizontal, 4)
+//                        }
+//                    }
+//                    .padding(.horizontal, 16)
+//                }
+//                .frame(maxHeight: 300)
+//            }
+//            
+//            // Footer Buttons
+//            HStack(spacing: 12) {
+//                Button(action: onCancel) {
+//                    Text("Cancel")
+//                        .font(.fuzzyBold_16)
+//                        .foregroundColor(.black)
+//                        .frame(maxWidth: .infinity)
+//                        .padding(.vertical, 12)
+//                        .background(Color.gray.opacity(0.2))
+//                        .cornerRadius(10)
+//                }
+//                
+//                Button(action: onConfirm) {
+//                    Text("Create Cart")
+//                        .font(.fuzzyBold_16)
+//                        .foregroundColor(.white)
+//                        .frame(maxWidth: .infinity)
+//                        .padding(.vertical, 12)
+//                        .background(Color.black)
+//                        .cornerRadius(10)
+//                }
+//            }
+//            .padding(.horizontal, 20)
+//            .padding(.top, 16)
+//            .padding(.bottom, 20)
+//        }
+//        .background(Color.white)
+//        .cornerRadius(16)
+//        .shadow(color: .black.opacity(0.2), radius: 20, x: 0, y: 10)
+//        .frame(width: 320)
+//        .frame(maxHeight: 400)
+//        .padding(.horizontal, 30)
+//    }
+//}
+
