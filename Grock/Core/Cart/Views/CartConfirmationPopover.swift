@@ -184,7 +184,7 @@ struct CartConfirmationPopover: View {
     let onConfirm: (String, Double) -> Void
     let onCancel: () -> Void
     
-    @State private var contentScale: CGFloat = 0.8
+    @State private var contentScale: CGFloat = 0
     @State private var cartTitle: String = ""
     @State private var budget: String = ""
     @FocusState private var focusedField: Field?
@@ -235,20 +235,23 @@ struct CartConfirmationPopover: View {
         .frame(width: UIScreen.main.bounds.width * 0.9)
         .scaleEffect(contentScale)
         .offset(y: -keyboardHeight / 2.5)
-        .animation(.easeOut(duration: 0.3), value: keyboardHeight)
+        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: keyboardHeight)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: contentScale)
         .onAppear {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                contentScale = 1
-            }
-            // Auto-focus the title field
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                focusedField = .title
-            }
-            
-            // Listen for keyboard events
-            setupKeyboardObservers()
-        }
+                  // Scale in on appear
+                  withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                      contentScale = 1
+                  }
+                  
+                  // Auto-focus the title field
+                  DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                      focusedField = .title
+                  }
+                  
+                  setupKeyboardObservers()
+              }
         .onDisappear {
+          
             // Remove keyboard observers
             removeKeyboardObservers()
         }
@@ -362,31 +365,55 @@ struct CartConfirmationPopover: View {
     }
     
     private var cancelButton: some View {
-        Button(action: onCancel) {
-            Text("Cancel")
-                .font(.fuzzyBold_16)
-                .foregroundColor(.black)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
-                .background(Color.gray.opacity(0.2))
-                .cornerRadius(10)
-        }
-    }
+           Button(action: {
+               // Dismiss keyboard first
+               focusedField = nil
+               
+               // Trigger scale animation, then dismiss
+               withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                   contentScale = 0.5
+               }
+               
+               // Wait for animation to complete before calling onCancel
+               DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                   onCancel()
+               }
+           }) {
+               Text("Cancel")
+                   .font(.fuzzyBold_16)
+                   .foregroundColor(.black)
+                   .frame(maxWidth: .infinity)
+                   .padding(.vertical, 12)
+                   .background(Color.gray.opacity(0.2))
+                   .cornerRadius(10)
+           }
+       }
     
     private var confirmButton: some View {
-        Button(action: {
-            onConfirm(cartTitle, budgetValue)
-        }) {
-            Text("Confirm")
-                .font(.fuzzyBold_16)
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
-                .background(canConfirm ? Color.black : Color.gray)
-                .cornerRadius(10)
-        }
-        .disabled(!canConfirm)
-    }
+           Button(action: {
+               // Dismiss keyboard first
+               focusedField = nil
+               
+               // Trigger scale animation, then confirm
+               withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                   contentScale = 0
+               }
+               
+               // Wait for animation to complete before calling onConfirm
+               DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                   onConfirm(cartTitle, budgetValue)
+               }
+           }) {
+               Text("Confirm")
+                   .font(.fuzzyBold_16)
+                   .foregroundColor(.white)
+                   .frame(maxWidth: .infinity)
+                   .padding(.vertical, 12)
+                   .background(canConfirm ? Color.black : Color.gray)
+                   .cornerRadius(10)
+           }
+           .disabled(!canConfirm)
+       }
     
     private var budgetRow: some View {
         HStack {

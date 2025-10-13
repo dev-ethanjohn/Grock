@@ -13,10 +13,12 @@ struct VaultView: View {
     @State private var createCartButtonVisible = true
     @State private var cartBadgeVisible = false
     
+    
     @State private var scrollProxy: ScrollViewProxy?
     @State private var showCartConfirmationPopover = false
     
-    var onCreateCart: (() -> Void)?
+    var onCreateCart: ((Cart) -> Void)?
+    
     
     private var hasActiveItems: Bool {
         !cartViewModel.activeCartItems.isEmpty
@@ -120,46 +122,68 @@ struct VaultView: View {
                 }
             }
             
+//            if showCartConfirmationPopover {
+//                Color.black.opacity(0.4)
+//                    .ignoresSafeArea()
+//                    .transition(.opacity)
+//                    .zIndex(2)
+//                    .onTapGesture {
+//                        withAnimation(.easeInOut(duration: 0.2)) {
+//                            showCartConfirmationPopover = false
+//                        }
+//                    }
+//                
+//                CartConfirmationPopover(
+//                    isPresented: $showCartConfirmationPopover,
+//                    activeCartItems: cartViewModel.activeCartItems,
+//                    vaultService: vaultService,
+//                    onConfirm: { title, budget in
+//                        withAnimation(.easeInOut(duration: 0.2)) {
+//                            showCartConfirmationPopover = false
+//                        }
+//                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+//                            // Pass the title and budget to your cart creation logic
+//                            print("Creating cart with title: '\(title)' and budget: ₱\(budget)")
+//                            onCreateCart?()
+//                        }
+//                    },
+//                    onCancel: {
+//                        withAnimation(.easeInOut(duration: 0.2)) {
+//                            showCartConfirmationPopover = false
+//                        }
+//                    }
+//                )
+//                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+//                .transition(.opacity)
+//                .zIndex(3)
+//                .onAppear {
+//                    createCartButtonVisible = false
+//                }
+//                .onDisappear {
+//                    showCreateCartButton()
+//                }
+//            }
+            
             if showCartConfirmationPopover {
                 Color.black.opacity(0.4)
                     .ignoresSafeArea()
-                    .transition(.opacity)
                     .zIndex(2)
                     .onTapGesture {
-                        withAnimation(.easeInOut(duration: 0.2)) {
+                        // USE THE SAME SPRING ANIMATION as the popover
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                             showCartConfirmationPopover = false
                         }
                     }
                 
-                CartConfirmationPopover(
-                    isPresented: $showCartConfirmationPopover,
-                    activeCartItems: cartViewModel.activeCartItems,
-                    vaultService: vaultService,
-                    onConfirm: { title, budget in
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            showCartConfirmationPopover = false
-                        }
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                            // Pass the title and budget to your cart creation logic
-                            print("Creating cart with title: '\(title)' and budget: ₱\(budget)")
-                            onCreateCart?()
-                        }
-                    },
-                    onCancel: {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            showCartConfirmationPopover = false
-                        }
+                cartConfirmationPopover
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                    .zIndex(3)
+                    .onAppear {
+                        createCartButtonVisible = false
                     }
-                )
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-                .transition(.opacity)
-                .zIndex(3)
-                .onAppear {
-                    createCartButtonVisible = false
-                }
-                .onDisappear {
-                    showCreateCartButton()
-                }
+                    .onDisappear {
+                        showCreateCartButton()
+                    }
             }
         }
         .ignoresSafeArea(.keyboard)
@@ -277,7 +301,7 @@ struct VaultView: View {
         print("\n  🛒 Cart Summary:")
         print("     Active items: \(cartViewModel.activeCartItems.count)")
         for (itemId, quantity) in cartViewModel.activeCartItems {
-            if let item = findItemById(itemId) {
+            if let item = vaultService.findItemById(itemId) {
                 print("     - \(item.name): \(quantity)")
             } else {
                 print("     - Unknown item (\(itemId)): \(quantity)")
@@ -297,17 +321,6 @@ struct VaultView: View {
         }
         
         return Array(Set(allStores)).sorted()
-    }
-    
-    private func findItemById(_ itemId: String) -> Item? {
-        guard let vault = vaultService.vault else { return nil }
-        
-        for category in vault.categories {
-            if let item = category.items.first(where: { $0.id == itemId }) {
-                return item
-            }
-        }
-        return nil
     }
     
     private var emptyVaultView: some View {
@@ -545,147 +558,53 @@ struct VaultView: View {
             printVaultStructure()
         }
     }
+    
+    // MARK: - Cart Creation Methods
+    private func handleCartCreation(title: String, budget: Double) {
+        print("🛒 Creating cart with title: '\(title)' and budget: ₱\(budget)")
+        
+        // 1. Spring animation for popover exit (more fluid than easeInOut)
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+            showCartConfirmationPopover = false
+        }
+        
+        // 2. Wait for popover to complete its exit animation
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+            // Create the cart
+            if let newCart = cartViewModel.createCartWithActiveItems(name: title, budget: budget) {
+                print("✅ Cart created successfully with \(newCart.cartItems.count) items")
+                
+                // Pass the cart to callback
+                onCreateCart?(newCart)
+                
+                // 3. Dismiss vault with smooth animation after brief pause
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    withAnimation(.easeInOut(duration: 0.4)) {
+                        dismiss()
+                    }
+                }
+            } else {
+                print("❌ Failed to create cart")
+                // Graceful fallback - show button again
+                showCreateCartButton()
+            }
+        }
+    }
+    
+    private var cartConfirmationPopover: some View {
+        CartConfirmationPopover(
+            isPresented: $showCartConfirmationPopover,
+            activeCartItems: cartViewModel.activeCartItems,
+            vaultService: vaultService,
+            onConfirm: { title, budget in
+                handleCartCreation(title: title, budget: budget)
+            },
+            onCancel: {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                    showCartConfirmationPopover = false
+                }
+            }
+        )
+    }
+    
 }
-
-
-
-// MARK: - Cart Confirmation Popover
-//struct CartConfirmationPopover: View {
-//    @Binding var isPresented: Bool
-//    let activeCartItems: [String: Double]
-//    let vaultService: VaultService
-//    let onConfirm: () -> Void
-//    let onCancel: () -> Void
-//    
-//    private var activeItemsWithDetails: [(item: Item, quantity: Double)] {
-//        activeCartItems.compactMap { itemId, quantity in
-//            guard let item = findItemById(itemId) else { return nil }
-//            return (item, quantity)
-//        }
-//    }
-//    
-//    private func findItemById(_ itemId: String) -> Item? {
-//        guard let vault = vaultService.vault else { return nil }
-//        
-//        for category in vault.categories {
-//            if let item = category.items.first(where: { $0.id == itemId }) {
-//                return item
-//            }
-//        }
-//        return nil
-//    }
-//    
-//    var body: some View {
-//        VStack(spacing: 0) {
-//            // Header
-//            HStack {
-//                Text("Cart Preview")
-//                    .font(.fuzzyBold_18)
-//                    .foregroundColor(.black)
-//                
-//                Spacer()
-//                
-//                Button(action: onCancel) {
-//                    Image(systemName: "xmark")
-//                        .font(.system(size: 16, weight: .medium))
-//                        .foregroundColor(.black)
-//                        .frame(width: 24, height: 24)
-//                }
-//            }
-//            .padding(.horizontal, 20)
-//            .padding(.top, 20)
-//            .padding(.bottom, 16)
-//            
-//            // Items List
-//            if activeItemsWithDetails.isEmpty {
-//                VStack(spacing: 12) {
-//                    Image(systemName: "cart")
-//                        .font(.system(size: 40))
-//                        .foregroundColor(.gray)
-//                    Text("No items selected")
-//                        .font(.fuzzyBold_16)
-//                        .foregroundColor(.gray)
-//                }
-//                .frame(height: 120)
-//                .padding(.horizontal, 20)
-//            } else {
-//                ScrollView {
-//                    LazyVStack(spacing: 12) {
-//                        ForEach(activeItemsWithDetails, id: \.item.id) { item, quantity in
-//                            HStack(spacing: 12) {
-//                                // Item icon/placeholder
-//                                RoundedRectangle(cornerRadius: 8)
-//                                    .fill(Color.gray.opacity(0.2))
-//                                    .frame(width: 40, height: 40)
-//                                    .overlay(
-//                                        Text(item.name.prefix(1))
-//                                            .font(.fuzzyBold_16)
-//                                            .foregroundColor(.black)
-//                                    )
-//                                
-//                                VStack(alignment: .leading, spacing: 4) {
-//                                    Text(item.name)
-//                                        .font(.fuzzyBold_16)
-//                                        .foregroundColor(.black)
-//                                        .lineLimit(1)
-//                                    
-//                                    if let firstPrice = item.priceOptions.first {
-//                                        Text("₱\(firstPrice.pricePerUnit.priceValue, specifier: "%.2f") • \(firstPrice.store)")
-//                                            .font(.system(size: 12))
-//                                            .foregroundColor(.gray)
-//                                    }
-//                                }
-//                                
-//                                Spacer()
-//                                
-//                                Text("×\(Int(quantity))")
-//                                    .font(.fuzzyBold_16)
-//                                    .foregroundColor(.black)
-//                                    .padding(.horizontal, 8)
-//                                    .padding(.vertical, 4)
-//                                    .background(Color.black.opacity(0.1))
-//                                    .cornerRadius(6)
-//                            }
-//                            .padding(.horizontal, 4)
-//                        }
-//                    }
-//                    .padding(.horizontal, 16)
-//                }
-//                .frame(maxHeight: 300)
-//            }
-//            
-//            // Footer Buttons
-//            HStack(spacing: 12) {
-//                Button(action: onCancel) {
-//                    Text("Cancel")
-//                        .font(.fuzzyBold_16)
-//                        .foregroundColor(.black)
-//                        .frame(maxWidth: .infinity)
-//                        .padding(.vertical, 12)
-//                        .background(Color.gray.opacity(0.2))
-//                        .cornerRadius(10)
-//                }
-//                
-//                Button(action: onConfirm) {
-//                    Text("Create Cart")
-//                        .font(.fuzzyBold_16)
-//                        .foregroundColor(.white)
-//                        .frame(maxWidth: .infinity)
-//                        .padding(.vertical, 12)
-//                        .background(Color.black)
-//                        .cornerRadius(10)
-//                }
-//            }
-//            .padding(.horizontal, 20)
-//            .padding(.top, 16)
-//            .padding(.bottom, 20)
-//        }
-//        .background(Color.white)
-//        .cornerRadius(16)
-//        .shadow(color: .black.opacity(0.2), radius: 20, x: 0, y: 10)
-//        .frame(width: 320)
-//        .frame(maxHeight: 400)
-//        .padding(.horizontal, 30)
-//    }
-//}
-

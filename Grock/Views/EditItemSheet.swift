@@ -5,6 +5,7 @@ struct EditItemSheet: View {
     let item: Item
     @Binding var isPresented: Bool
     var onSave: ((Item) -> Void)?
+    var context: EditContext = .vault
     
     @Environment(VaultService.self) private var vaultService
     @Environment(\.dismiss) private var dismiss
@@ -61,6 +62,14 @@ struct EditItemSheet: View {
                             UnitButton(unit: $unit)
                             PriceInputForEdit(price: $price)
                         }
+                        
+                        // ADD THIS CONTEXT-SPECIFIC NOTE:
+                                                if context == .cart {
+                                                    Text("Editing this item will update prices in all active carts")
+                                                        .font(.caption)
+                                                        .foregroundColor(.gray)
+                                                        .padding(.top, 8)
+                                                }
                         
                         Spacer()
                             .frame(height: 80)
@@ -295,4 +304,10 @@ struct SaveButton: View {
             }
         }
     }
+}
+
+
+enum EditContext {
+    case vault    // Editing from vault
+    case cart     // Editing from cart - shows note about active carts
 }
