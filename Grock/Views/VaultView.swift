@@ -15,7 +15,7 @@ struct VaultView: View {
     
     
     @State private var scrollProxy: ScrollViewProxy?
-    @State private var showCartConfirmationPopover = false
+    @State private var showCartConfirmation = false
     
     var onCreateCart: ((Cart) -> Void)?
     
@@ -50,8 +50,8 @@ struct VaultView: View {
             if vaultService.vault != nil {
                 ZStack(alignment: .topLeading) {
                     Button(action: {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            showCartConfirmationPopover = true
+                        withAnimation {
+                            showCartConfirmation = true
                         }
                     }) {
                         Text("Create cart")
@@ -121,73 +121,47 @@ struct VaultView: View {
                     createCartButtonVisible = false
                 }
             }
-            
-//            if showCartConfirmationPopover {
-//                Color.black.opacity(0.4)
-//                    .ignoresSafeArea()
-//                    .transition(.opacity)
-//                    .zIndex(2)
-//                    .onTapGesture {
-//                        withAnimation(.easeInOut(duration: 0.2)) {
-//                            showCartConfirmationPopover = false
-//                        }
-//                    }
-//                
-//                CartConfirmationPopover(
-//                    isPresented: $showCartConfirmationPopover,
-//                    activeCartItems: cartViewModel.activeCartItems,
-//                    vaultService: vaultService,
-//                    onConfirm: { title, budget in
-//                        withAnimation(.easeInOut(duration: 0.2)) {
-//                            showCartConfirmationPopover = false
-//                        }
-//                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-//                            // Pass the title and budget to your cart creation logic
-//                            print("Creating cart with title: '\(title)' and budget: ₱\(budget)")
-//                            onCreateCart?()
-//                        }
-//                    },
-//                    onCancel: {
-//                        withAnimation(.easeInOut(duration: 0.2)) {
-//                            showCartConfirmationPopover = false
-//                        }
-//                    }
-//                )
-//                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-//                .transition(.opacity)
-//                .zIndex(3)
-//                .onAppear {
-//                    createCartButtonVisible = false
-//                }
-//                .onDisappear {
-//                    showCreateCartButton()
-//                }
-//            }
-            
-            if showCartConfirmationPopover {
-                Color.black.opacity(0.4)
-                    .ignoresSafeArea()
-                    .zIndex(2)
-                    .onTapGesture {
-                        // USE THE SAME SPRING ANIMATION as the popover
-                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                            showCartConfirmationPopover = false
-                        }
-                    }
-                
-                cartConfirmationPopover
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-                    .zIndex(3)
-                    .onAppear {
-                        createCartButtonVisible = false
-                    }
-                    .onDisappear {
-                        showCreateCartButton()
-                    }
-            }
         }
         .ignoresSafeArea(.keyboard)
         .toolbar(.hidden)
+        .overlay {
+            if showCartConfirmation {
+                Color.black.opacity(0.4)
+                    .ignoresSafeArea()
+                    .transition(.opacity)
+            }
+        }
+        .animation(.easeInOut(duration: 0.3), value: showCartConfirmation)
+        .fullScreenCover(isPresented: $showCartConfirmation) {
+            CartConfirmationPopover(
+                isPresented: $showCartConfirmation,
+                activeCartItems: cartViewModel.activeCartItems,
+                vaultService: vaultService,
+                onConfirm: { title, budget in
+                    print("🛒 Creating cart...")
+                    
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        if let newCart = cartViewModel.createCartWithActiveItems(name: title, budget: budget) {
+                            print("✅ Cart created")
+                            onCreateCart?(newCart)
+                            
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                                withAnimation(.spring()) {
+                                    dismiss()
+                                }
+                            }
+                        } else {
+                            print("❌ Failed to create cart")
+                            showCreateCartButton()
+                        }
+                    }
+                },
+                onCancel: {
+                    showCartConfirmation = false
+                }
+            )
+            .presentationBackground(.clear)
+        }
         .onAppear {
             printVaultStructure()
             
@@ -212,6 +186,7 @@ struct VaultView: View {
                 }
             }
         }
+        
         .onDisappear {
             NotificationCenter.default.removeObserver(self)
         }
@@ -558,53 +533,15 @@ struct VaultView: View {
             printVaultStructure()
         }
     }
-    
-    // MARK: - Cart Creation Methods
-    private func handleCartCreation(title: String, budget: Double) {
-        print("🛒 Creating cart with title: '\(title)' and budget: ₱\(budget)")
-        
-        // 1. Spring animation for popover exit (more fluid than easeInOut)
-        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-            showCartConfirmationPopover = false
-        }
-        
-        // 2. Wait for popover to complete its exit animation
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-            // Create the cart
-            if let newCart = cartViewModel.createCartWithActiveItems(name: title, budget: budget) {
-                print("✅ Cart created successfully with \(newCart.cartItems.count) items")
-                
-                // Pass the cart to callback
-                onCreateCart?(newCart)
-                
-                // 3. Dismiss vault with smooth animation after brief pause
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    withAnimation(.easeInOut(duration: 0.4)) {
-                        dismiss()
-                    }
-                }
-            } else {
-                print("❌ Failed to create cart")
-                // Graceful fallback - show button again
-                showCreateCartButton()
-            }
-        }
+}
+
+
+struct ClearBackgroundView: UIViewRepresentable {
+    func makeUIView(context: Context) -> UIView {
+        let view = UIView()
+        view.backgroundColor = .clear
+        return view
     }
     
-    private var cartConfirmationPopover: some View {
-        CartConfirmationPopover(
-            isPresented: $showCartConfirmationPopover,
-            activeCartItems: cartViewModel.activeCartItems,
-            vaultService: vaultService,
-            onConfirm: { title, budget in
-                handleCartCreation(title: title, budget: budget)
-            },
-            onCancel: {
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                    showCartConfirmationPopover = false
-                }
-            }
-        )
-    }
-    
+    func updateUIView(_ uiView: UIView, context: Context) {}
 }

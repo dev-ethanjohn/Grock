@@ -160,7 +160,7 @@ struct VerticalScrollViewWithCustomIndicator<Content: View>: View {
                         .offset(y: indicatorOffset)
                         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: indicatorOffset)
                 }
-
+                
                 .frame(height: indicatorBgHeight)
                 .clipped()
                 .offset(x: 8)
@@ -184,11 +184,10 @@ struct CartConfirmationPopover: View {
     let onConfirm: (String, Double) -> Void
     let onCancel: () -> Void
     
-    @State private var contentScale: CGFloat = 0
     @State private var cartTitle: String = ""
     @State private var budget: String = ""
     @FocusState private var focusedField: Field?
-    @State private var keyboardHeight: CGFloat = 0
+    @State private var showing = false
     
     private enum Field {
         case title, budget
@@ -223,37 +222,31 @@ struct CartConfirmationPopover: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            titleSection
-            itemsSection
-            dividerSection
-            totalsSection
-            buttonsSection
+            VStack(spacing: 0) {
+                titleSection
+                itemsSection
+                dividerSection
+                totalsSection
+                buttonsSection
+            }
+            .frame(width: UIScreen.main.bounds.width * 0.92)
+            .presentationBackground(.clear)
+            .background(Color.white)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .shadow(color: .black.opacity(0.2), radius: 20, x: 0, y: 10)
+            
         }
-        .background(.white)
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.2), radius: 20, x: 0, y: 10)
-        .frame(width: UIScreen.main.bounds.width * 0.9)
-        .scaleEffect(contentScale)
-        .offset(y: -keyboardHeight / 2.5)
-        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: keyboardHeight)
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: contentScale)
+        .frame(maxHeight: UIScreen.main.bounds.height * 1)
+        .frame(width: UIScreen.main.bounds.width * 1)
+        .background(Color.white.opacity(0.01))
+        .scaleEffect(showing ? 1 : 0)
         .onAppear {
-                  // Scale in on appear
-                  withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                      contentScale = 1
-                  }
-                  
-                  // Auto-focus the title field
-                  DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                      focusedField = .title
-                  }
-                  
-                  setupKeyboardObservers()
-              }
-        .onDisappear {
-          
-            // Remove keyboard observers
-            removeKeyboardObservers()
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
+                showing = true
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                focusedField = .title
+            }
         }
         .onTapGesture {
             // Dismiss keyboard when tapping outside
@@ -365,55 +358,54 @@ struct CartConfirmationPopover: View {
     }
     
     private var cancelButton: some View {
-           Button(action: {
-               // Dismiss keyboard first
-               focusedField = nil
-               
-               // Trigger scale animation, then dismiss
-               withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                   contentScale = 0.5
-               }
-               
-               // Wait for animation to complete before calling onCancel
-               DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                   onCancel()
-               }
-           }) {
-               Text("Cancel")
-                   .font(.fuzzyBold_16)
-                   .foregroundColor(.black)
-                   .frame(maxWidth: .infinity)
-                   .padding(.vertical, 12)
-                   .background(Color.gray.opacity(0.2))
-                   .cornerRadius(10)
-           }
-       }
+        Button(action: {
+            focusedField = nil
+            
+            // This stays EXACTLY the same
+            withAnimation(.interpolatingSpring(mass: 1.0, stiffness: 100, damping: 10, initialVelocity: 0)) {
+                showing = false
+            }
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                onCancel()
+            }
+        }) {
+            Text("Cancel")
+                .font(.fuzzyBold_16)
+                .foregroundColor(.black)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(Color.gray.opacity(0.2))
+                .cornerRadius(10)
+        }
+    }
     
     private var confirmButton: some View {
-           Button(action: {
-               // Dismiss keyboard first
-               focusedField = nil
-               
-               // Trigger scale animation, then confirm
-               withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                   contentScale = 0
-               }
-               
-               // Wait for animation to complete before calling onConfirm
-               DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                   onConfirm(cartTitle, budgetValue)
-               }
-           }) {
-               Text("Confirm")
-                   .font(.fuzzyBold_16)
-                   .foregroundColor(.white)
-                   .frame(maxWidth: .infinity)
-                   .padding(.vertical, 12)
-                   .background(canConfirm ? Color.black : Color.gray)
-                   .cornerRadius(10)
-           }
-           .disabled(!canConfirm)
-       }
+        Button(action: {
+            focusedField = nil
+            
+            withAnimation(.interpolatingSpring(mass: 1.0, stiffness: 100, damping: 10, initialVelocity: 0)) {
+                showing = false
+            }
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                onCancel()
+                
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                    onConfirm(cartTitle, budgetValue)
+                }
+            }
+        })  {
+            Text("Confirm")
+                .font(.fuzzyBold_16)
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(canConfirm ? Color.black : Color.gray)
+                .cornerRadius(10)
+        }
+        .disabled(!canConfirm)
+    }
     
     private var budgetRow: some View {
         HStack {
@@ -477,9 +469,11 @@ struct CartConfirmationPopover: View {
             .contentShape(Rectangle())
             .onTapGesture {
                 focusedField = .budget
-            }        }
+            }
+        }
         .padding(.bottom)
     }
+    
     // MARK: - Helper Methods
     
     private func formatCurrency(_ value: Double) -> String {
@@ -495,27 +489,6 @@ struct CartConfirmationPopover: View {
         }
     }
     
-    private func setupKeyboardObservers() {
-        NotificationCenter.default.addObserver(forName: UIResponder.keyboardWillShowNotification, object: nil, queue: .main) { notification in
-            if let keyboardFrame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect {
-                withAnimation(.easeOut(duration: 0.3)) {
-                    keyboardHeight = keyboardFrame.height
-                }
-            }
-        }
-        
-        NotificationCenter.default.addObserver(forName: UIResponder.keyboardWillHideNotification, object: nil, queue: .main) { _ in
-            withAnimation(.easeOut(duration: 0.3)) {
-                keyboardHeight = 0
-            }
-        }
-    }
-    
-    private func removeKeyboardObservers() {
-        NotificationCenter.default.removeObserver(self, name: UIResponder.keyboardWillShowNotification, object: nil)
-        NotificationCenter.default.removeObserver(self, name: UIResponder.keyboardWillHideNotification, object: nil)
-    }
-    
     private func findItemById(_ itemId: String) -> Item? {
         guard let vault = vaultService.vault else { return nil }
         
@@ -527,4 +500,3 @@ struct CartConfirmationPopover: View {
         return nil
     }
 }
-
