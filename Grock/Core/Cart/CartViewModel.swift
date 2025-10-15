@@ -14,6 +14,11 @@ class CartViewModel {
     
     private let vaultService: VaultService
     
+    // Public getter
+    var getVaultService: VaultService {
+        return vaultService
+    }
+    
     init(vaultService: VaultService) {
         self.vaultService = vaultService
         loadCarts()

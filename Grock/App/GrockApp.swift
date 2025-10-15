@@ -13,7 +13,6 @@ struct ContentView: View {
     @State private var vaultService: VaultService
     @State private var cartViewModel: CartViewModel
     
-    // Initialize services immediately with the context
     init(modelContext: ModelContext) {
         let vaultService = VaultService(modelContext: modelContext)
         _vaultService = State(initialValue: vaultService)
@@ -23,7 +22,7 @@ struct ContentView: View {
     var body: some View {
         Group {
             if UserDefaults.standard.hasCompletedOnboarding {
-                HomeView()
+                HomeView(modelContext: modelContext, cartViewModel: cartViewModel)
                     .environment(vaultService)
                     .environment(cartViewModel)
             } else {

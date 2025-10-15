@@ -134,7 +134,7 @@ struct VaultView: View {
         .animation(.easeInOut(duration: 0.3), value: showCartConfirmation)
         .fullScreenCover(isPresented: $showCartConfirmation) {
             CartConfirmationPopover(
-                isPresented: $showCartConfirmation,
+                isPresented: $showCartConfirmation,  
                 activeCartItems: cartViewModel.activeCartItems,
                 vaultService: vaultService,
                 onConfirm: { title, budget in
@@ -157,10 +157,13 @@ struct VaultView: View {
                     }
                 },
                 onCancel: {
+                    // This works perfectly - just sets the binding
                     showCartConfirmation = false
                 }
             )
             .presentationBackground(.clear)
+            // Add this to disable fullScreenCover's default animation
+//            .animation(.none, value: showCartConfirmation)
         }
         .onAppear {
             printVaultStructure()

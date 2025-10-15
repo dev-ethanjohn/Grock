@@ -17,7 +17,8 @@ enum OnboardingStep {
 
 struct OnboardingContainer: View {
     @State private var step: OnboardingStep = .welcome
-    @Environment(\.modelContext) private var context
+    @Environment(\.modelContext) private var modelContext
+    @Environment(CartViewModel.self) private var cartViewModel
     @Environment(VaultService.self) private var vaultService
     @State private var storeFieldAnimated = false
 
@@ -95,7 +96,7 @@ struct OnboardingContainer: View {
             }
 
             if step == .done {
-                HomeView()
+                HomeView(modelContext: modelContext, cartViewModel: cartViewModel)
                     .environment(vaultService)
                     .environment(CartViewModel(vaultService: vaultService))
                     .transition(.opacity)
