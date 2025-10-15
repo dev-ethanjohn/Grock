@@ -4,6 +4,7 @@ import SwiftData
 struct HomeView: View {
     @StateObject private var viewModel: HomeViewModel
     @Environment(CartViewModel.self) private var cartViewModel
+    @State private var headerHeight: CGFloat = 0
     
     init(modelContext: ModelContext, cartViewModel: CartViewModel) {
         _viewModel = StateObject(wrappedValue: HomeViewModel(
@@ -22,11 +23,9 @@ struct HomeView: View {
                     fingerPointer
                 }
             }
-            .toolbar { toolbarContent }
             .sheet(isPresented: $viewModel.showVault) {
                 vaultSheet
             }
-            .toolbarBackground(.white, for: .navigationBar)
             .navigationDestination(isPresented: $viewModel.showCartPage) {
                 if let cart = viewModel.newlyCreatedCart {
                     CartDetailView(cart: cart)
@@ -44,18 +43,18 @@ struct HomeView: View {
         }
     }
     
-    // subviews
     private var mainContent: some View {
         ZStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 0) {
                 if viewModel.carts.isEmpty {
                     emptyStateView
-                        .padding(.top, 140)
+                        .padding(.top, headerHeight)
                         .padding(.horizontal)
                 } else {
                     ScrollView {
+
                         Color.clear
-                            .frame(height: 116)
+                            .frame(height: headerHeight)
                         
                         LazyVStack(spacing: 12) {
                             ForEach(viewModel.displayedCarts) { cart in
@@ -66,7 +65,6 @@ struct HomeView: View {
                             }
                         }
                         .padding(.horizontal)
-                        .padding(.vertical, 8)
                      
                         Color.clear
                             .frame(height: 80)
@@ -76,12 +74,18 @@ struct HomeView: View {
                 Spacer()
             }
             
-            VStack(spacing: 24) {
-                greetingText
-                tabButtons
-            }
-            .frame(maxWidth: .infinity)
-            .background(headerBackground)
+            customHeader
+                .background(
+                    GeometryReader { geometry in
+                        Color.clear
+                            .onAppear {
+                                headerHeight = geometry.size.height
+                            }
+                            .onChange(of: geometry.size.height) {_, newHeight in
+                                headerHeight = newHeight
+                            }
+                    }
+                )
             
             VStack {
                 Spacer()
@@ -89,14 +93,33 @@ struct HomeView: View {
                     .padding(.horizontal)
             }
         }
-        .ignoresSafeArea(edges: .bottom)
+        .ignoresSafeArea(edges: .top)
+    }
+    
+    private var customHeader: some View {
+        VStack(spacing: 0) {
+            HStack {
+                leadingToolbarButton
+                Spacer()
+                trailingToolbarButton
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 60)
+            
+            VStack(spacing: 24) {
+                greetingText
+                tabButtons
+            }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 4)
+        }
+        .frame(maxWidth: .infinity)
+        .background(headerBackground)
     }
     
     private var greetingText: some View {
         Text("Hi Ethan,")
             .fuzzyBubblesFont(36, weight: .bold)
-            .padding(.top)
-            .padding(.horizontal, 20)
             .frame(maxWidth: .infinity, alignment: .leading)
     }
     
@@ -130,8 +153,6 @@ struct HomeView: View {
             tabButton(title: "Planned", tabIndex: 0)
             tabButton(title: "History", tabIndex: 1)
         }
-        .padding(.bottom, 12)
-        .padding(.horizontal, 20)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
     
@@ -196,18 +217,7 @@ struct HomeView: View {
         FingerPointer()
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
             .padding(.trailing, 20)
-            .padding(.top, 60)
-    }
-    
-    @ToolbarContentBuilder
-    private var toolbarContent: some ToolbarContent {
-        ToolbarItem(placement: .navigationBarLeading) {
-            leadingToolbarButton
-        }
-        
-        ToolbarItem(placement: .navigationBarTrailing) {
-            trailingToolbarButton
-        }
+            .padding(.top, 120)
     }
     
     private var leadingToolbarButton: some View {
@@ -218,6 +228,7 @@ struct HomeView: View {
         } label: {
             Image(systemName: "line.horizontal.3")
                 .foregroundColor(.black)
+                .font(.system(size: 20))
         }
     }
     
@@ -245,8 +256,6 @@ struct HomeView: View {
         }
     }
 }
-
-
 
 //#Preview {
 //    HomeView()
