@@ -2,16 +2,20 @@ import SwiftUI
 import SwiftData
 
 struct HomeView: View {
-    @StateObject private var viewModel: HomeViewModel
-    @Environment(CartViewModel.self) private var cartViewModel
+ 
     @State private var headerHeight: CGFloat = 0
     
-    init(modelContext: ModelContext, cartViewModel: CartViewModel) {
-        _viewModel = StateObject(wrappedValue: HomeViewModel(
-            modelContext: modelContext,
-            cartViewModel: cartViewModel
-        ))
-    }
+    @Environment(\.modelContext) private var modelContext
+      @Environment(VaultService.self) private var vaultService
+      @Environment(CartViewModel.self) private var cartViewModel
+      @StateObject private var viewModel: HomeViewModel
+      
+      init(modelContext: ModelContext, cartViewModel: CartViewModel) {
+          _viewModel = StateObject(wrappedValue: HomeViewModel(
+              modelContext: modelContext,
+              cartViewModel: cartViewModel
+          ))
+      }
     
     var body: some View {
         NavigationStack {
@@ -226,9 +230,9 @@ struct HomeView: View {
                 Label("Reset App (Testing)", systemImage: "arrow.counterclockwise")
             }
         } label: {
-            Image(systemName: "line.horizontal.3")
-                .foregroundColor(.black)
-                .font(.system(size: 20))
+            Image("menu")
+                .resizable()
+                .frame(width: 24, height: 20)
         }
     }
     
@@ -252,7 +256,7 @@ struct HomeView: View {
     private var vaultSheet: some View {
         NavigationStack {
             VaultView(onCreateCart: viewModel.onCreateCartFromVault)
-                .environment(cartViewModel)
+    
         }
     }
 }

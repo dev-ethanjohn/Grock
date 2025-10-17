@@ -134,7 +134,7 @@ struct OnboardingContainer: View {
         print("   Name: '\(viewModel.itemName)'")
         print("   Category: '\(viewModel.categoryName)'")
         print("   Store: '\(viewModel.storeName)'")
-        print("   Price: ₱\(viewModel.itemPrice ?? 0)")
+        print("   Price: ₱\(viewModel.itemPrice)") // Removed nil-coalescing since it's now String
         print("   Unit: \(viewModel.unit)")
         
         if let vault = vaultService.vault {

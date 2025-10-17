@@ -80,7 +80,7 @@ struct CartRowView: View {
                         HStack(spacing: 3) {
                             ForEach(categories, id: \.self) { category in
                                 Text(category.emoji)
-                                    .font(.system(size: 10))
+                                    .font(.system(size: 11))
                                     .frame(width: 20, height: 20)
                                     .background(category.pastelColor)
                                     .cornerRadius(8)
@@ -133,7 +133,7 @@ struct BudgetProgressBar: View {
             ZStack(alignment: .leading) {
                 Capsule()
                     .fill(Color.white)
-                    .frame(height: 18)
+                    .frame(height: 20)
                     .overlay(
                         Capsule()
                             .stroke(Color(hex: "cacaca"), lineWidth: 1)
@@ -200,7 +200,7 @@ struct BudgetProgressText: View {
         totalSpent: 654,
         fulfillmentStatus: 0.8144,
         createdAt: Date(),
-        status: .active
+        status: .planning
     )
     
     // Just pass nil for vaultService - it will use mock categories

@@ -46,3 +46,45 @@ extension View {
     }
 }
 
+extension View {
+    func scalableText() -> some View {
+        self
+            .font(.subheadline)
+            .bold()
+//            .minimumScaleFactor(0.7)
+//            .lineLimit(1)
+            .multilineTextAlignment(.trailing)
+    }
+}
+
+
+
+
+
+//CART
+// MARK: - CartStatus Extension
+extension CartStatus {
+    var displayName: String {
+        switch self {
+        case .planning: return "Planning"
+        case .shopping: return "Shopping"
+        case .completed: return "Completed"
+        }
+    }
+    
+    var color: Color {
+        switch self {
+        case .planning: return .blue
+        case .shopping: return .orange
+        case .completed: return .green
+        }
+    }
+}
+
+// MARK: - GroceryCategory Helper Extension
+extension GroceryCategory {
+    static func fromTitle(_ title: String) -> GroceryCategory {
+        return GroceryCategory.allCases.first { $0.title == title } ?? .freshProduce
+    }
+}
+

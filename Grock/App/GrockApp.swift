@@ -23,11 +23,12 @@ struct ContentView: View {
         Group {
             if UserDefaults.standard.hasCompletedOnboarding {
                 HomeView(modelContext: modelContext, cartViewModel: cartViewModel)
-                    .environment(vaultService)
-                    .environment(cartViewModel)
+                    .environment(vaultService)  // Provide VaultService to environment
+                    .environment(cartViewModel) // Provide CartViewModel to environment
             } else {
                 OnboardingContainer()
                     .environment(vaultService)
+                    .environment(cartViewModel)
             }
         }
     }

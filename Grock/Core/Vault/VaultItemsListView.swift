@@ -1,7 +1,5 @@
 import SwiftUI
 
-import SwiftUI
-
 struct VaultItemsListView: View {
     let items: [Item]
     let availableStores: [String]

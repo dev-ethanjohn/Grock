@@ -13,7 +13,7 @@ struct AddItemPopover: View {
     @State private var itemName: String = ""
     @State private var storeName: String = ""
     @State private var unit: String = "g"
-    @State private var itemPrice: Double?
+    @State private var itemPrice: String = ""
     @State private var selectedCategory: GroceryCategory?
     
     @FocusState private var itemNameFieldIsFocused: Bool
@@ -27,7 +27,7 @@ struct AddItemPopover: View {
     
     private var isFormValid: Bool {
         !itemName.isEmpty &&
-        itemPrice != nil &&
+        Double(itemPrice) != nil && 
         !unit.isEmpty &&
         selectedCategory != nil
     }
@@ -77,14 +77,14 @@ struct AddItemPopover: View {
                     
                     HStack(spacing: 12) {
                         UnitButton(unit: $unit)
-                        PriceInput(itemPrice: $itemPrice)
+                        PricePerUnitField(price: $itemPrice)
                     }
                 }
                 
                 Button(action: {
                     if isFormValid,
                        let category = selectedCategory,
-                       let priceValue = itemPrice {
+                       let priceValue = Double(itemPrice) {
                         onSave?(itemName, category, storeName, unit, priceValue)
                         
                         NotificationCenter.default.post(

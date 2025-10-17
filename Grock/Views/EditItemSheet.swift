@@ -10,7 +10,7 @@ struct EditItemSheet: View {
     @Environment(VaultService.self) private var vaultService
     @Environment(\.dismiss) private var dismiss
     
-    // Form state
+    // Form states
     @State private var itemName: String = ""
     @State private var selectedCategory: GroceryCategory? = nil
     @State private var storeName: String = ""
@@ -24,7 +24,7 @@ struct EditItemSheet: View {
         selectedCategory?.emoji ?? "plus.circle.fill"
     }
     
-    private var isFormValid: Bool {
+    private var isEditFormValid: Bool {
         !itemName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
         selectedCategory != nil &&
         !storeName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
@@ -39,7 +39,6 @@ struct EditItemSheet: View {
                         Spacer()
                             .frame(height: 20)
                         
-                        // Item Name with Category
                         ItemNameInput(
                             itemName: $itemName,
                             itemNameFieldIsFocused: $itemNameFieldIsFocused,
@@ -54,22 +53,19 @@ struct EditItemSheet: View {
                             .padding(.vertical, 2)
                             .padding(.horizontal)
                         
-                        // Store
                         StoreNameComponent(storeName: $storeName)
                         
-                        // Unit and Price
                         HStack(spacing: 8) {
                             UnitButton(unit: $unit)
-                            PriceInputForEdit(price: $price)
+                            PricePerUnitField(price: $price)
                         }
                         
-                        // ADD THIS CONTEXT-SPECIFIC NOTE:
-                                                if context == .cart {
-                                                    Text("Editing this item will update prices in all active carts")
-                                                        .font(.caption)
-                                                        .foregroundColor(.gray)
-                                                        .padding(.top, 8)
-                                                }
+                        if context == .cart {
+                            Text("Editing this item will update prices in all active carts")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                                .padding(.top, 8)
+                        }
                         
                         Spacer()
                             .frame(height: 80)
@@ -77,10 +73,9 @@ struct EditItemSheet: View {
                     .padding()
                 }
                 
-                // Save Button
                 HStack {
                     Spacer()
-                    SaveButton(isFormValid: isFormValid) {
+                    EditItemSaveButton(isEditFormValid: isEditFormValid) {
                         saveChanges()
                     }
                 }
@@ -108,7 +103,7 @@ struct EditItemSheet: View {
         // Set initial values
         itemName = item.name
         storeName = priceOption?.store ?? ""
-        price = String(priceOption?.pricePerUnit.priceValue ?? 0) 
+        price = String(priceOption?.pricePerUnit.priceValue ?? 0)
         unit = priceOption?.pricePerUnit.unit ?? "g"
         
         // Find the current category
@@ -152,84 +147,8 @@ struct EditItemSheet: View {
     }
 }
 
-// MARK: - Custom Components for Edit Sheet
-
-struct UnitButtonForEdit: View {
-    @Binding var unit: String
-    @Binding var showUnitPicker: Bool
-    
-    var body: some View {
-        Button(action: {
-            showUnitPicker = true
-        }) {
-            HStack {
-                Text("Unit")
-                    .font(.footnote)
-                    .foregroundColor(.gray)
-                Spacer()
-                Text(unit.isEmpty ? "Select" : unit)
-                    .font(.subheadline)
-                    .bold()
-                    .foregroundStyle(unit.isEmpty ? .gray : .black)
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 12))
-                    .foregroundColor(.gray)
-            }
-            .padding(12)
-            .background(Color(.systemGray6))
-            .cornerRadius(12)
-        }
-    }
-}
-
-struct PriceInputForEdit: View {
-    @Binding var price: String
-    @FocusState private var isFocused: Bool
-    
-    var body: some View {
-        HStack {
-            Text("Price/unit")
-                .font(.footnote)
-                .foregroundColor(.gray)
-            Spacer()
-            
-            HStack(spacing: 4) {
-                Text("₱")
-                    .font(.system(size: 16))
-                    .foregroundStyle(price.isEmpty ? .gray : .black)
-                
-                Text(price.isEmpty ? "0" : price)
-                    .foregroundStyle(price.isEmpty ? .gray : .black)
-                    .font(.subheadline)
-                    .bold()
-                    .multilineTextAlignment(.trailing)
-                    .overlay(
-                        TextField("0", text: $price)
-                            .multilineTextAlignment(.trailing)
-                            .keyboardType(.decimalPad)
-                            .fixedSize(horizontal: true, vertical: false)
-                            .autocorrectionDisabled(true)
-                            .textInputAutocapitalization(.never)
-                            .numbersOnly($price, includeDecimal: true, maxDigits: 5)
-                            .font(.subheadline)
-                            .bold()
-                            .focused($isFocused)
-                            .opacity(isFocused ? 1 : 0)
-                    )
-            }
-        }
-        .padding(12)
-        .background(Color(.systemGray6))
-        .cornerRadius(12)
-        .contentShape(Rectangle())
-        .onTapGesture {
-            isFocused = true
-        }
-    }
-}
-
-struct SaveButton: View {
-    let isFormValid: Bool
+struct EditItemSaveButton: View {
+    let isEditFormValid: Bool
     let action: () -> Void
     
     @State private var fillAnimation: CGFloat = 0.0
@@ -246,7 +165,7 @@ struct SaveButton: View {
                 .background(
                     Capsule()
                         .fill(
-                            isFormValid
+                            isEditFormValid
                             ? RadialGradient(
                                 colors: [Color.black, Color.gray.opacity(0.3)],
                                 center: .center,
@@ -263,8 +182,8 @@ struct SaveButton: View {
                 )
                 .scaleEffect(buttonScale)
         }
-        .disabled(!isFormValid)
-        .onChange(of: isFormValid) { oldValue, newValue in
+        .disabled(!isEditFormValid)
+        .onChange(of: isEditFormValid) { oldValue, newValue in
             if newValue {
                 if !oldValue {
                     withAnimation(.spring(duration: 0.4)) {
@@ -280,7 +199,7 @@ struct SaveButton: View {
             }
         }
         .onAppear {
-            if isFormValid {
+            if isEditFormValid {
                 fillAnimation = 1.0
                 buttonScale = 1.0
             }
@@ -307,7 +226,4 @@ struct SaveButton: View {
 }
 
 
-enum EditContext {
-    case vault    // Editing from vault
-    case cart     // Editing from cart - shows note about active carts
-}
+

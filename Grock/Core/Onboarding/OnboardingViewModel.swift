@@ -15,14 +15,14 @@ class OnboardingViewModel {
     //form data
     var storeName: String = ""
     var itemName: String = ""
-    var itemPrice: Double?
+    var itemPrice: String = "" // Changed from Double? to String
     var unit: String = "g"
     var categoryName: String = ""
     var portion: Double?
     
     func saveInitialData(vaultService: VaultService) {
         guard let category = GroceryCategory.allCases.first(where: { $0.title == categoryName }),
-              let price = itemPrice else { return }
+              let price = Double(itemPrice) else { return } // Convert String to Double
         
         vaultService.addItem(
             name: itemName,

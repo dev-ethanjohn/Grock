@@ -1,13 +1,5 @@
-//
-//  Vault.swift
-//  Grock
-//
-//  Created by Ethan John Paguntalan on 9/28/25.
-//
-
 import Foundation
 import SwiftData
-
 
 @Model
 class User {
@@ -21,8 +13,6 @@ class User {
         self.userVault = Vault()
     }
 }
-
-
 
 @Model
 class Vault {
@@ -46,7 +36,6 @@ class Store {
         self.createdAt = Date()
     }
 }
-
 
 @Model
 class Category {
@@ -98,6 +87,14 @@ class PricePerUnit {
     }
 }
 
+// MARK: - Enhanced Cart Status
+enum CartStatus: Int, Codable {
+    case planning = 0      // Building the list, editable planned data
+    case shopping = 1      // Active shopping, capturing actuals
+    case completed = 2     // Finished, preserving historical data
+}
+
+
 @Model
 class Cart {
     @Attribute(.unique) var id: String
@@ -106,7 +103,7 @@ class Cart {
     var totalSpent: Double
     var fulfillmentStatus: Double
     var createdAt: Date
-    var status: CartStatus // Make sure this exists
+    var status: CartStatus
     
     @Relationship(deleteRule: .cascade)
     var cartItems: [CartItem] = []
@@ -118,7 +115,7 @@ class Cart {
         totalSpent: Double = 0.0,
         fulfillmentStatus: Double = 0.0,
         createdAt: Date = Date(),
-        status: CartStatus = .active
+        status: CartStatus = .planning
     ) {
         self.id = id
         self.name = name
@@ -129,69 +126,142 @@ class Cart {
         self.status = status
     }
     
-    var isActive: Bool {
-        status == .active
-    }
-    
-    var isCompleted: Bool {
-        status == .completed
-    }
+    // Add these convenience properties:
+    var isPlanning: Bool { status == .planning }
+    var isShopping: Bool { status == .shopping }
+    var isCompleted: Bool { status == .completed }
+    var isActive: Bool { isPlanning || isShopping }
 }
 
+// MARK: - Enhanced CartItem for 3-Mode Support
 @Model
 class CartItem {
     var itemId: String
     var quantity: Double
     var isFulfilled: Bool
-    var selectedStore: String
     
-    // Store historical price for completed carts
-    var historicalPrice: Double?
-    var historicalUnit: String?
+    // PLANNED data (frozen when shopping starts)
+    var plannedStore: String
+    var plannedPrice: Double?
+    var plannedUnit: String?
+    
+    // ACTUAL data (editable during shopping)
+    var actualStore: String?
+    var actualPrice: Double?
+    var actualQuantity: Double?
+    var actualUnit: String?
     
     init(
         itemId: String,
         quantity: Double,
-        selectedStore: String,
+        plannedStore: String,
         isFulfilled: Bool = false,
-        historicalPrice: Double? = nil,
-        historicalUnit: String? = nil
+        plannedPrice: Double? = nil,
+        plannedUnit: String? = nil,
+        actualStore: String? = nil,
+        actualPrice: Double? = nil,
+        actualQuantity: Double? = nil,
+        actualUnit: String? = nil
     ) {
         self.itemId = itemId
         self.quantity = quantity
-        self.selectedStore = selectedStore
+        self.plannedStore = plannedStore
         self.isFulfilled = isFulfilled
-        self.historicalPrice = historicalPrice
-        self.historicalUnit = historicalUnit
+        self.plannedPrice = plannedPrice
+        self.plannedUnit = plannedUnit
+        self.actualStore = actualStore
+        self.actualPrice = actualPrice
+        self.actualQuantity = actualQuantity
+        self.actualUnit = actualUnit
     }
     
-    // Get price - use historical if available, otherwise current from vault
+    // MARK: - Mode-Aware Getters
+    
     func getPrice(from vault: Vault, cart: Cart) -> Double {
-        // For completed carts, use historical price
-        if cart.isCompleted, let historicalPrice = historicalPrice {
-            return historicalPrice
+        switch cart.status {
+        case .planning:
+            return plannedPrice ?? getCurrentPrice(from: vault, store: plannedStore) ?? 0.0
+        case .shopping:
+            return actualPrice ?? plannedPrice ?? getCurrentPrice(from: vault, store: actualStore ?? plannedStore) ?? 0.0
+        case .completed:
+            return actualPrice ?? plannedPrice ?? 0.0
         }
-        
-        // For active carts, use current price from vault
-        guard let item = getItem(from: vault) else { return 0.0 }
-        return item.priceOptions.first(where: { $0.store == selectedStore })?.pricePerUnit.priceValue ?? 0.0
     }
     
-    // Get unit - use historical if available, otherwise current from vault
+    func getQuantity(cart: Cart) -> Double {
+        switch cart.status {
+        case .planning:
+            return quantity
+        case .shopping, .completed:
+            return actualQuantity ?? quantity
+        }
+    }
+    
     func getUnit(from vault: Vault, cart: Cart) -> String {
-        // For completed carts, use historical unit
-        if cart.isCompleted, let historicalUnit = historicalUnit {
-            return historicalUnit
+        switch cart.status {
+        case .planning:
+            return plannedUnit ?? getCurrentUnit(from: vault, store: plannedStore) ?? ""
+        case .shopping:
+            return actualUnit ?? plannedUnit ?? getCurrentUnit(from: vault, store: actualStore ?? plannedStore) ?? ""
+        case .completed:
+            return actualUnit ?? plannedUnit ?? ""
         }
-        
-        // For active carts, use current unit from vault
-        guard let item = getItem(from: vault) else { return "" }
-        return item.priceOptions.first(where: { $0.store == selectedStore })?.pricePerUnit.unit ?? ""
     }
     
-    // Get total price
+    func getStore(cart: Cart) -> String {
+        switch cart.status {
+        case .planning:
+            return plannedStore
+        case .shopping, .completed:
+            return actualStore ?? plannedStore
+        }
+    }
+    
     func getTotalPrice(from vault: Vault, cart: Cart) -> Double {
-        return getPrice(from: vault, cart: cart) * quantity
+        return getPrice(from: vault, cart: cart) * getQuantity(cart: cart)
+    }
+    
+    // MARK: - Data Capture Methods
+    
+    func capturePlannedData(from vault: Vault) {
+        if plannedPrice == nil {
+            plannedPrice = getCurrentPrice(from: vault, store: plannedStore)
+        }
+        if plannedUnit == nil {
+            plannedUnit = getCurrentUnit(from: vault, store: plannedStore)
+        }
+    }
+    
+    func captureActualData() {
+        // If user didn't set actual data during shopping, use planned as actual
+        if actualStore == nil {
+            actualStore = plannedStore
+        }
+        if actualPrice == nil {
+            actualPrice = plannedPrice
+        }
+        if actualQuantity == nil {
+            actualQuantity = quantity
+        }
+        if actualUnit == nil {
+            actualUnit = plannedUnit
+        }
+    }
+    
+    // MARK: - Helper Methods
+    
+    func getCurrentPrice(from vault: Vault, store: String) -> Double? {
+        guard let item = getItem(from: vault),
+              let priceOption = item.priceOptions.first(where: { $0.store == store })
+        else { return nil }
+        return priceOption.pricePerUnit.priceValue
+    }
+    
+    func getCurrentUnit(from vault: Vault, store: String) -> String? {
+        guard let item = getItem(from: vault),
+              let priceOption = item.priceOptions.first(where: { $0.store == store })
+        else { return nil }
+        return priceOption.pricePerUnit.unit
     }
     
     func getItem(from vault: Vault) -> Item? {
@@ -203,19 +273,31 @@ class CartItem {
         return nil
     }
     
-    // Capture historical prices when cart is completed
-    func captureHistoricalPrice(from vault: Vault) {
-        guard let item = getItem(from: vault),
-              let priceOption = item.priceOptions.first(where: { $0.store == selectedStore })
-        else { return }
-        
-        self.historicalPrice = priceOption.pricePerUnit.priceValue
-        self.historicalUnit = priceOption.pricePerUnit.unit
+    // MARK: - Shopping Mode Updates
+    
+    func updateActualData(price: Double? = nil, quantity: Double? = nil, unit: String? = nil, store: String? = nil) {
+        if let price = price { actualPrice = price }
+        if let quantity = quantity { actualQuantity = quantity }
+        if let unit = unit { actualUnit = unit }
+        if let store = store { actualStore = store }
     }
 }
 
-// Make sure CartStatus enum exists
-enum CartStatus: Int, Codable {
-    case active = 0      // Currently shopping, use current prices
-    case completed = 1   // Finished shopping, preserve historical prices
+// MARK: - Supporting Types for Insights
+struct CartInsights {
+    var plannedTotal: Double = 0.0
+    var actualTotal: Double = 0.0
+    var totalDifference: Double = 0.0
+    var priceChanges: [PriceChange] = []
+    
+    var isOverBudget: Bool { totalDifference > 0 }
+    var savings: Double { max(0, -totalDifference) }
+    var overspend: Double { max(0, totalDifference) }
+}
+
+struct PriceChange {
+    let itemName: String
+    let plannedPrice: Double
+    let actualPrice: Double
+    let difference: Double
 }

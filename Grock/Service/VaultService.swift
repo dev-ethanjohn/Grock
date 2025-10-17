@@ -1,10 +1,3 @@
-//
-//  VaultService.swift
-//  Grock
-//
-//  Created by Ethan John Paguntalan on 10/8/25.
-//
-
 import Foundation
 import SwiftData
 import Observation
@@ -14,9 +7,9 @@ import Observation
 class VaultService {
     private let modelContext: ModelContext
     
-    // Current state - now using User
+    // Current state
     var currentUser: User?
-    var vault: Vault? { currentUser?.userVault } // This stays the same
+    var vault: Vault? { currentUser?.userVault }
     
     var isLoading = false
     var error: Error?
@@ -26,48 +19,44 @@ class VaultService {
         loadUserAndVault()
     }
     
+    // MARK: - Computed Properties
     var sortedCategories: [Category] {
         vault?.categories.sorted { $0.sortOrder < $1.sortOrder } ?? []
     }
     
-    // In VaultService.swift - update loadUserAndVault method
+    // MARK: - User & Vault Management
     func loadUserAndVault() {
         isLoading = true
         defer { isLoading = false }
         
         do {
-            // First try to load existing user
             let userDescriptor = FetchDescriptor<User>()
             let users = try modelContext.fetch(userDescriptor)
             
             if let existingUser = users.first {
                 self.currentUser = existingUser
-                print("✅ Loaded existing user: \(existingUser.name)")
-                // Ensure all categories exist in existing vault
                 ensureAllCategoriesExist(in: existingUser.userVault)
             } else {
-                // Create new user with vault
                 let newUser = User(name: "Default User")
                 modelContext.insert(newUser)
-                
-                // Pre-populate with all categories
                 prePopulateCategories(in: newUser.userVault)
-                
                 try modelContext.save()
                 self.currentUser = newUser
-                print("✅ Created new user with vault: \(newUser.name)")
             }
         } catch {
             self.error = error
             print("❌ Failed to load user and vault: \(error)")
         }
     }
-
+    
+    func updateUserName(_ newName: String) {
+        currentUser?.name = newName
+        saveContext()
+    }
+    
+    // MARK: - Category Operations
     private func ensureAllCategoriesExist(in vault: Vault) {
-        // Create a dictionary of existing categories for quick lookup
         let existingCategoriesDict = Dictionary(uniqueKeysWithValues: vault.categories.map { ($0.name, $0) })
-        
-        // Create new array in the correct order WITH SORT ORDER
         var orderedCategories: [Category] = []
         var needsSave = false
         
@@ -75,73 +64,59 @@ class VaultService {
             let categoryName = groceryCategory.title
             
             if let existingCategory = existingCategoriesDict[categoryName] {
-                // Update sort order if needed
                 if existingCategory.sortOrder != index {
                     existingCategory.sortOrder = index
                     needsSave = true
                 }
                 orderedCategories.append(existingCategory)
             } else {
-                // Create new category with correct sort order
                 let newCategory = Category(name: categoryName)
                 newCategory.sortOrder = index
                 orderedCategories.append(newCategory)
                 needsSave = true
-                print("➕ Created missing category: \(categoryName) with order \(index)")
             }
         }
         
-        // Sort by sortOrder to ensure correct order
         vault.categories = orderedCategories.sorted { $0.sortOrder < $1.sortOrder }
         
         if needsSave {
             saveContext()
-            print("✅ Categories ordered with sort indexes")
         }
     }
 
     private func prePopulateCategories(in vault: Vault) {
-        // Clear any existing categories
         vault.categories.removeAll()
         
-        // Add categories with proper sort order
         for (index, groceryCategory) in GroceryCategory.allCases.enumerated() {
             let category = Category(name: groceryCategory.title)
             category.sortOrder = index
             vault.categories.append(category)
         }
         
-    //MARK: FOR LATER if needed
-//        // Add default stores
-//        let defaultStores = ["SM Supermarket", "Puregold", "Robinsons", "Metro Market"]
-//        for storeName in defaultStores {
-//            if !vault.stores.contains(where: { $0.name == storeName }) {
-//                let store = Store(name: storeName)
-//                vault.stores.append(store)
-//            }
-//        }
-        
-        vault.stores.sort { $0.name < $1.name }
-    }
-    
-    // MARK: - User Operations
-    func updateUserName(_ newName: String) {
-        currentUser?.name = newName
         saveContext()
     }
     
-    // MARK: - Category Operations
     func addCategory(_ category: GroceryCategory) {
         guard let vault = vault else { return }
         
         let newCategory = Category(name: category.title)
         vault.categories.append(newCategory)
-        
         saveContext()
     }
     
     func getCategory(_ groceryCategory: GroceryCategory) -> Category? {
         vault?.categories.first { $0.name == groceryCategory.title }
+    }
+    
+    func getCategory(for itemId: String) -> Category? {
+        guard let vault = vault else { return nil }
+        
+        for category in vault.categories {
+            if category.items.contains(where: { $0.id == itemId }) {
+                return category
+            }
+        }
+        return nil
     }
     
     // MARK: - Item Operations
@@ -154,7 +129,6 @@ class VaultService {
     ) {
         guard let vault = vault else { return }
         
-        // Find or create category
         let targetCategory: Category
         if let existingCategory = getCategory(category) {
             targetCategory = existingCategory
@@ -163,7 +137,6 @@ class VaultService {
             vault.categories.append(targetCategory)
         }
         
-        // Create item with price option
         let pricePerUnit = PricePerUnit(priceValue: price, unit: unit)
         let priceOption = PriceOption(store: store, pricePerUnit: pricePerUnit)
         let newItem = Item(name: name)
@@ -171,6 +144,88 @@ class VaultService {
         
         targetCategory.items.append(newItem)
         saveContext()
+    }
+    
+    func updateItem(
+        item: Item,
+        newName: String,
+        newCategory: GroceryCategory,
+        newStore: String,
+        newPrice: Double,
+        newUnit: String
+    ) {
+        guard let vault = vault else { return }
+        
+        // 1. Update the item properties
+        item.name = newName
+        
+        // 2. Update price options
+        if let existingPriceOption = item.priceOptions.first(where: { $0.store == newStore }) {
+            // Update existing store's price
+            existingPriceOption.pricePerUnit = PricePerUnit(priceValue: newPrice, unit: newUnit)
+        } else {
+            // Create new price option
+            let newPriceOption = PriceOption(
+                store: newStore,
+                pricePerUnit: PricePerUnit(priceValue: newPrice, unit: newUnit)
+            )
+            item.priceOptions.append(newPriceOption)
+        }
+        
+        // 3. Update category if needed
+        let currentCategory = vault.categories.first { $0.items.contains(where: { $0.id == item.id }) }
+        let targetCategory = getCategory(newCategory) ?? Category(name: newCategory.title)
+        
+        if currentCategory?.name != targetCategory.name {
+            // Remove from current category
+            currentCategory?.items.removeAll { $0.id == item.id }
+            
+            // Add to target category (create if needed)
+            if !vault.categories.contains(where: { $0.name == targetCategory.name }) {
+                vault.categories.append(targetCategory)
+            }
+            targetCategory.items.append(item)
+        }
+        
+        saveContext()
+        
+        // 4. Update all ACTIVE carts that contain this item
+        updateActiveCartsContainingItem(itemId: item.id)
+    }
+    
+    func updateItemFromCart(
+        itemId: String,
+        newName: String? = nil,
+        newCategory: GroceryCategory? = nil,
+        newStore: String? = nil,
+        newPrice: Double? = nil,
+        newUnit: String? = nil
+    ) {
+        guard let item = findItemById(itemId) else { return }
+        
+        // Get current category - use the first available GroceryCategory as default
+        var currentGroceryCategory: GroceryCategory = GroceryCategory.allCases.first!
+        if let currentCategory = getCategory(for: itemId),
+           let groceryCategory = GroceryCategory.allCases.first(where: { $0.title == currentCategory.name }) {
+            currentGroceryCategory = groceryCategory
+        }
+        
+        // Determine target store
+        let targetStore = newStore ?? item.priceOptions.first?.store ?? "Unknown Store"
+        
+        // Determine target price and unit
+        let targetPrice = newPrice ?? item.priceOptions.first(where: { $0.store == targetStore })?.pricePerUnit.priceValue ?? 0.0
+        let targetUnit = newUnit ?? item.priceOptions.first(where: { $0.store == targetStore })?.pricePerUnit.unit ?? "piece"
+        
+        // Update the item
+        updateItem(
+            item: item,
+            newName: newName ?? item.name,
+            newCategory: newCategory ?? currentGroceryCategory,
+            newStore: targetStore,
+            newPrice: targetPrice,
+            newUnit: targetUnit
+        )
     }
     
     func deleteItem(_ item: Item) {
@@ -185,6 +240,11 @@ class VaultService {
         }
     }
     
+    func getAllItems() -> [Item] {
+        guard let vault = vault else { return [] }
+        return vault.categories.flatMap { $0.items }
+    }
+    
     // MARK: - Store Operations
     func addStore(_ storeName: String) {
         guard let vault = vault else { return }
@@ -192,25 +252,18 @@ class VaultService {
         let trimmedStore = storeName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedStore.isEmpty else { return }
         
-        // Check if store already exists
         if !vault.stores.contains(where: { $0.name == trimmedStore }) {
             let newStore = Store(name: trimmedStore)
             vault.stores.append(newStore)
-            
-            // Sort stores by name
             vault.stores.sort { $0.name < $1.name }
             saveContext()
-            print("➕ Added new store to vault: \(trimmedStore)")
         }
     }
     
     func getAllStores() -> [String] {
         guard let vault = vault else { return [] }
         
-        // Get stores from Store objects
         let vaultStores = vault.stores.map { $0.name }
-        
-        // Combine with stores from existing items
         let itemStores = vault.categories.flatMap { category in
             category.items.flatMap { item in
                 item.priceOptions.map { $0.store }
@@ -221,103 +274,199 @@ class VaultService {
         return allStores
     }
     
-    // MARK: - Cart Operations
+    // MARK: - Cart Management
     func createCart(name: String, budget: Double) -> Cart {
-        let newCart = Cart(name: name, budget: budget)
+        let newCart = Cart(name: name, budget: budget, status: .planning)
         vault?.carts.append(newCart)
         saveContext()
         return newCart
     }
     
-    // MARK: - Helper
-    private func saveContext() {
-        do {
-            try modelContext.save()
-        } catch {
-            self.error = error
-            print("❌ Failed to save: \(error)")
-        }
-    }
-    
-    // In VaultService - make sure your updateItem method does this:
-    func updateItem(
-        item: Item,
-        newName: String,
-        newCategory: GroceryCategory,
-        newStore: String,
-        newPrice: Double,
-        newUnit: String
-    ) {
-        guard let vault = vault else { return }
+    func createCartWithActiveItems(name: String, budget: Double, activeItems: [String: Double]) -> Cart {
+        let newCart = createCart(name: name, budget: budget)
         
-        // 1. Update the item properties (your existing code)
-        item.name = newName
-        
-        // Update price options...
-        if let existingPriceOption = item.priceOptions.first(where: { $0.store == newStore }) {
-            existingPriceOption.pricePerUnit = PricePerUnit(priceValue: newPrice, unit: newUnit)
-        } else {
-            let newPriceOption = PriceOption(store: newStore, pricePerUnit: PricePerUnit(priceValue: newPrice, unit: newUnit))
-            item.priceOptions.append(newPriceOption)
-        }
-        
-        // Update category if needed...
-        let currentCategory = vault.categories.first { $0.items.contains(where: { $0.id == item.id }) }
-        let targetCategory = getCategory(newCategory) ?? Category(name: newCategory.title)
-        
-        if currentCategory?.name != targetCategory.name {
-            currentCategory?.items.removeAll { $0.id == item.id }
-            if !vault.categories.contains(where: { $0.name == targetCategory.name }) {
-                vault.categories.append(targetCategory)
+        for (itemId, quantity) in activeItems {
+            if let item = findItemById(itemId) {
+                addItemToCart(item: item, cart: newCart, quantity: quantity)
             }
-            targetCategory.items.append(item)
         }
         
+        updateCartTotals(cart: newCart)
         saveContext()
         
-        // 2. CRITICAL: Update all ACTIVE carts that contain this item
-        updateActiveCartsContainingItem(itemId: item.id)
+        return newCart
     }
     
-    // MARK: - Cart Status Management
-    func completeCart(_ cart: Cart) {
-        guard cart.isActive else { return }
+    func deleteCart(_ cart: Cart) {
+        vault?.carts.removeAll { $0.id == cart.id }
+        saveContext()
+        print("🗑️ Deleted cart: \(cart.name)")
+    }
+    
+    // MARK: - Cart Mode Management
+    func startShopping(cart: Cart) {
+        guard cart.status == .planning else { return }
         
-        // Capture historical prices for all items
+        // Capture planned prices for all items (FREEZE planned data)
         for cartItem in cart.cartItems {
-            cartItem.captureHistoricalPrice(from: vault!)
+            cartItem.capturePlannedData(from: vault!)
+        }
+        
+        cart.status = .shopping
+        updateCartTotals(cart: cart)
+        saveContext()
+        print("🛒 Started shopping for: \(cart.name)")
+    }
+    
+    func completeShopping(cart: Cart) {
+        guard cart.status == .shopping else { return }
+        
+        // Capture actual data for all items
+        for cartItem in cart.cartItems {
+            cartItem.captureActualData()
         }
         
         cart.status = .completed
-        cart.fulfillmentStatus = 1.0 // 100% fulfilled
-        
+        updateCartTotals(cart: cart)
         saveContext()
-        print("✅ Completed cart: \(cart.name) - Prices preserved historically")
+        print("✅ Completed shopping for: \(cart.name)")
     }
-
-    // REMOVED: archiveCart method
-    // REMOVED: reactivateCart method
-
-    // NEW: Simple reactivation for completed carts
-    func reactivateCart(_ cart: Cart) {
-        guard cart.isCompleted else { return }
+    
+    func reopenCart(cart: Cart) {
+        guard cart.status == .completed else { return }
         
-        cart.status = .active
+        cart.status = .shopping
         
-        // Clear historical prices since we're active again
+        // Clear actual data since we're active again
         for cartItem in cart.cartItems {
-            cartItem.historicalPrice = nil
-            cartItem.historicalUnit = nil
+            cartItem.actualPrice = nil
+            cartItem.actualQuantity = nil
+            cartItem.actualUnit = nil
+            cartItem.actualStore = nil
+            cartItem.isFulfilled = false
         }
         
         // Update totals with current prices
         updateCartTotals(cart: cart)
         
         saveContext()
-        print("🔄 Reactivated cart: \(cart.name) - Now using current prices")
+        print("🔄 Reopened cart: \(cart.name) - Now using current prices")
     }
-
-    // UPDATED: Update cart totals - respect cart status
+    
+    // MARK: - Cart Item Operations
+    func addItemToCart(item: Item, cart: Cart, quantity: Double, selectedStore: String? = nil) {
+        let store = selectedStore ?? item.priceOptions.first?.store ?? "Unknown Store"
+        
+        let cartItem = CartItem(
+            itemId: item.id,
+            quantity: quantity,
+            plannedStore: store
+        )
+        
+        // If cart is already in shopping mode, capture planned data immediately
+        if cart.status == .shopping {
+            cartItem.capturePlannedData(from: vault!)
+        }
+        
+        cart.cartItems.append(cartItem)
+        updateCartTotals(cart: cart)
+        saveContext()
+        print("➕ Added item to cart: \(item.name) ×\(quantity)")
+    }
+    
+    func updateCartItemActualData(
+        cart: Cart,
+        itemId: String,
+        actualPrice: Double? = nil,
+        actualQuantity: Double? = nil,
+        actualUnit: String? = nil,
+        actualStore: String? = nil
+    ) {
+        guard let cartItem = cart.cartItems.first(where: { $0.itemId == itemId }),
+              cart.status == .shopping else { return }
+        
+        // Update the actual data
+        if let actualPrice = actualPrice {
+            cartItem.actualPrice = actualPrice
+        }
+        if let actualQuantity = actualQuantity {
+            cartItem.actualQuantity = actualQuantity
+        }
+        if let actualUnit = actualUnit {
+            cartItem.actualUnit = actualUnit
+        }
+        if let actualStore = actualStore {
+            cartItem.actualStore = actualStore
+        }
+        
+        updateCartTotals(cart: cart)
+        saveContext()
+        print("💰 Updated cart item actual data")
+    }
+    
+    func updateCartItemPrice(
+        cart: Cart,
+        itemId: String,
+        newPrice: Double?,
+        newQuantity: Double?,
+        newUnit: String? = nil
+    ) {
+        updateCartItemActualData(
+            cart: cart,
+            itemId: itemId,
+            actualPrice: newPrice,
+            actualQuantity: newQuantity,
+            actualUnit: newUnit
+        )
+    }
+    
+    func changeCartItemStore(cart: Cart, itemId: String, newStore: String) {
+        guard let vault = vault else { return }
+        
+        if let cartItem = cart.cartItems.first(where: { $0.itemId == itemId }) {
+            switch cart.status {
+            case .planning:
+                cartItem.plannedStore = newStore
+                // Update planned price/unit from vault for the new store
+                if let newPrice = cartItem.getCurrentPrice(from: vault, store: newStore) {
+                    cartItem.plannedPrice = newPrice
+                }
+                if let newUnit = cartItem.getCurrentUnit(from: vault, store: newStore) {
+                    cartItem.plannedUnit = newUnit
+                }
+                
+            case .shopping:
+                cartItem.actualStore = newStore
+                // Auto-update actual price/unit from vault for the new store
+                if let newPrice = cartItem.getCurrentPrice(from: vault, store: newStore) {
+                    cartItem.actualPrice = newPrice
+                }
+                if let newUnit = cartItem.getCurrentUnit(from: vault, store: newStore) {
+                    cartItem.actualUnit = newUnit
+                }
+                
+            case .completed:
+                // Don't allow store changes in completed carts
+                return
+            }
+            
+            updateCartTotals(cart: cart)
+            saveContext()
+            print("🏪 Updated cart item store to: \(newStore)")
+        }
+    }
+    
+    func toggleItemFulfillment(cart: Cart, itemId: String) {
+        guard let cartItem = cart.cartItems.first(where: { $0.itemId == itemId }),
+              cart.status == .shopping else { return }
+        
+        cartItem.isFulfilled.toggle()
+        updateCartTotals(cart: cart)
+        saveContext()
+        print(cartItem.isFulfilled ? "✅ Fulfilled item" : "❌ Unfulfilled item")
+    }
+    
+    // MARK: - Cart Calculations & Insights
     func updateCartTotals(cart: Cart) {
         guard let vault = vault else { return }
         
@@ -329,143 +478,65 @@ class VaultService {
         
         cart.totalSpent = totalSpent
         
-        // Update fulfillment status for active carts only
-        if cart.isActive && cart.budget > 0 {
-            cart.fulfillmentStatus = min(totalSpent / cart.budget, 1.0)
+        // Update fulfillment status based on mode
+        switch cart.status {
+        case .planning:
+            if cart.budget > 0 {
+                cart.fulfillmentStatus = min(totalSpent / cart.budget, 1.0)
+            }
+        case .shopping:
+            let fulfilledCount = cart.cartItems.filter { $0.isFulfilled }.count
+            let totalCount = cart.cartItems.count
+            cart.fulfillmentStatus = totalCount > 0 ? Double(fulfilledCount) / Double(totalCount) : 0.0
+        case .completed:
+            cart.fulfillmentStatus = 1.0
         }
         
         saveContext()
-    }
-
-    // UPDATED: Update item from cart - only affect active carts
-    func updateItemFromCart(
-        itemId: String,
-        newName: String? = nil,
-        newCategory: GroceryCategory? = nil,
-        newStore: String? = nil,
-        newPrice: Double? = nil,
-        newUnit: String? = nil
-    ) {
-        guard let vault = vault,
-              let item = findItemById(itemId) else { return }
-        
-        var needsSave = false
-        
-        // Update item name if provided
-        if let newName = newName, !newName.isEmpty, item.name != newName {
-            item.name = newName
-            needsSave = true
-            print("✏️ Updated item name to: \(newName)")
-        }
-        
-        // Update category if provided
-        if let newCategory = newCategory {
-            let currentCategory = vault.categories.first { $0.items.contains(where: { $0.id == itemId }) }
-            let targetCategory = getCategory(newCategory) ?? Category(name: newCategory.title)
-            
-            if currentCategory?.name != targetCategory.name {
-                currentCategory?.items.removeAll { $0.id == itemId }
-                
-                if !vault.categories.contains(where: { $0.name == targetCategory.name }) {
-                    vault.categories.append(targetCategory)
-                }
-                targetCategory.items.append(item)
-                needsSave = true
-                print("🔄 Moved item to category: \(newCategory.title)")
-            }
-        }
-        
-        // Update price options if provided
-        if let newStore = newStore, let newPrice = newPrice, let newUnit = newUnit {
-            if let existingPriceOption = item.priceOptions.first(where: { $0.store == newStore }) {
-                // Update existing store's price
-                existingPriceOption.pricePerUnit = PricePerUnit(priceValue: newPrice, unit: newUnit)
-                needsSave = true
-                print("💰 Updated price for \(newStore): ₱\(newPrice) per \(newUnit)")
-            } else {
-                // Create new price option
-                let newPriceOption = PriceOption(
-                    store: newStore,
-                    pricePerUnit: PricePerUnit(priceValue: newPrice, unit: newUnit)
-                )
-                item.priceOptions.append(newPriceOption)
-                needsSave = true
-                print("➕ Added new price option: \(newStore) @ ₱\(newPrice) per \(newUnit)")
-            }
-        }
-        
-        if needsSave {
-            saveContext()
-            
-            // Update ONLY ACTIVE carts that contain this item
-            updateActiveCartsContainingItem(itemId: itemId)
-        }
-    }
-
-    // UPDATED: Only update active carts
-    private func updateActiveCartsContainingItem(itemId: String) {
-        guard let vault = vault else { return }
-        
-        for cart in vault.carts where cart.isActive {
-            if cart.cartItems.contains(where: { $0.itemId == itemId }) {
-                updateCartTotals(cart: cart)
-            }
-        }
-        saveContext()
-        print("🔄 Updated active carts with new item prices")
     }
     
-    // MARK: - Cart Item Operations
-    func createCartWithActiveItems(name: String, budget: Double, activeItems: [String: Double]) -> Cart {
-        let newCart = createCart(name: name, budget: budget)
+    func getCartInsights(cart: Cart) -> CartInsights {
+        guard let vault = vault else { return CartInsights() }
         
-        // Add all active items to the cart
-        for (itemId, quantity) in activeItems {
-            if let item = findItemById(itemId) {
-                addItemToCart(item: item, cart: newCart, quantity: quantity)
+        var insights = CartInsights()
+        
+        for cartItem in cart.cartItems {
+            let plannedPrice = cartItem.plannedPrice ?? 0.0
+            let actualPrice = cartItem.actualPrice ?? plannedPrice
+            let plannedQty = cartItem.quantity
+            let actualQty = cartItem.actualQuantity ?? plannedQty
+            
+            let plannedTotal = plannedPrice * plannedQty
+            let actualTotal = actualPrice * actualQty
+            let difference = actualTotal - plannedTotal
+            
+            insights.plannedTotal += plannedTotal
+            insights.actualTotal += actualTotal
+            insights.totalDifference += difference
+            
+            if difference != 0 {
+                insights.priceChanges.append(PriceChange(
+                    itemName: cartItem.getItem(from: vault)?.name ?? "Unknown",
+                    plannedPrice: plannedPrice,
+                    actualPrice: actualPrice,
+                    difference: difference
+                ))
             }
         }
         
-        updateCartTotals(cart: newCart)
-        saveContext()
-        
-        print("🛒 Created cart '\(name)' with \(newCart.cartItems.count) items")
-        return newCart
+        return insights
     }
-
-    func addItemToCart(item: Item, cart: Cart, quantity: Double, selectedStore: String? = nil) {
-        // Use the first store if none specified
-        let store = selectedStore ?? item.priceOptions.first?.store ?? "Unknown Store"
-        
-        let cartItem = CartItem(
-            itemId: item.id,
-            quantity: quantity,
-            selectedStore: store
-        )
-        
-        cart.cartItems.append(cartItem)
-        updateCartTotals(cart: cart)
-        
-        saveContext()
-        print("➕ Added item to cart: \(item.name) ×\(quantity)")
-    }
-
-    func deleteCart(_ cart: Cart) {
-        vault?.carts.removeAll { $0.id == cart.id }
-        saveContext()
-        print("🗑️ Deleted cart: \(cart.name)")
-    }
-
-    func updateCartItemStore(cart: Cart, itemId: String, newStore: String) {
-        if let cartItem = cart.cartItems.first(where: { $0.itemId == itemId }) {
-            cartItem.selectedStore = newStore
-            updateCartTotals(cart: cart)
-            saveContext()
-            print("🏪 Updated cart item store to: \(newStore)")
+    
+    // MARK: - Helper Methods
+    private func saveContext() {
+        do {
+            try modelContext.save()
+        } catch {
+            self.error = error
+            print("❌ Failed to save: \(error)")
         }
     }
-
-    // MARK: - Helper Methods
+    
     func findItemById(_ itemId: String) -> Item? {
         guard let vault = vault else { return nil }
         
@@ -476,22 +547,16 @@ class VaultService {
         }
         return nil
     }
-
-    // MARK: - Item Search and Management
-    func getCategory(for itemId: String) -> Category? {
-        guard let vault = vault else { return nil }
+    
+    private func updateActiveCartsContainingItem(itemId: String) {
+        guard let vault = vault else { return }
         
-        for category in vault.categories {
-            if category.items.contains(where: { $0.id == itemId }) {
-                return category
+        for cart in vault.carts where cart.isShopping {
+            if cart.cartItems.contains(where: { $0.itemId == itemId }) {
+                updateCartTotals(cart: cart)
             }
         }
-        return nil
-    }
-
-    func getAllItems() -> [Item] {
-        guard let vault = vault else { return [] }
-        
-        return vault.categories.flatMap { $0.items }
+        saveContext()
+        print("🔄 Updated active carts with new item prices")
     }
 }

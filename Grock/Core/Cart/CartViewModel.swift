@@ -2,7 +2,6 @@ import Foundation
 import SwiftUI
 import Observation
 
-
 @MainActor
 @Observable
 class CartViewModel {
@@ -63,13 +62,13 @@ class CartViewModel {
     
     // MARK: - Cart Status Management
     func completeCart(_ cart: Cart) {
-        vaultService.completeCart(cart)
-        loadCarts() // Refresh the carts list
+        vaultService.completeShopping(cart: cart)
+        loadCarts()
     }
     
     func reactivateCart(_ cart: Cart) {
-        vaultService.reactivateCart(cart)
-        loadCarts() // Refresh the carts list
+        vaultService.reopenCart(cart: cart)
+        loadCarts()
     }
     
     func deleteCart(_ cart: Cart) {
@@ -106,9 +105,11 @@ class CartViewModel {
     
     // MARK: - Cart Item Updates
     func updateCartItemStore(cart: Cart, itemId: String, newStore: String) {
-        vaultService.updateCartItemStore(cart: cart, itemId: itemId, newStore: newStore)
+        vaultService.changeCartItemStore(cart: cart, itemId: itemId, newStore: newStore)
     }
     
+    // MARK: - Item Editing (Updates both cart and vault)
+    // MARK: - Item Editing (Updates both cart and vault)
     // MARK: - Item Editing (Updates both cart and vault)
     func updateItemFromCart(
         itemId: String,
@@ -118,13 +119,31 @@ class CartViewModel {
         newPrice: Double? = nil,
         newUnit: String? = nil
     ) {
-        vaultService.updateItemFromCart(
-            itemId: itemId,
-            newName: newName,
-            newCategory: newCategory,
-            newStore: newStore,
-            newPrice: newPrice,
-            newUnit: newUnit
+        // Find the item first
+        guard let item = vaultService.findItemById(itemId) else { return }
+        
+        // Get current category - use the first available GroceryCategory as default
+        var currentGroceryCategory: GroceryCategory = GroceryCategory.allCases.first!
+        if let currentCategory = vaultService.getCategory(for: itemId),
+           let groceryCategory = GroceryCategory.allCases.first(where: { $0.title == currentCategory.name }) {
+            currentGroceryCategory = groceryCategory
+        }
+        
+        // Determine target store
+        let targetStore = newStore ?? item.priceOptions.first?.store ?? "Unknown Store"
+        
+        // Determine target price and unit
+        let targetPrice = newPrice ?? item.priceOptions.first(where: { $0.store == targetStore })?.pricePerUnit.priceValue ?? 0.0
+        let targetUnit = newUnit ?? item.priceOptions.first(where: { $0.store == targetStore })?.pricePerUnit.unit ?? "piece"
+        
+        // Use existing updateItem method
+        vaultService.updateItem(
+            item: item,
+            newName: newName ?? item.name,
+            newCategory: newCategory ?? currentGroceryCategory,
+            newStore: targetStore,
+            newPrice: targetPrice,
+            newUnit: targetUnit
         )
     }
 }
