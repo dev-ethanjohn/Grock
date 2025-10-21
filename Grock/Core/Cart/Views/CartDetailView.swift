@@ -15,6 +15,7 @@ struct CartDetailView: View {
     
     // Filter state
     @State private var selectedFilter: FilterOption = .all
+    @State private var showingFilterSheet = false
     
     private var cartInsights: CartInsights {
         vaultService.getCartInsights(cart: cart)
@@ -40,8 +41,8 @@ struct CartDetailView: View {
             // Header with cart name and totals
             headerView
             
-            // Filter bar
-            filterBarView
+            // Mode toggle and filter bar
+            modeToggleView
             
             // Items list grouped by store
             itemsListView
@@ -51,22 +52,20 @@ struct CartDetailView: View {
         }
         .background(Color(.systemGroupedBackground))
         .navigationBarBackButtonHidden(true)
-//        .sheet(isPresented: $showingEditSheet) {
-//            if let editingItem = editingItem,
-//               let item = vaultService.findItemById(editingItem.itemId) {
-//                EditItemSheet(
-//                    item: item,
-//                    cartItem: editingItem,
-//                    cart: cart,
-//                    isPresented: $showingEditSheet,
-//                    onSave: { updatedItem in
-//                        vaultService.updateCartTotals(cart: cart)
-//                    },
-//                    context: .cart
-//                )
-//                .environment(vaultService)
-//            }
-//        }
+        .sheet(isPresented: $showingEditSheet) {
+            if let editingItem = editingItem,
+               let item = vaultService.findItemById(editingItem.itemId) {
+                EditItemSheet(
+                    item: item,
+                    isPresented: $showingEditSheet,
+                    onSave: { updatedItem in
+                        vaultService.updateCartTotals(cart: cart)
+                    },
+                    context: .cart
+                )
+                .environment(vaultService)
+            }
+        }
         .alert("Start Shopping", isPresented: $showingStartShoppingAlert) {
             Button("Cancel", role: .cancel) { }
             Button("Start Shopping") {
@@ -92,40 +91,22 @@ struct CartDetailView: View {
         } message: {
             Text("Are you sure you want to delete this cart? This action cannot be undone.")
         }
+        .sheet(isPresented: $showingFilterSheet) {
+            FilterSheet(selectedFilter: $selectedFilter)
+        }
     }
     
-    // MARK: - Header View
     private var headerView: some View {
-        VStack(spacing: 16) {
-            // Back button and cart name
+        VStack(alignment: .leading, spacing: 8) {
+            //MARK: toolbar
             HStack {
                 Button(action: { dismiss() }) {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 18, weight: .medium))
                         .foregroundColor(.black)
                 }
-                
                 Spacer()
-                
-                VStack(spacing: 4) {
-                    Text(cart.name)
-                        .font(.fuzzyBold_20)
-                        .foregroundColor(.black)
-                    
-                    // Mode badge
-                    Text(cart.status.displayName.uppercased())
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(cart.status.color)
-                        .cornerRadius(6)
-                }
-                
-                Spacer()
-                
                 Menu {
-                    // Mode-specific actions
                     if cart.isPlanning {
                         Button("Start Shopping", systemImage: "cart") {
                             showingStartShoppingAlert = true
@@ -139,7 +120,6 @@ struct CartDetailView: View {
                             vaultService.reopenCart(cart: cart)
                         }
                     }
-                    
                     Divider()
                     
                     Button("Delete Cart", systemImage: "trash", role: .destructive) {
@@ -149,9 +129,14 @@ struct CartDetailView: View {
                     Image(systemName: "ellipsis")
                         .font(.system(size: 18, weight: .medium))
                         .foregroundColor(.black)
-                        .frame(width: 44, height: 44)
                 }
             }
+   
+                
+            Text(cart.name)
+                .lexendFont(22, weight: .bold)
+                .foregroundColor(.black)
+                .padding(.top, 4)
             
             // Total and budget
             VStack(spacing: 8) {
@@ -188,27 +173,67 @@ struct CartDetailView: View {
         .padding(.bottom, 16)
     }
     
-    // MARK: - Filter Bar
-    private var filterBarView: some View {
-        HStack {
-            Text("Filter:")
-                .font(.system(size: 14, weight: .medium))
-                .foregroundColor(.gray)
-            
-            Picker("Filter", selection: $selectedFilter) {
-                ForEach(FilterOption.allCases, id: \.self) { option in
-                    Text(option.rawValue).tag(option)
+    // MARK: - Mode Toggle View
+    private var modeToggleView: some View {
+        HStack(spacing: 12) {
+            // Planning/Shopping Toggle - Simple UI toggle only
+            HStack(spacing: 0) {
+                Button(action: {
+                    // Just visual toggle - don't change actual cart status
+                    if cart.status == .shopping {
+                        cart.status = .planning
+                        vaultService.updateCartTotals(cart: cart)
+                    }
+                }) {
+                    Text("Planning")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundColor(cart.isPlanning ? .white : .black)
+                        .padding(.vertical, 8)
+                        .padding(.horizontal, 20)
+                        .background(cart.isPlanning ? Color.black : Color.clear)
+                        .cornerRadius(8)
                 }
+                .disabled(cart.isCompleted)
+                
+                Button(action: {
+                    // Just visual toggle - don't change actual cart status
+                    if cart.status == .planning {
+                        cart.status = .shopping
+                        vaultService.updateCartTotals(cart: cart)
+                    }
+                }) {
+                    Text("Shopping")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundColor(cart.isShopping ? .white : .black)
+                        .padding(.vertical, 8)
+                        .padding(.horizontal, 20)
+                        .background(cart.isShopping ? Color.black : Color.clear)
+                        .cornerRadius(8)
+                }
+                .disabled(cart.isCompleted)
             }
-            .pickerStyle(.segmented)
-            .padding(.horizontal, 8)
+            .background(Color(.systemGray6))
+            .cornerRadius(10)
             
             Spacer()
             
-            // Items count
-            Text("\(cart.cartItems.count) items")
-                .font(.system(size: 14, weight: .medium))
-                .foregroundColor(.gray)
+            // Filter icon (hamburger lines in circle)
+            Button(action: {
+                showingFilterSheet = true
+            }) {
+                Image(systemName: "line.3.horizontal.decrease.circle")
+                    .font(.system(size: 24))
+                    .foregroundColor(.black)
+            }
+            
+            // Empty filter icon (circle outline)
+            Button(action: {
+                // Future filter functionality
+            }) {
+                Image(systemName: "circle")
+                    .font(.system(size: 24))
+                    .foregroundColor(.black)
+            }
         }
         .padding(.horizontal)
         .padding(.vertical, 12)
@@ -312,12 +337,6 @@ struct CartDetailView: View {
 
 // MARK: - Supporting Types
 
-enum FilterOption: String, CaseIterable {
-    case all = "All"
-    case fulfilled = "Fulfilled"
-    case unfulfilled = "Unfulfilled"
-}
-
 struct StoreSectionView: View {
     let store: String
     let items: [(cartItem: CartItem, item: Item?)]
@@ -364,7 +383,7 @@ struct StoreSectionView: View {
                     
                     if cartItem.itemId != items.last?.cartItem.itemId {
                         Divider()
-                            .padding(.leading, 52)
+                            .padding(.leading, cart.isShopping ? 52 : 16)
                     }
                 }
             }
@@ -423,7 +442,7 @@ struct CartItemRowView: View {
     
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            // Checkbox (only in shopping mode)
+            // Checkbox (only visible in shopping mode)
             if cart.isShopping {
                 Button(action: onToggleFulfillment) {
                     Image(systemName: cartItem.isFulfilled ? "checkmark.circle.fill" : "circle")
@@ -485,5 +504,43 @@ struct CartItemRowView: View {
         formatter.currencyCode = "PHP"
         formatter.maximumFractionDigits = value == Double(Int(value)) ? 0 : 2
         return formatter.string(from: NSNumber(value: value)) ?? "₱\(value)"
+    }
+}
+
+// MARK: - Filter Sheet
+struct FilterSheet: View {
+    @Binding var selectedFilter: FilterOption
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        NavigationView {
+            List {
+                ForEach(FilterOption.allCases, id: \.self) { option in
+                    Button(action: {
+                        selectedFilter = option
+                        dismiss()
+                    }) {
+                        HStack {
+                            Text(option.rawValue)
+                                .foregroundColor(.black)
+                            Spacer()
+                            if selectedFilter == option {
+                                Image(systemName: "checkmark")
+                                    .foregroundColor(.blue)
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Filter Items")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+        }
     }
 }

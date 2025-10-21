@@ -63,7 +63,7 @@ struct HomeView: View {
                         LazyVStack(spacing: 12) {
                             ForEach(viewModel.displayedCarts) { cart in
                                 NavigationLink(value: cart) {
-                                    CartRowView(cart: cart, vaultService: viewModel.getVaultService(for: cart))
+                                    HomeCartRowView(cart: cart, vaultService: viewModel.getVaultService(for: cart))
                                 }
                                 .buttonStyle(PlainButtonStyle())
                             }

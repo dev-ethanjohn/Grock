@@ -1,7 +1,7 @@
 import SwiftUI
-import SwiftData // Add this import
+import SwiftData
 
-struct CartRowView: View {
+struct HomeCartRowView: View {
     let cart: Cart
     let vaultService: VaultService?
     
@@ -204,7 +204,7 @@ struct BudgetProgressText: View {
     )
     
     // Just pass nil for vaultService - it will use mock categories
-    CartRowView(cart: mockCart, vaultService: nil)
+    HomeCartRowView(cart: mockCart, vaultService: nil)
         .padding()
         .background(Color.gray.opacity(0.1))
 }
