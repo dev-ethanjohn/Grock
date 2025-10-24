@@ -11,7 +11,7 @@ extension View {
     /// This `offset` is needed to get the CGRect value from the view
     /// with this function, we can get the values we needed
     @ViewBuilder
-    func offset(completion: @escaping (CGRect)->()) -> some View {
+    func offset(completion: @escaping (CGRect) -> ()) -> some View {
         self
             .overlay {
                 GeometryReader { geo in
@@ -19,7 +19,11 @@ extension View {
                     Color.clear
                         .preference(key: OffsetKey.self, value: rect)
                         .onPreferenceChange(OffsetKey.self) { value in
-                            completion(value)
+                            // Only update if the rect actually changed significantly
+                            // This prevents multiple updates per frame
+                            DispatchQueue.main.async {
+                                completion(value)
+                            }
                         }
                 }
             }
@@ -47,33 +51,35 @@ struct Constants {
 
 // MARK: - Vertical Scroll View with Custom Indicator
 struct VerticalScrollViewWithCustomIndicator<Content: View>: View {
-    
     private let contentBody: () -> Content
-    
-    init(@ViewBuilder content: @escaping () -> Content) {
+    private let maxHeight: CGFloat
+    private let indicatorVerticalPadding: CGFloat
+
+    init(
+        maxHeight: CGFloat = 200,
+        indicatorVerticalPadding: CGFloat = 0,
+        @ViewBuilder content: @escaping () -> Content
+    ) {
+        self.maxHeight = maxHeight
+        self.indicatorVerticalPadding = indicatorVerticalPadding
         self.contentBody = content
     }
-    
+
     @State private var scrollPosition: CGPoint = .zero
-    @State private var startOffset: CGFloat = 0
     @State private var indicatorOffset: CGFloat = 0
     @State private var contentHeight: CGFloat = 0
-    
-    private let indicatorBgHeight: CGFloat = 200
-    private let indicatorFrontHeight: CGFloat = 60
-    private let indicatorWidth: CGFloat = 6
+
+    private let indicatorWidth: CGFloat = 4
     private let paddingContentToScrollIndicator: CGFloat = 0
     
+    // Add throttling to prevent rapid updates
+    @State private var lastUpdateTime: Date = Date()
+
     var body: some View {
         HStack(alignment: .top, spacing: 0) {
-            
             GeometryReader { geometryParent in
-                
                 HStack(alignment: .top, spacing: 0) {
-                    
                     ScrollView(.vertical, showsIndicators: false) {
-                        
-                        // MARK: Scroll view content
                         contentBody()
                             .background(
                                 GeometryReader { contentGeometry in
@@ -81,37 +87,11 @@ struct VerticalScrollViewWithCustomIndicator<Content: View>: View {
                                         .onAppear {
                                             contentHeight = contentGeometry.size.height
                                         }
-                                        .onChange(of: contentGeometry.size.height) {_, newHeight in
+                                        .onChange(of: contentGeometry.size.height) { _, newHeight in
                                             contentHeight = newHeight
                                         }
                                 }
                             )
-                            .offset { rect in
-                                
-                                // MARK: FINDING SCROLL INDICATOR OFFSET (VERTICAL)
-                                let viewHeight = geometryParent.size.height
-                                
-                                // Calculate how much content is visible vs hidden
-                                let hiddenContentHeight = max(0, contentHeight - viewHeight)
-                                
-                                if hiddenContentHeight > 0 {
-                                    // Current scroll position (0 = top, hiddenContentHeight = bottom)
-                                    let currentScroll = -scrollPosition.y
-                                    
-                                    // Calculate progress (0 to 1)
-                                    let scrollProgress = max(0, min(1, currentScroll / hiddenContentHeight))
-                                    
-                                    // Calculate indicator position within available space
-                                    let availableSpace = indicatorBgHeight - indicatorFrontHeight
-                                    let newOffset = scrollProgress * availableSpace
-                                    
-                                    // Apply bounds checking
-                                    indicatorOffset = max(0, min(newOffset, availableSpace))
-                                } else {
-                                    indicatorOffset = 0
-                                }
-                                
-                            }
                             .background(
                                 GeometryReader { geometry in
                                     Color.clear
@@ -123,55 +103,65 @@ struct VerticalScrollViewWithCustomIndicator<Content: View>: View {
                             )
                             .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
                                 self.scrollPosition = value
+                                updateIndicatorOffset(viewHeight: geometryParent.size.height)
                             }
-                        
                     }
                     .coordinateSpace(name: Constants.offsetNameSpace)
-                    
                 }
                 .padding(0)
-                
             }
-            .offset { rect in
-                if startOffset != rect.minY {
-                    startOffset = rect.minY
-                }
-            }
-            
-            
-            // MARK: Custom vertical scroll view indicator
+
             GeometryReader { geometry in
-                
-                // Apply clipping to the entire ZStack container
+                let indicatorBgHeight = geometry.size.height
+                let trackHeight = indicatorBgHeight - (indicatorVerticalPadding * 2)
+                let visibleRatio = indicatorBgHeight / max(contentHeight, indicatorBgHeight)
+                let indicatorFrontHeight = max(12, trackHeight * visibleRatio)
+
                 ZStack(alignment: .top) {
-                    // Background track - this defines the clipping bounds
+                    // Background track - apply vertical padding here
                     RoundedRectangle(cornerRadius: 2)
-                        .fill(Color.gray.opacity(0.3))
-                        .frame(width: indicatorWidth, height: indicatorBgHeight)
+                        .fill(Color.gray.opacity(0.025))
+                        .frame(width: indicatorWidth)
                         .padding(.trailing, paddingContentToScrollIndicator)
-                        .zIndex(0)
-                    
-                    
+                        .padding(.vertical, indicatorVerticalPadding) // Padding only on track
+
+                    // Foreground scroll indicator - NO vertical padding on thumb
                     RoundedRectangle(cornerRadius: 2)
                         .frame(width: indicatorWidth, height: indicatorFrontHeight)
-                        .foregroundColor(.gray.opacity(0.7))
+                        .foregroundColor(.gray.opacity(0.5))
                         .padding(.trailing, paddingContentToScrollIndicator)
-                        .zIndex(1)
                         .offset(y: indicatorOffset)
                         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: indicatorOffset)
                 }
-                
-                .frame(height: indicatorBgHeight)
                 .clipped()
                 .offset(x: 8)
-                
             }
             .frame(width: 20)
-            
-            
         }
         .padding(0)
-        .frame(maxHeight: 200)
+        .frame(maxHeight: maxHeight)
+    }
+    
+    private func updateIndicatorOffset(viewHeight: CGFloat) {
+        // Throttle updates to prevent multiple updates per frame
+        let now = Date()
+        guard now.timeIntervalSince(lastUpdateTime) > 0.016 else { return } // ~60fps
+        lastUpdateTime = now
+        
+        let hiddenContentHeight = max(0, contentHeight - viewHeight)
+        let trackHeight = viewHeight - (indicatorVerticalPadding * 2)
+        let visibleRatio = viewHeight / max(contentHeight, viewHeight)
+        let indicatorFrontHeight = max(30, trackHeight * visibleRatio)
+
+        if hiddenContentHeight > 0 {
+            let currentScroll = -scrollPosition.y
+            let scrollProgress = max(0, min(1, currentScroll / hiddenContentHeight))
+            let availableSpace = trackHeight - indicatorFrontHeight
+            indicatorOffset = indicatorVerticalPadding + (scrollProgress * availableSpace)
+        } else {
+            // When no scrolling needed, center the thumb in the track
+            indicatorOffset = indicatorVerticalPadding + (trackHeight - indicatorFrontHeight) / 2
+        }
     }
 }
 
@@ -301,7 +291,7 @@ struct CartConfirmationPopover: View {
     
     private var itemsListView: some View {
         Group {
-            if activeItemsWithDetails.count <= 4 {
+            if activeItemsWithDetails.count <= 7 {
                 // Just use VStack for small number of items
                 VStack(spacing: 0) {
                     ForEach(Array(activeItemsWithDetails.enumerated()), id: \.element.item.id) { index, data in
@@ -312,7 +302,7 @@ struct CartConfirmationPopover: View {
                 .padding(.horizontal, 20)
             } else {
                 // Use Custom ScrollView with moving indicator
-                VerticalScrollViewWithCustomIndicator {
+                VerticalScrollViewWithCustomIndicator(maxHeight: 200) {
                     LazyVStack(spacing: 0) {
                         ForEach(Array(activeItemsWithDetails.enumerated()), id: \.element.item.id) { index, data in
                             let (item, quantity) = data

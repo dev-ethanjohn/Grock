@@ -32,14 +32,14 @@ struct HomeView: View {
             }
             .navigationDestination(isPresented: $viewModel.showCartPage) {
                 if let cart = viewModel.newlyCreatedCart {
-                    CartDetailView(cart: cart)
+                    CartDetailScreen(cart: cart)
                         .onAppear {
                             viewModel.newlyCreatedCart = nil
                         }
                 }
             }
             .navigationDestination(for: Cart.self) { cart in
-                CartDetailView(cart: cart)
+                CartDetailScreen(cart: cart)
             }
             .onAppear {
                 viewModel.loadCarts()
@@ -107,14 +107,14 @@ struct HomeView: View {
                 Spacer()
                 trailingToolbarButton
             }
-            .padding(.horizontal, 20)
+            .padding(.horizontal)
             .padding(.top, 60)
             
             VStack(spacing: 24) {
                 greetingText
                 tabButtons
             }
-            .padding(.horizontal, 20)
+            .padding(.horizontal)
             .padding(.bottom, 4)
         }
         .frame(maxWidth: .infinity)
@@ -220,7 +220,7 @@ struct HomeView: View {
     private var fingerPointer: some View {
         FingerPointer()
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-            .padding(.trailing, 20)
+            .padding(.trailing)
             .padding(.top, 120)
     }
     

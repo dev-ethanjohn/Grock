@@ -109,8 +109,6 @@ class CartViewModel {
     }
     
     // MARK: - Item Editing (Updates both cart and vault)
-    // MARK: - Item Editing (Updates both cart and vault)
-    // MARK: - Item Editing (Updates both cart and vault)
     func updateItemFromCart(
         itemId: String,
         newName: String? = nil,

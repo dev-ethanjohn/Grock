@@ -94,7 +94,7 @@ struct HomeCartRowView: View {
             }
          
         }
-        .padding(16)
+        .padding()
         .background(Color.white)
         .cornerRadius(24)
         .overlay(
@@ -116,6 +116,9 @@ struct HomeCartRowView: View {
     }
     
     private func progressWidth(for totalWidth: CGFloat) -> CGFloat {
+        // Handle zero budget case to avoid division by zero
+        guard cart.budget > 0 else { return 0 }
+        
         let progress = cart.totalSpent / cart.budget
         return CGFloat(min(progress, 1.0)) * totalWidth
     }
@@ -128,9 +131,15 @@ struct BudgetProgressBar: View {
     
     var body: some View {
         GeometryReader { geometry in
-            let pillWidth = max(progressWidth(geometry.size.width), 20)
+            let rawPillWidth = progressWidth(geometry.size.width)
+            let pillWidth = max(0, min(rawPillWidth, geometry.size.width))
             let minWidthForInternalText: CGFloat = 80
+            
+            // Add minimum visual width (e.g., 8 points)
+            let visualPillWidth = max(20, pillWidth) // Always at least 8px wide
+            
             ZStack(alignment: .leading) {
+                // Background capsule
                 Capsule()
                     .fill(Color.white)
                     .frame(height: 20)
@@ -139,18 +148,20 @@ struct BudgetProgressBar: View {
                             .stroke(Color(hex: "cacaca"), lineWidth: 1)
                     )
 
+                // Progress capsule with minimum width
                 Capsule()
                     .fill(budgetProgressColor)
-                    .frame(width: pillWidth, height: 22)
+                    .frame(width: visualPillWidth, height: 22)
                     .overlay(
                         Capsule()
                             .stroke(.black, lineWidth: 1)
                     )
                 
+                // Text overlay
                 BudgetProgressText(
                     cart: cart,
                     budgetProgressColor: budgetProgressColor,
-                    pillWidth: pillWidth,
+                    pillWidth: visualPillWidth, // Pass the visual width
                     minWidthForInternalText: minWidthForInternalText
                 )
             }
@@ -165,19 +176,23 @@ struct BudgetProgressText: View {
     let pillWidth: CGFloat
     let minWidthForInternalText: CGFloat
     
+    private var safePillWidth: CGFloat {
+        max(0, pillWidth)
+    }
+    
     var body: some View {
         Group {
-            if pillWidth >= minWidthForInternalText {
+            if safePillWidth >= minWidthForInternalText {
                 Text(cart.totalSpent.formattedCurrency)
                     .lexendFont(14, weight: .bold)
                     .foregroundColor(budgetProgressColor.darker(by: 0.5).saturated(by: 0.4))
                     .padding(.horizontal, 12)
-                    .frame(width: pillWidth, height: 22, alignment: .trailing)
+                    .frame(width: safePillWidth, height: 22, alignment: .trailing)
             } else {
                 HStack(spacing: 8) {
                     Capsule()
                         .fill(budgetProgressColor)
-                        .frame(width: pillWidth, height: 22)
+                        .frame(width: safePillWidth, height: 22)
                         .overlay(
                             Capsule()
                                 .stroke(.black, lineWidth: 1)
