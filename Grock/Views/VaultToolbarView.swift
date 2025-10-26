@@ -24,7 +24,7 @@ struct VaultToolbarView: View {
             Spacer()
             
             Text("vault")
-                .font(.fuzzyBold_18)
+                .lexendFont(18, weight: .bold)
             
             Spacer()
             

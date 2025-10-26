@@ -19,7 +19,7 @@ struct VaultCategorySectionView: View {
             HStack {
                 if let category = selectedCategory {
                     Text(category.title) 
-                        .font(.fuzzyBold_15)
+                        .lexendFont(15, weight: .medium)
                         .contentTransition(.identity)
                         .animation(.spring(duration: 0.3), value: selectedCategory?.id)
                         .transition(.push(from: .leading))

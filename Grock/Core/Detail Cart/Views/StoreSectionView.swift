@@ -1,9 +1,3 @@
-//
-//  StoreSectionView.swift
-//  Grock
-//
-//  Created by Ethan John Paguntalan on 10/22/25.
-//
 import SwiftUI
 import SwiftData
 
@@ -25,7 +19,6 @@ struct StoreSectionView: View {
                     .resizable()
                     .scaledToFit()
                     .frame(width: 10, height: 10)
-                    .symbolRenderingMode(.monochrome)
                     .foregroundColor(.white)
                 
                 Text(store)

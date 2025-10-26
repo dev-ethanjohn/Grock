@@ -43,7 +43,7 @@ struct AddItemPopover: View {
             VStack(spacing: 8) {
                 HStack {
                     Text("Add new item to vault")
-                        .font(.fuzzyBold_13)
+                        .lexendFont(13, weight: .medium)
                     
                     Spacer()
                     

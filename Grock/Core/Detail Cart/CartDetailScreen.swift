@@ -46,21 +46,24 @@ struct CartDetailScreen: View {
     }
     
     var body: some View {
-        ZStack(alignment: .top) {
-            VStack(spacing: 12) {
-                modeToggleView
+        ZStack (alignment: .bottom){
+            ZStack(alignment: .top) {
+                VStack(spacing: 12) {
+                    modeToggleView
+                    
+                    itemsListView
+                    
+                    Spacer(minLength: 0)
+                    
+                }
+                .padding(.vertical, 40)
+                .padding(.horizontal)
+                .frame(maxHeight: .infinity, alignment: .top)
                 
-                itemsListView
-                
-                Spacer(minLength: 0)
-                
-                footerView
+                headerView
             }
-            .padding(.vertical, 40)
-            .padding(.horizontal)
-            .frame(maxHeight: .infinity, alignment: .top)
+            footerView
             
-            headerView
         }
         .navigationBarBackButtonHidden(true)
         .sheet(isPresented: $showingEditSheet) {
@@ -175,60 +178,100 @@ struct CartDetailScreen: View {
             }
         )
     }
-    
     private var modeToggleView: some View {
-        HStack(spacing: 12) {
-            HStack(spacing: 0) {
-                Button(action: {
-                    if cart.status == .shopping {
-                        cart.status = .planning
-                        vaultService.updateCartTotals(cart: cart)
-                    }
-                }) {
-                    Text("Planning")
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundColor(cart.isPlanning ? .white : .black)
-                        .padding(.vertical, 8)
-                        .padding(.horizontal, 20)
-                        .background(cart.isPlanning ? Color.black : Color.clear)
-                        .cornerRadius(8)
-                }
-                .disabled(cart.isCompleted)
+        HStack(spacing: 0) {
+            ZStack {
+                // Background container
+                Color(hex: "EEEEEE")
+                    .frame(width: 176, height: 26)
+                    .cornerRadius(16)
                 
-                Button(action: {
-                    if cart.status == .planning {
-                        cart.status = .shopping
-                        vaultService.updateCartTotals(cart: cart)
+                // Sliding active background (white and taller)
+                HStack {
+                    if cart.isShopping {
+                        Spacer()
                     }
-                }) {
-                    Text("Shopping")
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundColor(cart.isShopping ? .white : .black)
-                        .padding(.vertical, 8)
-                        .padding(.horizontal, 20)
-                        .background(cart.isShopping ? Color.black : Color.clear)
-                        .cornerRadius(8)
+               Color.white
+                        .frame(width: 88, height: 30)
+                        .cornerRadius(20)
+                        .shadow(color: Color.black.opacity(0.25), radius: 2, x: 0.5, y: 1)
+                    if cart.isPlanning {
+                        Spacer()
+                    }
                 }
-                .disabled(cart.isCompleted)
+                .frame(width: 176)
+                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: cart.status)
+         
+                
+                // Buttons
+                HStack(spacing: 0) {
+                    Button(action: {
+                        if cart.status == .shopping {
+                            cart.status = .planning
+                            vaultService.updateCartTotals(cart: cart)
+                        }
+                    }) {
+                        Text("Planning")
+                            .lexendFont(12, weight: .medium)
+                            .foregroundColor(cart.isPlanning ? .black : Color(hex: "999999"))
+                            .frame(width: 88, height: 26)
+                            .animation(.easeInOut(duration: 0.2), value: cart.isPlanning)
+                    }
+                    .disabled(cart.isCompleted)
+                    
+                    Button(action: {
+                        if cart.status == .planning {
+                            cart.status = .shopping
+                            vaultService.updateCartTotals(cart: cart)
+                        }
+                    }) {
+                        Text("Shopping")
+                            .lexendFont(12, weight: cart.isShopping ? .bold : .medium)
+                            .foregroundColor(cart.isShopping ? .black : Color(hex: "999999"))
+                            .frame(width: 88, height: 26)
+                            .animation(.easeInOut(duration: 0.2), value: cart.isShopping)
+                    }
+                    .disabled(cart.isCompleted)
+                }
             }
-            .background(Color(.systemGray6))
-            .cornerRadius(10)
+            .frame(width: 176, height: 30)
             
             Spacer()
             
-            Button(action: {
-                showingFilterSheet = true
-            }) {
-                Image(systemName: "line.3.horizontal.decrease.circle")
-                    .font(.system(size: 24))
-                    .foregroundColor(.black)
-            }
-            
-            Button(action: {
-            }) {
-                Image(systemName: "circle")
-                    .font(.system(size: 24))
-                    .foregroundColor(.black)
+            HStack(spacing: 8) {
+                Button(action: {
+                    showingFilterSheet = true
+                }) {
+                    Image(systemName: "line.3.horizontal.decrease.circle")
+                        .resizable()
+                        .frame(width: 20, height: 20)
+                        .fontWeight(.light)
+                        .foregroundColor(.black)
+               
+                }
+                .padding(1.5)
+                .background(.white)
+                .clipShape(Circle())
+                .shadow(color: Color.black.opacity(0.4), radius: 1, x: 0, y: 0.5)
+
+              
+                Text("|")
+                    .lexendFont(16, weight: .thin)
+                
+                Button(action: {
+                    // Future filter functionality
+                }) {
+                    Image(systemName: "circle")
+                        .resizable()
+                        .frame(width: 20, height: 20)
+                        .fontWeight(.light)
+                        .foregroundColor(.black)
+                    
+                }
+                .padding(1.5)
+                .background(.white)
+                .clipShape(Circle())
+                .shadow(color: Color.black.opacity(0.4), radius: 1, x: 0, y: 0.5)
             }
         }
         .padding(.top, headerHeight)
@@ -236,40 +279,11 @@ struct CartDetailScreen: View {
     }
     
     private var itemsListView: some View {
-        Group {
-            if totalItemCount <= 7 {
-                VStack(spacing: 0) {
-                    ForEach(sortedStores, id: \.self) { store in
-                        if let storeItems = itemsByStore[store] {
-                            StoreSectionView(
-                                store: store,
-                                items: storeItems,
-                                cart: cart,
-                                onToggleFulfillment: { cartItem in
-                                    if cart.isShopping {
-                                        withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
-                                            vaultService.toggleItemFulfillment(cart: cart, itemId: cartItem.itemId)
-                                        }
-                                    }
-                                },
-                                onEditItem: { cartItem in
-                                    editingItem = cartItem
-                                    showingEditSheet = true
-                                },
-                                isLastStore: store == sortedStores.last,
-                                isInScrollableView: false
-                            )
-                            .environment(vaultService)
-                            .id(store)
-                        }
-                    }
-                }
-                .padding(.vertical, 12)
-                .padding(.leading, 12)
-            } else {
-                VerticalScrollViewWithCustomIndicator(maxHeight: 500, indicatorVerticalPadding: 12) {
+            Group {
+                if totalItemCount <= 7 {
                     VStack(spacing: 0) {
-                        ForEach(sortedStores, id: \.self) { store in
+                        ForEach(sortedStores.indices, id: \.self) { index in
+                            let store = sortedStores[index]
                             if let storeItems = itemsByStore[store] {
                                 StoreSectionView(
                                     store: store,
@@ -277,9 +291,7 @@ struct CartDetailScreen: View {
                                     cart: cart,
                                     onToggleFulfillment: { cartItem in
                                         if cart.isShopping {
-                                            withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
-                                                vaultService.toggleItemFulfillment(cart: cart, itemId: cartItem.itemId)
-                                            }
+                                            vaultService.toggleItemFulfillment(cart: cart, itemId: cartItem.itemId)
                                         }
                                     },
                                     onEditItem: { cartItem in
@@ -287,21 +299,48 @@ struct CartDetailScreen: View {
                                         showingEditSheet = true
                                     },
                                     isLastStore: store == sortedStores.last,
-                                    isInScrollableView: true
+                                    isInScrollableView: false
                                 )
-                                .environment(vaultService)
-                                .id(store)
+                                .padding(.top, index == 0 ? 0 : 20) // Top padding for all but first store
                             }
                         }
                     }
                     .padding(.vertical, 12)
                     .padding(.leading, 12)
+                } else {
+                    VerticalScrollViewWithCustomIndicator(maxHeight: 500, indicatorVerticalPadding: 12) {
+                        VStack(spacing: 0) {
+                            ForEach(sortedStores.indices, id: \.self) { index in
+                                let store = sortedStores[index]
+                                if let storeItems = itemsByStore[store] {
+                                    StoreSectionView(
+                                        store: store,
+                                        items: storeItems,
+                                        cart: cart,
+                                        onToggleFulfillment: { cartItem in
+                                            if cart.isShopping {
+                                                vaultService.toggleItemFulfillment(cart: cart, itemId: cartItem.itemId)
+                                            }
+                                        },
+                                        onEditItem: { cartItem in
+                                            editingItem = cartItem
+                                            showingEditSheet = true
+                                        },
+                                        isLastStore: store == sortedStores.last,
+                                        isInScrollableView: true
+                                    )
+                                    .padding(.top, index == 0 ? 0 : 20) // Top padding for all but first store
+                                }
+                            }
+                        }
+                        .padding(.vertical, 12)
+                        .padding(.leading, 12)
+                    }
                 }
             }
+            .background(Color(hex: "FAFAFA").darker(by: 0.03))
+            .cornerRadius(16)
         }
-        .background(Color(hex: "FAFAFA").darker(by: 0.03))
-        .cornerRadius(16)
-    }
     
     private var footerView: some View {
         VStack(spacing: 16) {

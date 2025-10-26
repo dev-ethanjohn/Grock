@@ -222,6 +222,7 @@ struct VaultItemRow: View {
                )
                .environment(vaultService)
                .presentationDetents([.medium, .fraction(0.75)])
+               .presentationCornerRadius(24)
            }
            .contextMenu {
                Button(role: .destructive) {

@@ -123,7 +123,8 @@ struct HomeView: View {
     
     private var greetingText: some View {
         Text("Hi Ethan,")
-            .fuzzyBubblesFont(36, weight: .bold)
+//            .fuzzyBubblesFont(36, weight: .bold)
+            .lexendFont(36, weight: .bold)
             .frame(maxWidth: .infinity, alignment: .leading)
     }
     
@@ -198,9 +199,9 @@ struct HomeView: View {
     private var createCartButton: some View {
         Button(action: viewModel.handleCreateCart) {
             Text("Create Cart")
-                .fontWeight(.semibold)
-                .padding()
-                .frame(maxWidth: .infinity)
+                .fuzzyBubblesFont(18, weight: .bold)
+                .padding(.vertical, 12)
+                .padding(.horizontal, 24)
                 .background(.black)
                 .foregroundColor(.white)
                 .clipShape(Capsule())
