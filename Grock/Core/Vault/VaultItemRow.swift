@@ -130,16 +130,16 @@ struct VaultItemRow: View {
                        .frame(minWidth: 40)
                        .frame(maxWidth: 80)
                        .fixedSize(horizontal: true, vertical: false)
-                       .toolbar {
-                           ToolbarItemGroup(placement: .keyboard) {
-                               if isFocused {
-                                   Spacer()
-                                   Button("Done") {
-                                       isFocused = false
-                                   }
-                               }
-                           }
-                       }
+//                       .toolbar {
+//                           ToolbarItemGroup(placement: .keyboard) {
+//                               if isFocused {
+//                                   Spacer()
+//                                   Button("Done") {
+//                                       isFocused = false
+//                                   }
+//                               }
+//                           }
+//                       }
                        .scaleEffect(isActive ? 1 : 0)
                        .frame(width: isActive ? nil : 0)
                        .onAppear {
@@ -215,7 +215,7 @@ struct VaultItemRow: View {
            .sheet(isPresented: $showEditSheet) {
                EditItemSheet(
                    item: item,
-                   isPresented: $showEditSheet,
+//                   isPresented: $showEditSheet,
                    onSave: { updatedItem in
                        print("✅ Updated item: \(updatedItem.name)")
                    }
@@ -311,5 +311,8 @@ struct VaultItemRow: View {
         }
     }
 }
+
+
+
 
 

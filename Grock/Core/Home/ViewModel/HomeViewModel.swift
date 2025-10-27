@@ -15,12 +15,16 @@ import Combine
 class HomeViewModel: ObservableObject {
     @Published var selectedTab: Int = 0
     @Published var showVault: Bool = false
-    @Published var showCartPage: Bool = false
     @Published var isGuided: Bool = true
-    @Published var newlyCreatedCart: Cart? = nil
+    
+    // REMOVE these - we'll use selectedCart for everything
+    // @Published var newlyCreatedCart: Cart? = nil
+    // @Published var showCartPage: Bool = false
     
     private let modelContext: ModelContext
     private let cartViewModel: CartViewModel
+    
+    @Published var selectedCart: Cart?  // Use this for ALL cart presentations
     
     init(modelContext: ModelContext, cartViewModel: CartViewModel) {
         self.modelContext = modelContext
@@ -71,7 +75,7 @@ class HomeViewModel: ObservableObject {
         try? modelContext.save()
 
         UserDefaults.standard.hasCompletedOnboarding = false
-        cartViewModel.loadCarts() 
+        cartViewModel.loadCarts()
 
         print("✅ Reset done: Vault cleared")
     }
@@ -86,9 +90,7 @@ class HomeViewModel: ObservableObject {
     
     func onCreateCartFromVault(_ createdCart: Cart) {
         showVault = false
-        newlyCreatedCart = createdCart
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            self.showCartPage = true
-        }
+        // Set selectedCart instead of newlyCreatedCart
+        selectedCart = createdCart
     }
 }

@@ -559,4 +559,29 @@ class VaultService {
         saveContext()
         print("🔄 Updated active carts with new item prices")
     }
+    
+    
+//    cart related
+    func getTotalFulfilledAmount(for cart: Cart) -> Double {
+        guard let vault = vault else { return 0.0 }
+        return cart.cartItems
+            .filter { $0.isFulfilled }
+            .reduce(0.0) { result, cartItem in
+                result + cartItem.getTotalPrice(from: vault, cart: cart)
+            }
+    }
+
+    func getTotalCartValue(for cart: Cart) -> Double {
+        guard let vault = vault else { return 0.0 }
+        return cart.cartItems.reduce(0.0) { result, cartItem in
+            result + cartItem.getTotalPrice(from: vault, cart: cart)
+        }
+    }
+
+    func getCurrentFulfillmentPercentage(for cart: Cart) -> Double {
+        let totalValue = getTotalCartValue(for: cart)
+        guard totalValue > 0 else { return 0 }
+        return (getTotalFulfilledAmount(for: cart) / totalValue) * 100
+    }
+
 }

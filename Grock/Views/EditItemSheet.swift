@@ -3,7 +3,7 @@ import SwiftData
 
 struct EditItemSheet: View {
     let item: Item
-    @Binding var isPresented: Bool
+//    @Binding var isPresented: Bool
     var onSave: ((Item) -> Void)?
     var context: EditContext = .vault
     
@@ -87,7 +87,8 @@ struct EditItemSheet: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") {
-                        isPresented = false
+//                        isPresented = false
+                        dismiss()
                     }
                 }
             }
@@ -131,7 +132,8 @@ struct EditItemSheet: View {
         )
         
         onSave?(item)
-        isPresented = false
+//        isPresented = false
+        dismiss()
         
         // Notify about category change if needed
         if oldCategoryName != selectedCategory.title {
@@ -224,6 +226,3 @@ struct EditItemSaveButton: View {
         }
     }
 }
-
-
-

@@ -54,7 +54,7 @@ class Category {
 }
 
 @Model
-class Item {
+class Item: Identifiable {
     @Attribute(.unique) var id: String
     var name: String
     var priceOptions: [PriceOption] = []
@@ -64,6 +64,7 @@ class Item {
         self.name = name
     }
 }
+
 
 @Model
 class PriceOption {
@@ -131,6 +132,14 @@ class Cart {
     var isShopping: Bool { status == .shopping }
     var isCompleted: Bool { status == .completed }
     var isActive: Bool { isPlanning || isShopping }
+    
+    var fulfilledItemsCount: Int {
+        cartItems.filter { $0.isFulfilled }.count
+    }
+
+    var totalItemsCount: Int {
+        cartItems.count
+    }
 }
 
 // MARK: - Enhanced CartItem for 3-Mode Support
