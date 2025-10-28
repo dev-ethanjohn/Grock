@@ -1,19 +1,18 @@
 import Foundation
 import SwiftUI
 import SwiftData
-import Combine
+import Observation
 
 @MainActor
-class HomeViewModel: ObservableObject {
-    @Published var selectedTab: Int = 0
-    @Published var showVault: Bool = false
+@Observable
+final class HomeViewModel {
+    var selectedTab: Int = 0
+    var showVault: Bool = false
+    var selectedCart: Cart?
+    var pendingSelectedCart: Cart? = nil
     
     private let modelContext: ModelContext
     private let cartViewModel: CartViewModel
-    
-    @Published var selectedCart: Cart?
-    
-    @Published var pendingSelectedCart: Cart? = nil
     
     init(modelContext: ModelContext, cartViewModel: CartViewModel) {
         self.modelContext = modelContext
@@ -93,18 +92,34 @@ class HomeViewModel: ObservableObject {
         
         print("🔄 HomeViewModel: After loadCarts - available carts: \(cartViewModel.carts.count)")
         
-        // ✅ Queue pending instead of direct set
+        // store the pending cart immediately
         if let exactCart = cartViewModel.carts.first(where: { $0.id == createdCart.id }) {
             print("🎯 HomeViewModel: Found exact cart in list - queuing as pending")
-            pendingSelectedCart = exactCart
+            self.pendingSelectedCart = exactCart
         } else {
             print("⚠️ HomeViewModel: Cart not found in list, queuing created cart")
-            pendingSelectedCart = createdCart
+            self.pendingSelectedCart = createdCart
         }
         
-        // Close the vault
         showVault = false
         
         print("✅ HomeViewModel: Vault closed, pendingSelectedCart set to: \(pendingSelectedCart?.name ?? "nil")")
+    }
+    
+    // transfer pending cart
+    func transferPendingCart() {
+        if let pending = pendingSelectedCart {
+            print("✅ Transferring pending to selectedCart: \(pending.name)")
+            selectedCart = pending
+            pendingSelectedCart = nil
+        }
+    }
+    
+    //check for pending cart on view appear
+    func checkPendingCart() {
+        if let pending = pendingSelectedCart {
+            print("🔍 Found pending cart on appear: \(pending.name)")
+            transferPendingCart()
+        }
     }
 }

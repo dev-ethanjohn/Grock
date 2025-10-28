@@ -1,10 +1,3 @@
-//
-//  GrockApp.swift
-//  Grock
-//
-//  Created by Ethan John Paguntalan on 9/28/25.
-//
-
 import SwiftUI
 import SwiftData
 
@@ -12,23 +5,27 @@ struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @State private var vaultService: VaultService
     @State private var cartViewModel: CartViewModel
+    @State private var homeViewModel: HomeViewModel
     
     init(modelContext: ModelContext) {
         let vaultService = VaultService(modelContext: modelContext)
         _vaultService = State(initialValue: vaultService)
         _cartViewModel = State(initialValue: CartViewModel(vaultService: vaultService))
+        // ✅ FIX: Create HomeViewModel ONCE and share it
+        _homeViewModel = State(initialValue: HomeViewModel(modelContext: modelContext, cartViewModel: _cartViewModel.wrappedValue))
     }
     
     var body: some View {
         Group {
             if UserDefaults.standard.hasCompletedOnboarding {
-                HomeView(modelContext: modelContext, cartViewModel: cartViewModel)
-                    .environment(vaultService)  // Provide VaultService to environment
-                    .environment(cartViewModel) // Provide CartViewModel to environment
+                HomeView(viewModel: homeViewModel)
+                    .environment(vaultService)
+                    .environment(cartViewModel)
             } else {
                 OnboardingContainer()
                     .environment(vaultService)
                     .environment(cartViewModel)
+                    .environment(homeViewModel) // ✅ FIX: Share the same HomeViewModel
             }
         }
     }

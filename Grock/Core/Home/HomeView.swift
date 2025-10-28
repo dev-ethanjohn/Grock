@@ -7,15 +7,9 @@ struct HomeView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(VaultService.self) private var vaultService
     @Environment(CartViewModel.self) private var cartViewModel
-    @StateObject private var viewModel: HomeViewModel
-     
-    private let shouldAutoShowVault: Bool
-     
-    init(modelContext: ModelContext, cartViewModel: CartViewModel, shouldAutoShowVault: Bool = false) {
-        _viewModel = StateObject(wrappedValue: HomeViewModel(modelContext: modelContext, cartViewModel: cartViewModel))
-        self.shouldAutoShowVault = shouldAutoShowVault
-    }
-     
+    
+    @State var viewModel: HomeViewModel
+    
     var body: some View {
         NavigationStack {
             ZStack {
@@ -32,17 +26,15 @@ struct HomeView: View {
             }
             .onAppear {
                 viewModel.loadCarts()
-                if shouldAutoShowVault {
-                    viewModel.showVault = true
-                }
                 print("🏠 HomeView appeared - carts: \(viewModel.carts.count)")
+                
+                // ✅ FIX: Check for pending cart immediately on appear
+                viewModel.checkPendingCart()
             }
-            .onChange(of: viewModel.showVault) { _, newValue in
-                // ✅ Set selectedCart after vault fully dismisses
-                if !newValue, let pending = viewModel.pendingSelectedCart {
-                    viewModel.selectedCart = pending
-                    viewModel.pendingSelectedCart = nil
-                    print("✅ Transferred pending to selectedCart: \(pending.name)")
+            .onChange(of: viewModel.showVault) { oldValue, newValue in
+                // ✅ FIX: Set selectedCart after vault fully dismisses
+                if !newValue {
+                    viewModel.transferPendingCart()
                 }
             }
             .onChange(of: viewModel.selectedCart) { oldValue, newValue in
@@ -86,8 +78,8 @@ struct HomeView: View {
                             .onAppear {
                                 headerHeight = geometry.size.height
                             }
-                            .onChange(of: geometry.size.height) {_, newHeight in
-                                headerHeight = newHeight
+                            .onChange(of: geometry.size.height) { oldValue, newValue in
+                                headerHeight = newValue
                             }
                     }
                 )
@@ -254,8 +246,8 @@ struct HomeView: View {
                 .environment(cartViewModel)
         }
     }
+    
     private func autoSelectFirstCart() {
-        // Only auto-select if no cart is currently selected AND there are active carts
         if viewModel.shouldAutoSelectCart(), let mostRecentCart = viewModel.getMostRecentActiveCart() {
             print("🏠 Auto-selecting cart: \(mostRecentCart.name)")
             viewModel.selectedCart = mostRecentCart

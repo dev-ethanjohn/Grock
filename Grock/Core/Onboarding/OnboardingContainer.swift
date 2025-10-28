@@ -14,6 +14,7 @@ struct OnboardingContainer: View {
     @Environment(CartViewModel.self) private var cartViewModel
     @Environment(VaultService.self) private var vaultService
     @State private var storeFieldAnimated = false
+    @Environment(HomeViewModel.self) private var homeViewModel
 
     @State private var viewModel = OnboardingViewModel()
     @Namespace private var animationNamespace
@@ -64,24 +65,20 @@ struct OnboardingContainer: View {
                 OnboardingFirstItemView(
                     viewModel: viewModel,
                     onFinish: {
-                        // ✅ Only save to vault
                         viewModel.saveInitialData(vaultService: vaultService)
                         
-                        // ✅ Save data for preloading into active items
                         UserDefaults.standard.set([
                             "itemName": viewModel.itemName,
                             "categoryName": viewModel.categoryName,
                             "portion": viewModel.portion ?? 1.0
                         ] as [String : Any], forKey: "onboardingItemData")
                         
-                        // Mark onboarding as complete
                         UserDefaults.standard.hasCompletedOnboarding = true
                         
                         withAnimation(.easeOut(duration: 0.2)) {
                             showPageIndicator = false
                         }
                         
-                        // ✅ Transition to done (HomeView will auto-show vault)
                         withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
                             step = .done
                         }
@@ -99,11 +96,7 @@ struct OnboardingContainer: View {
             }
 
             if step == .done {
-                OnboardingCompletedHomeView(
-                    modelContext: modelContext,
-                    cartViewModel: cartViewModel,
-                    vaultService: vaultService
-                )
+                OnboardingCompletedHomeView()
                 .transition(.opacity)
                 .onAppear {
                     printOnboardingCompletion()
@@ -138,22 +131,19 @@ struct OnboardingContainer: View {
 }
 
 struct OnboardingCompletedHomeView: View {
-    let modelContext: ModelContext
-    let cartViewModel: CartViewModel
-    let vaultService: VaultService
+    @Environment(\.modelContext) private var modelContext
+    @Environment(CartViewModel.self) private var cartViewModel
+    @Environment(VaultService.self) private var vaultService
+    @Environment(HomeViewModel.self) private var homeViewModel 
     
     var body: some View {
-        HomeView(
-            modelContext: modelContext,
-            cartViewModel: cartViewModel,
-            shouldAutoShowVault: true  // ✅ Flag to auto-open vault
-        )
-        .environment(vaultService)
-        .environment(cartViewModel)
-        .onAppear {
-            // ✅ Preload onboarding item into activeCartItems
-            preloadOnboardingItem()
-        }
+        HomeView(viewModel: homeViewModel)
+            .onAppear {
+                preloadOnboardingItem()
+                
+                //  show vault after onboarding
+                homeViewModel.showVault = true
+            }
     }
     
     private func preloadOnboardingItem() {
@@ -170,7 +160,6 @@ struct OnboardingCompletedHomeView: View {
         cartViewModel.activeCartItems[item.id] = portion
         print("✅ Preloaded onboarding item '\(itemName)' with portion \(portion) into activeCartItems")
         
-        // Optional: Clear temp data
         UserDefaults.standard.removeObject(forKey: "onboardingItemData")
     }
 }
