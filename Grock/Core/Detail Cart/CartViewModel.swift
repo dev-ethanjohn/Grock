@@ -34,15 +34,31 @@ class CartViewModel {
     
     // MARK: - Cart Loading
     func loadCarts() {
+        print("🔄 CartViewModel: Loading carts...")
+        
         if let vault = vaultService.vault {
             // Sort carts by creation date (newest first)
-            self.carts = vault.carts.sorted { $0.createdAt > $1.createdAt }
+            let loadedCarts = vault.carts.sorted { $0.createdAt > $1.createdAt }
+            self.carts = loadedCarts
+            
+            print("🔄 CartViewModel: Loaded \(loadedCarts.count) carts")
+            for cart in loadedCarts {
+                print("   - \(cart.name) (ID: \(cart.id), Items: \(cart.cartItems.count))")
+            }
+        } else {
+            print("❌ CartViewModel: No vault found when loading carts")
+            self.carts = []
         }
     }
     
     // MARK: - Cart Creation with Active Items
     func createCartWithActiveItems(name: String, budget: Double) -> Cart? {
-        guard vaultService.vault != nil else { return nil }
+        print("🛒 CartViewModel: Creating cart with \(activeCartItems.count) active items")
+//        
+//        guard let vault = vaultService.vault else {
+//            print("❌ CartViewModel: No vault available")
+//            return nil
+//        }
         
         // Use the new method from VaultService that adds active items
         let newCart = vaultService.createCartWithActiveItems(
@@ -51,13 +67,27 @@ class CartViewModel {
             activeItems: activeCartItems
         )
         
-        // Update local state
-        self.carts.append(newCart)
-        self.currentCart = newCart
-        self.activeCartItems.removeAll() // Clear active items after cart creation
+        print("🛒 CartViewModel: Cart created by VaultService - ID: \(newCart.id), Name: \(newCart.name)")
+        print("🛒 CartViewModel: Cart items count: \(newCart.cartItems.count)")
         
-        print("✅ Cart created with \(newCart.cartItems.count) items")
-        return newCart
+        // ✅ FIX: Force reload carts to ensure the new cart is included
+        loadCarts()
+        
+        // ✅ FIX: Verify the cart is in our list
+        if let foundCart = carts.first(where: { $0.id == newCart.id }) {
+            print("✅ CartViewModel: Cart found in carts list - setting as current")
+            self.currentCart = foundCart
+        } else {
+            print("⚠️ CartViewModel: Cart not found in carts list, using newly created one")
+            self.currentCart = newCart
+            self.carts.append(newCart)
+        }
+        
+        // Clear active items after cart creation
+        self.activeCartItems.removeAll()
+        
+        print("✅ CartViewModel: Cart creation complete - returning cart")
+        return currentCart
     }
     
     // MARK: - Cart Status Management

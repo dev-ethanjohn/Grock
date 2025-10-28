@@ -13,12 +13,13 @@ struct VaultView: View {
     @State private var createCartButtonVisible = true
     @State private var cartBadgeVisible = false
     
-    
     @State private var scrollProxy: ScrollViewProxy?
     @State private var showCartConfirmation = false
     
+    // ✅ COMPLETE: Properties for different modes
     var onCreateCart: ((Cart) -> Void)?
-    
+    var existingCart: Cart?
+    var onAddItemsToCart: (([String: Double]) -> Void)?
     
     private var hasActiveItems: Bool {
         !cartViewModel.activeCartItems.isEmpty
@@ -50,11 +51,19 @@ struct VaultView: View {
             if vaultService.vault != nil {
                 ZStack(alignment: .topLeading) {
                     Button(action: {
-                        withAnimation {
-                            showCartConfirmation = true
+                        if existingCart != nil {
+                            // ✅ MODE: Adding to existing cart - DON'T clear active items
+                            onAddItemsToCart?(cartViewModel.activeCartItems)
+                            // Note: We don't clear activeCartItems here so they persist for next use
+                            dismiss()
+                        } else {
+                            // MODE: Creating new cart
+                            withAnimation {
+                                showCartConfirmation = true
+                            }
                         }
                     }) {
-                        Text("Create cart")
+                        Text(existingCart != nil ? "Add to Cart" : "Create cart")
                             .font(.fuzzyBold_16)
                             .foregroundColor(.white)
                             .padding(.horizontal, 24)
@@ -134,38 +143,33 @@ struct VaultView: View {
         .animation(.easeInOut(duration: 0.3), value: showCartConfirmation)
         .fullScreenCover(isPresented: $showCartConfirmation) {
             CartConfirmationPopover(
-                isPresented: $showCartConfirmation,  
+                isPresented: $showCartConfirmation,
                 activeCartItems: cartViewModel.activeCartItems,
                 vaultService: vaultService,
                 onConfirm: { title, budget in
                     print("🛒 Creating cart...")
                     
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        if let newCart = cartViewModel.createCartWithActiveItems(name: title, budget: budget) {
-                            print("✅ Cart created")
-                            onCreateCart?(newCart)
-                            
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                                withAnimation(.spring()) {
-                                    dismiss()
-                                }
-                            }
-                        } else {
-                            print("❌ Failed to create cart")
-                            showCreateCartButton()
-                        }
+                    // ✅ FIX: Create cart and pass it immediately
+                    if let newCart = cartViewModel.createCartWithActiveItems(name: title, budget: budget) {
+                        print("✅ Cart created: \(newCart.name)")
+                        
+                        // ✅ Clear active items ONLY when creating new cart
+                        cartViewModel.activeCartItems.removeAll()
+                        
+                        // ✅ Call onCreateCart immediately with the new cart
+                        onCreateCart?(newCart)
+                    } else {
+                        print("❌ Failed to create cart")
+                        showCreateCartButton()
                     }
                 },
                 onCancel: {
-                    // This works perfectly - just sets the binding
                     showCartConfirmation = false
+                    showCreateCartButton()
                 }
             )
             .presentationBackground(.clear)
-            // Add this to disable fullScreenCover's default animation
-//            .animation(.none, value: showCartConfirmation)
-        }
-        .onAppear {
+        }        .onAppear {
             printVaultStructure()
             
             if selectedCategory == nil {
@@ -211,94 +215,6 @@ struct VaultView: View {
                 }
             }
         }
-    }
-    
-    private func printVaultStructure() {
-        print("\n🔍 ===== VAULT STRUCTURE DEBUG INFO =====")
-        print("📦 Number of vaults in service: \(vaultService.vault != nil ? 1 : 0)")
-        
-        guard let vault = vaultService.vault else {
-            print("❌ No vault found in VaultService!")
-            return
-        }
-        
-        print("🏷️ Vault ID: \(vault.uid)")
-        print("📂 Number of categories in vault: \(vault.categories.count)")
-        
-        if vault.categories.isEmpty {
-            print("📭 Vault is empty - no categories found")
-        } else {
-            print("\n🔍 RAW ARRAY ORDER (as stored in SwiftData):")
-            for categoryIndex in 0..<vault.categories.count {
-                let category = vault.categories[categoryIndex]
-                print("  [\(categoryIndex)]: '\(category.name)' (Sort Order: \(category.sortOrder))")
-            }
-            
-            let sortedCategories = vault.categories.sorted { $0.sortOrder < $1.sortOrder }
-            print("\n🔍 SORTED ORDER (by sortOrder property):")
-            for (sortedIndex, category) in sortedCategories.enumerated() {
-                print("  [\(sortedIndex)]: '\(category.name)' (Sort Order: \(category.sortOrder))")
-            }
-            
-            print("\n📋 DETAILED CATEGORY STRUCTURE (SORTED):")
-            for (categoryIndex, category) in sortedCategories.enumerated() {
-                print("\n  📁 Category \(categoryIndex + 1) (Sort Order: \(category.sortOrder)):")
-                print("     Name: '\(category.name)'")
-                print("     ID: \(category.uid)")
-                print("     Number of items: \(category.items.count)")
-                
-                if category.items.isEmpty {
-                    print("     📭 No items in this category")
-                } else {
-                    for (itemIndex, item) in category.items.enumerated() {
-                        print("     🛒 Item \(itemIndex + 1):")
-                        print("        Name: '\(item.name)'")
-                        print("        ID: \(item.id)")
-                        print("        Price options: \(item.priceOptions.count)")
-                        
-                        if item.priceOptions.isEmpty {
-                            print("        💰 No price options for this item")
-                        } else {
-                            for (priceIndex, priceOption) in item.priceOptions.enumerated() {
-                                print("        💰 Price option \(priceIndex + 1):")
-                                print("           Store: '\(priceOption.store)'")
-                                print("           Price: ₱\(priceOption.pricePerUnit.priceValue)")
-                                print("           Unit: '\(priceOption.pricePerUnit.unit)'")
-                            }
-                        }
-                        let isActive = (cartViewModel.activeCartItems[item.id] ?? 0) > 0
-                        let quantity = cartViewModel.activeCartItems[item.id] ?? 0
-                        print("        🛍️ Cart Status: \(isActive ? "ACTIVE (qty: \(quantity))" : "inactive")")
-                    }
-                }
-            }
-        }
-        let allStores = getAllStores()
-        print("\n  🏪 All available stores: \(allStores)")
-        
-        print("\n  🛒 Cart Summary:")
-        print("     Active items: \(cartViewModel.activeCartItems.count)")
-        for (itemId, quantity) in cartViewModel.activeCartItems {
-            if let item = vaultService.findItemById(itemId) {
-                print("     - \(item.name): \(quantity)")
-            } else {
-                print("     - Unknown item (\(itemId)): \(quantity)")
-            }
-        }
-        
-        print("===== END VAULT DEBUG INFO =====")
-    }
-    
-    private func getAllStores() -> [String] {
-        guard let vault = vaultService.vault else { return [] }
-        
-        let allStores = vault.categories.flatMap { category in
-            category.items.flatMap { item in
-                item.priceOptions.map { $0.store }
-            }
-        }
-        
-        return Array(Set(allStores)).sorted()
     }
     
     private var emptyVaultView: some View {
@@ -536,8 +452,95 @@ struct VaultView: View {
             printVaultStructure()
         }
     }
+    
+    private func printVaultStructure() {
+        print("\n🔍 ===== VAULT STRUCTURE DEBUG INFO =====")
+        print("📦 Number of vaults in service: \(vaultService.vault != nil ? 1 : 0)")
+        
+        guard let vault = vaultService.vault else {
+            print("❌ No vault found in VaultService!")
+            return
+        }
+        
+        print("🏷️ Vault ID: \(vault.uid)")
+        print("📂 Number of categories in vault: \(vault.categories.count)")
+        
+        if vault.categories.isEmpty {
+            print("📭 Vault is empty - no categories found")
+        } else {
+            print("\n🔍 RAW ARRAY ORDER (as stored in SwiftData):")
+            for categoryIndex in 0..<vault.categories.count {
+                let category = vault.categories[categoryIndex]
+                print("  [\(categoryIndex)]: '\(category.name)' (Sort Order: \(category.sortOrder))")
+            }
+            
+            let sortedCategories = vault.categories.sorted { $0.sortOrder < $1.sortOrder }
+            print("\n🔍 SORTED ORDER (by sortOrder property):")
+            for (sortedIndex, category) in sortedCategories.enumerated() {
+                print("  [\(sortedIndex)]: '\(category.name)' (Sort Order: \(category.sortOrder))")
+            }
+            
+            print("\n📋 DETAILED CATEGORY STRUCTURE (SORTED):")
+            for (categoryIndex, category) in sortedCategories.enumerated() {
+                print("\n  📁 Category \(categoryIndex + 1) (Sort Order: \(category.sortOrder)):")
+                print("     Name: '\(category.name)'")
+                print("     ID: \(category.uid)")
+                print("     Number of items: \(category.items.count)")
+                
+                if category.items.isEmpty {
+                    print("     📭 No items in this category")
+                } else {
+                    for (itemIndex, item) in category.items.enumerated() {
+                        print("     🛒 Item \(itemIndex + 1):")
+                        print("        Name: '\(item.name)'")
+                        print("        ID: \(item.id)")
+                        print("        Price options: \(item.priceOptions.count)")
+                        
+                        if item.priceOptions.isEmpty {
+                            print("        💰 No price options for this item")
+                        } else {
+                            for (priceIndex, priceOption) in item.priceOptions.enumerated() {
+                                print("        💰 Price option \(priceIndex + 1):")
+                                print("           Store: '\(priceOption.store)'")
+                                print("           Price: ₱\(priceOption.pricePerUnit.priceValue)")
+                                print("           Unit: '\(priceOption.pricePerUnit.unit)'")
+                            }
+                        }
+                        let isActive = (cartViewModel.activeCartItems[item.id] ?? 0) > 0
+                        let quantity = cartViewModel.activeCartItems[item.id] ?? 0
+                        print("        🛍️ Cart Status: \(isActive ? "ACTIVE (qty: \(quantity))" : "inactive")")
+                    }
+                }
+            }
+        }
+        let allStores = getAllStores()
+        print("\n  🏪 All available stores: \(allStores)")
+        
+        print("\n  🛒 Cart Summary:")
+        print("     Active items: \(cartViewModel.activeCartItems.count)")
+        for (itemId, quantity) in cartViewModel.activeCartItems {
+            if let item = vaultService.findItemById(itemId) {
+                print("     - \(item.name): \(quantity)")
+            } else {
+                print("     - Unknown item (\(itemId)): \(quantity)")
+            }
+        }
+        
+        print("===== END VAULT DEBUG INFO =====")
+    }
+    
+    private func getAllStores() -> [String] {
+        guard let vault = vaultService.vault else { return [] }
+        
+        let allStores = vault.categories.flatMap { category in
+            category.items.flatMap { item in
+                item.priceOptions.map { $0.store }
+            }
+        }
+        
+        return Array(Set(allStores)).sorted()
+    }
 }
-
 
 struct ClearBackgroundView: UIViewRepresentable {
     func makeUIView(context: Context) -> UIView {
@@ -548,3 +551,6 @@ struct ClearBackgroundView: UIViewRepresentable {
     
     func updateUIView(_ uiView: UIView, context: Context) {}
 }
+
+
+

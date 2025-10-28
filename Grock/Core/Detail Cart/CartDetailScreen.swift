@@ -4,6 +4,7 @@ import SwiftData
 struct CartDetailScreen: View {
     let cart: Cart
     @Environment(VaultService.self) private var vaultService
+    @Environment(CartViewModel.self) private var cartViewModel
     @Environment(\.dismiss) private var dismiss
     
     // modes
@@ -23,6 +24,9 @@ struct CartDetailScreen: View {
     
     // ✅ SIMPLIFIED: Use only item binding for sheet
     @State private var itemToEdit: Item? = nil
+    
+    // ✅ NEW: State for showing VaultView
+    @State private var showingVaultView = false
     
     private var cartInsights: CartInsights {
         vaultService.getCartInsights(cart: cart)
@@ -72,7 +76,8 @@ struct CartDetailScreen: View {
                     .padding(.bottom, geometry.safeAreaInsets.bottom + 20)
                 
                 Button(action: {
-                    // Add item action
+                    // ✅ UPDATED: Open VaultView to add items
+                    showingVaultView = true
                 }) {
                     Image(systemName: "plus")
                         .font(.system(size: 24, weight: .medium))
@@ -101,6 +106,28 @@ struct CartDetailScreen: View {
             .environment(vaultService)
             .presentationDetents([.medium, .fraction(0.75)])
             .presentationCornerRadius(24)
+        }
+        // ✅ NEW: Sheet for VaultView - USE EXISTING CartViewModel
+        .sheet(isPresented: $showingVaultView) {
+            NavigationView {
+                VaultView(
+                    // ✅ Pass the current cart so we can add items directly to it
+                    existingCart: cart,
+                    onAddItemsToCart: { selectedItems in
+                        // Handle adding selected items to the current cart
+                        for (itemId, quantity) in selectedItems {
+                            if let item = vaultService.findItemById(itemId) {
+                                vaultService.addItemToCart(item: item, cart: cart, quantity: quantity)
+                            }
+                        }
+                        vaultService.updateCartTotals(cart: cart)
+                        showingVaultView = false
+                        // ✅ DON'T clear activeCartItems - they persist for next use
+                    }
+                )
+                .environment(vaultService)
+                // ✅ USE EXISTING CartViewModel from environment (not creating new one)
+            }
         }
         .alert("Start Shopping", isPresented: $showingStartShoppingAlert) {
             Button("Cancel", role: .cancel) { }
@@ -194,7 +221,7 @@ struct CartDetailScreen: View {
                     .onAppear {
                         headerHeight = geometry.size.height
                     }
-                    .onChange(of: geometry.size.height) { oldValue, newValue in
+                    .onChange(of: geometry.size.height) {_, newValue in
                         headerHeight = newValue
                     }
             }
@@ -314,12 +341,14 @@ struct CartDetailScreen: View {
                                         vaultService.toggleItemFulfillment(cart: cart, itemId: cartItem.itemId)
                                     }
                                 },
-                                // ✅ SIMPLIFIED: Just set the item
                                 onEditItem: { cartItem in
                                     if let found = vaultService.findItemById(cartItem.itemId) {
                                         print("🟢 Setting item to edit: \(found.name)")
                                         itemToEdit = found
                                     }
+                                },
+                                onDeleteItem: { cartItem in
+                                    handleDeleteItem(cartItem)
                                 },
                                 isLastStore: store == sortedStores.last,
                                 isInScrollableView: false
@@ -329,7 +358,6 @@ struct CartDetailScreen: View {
                     }
                 }
                 .padding(.vertical, 12)
-                .padding(.leading, 12)
             } else {
                 VerticalScrollViewWithCustomIndicator(maxHeight: 500, indicatorVerticalPadding: 12) {
                     VStack(spacing: 0) {
@@ -345,12 +373,14 @@ struct CartDetailScreen: View {
                                             vaultService.toggleItemFulfillment(cart: cart, itemId: cartItem.itemId)
                                         }
                                     },
-                                    // ✅ SIMPLIFIED: Just set the item
                                     onEditItem: { cartItem in
                                         if let item = vaultService.findItemById(cartItem.itemId) {
                                             print("🟢 Setting item to edit: \(item.name)")
                                             itemToEdit = item
                                         }
+                                    },
+                                    onDeleteItem: { cartItem in
+                                        handleDeleteItem(cartItem)
                                     },
                                     isLastStore: store == sortedStores.last,
                                     isInScrollableView: true
@@ -360,7 +390,6 @@ struct CartDetailScreen: View {
                         }
                     }
                     .padding(.vertical, 12)
-                    .padding(.leading, 12)
                 }
             }
         }
@@ -425,197 +454,11 @@ struct CartDetailScreen: View {
             animatedFulfilledPercentage = vaultService.getCurrentFulfillmentPercentage(for: cart)
         }
     }
-}
-struct FilterSheet: View {
-    @Binding var selectedFilter: FilterOption
-    @Environment(\.dismiss) private var dismiss
     
-    var body: some View {
-        NavigationView {
-            List {
-                ForEach(FilterOption.allCases, id: \.self) { option in
-                    Button(action: {
-                        selectedFilter = option
-                        dismiss()
-                    }) {
-                        HStack {
-                            Text(option.rawValue)
-                                .foregroundColor(.black)
-                            Spacer()
-                            if selectedFilter == option {
-                                Image(systemName: "checkmark")
-                                    .foregroundColor(.blue)
-                            }
-                        }
-                    }
-                }
-            }
-            .navigationTitle("Filter Items")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                }
-            }
+    private func handleDeleteItem(_ cartItem: CartItem) {
+        withTransaction(Transaction(animation: nil)) {
+            vaultService.removeItemFromCart(cart: cart, itemId: cartItem.itemId)
+            vaultService.updateCartTotals(cart: cart)
         }
     }
 }
-
-//import SwiftUI
-//import SwiftData
-//
-//struct StoreSectionView: View {
-//    let store: String
-//    let items: [(cartItem: CartItem, item: Item?)]
-//    let cart: Cart
-//    let onToggleFulfillment: (CartItem) -> Void
-//    let onEditItem: (CartItem) -> Void
-//    let isLastStore: Bool
-//    var isInScrollableView: Bool = false
-//    
-//    @Environment(VaultService.self) private var vaultService
-//    
-//    var body: some View {
-//        VStack(alignment: .leading, spacing: 0) {
-//            HStack(spacing: 2) {
-//                Image("store")
-//                    .resizable()
-//                    .scaledToFit()
-//                    .frame(width: 10, height: 10)
-//                    .foregroundColor(.white)
-//                
-//                Text(store)
-//                    .lexendFont(11, weight: .bold)
-//            }
-//            .foregroundColor(.white)
-//            .padding(.horizontal, 8)
-//            .padding(.vertical, 4)
-//            .background(Color.black)
-//            .cornerRadius(6)
-//            
-//            LazyVStack(spacing: 0) {
-//                ForEach(items, id: \.cartItem.itemId) { tuple in
-//                    CartItemRowView(
-//                        cartItem: tuple.cartItem,
-//                        item: tuple.item,
-//                        cart: cart,
-//                        onToggleFulfillment: { onToggleFulfillment(tuple.cartItem) },
-//                        onEditItem: { onEditItem(tuple.cartItem) },
-//                        isLastItem: tuple.cartItem.itemId == items.last?.cartItem.itemId,
-//                        isInScrollableView: isInScrollableView
-//                    )
-//                }
-//            }
-//        }
-//        .padding(.bottom, isLastStore ? 0 : 8)
-//    }
-//}
-//
-//import SwiftUI
-//import SwiftData
-//
-//struct CartItemRowView: View {
-//    let cartItem: CartItem
-//    let item: Item?
-//    let cart: Cart
-//    let onToggleFulfillment: () -> Void
-//    let onEditItem: () -> Void
-//    let isLastItem: Bool
-//    var isInScrollableView: Bool = false
-//    
-//    @Environment(VaultService.self) private var vaultService
-//    
-//    private var itemName: String {
-//        item?.name ?? "Unknown Item"
-//    }
-//    
-//    private var price: Double {
-//        guard let vault = vaultService.vault else { return 0.0 }
-//        return cartItem.getPrice(from: vault, cart: cart)
-//    }
-//    
-//    private var unit: String {
-//        guard let vault = vaultService.vault else { return "" }
-//        return cartItem.getUnit(from: vault, cart: cart)
-//    }
-//    
-//    private var quantity: Double {
-//        cartItem.getQuantity(cart: cart)
-//    }
-//    
-//    private var totalPrice: Double {
-//        guard let vault = vaultService.vault else { return 0.0 }
-//        return cartItem.getTotalPrice(from: vault, cart: cart)
-//    }
-//    
-//    var body: some View {
-//        VStack(spacing: 0) {
-//            HStack(alignment: .bottom, spacing: 2) {
-//                if cart.isShopping {
-//                    Button(action: {
-//                        withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-//                            onToggleFulfillment()
-//                        }
-//                    }) {
-//                        Image(systemName: cartItem.isFulfilled ? "checkmark.circle.fill" : "circle")
-//                            .font(.system(size: 16))
-//                            .foregroundColor(cartItem.isFulfilled ? .green : Color(hex: "999"))
-//                    }
-//                    .buttonStyle(.plain)
-//                    .transition(.scale)
-//                    .frame(maxHeight: .infinity, alignment: .top)
-//                    .padding(.top, 2.5)
-//                }
-//                
-//                VStack(alignment: .leading, spacing: 2) {
-//                    Text("\(quantityString) \(itemName)")
-//                        .lexendFont(17, weight: .regular)
-//                        .foregroundColor(Color(hex: "231F30"))
-//                        .lineLimit(1)
-//                    
-//                    Text("\(formatCurrency(price)) / \(unit)")
-//                        .lexendFont(12, weight: .medium)
-//                        .foregroundColor(Color(hex: "666666"))
-//                }
-//                .opacity(cartItem.isFulfilled ? 0.5 : 1.0)
-//                
-//                Spacer()
-//                
-//                Text(formatCurrency(totalPrice))
-//                    .lexendFont(14, weight: .bold)
-//                    .foregroundColor(Color(hex: "231F30"))
-//                    .opacity(cartItem.isFulfilled ? 0.5 : 1.0)
-//            }
-//            .contentShape(Rectangle())
-//            .onTapGesture { onEditItem() }
-//            .padding(.top, 12)
-//            .padding(.bottom, isLastItem ? 0 : 12)
-//            .padding(.trailing, isInScrollableView ? 0 : 12)
-//            .animation(.spring(response: 0.35, dampingFraction: 0.75), value: cart.isShopping)
-//            
-//            if !isLastItem {
-//                DashedLine()
-//                    .stroke(style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
-//                    .frame(height: 0.5)
-//                    .foregroundColor(Color(hex: "999").opacity(0.5))
-//                    .padding(.leading, 12)
-//                    .padding(.trailing, isInScrollableView ? 4 : 12)
-//            }
-//        }
-//    }
-//    
-//    private var quantityString: String {
-//        let qty = quantity
-//        return qty == Double(Int(qty)) ? "\(Int(qty))\(unit)" : String(format: "%.2f\(unit)", qty)
-//    }
-//    
-//    private func formatCurrency(_ value: Double) -> String {
-//        let formatter = NumberFormatter()
-//        formatter.numberStyle = .currency
-//        formatter.currencyCode = "PHP"
-//        formatter.maximumFractionDigits = value == Double(Int(value)) ? 0 : 2
-//        return formatter.string(from: NSNumber(value: value)) ?? "\(value)"
-//    }
-//}

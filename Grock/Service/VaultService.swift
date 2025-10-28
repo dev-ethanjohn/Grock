@@ -583,5 +583,18 @@ class VaultService {
         guard totalValue > 0 else { return 0 }
         return (getTotalFulfilledAmount(for: cart) / totalValue) * 100
     }
+    
+    func removeItemFromCart(cart: Cart, itemId: String) {
+        guard let index = cart.cartItems.firstIndex(where: { $0.itemId == itemId }) else {
+            print("⚠️ Item not found in cart")
+            return
+        }
+        
+        let itemName = findItemById(itemId)?.name ?? "Unknown Item"
+        cart.cartItems.remove(at: index)
+        updateCartTotals(cart: cart)
+        saveContext()
+        print("🗑️ Removed \(itemName) from cart: \(cart.name)")
+    }
 
 }

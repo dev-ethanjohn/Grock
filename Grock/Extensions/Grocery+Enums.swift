@@ -14,8 +14,8 @@ enum EditContext {
     case cart
 }
 
-enum FilterOption: String, CaseIterable {
-    case all = "All"
-    case fulfilled = "Fulfilled"
-    case unfulfilled = "Unfulfilled"
-}
+//enum FilterOption: String, CaseIterable {
+//    case all = "All"
+//    case fulfilled = "Fulfilled"
+//    case unfulfilled = "Unfulfilled"
+//}

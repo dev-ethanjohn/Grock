@@ -7,6 +7,7 @@ struct StoreSectionView: View {
     let cart: Cart
     let onToggleFulfillment: (CartItem) -> Void
     let onEditItem: (CartItem) -> Void
+    let onDeleteItem: (CartItem) -> Void
     let isLastStore: Bool
     var isInScrollableView: Bool = false
     
@@ -29,18 +30,29 @@ struct StoreSectionView: View {
             .padding(.vertical, 4)
             .background(Color.black)
             .cornerRadius(6)
+            .padding(.leading, 12)
             
             LazyVStack(spacing: 0) {
-                ForEach(items, id: \.cartItem.itemId) { tuple in
+                ForEach(Array(items.enumerated()), id: \.element.cartItem.itemId) { index, tuple in
                     CartItemRowView(
                         cartItem: tuple.cartItem,
                         item: tuple.item,
                         cart: cart,
                         onToggleFulfillment: { onToggleFulfillment(tuple.cartItem) },
                         onEditItem: { onEditItem(tuple.cartItem) },
-                        isLastItem: tuple.cartItem.itemId == items.last?.cartItem.itemId,
+                        onDelete: { onDeleteItem(tuple.cartItem) },
+                        isLastItem: index == items.count - 1,
                         isInScrollableView: isInScrollableView
                     )
+                    
+                    if index < items.count - 1 {
+                        DashedLine()
+                            .stroke(style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
+                            .frame(height: 0.5)
+                            .foregroundColor(Color(hex: "999").opacity(0.5))
+                            .padding(.leading, 12)
+                            .padding(.trailing, isInScrollableView ? 4 : 12)
+                    }
                 }
             }
         }

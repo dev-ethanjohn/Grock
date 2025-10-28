@@ -1,10 +1,3 @@
-//
-//  OnboardingContainer.swift
-//  Grock
-//
-//  Created by Ethan John Paguntalan on 9/28/25.
-//
-
 import SwiftUI
 import SwiftData
 
@@ -63,7 +56,7 @@ struct OnboardingContainer: View {
                 }
                 .transition(.asymmetric(
                     insertion: .move(edge: .trailing).combined(with: .opacity),
-                    removal: .identity // prevent reanimating again
+                    removal: .identity
                 ))
             }
 
@@ -71,14 +64,24 @@ struct OnboardingContainer: View {
                 OnboardingFirstItemView(
                     viewModel: viewModel,
                     onFinish: {
-                        //*vaultService is guaranteed to be available
+                        // ✅ Only save to vault
                         viewModel.saveInitialData(vaultService: vaultService)
+                        
+                        // ✅ Save data for preloading into active items
+                        UserDefaults.standard.set([
+                            "itemName": viewModel.itemName,
+                            "categoryName": viewModel.categoryName,
+                            "portion": viewModel.portion ?? 1.0
+                        ] as [String : Any], forKey: "onboardingItemData")
+                        
+                        // Mark onboarding as complete
                         UserDefaults.standard.hasCompletedOnboarding = true
                         
                         withAnimation(.easeOut(duration: 0.2)) {
                             showPageIndicator = false
                         }
                         
+                        // ✅ Transition to done (HomeView will auto-show vault)
                         withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
                             step = .done
                         }
@@ -96,15 +99,16 @@ struct OnboardingContainer: View {
             }
 
             if step == .done {
-                HomeView(modelContext: modelContext, cartViewModel: cartViewModel)
-                    .environment(vaultService)
-                    .environment(CartViewModel(vaultService: vaultService))
-                    .transition(.opacity)
-                    .onAppear {
-                        printOnboardingCompletion()
-                    }
+                OnboardingCompletedHomeView(
+                    modelContext: modelContext,
+                    cartViewModel: cartViewModel,
+                    vaultService: vaultService
+                )
+                .transition(.opacity)
+                .onAppear {
+                    printOnboardingCompletion()
+                }
             }
-            
 
             if (step == .lastStore || step == .firstItem) && showPageIndicator {
                 VStack {
@@ -129,29 +133,44 @@ struct OnboardingContainer: View {
     
     private func printOnboardingCompletion() {
         print("\n🎯 ONBOARDING COMPLETE - DATA CHECK")
-        
-        print("📝 NEW ITEM DATA:")
-        print("   Name: '\(viewModel.itemName)'")
-        print("   Category: '\(viewModel.categoryName)'")
-        print("   Store: '\(viewModel.storeName)'")
-        print("   Price: ₱\(viewModel.itemPrice)") // Removed nil-coalescing since it's now String
-        print("   Unit: \(viewModel.unit)")
-        
-        if let vault = vaultService.vault {
-            print("\n📦 VAULT SUMMARY:")
-            print("   Categories: \(vault.categories.count)")
-            
-            let totalItems = vault.categories.reduce(0) { $0 + $1.items.count }
-            print("   Total Items: \(totalItems)")
-            
-            for category in vault.categories {
-                if !category.items.isEmpty {
-                    print("   📁 \(category.name): \(category.items.count) items")
-                    for item in category.items {
-                        print("      🛒 \(item.name)")
-                    }
-                }
-            }
+        // ... your existing print code
+    }
+}
+
+struct OnboardingCompletedHomeView: View {
+    let modelContext: ModelContext
+    let cartViewModel: CartViewModel
+    let vaultService: VaultService
+    
+    var body: some View {
+        HomeView(
+            modelContext: modelContext,
+            cartViewModel: cartViewModel,
+            shouldAutoShowVault: true  // ✅ Flag to auto-open vault
+        )
+        .environment(vaultService)
+        .environment(cartViewModel)
+        .onAppear {
+            // ✅ Preload onboarding item into activeCartItems
+            preloadOnboardingItem()
         }
+    }
+    
+    private func preloadOnboardingItem() {
+        guard let data = UserDefaults.standard.dictionary(forKey: "onboardingItemData"),
+              let itemName = data["itemName"] as? String,
+              let categoryName = data["categoryName"] as? String,
+              let portion = data["portion"] as? Double,
+              let category = vaultService.vault?.categories.first(where: { $0.name == categoryName }),
+              let item = category.items.first(where: { $0.name == itemName }) else {
+            print("⚠️ Could not preload onboarding item")
+            return
+        }
+        
+        cartViewModel.activeCartItems[item.id] = portion
+        print("✅ Preloaded onboarding item '\(itemName)' with portion \(portion) into activeCartItems")
+        
+        // Optional: Clear temp data
+        UserDefaults.standard.removeObject(forKey: "onboardingItemData")
     }
 }
