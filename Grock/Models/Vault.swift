@@ -88,11 +88,10 @@ class PricePerUnit {
     }
 }
 
-// MARK: - Enhanced Cart Status
 enum CartStatus: Int, Codable {
-    case planning = 0      // Building the list, editable planned data
-    case shopping = 1      // Active shopping, capturing actuals
-    case completed = 2     // Finished, preserving historical data
+    case planning = 0
+    case shopping = 1
+    case completed = 2
 }
 
 
@@ -127,7 +126,6 @@ class Cart {
         self.status = status
     }
     
-    // Add these convenience properties:
     var isPlanning: Bool { status == .planning }
     var isShopping: Bool { status == .shopping }
     var isCompleted: Bool { status == .completed }
@@ -142,7 +140,6 @@ class Cart {
     }
 }
 
-// MARK: - Enhanced CartItem for 3-Mode Support
 @Model
 class CartItem {
     var itemId: String
@@ -183,8 +180,6 @@ class CartItem {
         self.actualQuantity = actualQuantity
         self.actualUnit = actualUnit
     }
-    
-    // MARK: - Mode-Aware Getters
     
     func getPrice(from vault: Vault, cart: Cart) -> Double {
         switch cart.status {
@@ -230,8 +225,6 @@ class CartItem {
         return getPrice(from: vault, cart: cart) * getQuantity(cart: cart)
     }
     
-    // MARK: - Data Capture Methods
-    
     func capturePlannedData(from vault: Vault) {
         if plannedPrice == nil {
             plannedPrice = getCurrentPrice(from: vault, store: plannedStore)
@@ -257,8 +250,7 @@ class CartItem {
         }
     }
     
-    // MARK: - Helper Methods
-    
+    // Helper methods
     func getCurrentPrice(from vault: Vault, store: String) -> Double? {
         guard let item = getItem(from: vault),
               let priceOption = item.priceOptions.first(where: { $0.store == store })
@@ -283,7 +275,6 @@ class CartItem {
     }
     
     // MARK: - Shopping Mode Updates
-    
     func updateActualData(price: Double? = nil, quantity: Double? = nil, unit: String? = nil, store: String? = nil) {
         if let price = price { actualPrice = price }
         if let quantity = quantity { actualQuantity = quantity }

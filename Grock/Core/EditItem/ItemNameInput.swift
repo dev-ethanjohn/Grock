@@ -15,43 +15,57 @@ struct ItemNameInput: View {
     
     @State private var fillAnimation: CGFloat = 0.0
     @State private var fieldScale: CGFloat = 1.0
+    @State private var showTooltip = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                TextField("e.g. Tapa", text: $itemName)
-                    .font(.subheadline)
-                    .bold()
-                    .padding(12)
-                    .padding(.trailing, 44)
-                    .background(
-                        Group {
-                            if selectedCategory == nil {
-                                Color(.systemGray6)
-                                    .brightness(0.03)
-                            } else {
-                                RadialGradient(
-                                    colors: [
-                                        selectedCategory!.pastelColor.opacity(0.4),
-                                        selectedCategory!.pastelColor.opacity(0.35)
-                                    ],
-                                    center: .center,
-                                    startRadius: 0,
-                                    endRadius: fillAnimation * 100
-                                )
+            ZStack(alignment: .trailing) {
+                if showTooltip && selectedCategory == nil {
+                    TooltipPopover()
+                        .offset(x: -10, y: -32)
+                        .transition(.asymmetric(
+                            insertion: .scale(scale: 0.8).combined(with: .opacity).combined(with: .offset(y: -10)),
+                            removal: .scale(scale: 0.9).combined(with: .opacity).combined(with: .offset(y: -5))
+                        ))
+                        .zIndex(1)
+                }
+                
+                HStack {
+                    TextField("e.g. Tapa", text: $itemName)
+                        .font(.subheadline)
+                        .bold()
+                        .padding(12)
+                        .padding(.trailing, 44)
+                        .background(
+                            Group {
+                                if selectedCategory == nil {
+                                    Color(.systemGray6)
+                                        .brightness(0.03)
+                                } else {
+                                    RadialGradient(
+                                        colors: [
+                                            selectedCategory!.pastelColor.opacity(0.4),
+                                            selectedCategory!.pastelColor.opacity(0.35)
+                                        ],
+                                        center: .center,
+                                        startRadius: 0,
+                                        endRadius: fillAnimation * 100
+                                    )
+                                }
                             }
-                        }
-                            .brightness(-0.03)
-                    )
-                    .cornerRadius(40)
-                    .focused(itemNameFieldIsFocused)
-                    .scaleEffect(fieldScale)
-                    .overlay(
-                        CategoryButton(
-                            selectedCategory: $selectedCategory,
-                            selectedCategoryEmoji: selectedCategoryEmoji
+                                .brightness(-0.03)
                         )
-                    )
+                        .cornerRadius(40)
+                        .focused(itemNameFieldIsFocused)
+                        .scaleEffect(fieldScale)
+                        .overlay(
+                            CategoryButton(
+                                selectedCategory: $selectedCategory,
+                                selectedCategoryEmoji: selectedCategoryEmoji,
+                                showTooltip: $showTooltip
+                            )
+                        )
+                }
             }
             
             if let category = selectedCategory {
@@ -67,13 +81,11 @@ struct ItemNameInput: View {
         .onChange(of: selectedCategory) { oldValue, newValue in
             if newValue != nil {
                 if oldValue == nil {
-                    // Just selected a category for the first time
                     withAnimation(.spring(duration: 0.5)) {
                         fillAnimation = 1.0
                     }
                     startFieldBounce()
                 } else {
-                    // Changed from one category to another - reset and refill
                     withAnimation(.spring(duration: 0.5)) {
                         fillAnimation = 0.0
                     }
@@ -85,10 +97,29 @@ struct ItemNameInput: View {
                     }
                 }
             } else {
-                // Deselected category
                 withAnimation(.easeInOut(duration: 0.4)) {
                     fillAnimation = 0.0
                     fieldScale = 1.0
+                }
+            }
+            
+            if newValue != nil {
+                withAnimation(.easeOut(duration: 0.3)) {
+                    showTooltip = false
+                }
+            }
+        }
+        .onAppear {
+            if selectedCategory == nil {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        showTooltip = true
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
+                        withAnimation(.easeOut(duration: 0.3)) {
+                            showTooltip = false
+                        }
+                    }
                 }
             }
         }
@@ -112,4 +143,3 @@ struct ItemNameInput: View {
         }
     }
 }
-

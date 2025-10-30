@@ -83,7 +83,7 @@ struct CartDetailScreen: View {
                                     .transition(.scale)
                             }
                         }
-                        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: hasItems)
+                        .animation(.spring(response: 0.3, dampingFraction: 0.85), value: hasItems)
                         
                         Spacer(minLength: 0)
                         
