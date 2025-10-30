@@ -22,34 +22,49 @@ struct CartDetailScreen: View {
     @State private var animatedFulfilledAmount: Double = 0
     @State private var animatedFulfilledPercentage: Double = 0
     
-    // ✅ SIMPLIFIED: Use only item binding for sheet
     @State private var itemToEdit: Item? = nil
     
-    // ✅ NEW: State for showing VaultView
     @State private var showingVaultView = false
+    
+    @State private var previousHasItems = false
     
     private var cartInsights: CartInsights {
         vaultService.getCartInsights(cart: cart)
     }
     
-    // group items by store with stable sorting
     private var itemsByStore: [String: [(cartItem: CartItem, item: Item?)]] {
         let sortedCartItems = cart.cartItems.sorted { $0.itemId < $1.itemId }
         let cartItemsWithDetails = sortedCartItems.map { cartItem in
             (cartItem, vaultService.findItemById(cartItem.itemId))
         }
         
-        return Dictionary(grouping: cartItemsWithDetails) { cartItem, item in
+        // Filter out any nil stores and ensure we have valid data
+        let grouped = Dictionary(grouping: cartItemsWithDetails) { cartItem, item in
             cartItem.getStore(cart: cart)
         }
+        
+        // Return only non-empty groups with valid store names
+        return grouped.filter { !$0.key.isEmpty && !$0.value.isEmpty }
     }
     
     private var sortedStores: [String] {
-        itemsByStore.keys.sorted()
+        Array(itemsByStore.keys).sorted()
     }
     
     private var totalItemCount: Int {
         cart.cartItems.count
+    }
+    
+    private var hasItems: Bool {
+        totalItemCount > 0 && !sortedStores.isEmpty
+    }
+    
+    private var shouldAnimateTransition: Bool {
+        previousHasItems != hasItems
+    }
+    
+    private func storeItems(for store: String) -> [(cartItem: CartItem, item: Item?)] {
+        itemsByStore[store] ?? []
     }
     
     var body: some View {
@@ -59,7 +74,16 @@ struct CartDetailScreen: View {
                     VStack(spacing: 12) {
                         modeToggleView
                         
-                        itemsListView
+                        ZStack {
+                            if hasItems {
+                                itemsListView
+                                    .transition(.scale)
+                            } else {
+                                emptyStateView
+                                    .transition(.scale)
+                            }
+                        }
+                        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: hasItems)
                         
                         Spacer(minLength: 0)
                         
@@ -71,12 +95,15 @@ struct CartDetailScreen: View {
                     headerView
                 }
                 
-                footerView
-                    .padding(.leading)
-                    .padding(.bottom, geometry.safeAreaInsets.bottom + 20)
+                if hasItems {
+                    footerView
+                        .scaleEffect(shouldAnimateTransition ? 0.8 : 1)
+                        .animation(.spring(response: 0.3, dampingFraction: 0.7).delay(0.05), value: shouldAnimateTransition)
+                        .padding(.leading)
+                        .padding(.bottom, geometry.safeAreaInsets.bottom + 20)
+                }
                 
                 Button(action: {
-                    // ✅ UPDATED: Open VaultView to add items
                     showingVaultView = true
                 }) {
                     Image(systemName: "plus")
@@ -87,14 +114,25 @@ struct CartDetailScreen: View {
                         .clipShape(Circle())
                         .shadow(color: Color.black.opacity(0.3), radius: 8, x: 0, y: 4)
                 }
+                .scaleEffect(shouldAnimateTransition ? 0 : 1)
+                .animation(.spring(response: 0.3, dampingFraction: 0.7).delay(0.1), value: shouldAnimateTransition)
                 .frame(maxWidth: .infinity, alignment: .trailing)
                 .padding(.trailing)
                 .padding(.bottom, geometry.safeAreaInsets.bottom + 20)
                 
             }
         }
+        .onAppear {
+            previousHasItems = hasItems
+        }
+        .onChange(of: hasItems) { oldValue, newValue in
+            if oldValue != newValue {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    previousHasItems = newValue
+                }
+            }
+        }
         .navigationBarBackButtonHidden(true)
-        // ✅ SIMPLIFIED: Use item binding for sheet
         .sheet(item: $itemToEdit) { item in
             EditItemSheet(
                 item: item,
@@ -107,27 +145,13 @@ struct CartDetailScreen: View {
             .presentationDetents([.medium, .fraction(0.75)])
             .presentationCornerRadius(24)
         }
-        // ✅ NEW: Sheet for VaultView - USE EXISTING CartViewModel
         .sheet(isPresented: $showingVaultView) {
-            NavigationView {
-                VaultView(
-                    // ✅ Pass the current cart so we can add items directly to it
-                    existingCart: cart,
-                    onAddItemsToCart: { selectedItems in
-                        // Handle adding selected items to the current cart
-                        for (itemId, quantity) in selectedItems {
-                            if let item = vaultService.findItemById(itemId) {
-                                vaultService.addItemToCart(item: item, cart: cart, quantity: quantity)
-                            }
-                        }
-                        vaultService.updateCartTotals(cart: cart)
-                        showingVaultView = false
-                        // ✅ DON'T clear activeCartItems - they persist for next use
-                    }
-                )
-                .environment(vaultService)
-                // ✅ USE EXISTING CartViewModel from environment (not creating new one)
+            NavigationStack {
+                AddItemsToCartSheet(cart: cart)
+                    .environment(vaultService)
+                    .environment(cartViewModel)
             }
+            .presentationCornerRadius(24)
         }
         .alert("Start Shopping", isPresented: $showingStartShoppingAlert) {
             Button("Cancel", role: .cancel) { }
@@ -329,9 +353,9 @@ struct CartDetailScreen: View {
         Group {
             if totalItemCount <= 7 {
                 VStack(spacing: 0) {
-                    ForEach(sortedStores.indices, id: \.self) { index in
-                        let store = sortedStores[index]
-                        if let storeItems = itemsByStore[store] {
+                    ForEach(Array(sortedStores.enumerated()), id: \.offset) { index, store in
+                        let storeItems = storeItems(for: store)
+                        if !storeItems.isEmpty {
                             StoreSectionView(
                                 store: store,
                                 items: storeItems,
@@ -350,7 +374,7 @@ struct CartDetailScreen: View {
                                 onDeleteItem: { cartItem in
                                     handleDeleteItem(cartItem)
                                 },
-                                isLastStore: store == sortedStores.last,
+                                isLastStore: index == sortedStores.count - 1,
                                 isInScrollableView: false
                             )
                             .padding(.top, index == 0 ? 0 : 20)
@@ -361,9 +385,9 @@ struct CartDetailScreen: View {
             } else {
                 VerticalScrollViewWithCustomIndicator(maxHeight: 500, indicatorVerticalPadding: 12) {
                     VStack(spacing: 0) {
-                        ForEach(sortedStores.indices, id: \.self) { index in
-                            let store = sortedStores[index]
-                            if let storeItems = itemsByStore[store] {
+                        ForEach(Array(sortedStores.enumerated()), id: \.offset) { index, store in
+                            let storeItems = storeItems(for: store)
+                            if !storeItems.isEmpty {
                                 StoreSectionView(
                                     store: store,
                                     items: storeItems,
@@ -382,7 +406,7 @@ struct CartDetailScreen: View {
                                     onDeleteItem: { cartItem in
                                         handleDeleteItem(cartItem)
                                     },
-                                    isLastStore: store == sortedStores.last,
+                                    isLastStore: index == sortedStores.count - 1,
                                     isInScrollableView: true
                                 )
                                 .padding(.top, index == 0 ? 0 : 20)
@@ -393,6 +417,22 @@ struct CartDetailScreen: View {
                 }
             }
         }
+        .background(Color(hex: "FAFAFA").darker(by: 0.03))
+        .cornerRadius(16)
+    }
+    
+    private var emptyStateView: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "cart.badge.plus")
+                .font(.system(size: 48))
+                .foregroundColor(.gray.opacity(0.5))
+            
+            Text("Add items from vault")
+                .lexendFont(18, weight: .medium)
+                .foregroundColor(.gray)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(hex: "FAFAFA").darker(by: 0.03))
         .cornerRadius(16)
     }
@@ -456,7 +496,7 @@ struct CartDetailScreen: View {
     }
     
     private func handleDeleteItem(_ cartItem: CartItem) {
-        withTransaction(Transaction(animation: nil)) {
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
             vaultService.removeItemFromCart(cart: cart, itemId: cartItem.itemId)
             vaultService.updateCartTotals(cart: cart)
         }

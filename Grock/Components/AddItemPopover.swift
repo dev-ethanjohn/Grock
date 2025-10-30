@@ -118,7 +118,7 @@ struct AddItemPopover: View {
             .background(Color.white)
             .cornerRadius(20)
             .padding(.horizontal, UIScreen.main.bounds.width * 0.038)
-            .offset(y: UIScreen.main.bounds.height * 0.15)
+            .offset(y: UIScreen.main.bounds.height * 0.12)
             .scaleEffect(contentScale)
         }
         .onAppear {

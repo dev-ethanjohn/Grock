@@ -21,6 +21,9 @@ struct VaultView: View {
     var existingCart: Cart?
     var onAddItemsToCart: (([String: Double]) -> Void)?
     
+    // ✅ NEW: Track if we've initialized from existing cart
+    @State private var hasInitializedFromExistingCart = false
+    
     private var hasActiveItems: Bool {
         !cartViewModel.activeCartItems.isEmpty
     }
@@ -169,8 +172,12 @@ struct VaultView: View {
                 }
             )
             .presentationBackground(.clear)
-        }        .onAppear {
+        }
+        .onAppear {
             printVaultStructure()
+            
+            // ✅ NEW: Initialize active items from existing cart
+            initializeActiveItemsFromExistingCart()
             
             if selectedCategory == nil {
                 selectedCategory = firstCategoryWithItems ?? GroceryCategory.allCases.first
@@ -215,6 +222,27 @@ struct VaultView: View {
                 }
             }
         }
+    }
+    
+    // ✅ NEW: Initialize active items from existing cart
+    private func initializeActiveItemsFromExistingCart() {
+        guard let existingCart = existingCart, !hasInitializedFromExistingCart else { return }
+        
+        print("🔄 VaultView: Initializing active items from existing cart '\(existingCart.name)'")
+        
+        // Clear any existing active items
+        cartViewModel.activeCartItems.removeAll()
+        
+        // Add items from the existing cart to activeCartItems
+        for cartItem in existingCart.cartItems {
+            cartViewModel.activeCartItems[cartItem.itemId] = cartItem.quantity
+            if let item = vaultService.findItemById(cartItem.itemId) {
+                print("   - Activated: \(item.name) × \(cartItem.quantity)")
+            }
+        }
+        
+        print("   Total active items: \(cartViewModel.activeCartItems.count)")
+        hasInitializedFromExistingCart = true
     }
     
     private var emptyVaultView: some View {
@@ -334,6 +362,7 @@ struct VaultView: View {
         let onDeleteItem: (Item) -> Void
         
         @Environment(VaultService.self) private var vaultService
+        @Environment(CartViewModel.self) private var cartViewModel
         
         private var categoryItems: [Item] {
             guard let vault = vaultService.vault,
@@ -367,6 +396,14 @@ struct VaultView: View {
                 print("📱 CategoryItemsView appeared for: '\(category.title)'")
                 print("   Items count: \(categoryItems.count)")
                 print("   Available stores: \(availableStores)")
+                print("   Active items in this category: \(getActiveItemCount(in: categoryItems))")
+            }
+        }
+        
+        private func getActiveItemCount(in items: [Item]) -> Int {
+            items.reduce(0) { count, item in
+                let isActive = (cartViewModel.activeCartItems[item.id] ?? 0) > 0
+                return count + (isActive ? 1 : 0)
             }
         }
         
@@ -397,8 +434,17 @@ struct VaultView: View {
         if let vault = vaultService.vault,
            let foundCategory = vault.categories.first(where: { $0.name == category.title }) {
             print("   Items in this category: \(foundCategory.items.count)")
+            let activeCount = getActiveItemCount(in: foundCategory.items)
+            print("   Active items in this category: \(activeCount)")
         } else {
             print("   No items found in this category")
+        }
+    }
+    
+    private func getActiveItemCount(in items: [Item]) -> Int {
+        items.reduce(0) { count, item in
+            let isActive = (cartViewModel.activeCartItems[item.id] ?? 0) > 0
+            return count + (isActive ? 1 : 0)
         }
     }
     
@@ -526,6 +572,14 @@ struct VaultView: View {
             }
         }
         
+        // ✅ NEW: Show which cart we're adding to (if any)
+        if let existingCart = existingCart {
+            print("\n  🎯 Vault Mode: Adding to existing cart '\(existingCart.name)'")
+            print("     Cart items: \(existingCart.cartItems.count)")
+        } else {
+            print("\n  🎯 Vault Mode: Creating new cart")
+        }
+        
         print("===== END VAULT DEBUG INFO =====")
     }
     
@@ -551,6 +605,3 @@ struct ClearBackgroundView: UIViewRepresentable {
     
     func updateUIView(_ uiView: UIView, context: Context) {}
 }
-
-
-

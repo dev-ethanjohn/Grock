@@ -16,6 +16,7 @@ struct CartItemRowView: View {
     @State private var dragPosition: CGFloat = 0
     @GestureState private var dragOffset: CGFloat = 0
     @State private var isDeleting: Bool = false
+    @State private var isNewlyAdded: Bool = true
     
     private var itemName: String {
         item?.name ?? "Unknown Item"
@@ -40,7 +41,6 @@ struct CartItemRowView: View {
         return cartItem.getTotalPrice(from: vault, cart: cart)
     }
     
-    // ✅ unified computed offset
     private var totalOffset: CGFloat {
         isDeleting ? -400 : (dragPosition + dragOffset)
     }
@@ -50,7 +50,7 @@ struct CartItemRowView: View {
             HStack {
                 Spacer()
                 Button(action: {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.68)) {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                         isDeleting = true
                     }
                 }) {
@@ -71,7 +71,10 @@ struct CartItemRowView: View {
                     .frame(width: 80)
                 }
                 .buttonStyle(.plain)
+                .opacity(isNewlyAdded ? 0 : 1)
             }
+            .offset(x: isDeleting ? totalOffset : 0)
+            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isDeleting)
             
             HStack(alignment: .bottom, spacing: 2) {
                 if cart.isShopping {
@@ -115,8 +118,8 @@ struct CartItemRowView: View {
             .padding(.leading, 12)
             .padding(.trailing, isInScrollableView ? 0 : 12)
             .background(Color(hex: "FAFAFA").darker(by: 0.03))
-            .offset(x: totalOffset)
-            .animation(.spring(response: 0.3, dampingFraction: 0.68), value: totalOffset)
+            .offset(x: totalOffset)  
+            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: totalOffset)
             .gesture(
                 DragGesture()
                     .updating($dragOffset) { value, state, _ in
@@ -134,7 +137,7 @@ struct CartItemRowView: View {
                         }
                     }
                     .onEnded { value in
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.68)) {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                             if value.translation.width < -50 {
                                 dragPosition = -80
                             } else {
@@ -149,7 +152,7 @@ struct CartItemRowView: View {
         .contentShape(Rectangle())
         .onTapGesture {
             if dragPosition < 0 {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.68)) {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                     dragPosition = 0
                 }
             } else {
@@ -158,8 +161,8 @@ struct CartItemRowView: View {
         }
         .contextMenu {
             Button(role: .destructive) {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.68)) {
-                    onDelete()
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    isDeleting = true
                 }
             } label: {
                 Label("Delete", systemImage: "trash")
@@ -190,6 +193,21 @@ struct CartItemRowView: View {
                     onDelete()
                 }
             }
+        }
+        .onAppear {
+            dragPosition = 0
+            isDeleting = false
+            
+            if isNewlyAdded {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    withAnimation(.easeIn(duration: 0.2)) {
+                        isNewlyAdded = false
+                    }
+                }
+            }
+        }
+        .onDisappear {
+            isNewlyAdded = true
         }
     }
     
