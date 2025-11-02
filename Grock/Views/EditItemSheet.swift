@@ -43,7 +43,8 @@ struct EditItemSheet: View {
                             itemName: $itemName,
                             itemNameFieldIsFocused: $itemNameFieldIsFocused,
                             selectedCategory: $selectedCategory,
-                            selectedCategoryEmoji: selectedCategoryEmoji
+                            selectedCategoryEmoji: selectedCategoryEmoji,
+                            showTooltip: false 
                         )
                         
                         DashedLine()

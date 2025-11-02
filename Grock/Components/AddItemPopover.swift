@@ -55,11 +55,12 @@ struct AddItemPopover: View {
                 
                 VStack(spacing: 12) {
                     ItemNameInput(
-                        itemName: $itemName,
-                        itemNameFieldIsFocused: $itemNameFieldIsFocused,
-                        selectedCategory: $selectedCategory,
-                        selectedCategoryEmoji: selectedCategoryEmoji
-                    )
+                                          itemName: $itemName,
+                                          itemNameFieldIsFocused: $itemNameFieldIsFocused,
+                                          selectedCategory: $selectedCategory,
+                                          selectedCategoryEmoji: selectedCategoryEmoji,
+                                          showTooltip: false 
+                                      )
                     
                     DashedLine()
                         .stroke(style: StrokeStyle(lineWidth: 1, dash: [8, 4]))

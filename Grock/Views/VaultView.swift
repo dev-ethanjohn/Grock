@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import Lottie
 
 struct VaultView: View {
     @Environment(VaultService.self) private var vaultService
@@ -16,21 +17,56 @@ struct VaultView: View {
     @State private var scrollProxy: ScrollViewProxy?
     @State private var showCartConfirmation = false
     
-    // ✅ COMPLETE: Properties for different modes
+    // Properties for different modes
     var onCreateCart: ((Cart) -> Void)?
     var existingCart: Cart?
     var onAddItemsToCart: (([String: Double]) -> Void)?
+    var shouldTriggerCelebration: Bool = false
     
-    // ✅ NEW: Track if we've initialized from existing cart
     @State private var hasInitializedFromExistingCart = false
+    
+    // Celebration States with Lottie
+    @State private var showCelebration = false
+    @State private var debugCelebrationCount = 0
+    @State private var buttonScale: CGFloat = 1.0
     
     private var hasActiveItems: Bool {
         !cartViewModel.activeCartItems.isEmpty
     }
     
+    // guide
+    @State private var showFirstItemTooltip = false
+    @State private var firstItemId: String? = nil
+    
     var body: some View {
         ZStack(alignment: .bottom) {
             VStack(spacing: 0) {
+//                
+//                HStack {
+//                    Spacer()
+//                    Button(action: {
+//                        debugCelebrationCount += 1
+//                        print("🎉 DEBUG: Manual celebration triggered #\(debugCelebrationCount)")
+//                        showCelebration = true
+//                    }) {
+//                        HStack(spacing: 4) {
+//                            Image(systemName: "sparkles")
+//                                .font(.system(size: 14))
+//                            Text("Test Celebration")
+//                                .font(.system(size: 12, weight: .medium))
+//                        }
+//                        .foregroundColor(.white)
+//                        .padding(.horizontal, 12)
+//                        .padding(.vertical, 6)
+//                        .background(Color.blue)
+//                        .cornerRadius(15)
+//                    }
+//                    .padding(.top, 8)
+//                    .padding(.trailing, 16)
+//                }
+//                .frame(height: 40)
+//                .background(Color.clear)
+                
                 VaultToolbarView(
                     toolbarAppeared: $toolbarAppeared,
                     onAddTapped: {
@@ -51,16 +87,13 @@ struct VaultView: View {
                 }
             }
             
-            if vaultService.vault != nil {
+            if vaultService.vault != nil && !showCelebration {
                 ZStack(alignment: .topLeading) {
                     Button(action: {
                         if existingCart != nil {
-                            // ✅ MODE: Adding to existing cart - DON'T clear active items
                             onAddItemsToCart?(cartViewModel.activeCartItems)
-                            // Note: We don't clear activeCartItems here so they persist for next use
                             dismiss()
                         } else {
-                            // MODE: Creating new cart
                             withAnimation {
                                 showCartConfirmation = true
                             }
@@ -75,11 +108,20 @@ struct VaultView: View {
                             .cornerRadius(25)
                     }
                     .padding(.bottom, 20)
-                    .scaleEffect(createCartButtonVisible ? 1 : 0)
-                    .animation(.spring(response: 0.3, dampingFraction: 0.8, blendDuration: 0), value: createCartButtonVisible)
-                    .opacity(createCartButtonVisible ? 1 : 0)
-                    .opacity(hasActiveItems ? 1 : 0.5)
+                    .scaleEffect(createCartButtonVisible ? buttonScale : 0)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.6), value: createCartButtonVisible)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.6), value: buttonScale)
                     .disabled(!hasActiveItems)
+                    .onChange(of: createCartButtonVisible) { oldValue, newValue in
+                        if newValue && hasActiveItems {
+                            startButtonBounce()
+                        }
+                    }
+                    .onChange(of: hasActiveItems) { oldValue, newValue in
+                        if newValue && createCartButtonVisible {
+                            startButtonBounce()
+                        }
+                    }
                     
                     if hasActiveItems {
                         Text("\(cartViewModel.activeCartItems.count)")
@@ -97,19 +139,18 @@ struct VaultView: View {
                             .offset(x: -8, y: -4)
                             .scaleEffect(cartBadgeVisible ? 1 : 0)
                             .animation(
-                                cartBadgeVisible ?
-                                    .spring(response: 0.3, dampingFraction: 0.5, blendDuration: 0).delay(0.35) :
-                                    .spring(response: 0.3, dampingFraction: 0.8, blendDuration: 0),
+                                .spring(response: 0.6, dampingFraction: 0.6),
                                 value: cartBadgeVisible
                             )
                     }
                 }
                 .onChange(of: createCartButtonVisible) { oldValue, newValue in
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    withAnimation(.spring(response: 0.6, dampingFraction: 0.6)) {
                         cartBadgeVisible = newValue
                     }
                 }
             }
+            
             
             if showAddItemPopover {
                 AddItemPopover(
@@ -144,7 +185,35 @@ struct VaultView: View {
             }
         }
         .animation(.easeInOut(duration: 0.3), value: showCartConfirmation)
-        .fullScreenCover(isPresented: $showCartConfirmation) {
+        .fullScreenCover(isPresented: $showCelebration) {
+            CelebrationView(isPresented: $showCelebration)
+                .presentationBackground(.clear)
+        }
+        .onChange(of: showCelebration) { oldValue, newValue in
+            if newValue {
+                // Celebration starting - hide button
+                withAnimation(.easeOut(duration: 0.2)) {
+                    createCartButtonVisible = false
+                }
+            } else {
+                // Celebration ending - show button with bounce
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                    createCartButtonVisible = true
+                }
+                // Trigger bounce after button appears
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    if hasActiveItems {
+                        startButtonBounce()
+                    }
+                }
+                
+                // Celebration just ended - show first item tooltip
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    findAndHighlightFirstItem()
+                }
+            }
+        }
+              .fullScreenCover(isPresented: $showCartConfirmation) {
             CartConfirmationPopover(
                 isPresented: $showCartConfirmation,
                 activeCartItems: cartViewModel.activeCartItems,
@@ -152,14 +221,9 @@ struct VaultView: View {
                 onConfirm: { title, budget in
                     print("🛒 Creating cart...")
                     
-                    // ✅ FIX: Create cart and pass it immediately
                     if let newCart = cartViewModel.createCartWithActiveItems(name: title, budget: budget) {
                         print("✅ Cart created: \(newCart.name)")
-                        
-                        // ✅ Clear active items ONLY when creating new cart
                         cartViewModel.activeCartItems.removeAll()
-                        
-                        // ✅ Call onCreateCart immediately with the new cart
                         onCreateCart?(newCart)
                     } else {
                         print("❌ Failed to create cart")
@@ -175,12 +239,31 @@ struct VaultView: View {
         }
         .onAppear {
             printVaultStructure()
-            
-            // ✅ NEW: Initialize active items from existing cart
             initializeActiveItemsFromExistingCart()
             
             if selectedCategory == nil {
                 selectedCategory = firstCategoryWithItems ?? GroceryCategory.allCases.first
+            }
+            
+            // ✅ FIXED: Check celebration with shouldTriggerCelebration parameter
+            print("🎉 VaultView onAppear - Checking celebration conditions:")
+            print("🎉 shouldTriggerCelebration parameter: \(shouldTriggerCelebration)")
+            
+            let hasSeenCelebration = UserDefaults.standard.bool(forKey: "hasSeenVaultCelebration")
+            print("🎉 hasSeenCelebration: \(hasSeenCelebration)")
+            
+            if let vault = vaultService.vault {
+                let totalItems = vault.categories.reduce(0) { $0 + $1.items.count }
+                print("🎉 Total items in vault: \(totalItems)")
+                print("🎉 Categories with items: \(vault.categories.filter { !$0.items.isEmpty }.count)")
+            }
+            
+            if shouldTriggerCelebration {
+                print("🎉 Celebration triggered by parent view!")
+                showCelebration = true
+                UserDefaults.standard.set(true, forKey: "hasSeenVaultCelebration")
+            } else {
+                checkAndStartCelebration()
             }
             
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
@@ -200,7 +283,6 @@ struct VaultView: View {
                 }
             }
         }
-        
         .onDisappear {
             NotificationCenter.default.removeObserver(self)
         }
@@ -222,18 +304,46 @@ struct VaultView: View {
                 }
             }
         }
+        .overlay {
+            if showFirstItemTooltip, let firstItemId = firstItemId {
+                FirstItemTooltip(itemId: firstItemId, isPresented: $showFirstItemTooltip)
+            }
+        }
     }
     
-    // ✅ NEW: Initialize active items from existing cart
+    private func checkAndStartCelebration() {
+        let hasSeenCelebration = UserDefaults.standard.bool(forKey: "hasSeenVaultCelebration")
+        
+        guard !hasSeenCelebration else {
+            print("⏭️ Skipping celebration - already seen")
+            return
+        }
+        
+        guard let vault = vaultService.vault else {
+            print("⏭️ Skipping celebration - no vault")
+            return
+        }
+        
+        let totalItems = vault.categories.reduce(0) { $0 + $1.items.count }
+        print("🎉 Total items in vault: \(totalItems)")
+        
+        guard totalItems > 0 else {
+            print("⏭️ Skipping celebration - vault is empty")
+            return
+        }
+        
+        print("🎉 ✅ CONDITIONS MET - Starting celebration!")
+        showCelebration = true
+        UserDefaults.standard.set(true, forKey: "hasSeenVaultCelebration")
+    }
+    
     private func initializeActiveItemsFromExistingCart() {
         guard let existingCart = existingCart, !hasInitializedFromExistingCart else { return }
         
         print("🔄 VaultView: Initializing active items from existing cart '\(existingCart.name)'")
         
-        // Clear any existing active items
         cartViewModel.activeCartItems.removeAll()
         
-        // Add items from the existing cart to activeCartItems
         for cartItem in existingCart.cartItems {
             cartViewModel.activeCartItems[cartItem.itemId] = cartItem.quantity
             if let item = vaultService.findItemById(cartItem.itemId) {
@@ -329,7 +439,7 @@ struct VaultView: View {
             }
         }
     }
-
+    
     private var categoryContentScrollView: some View {
         GeometryReader { geometry in
             ScrollView(.horizontal, showsIndicators: false) {
@@ -392,19 +502,6 @@ struct VaultView: View {
                     )
                 }
             }
-            .onAppear {
-                print("📱 CategoryItemsView appeared for: '\(category.title)'")
-                print("   Items count: \(categoryItems.count)")
-                print("   Available stores: \(availableStores)")
-                print("   Active items in this category: \(getActiveItemCount(in: categoryItems))")
-            }
-        }
-        
-        private func getActiveItemCount(in items: [Item]) -> Int {
-            items.reduce(0) { count, item in
-                let isActive = (cartViewModel.activeCartItems[item.id] ?? 0) > 0
-                return count + (isActive ? 1 : 0)
-            }
         }
         
         private var emptyCategoryView: some View {
@@ -428,23 +525,6 @@ struct VaultView: View {
             withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                 proxy.scrollTo(category.id, anchor: .center)
             }
-        }
-        
-        print("🎯 Selected category: '\(category.title)'")
-        if let vault = vaultService.vault,
-           let foundCategory = vault.categories.first(where: { $0.name == category.title }) {
-            print("   Items in this category: \(foundCategory.items.count)")
-            let activeCount = getActiveItemCount(in: foundCategory.items)
-            print("   Active items in this category: \(activeCount)")
-        } else {
-            print("   No items found in this category")
-        }
-    }
-    
-    private func getActiveItemCount(in items: [Item]) -> Int {
-        items.reduce(0) { count, item in
-            let isActive = (cartViewModel.activeCartItems[item.id] ?? 0) > 0
-            return count + (isActive ? 1 : 0)
         }
     }
     
@@ -484,7 +564,7 @@ struct VaultView: View {
         
         return foundCategory.items.count
     }
-
+    
     private func hasItems(in category: GroceryCategory) -> Bool {
         return getTotalItemCount(for: category) > 0
     }
@@ -501,8 +581,6 @@ struct VaultView: View {
     
     private func printVaultStructure() {
         print("\n🔍 ===== VAULT STRUCTURE DEBUG INFO =====")
-        print("📦 Number of vaults in service: \(vaultService.vault != nil ? 1 : 0)")
-        
         guard let vault = vaultService.vault else {
             print("❌ No vault found in VaultService!")
             return
@@ -511,97 +589,206 @@ struct VaultView: View {
         print("🏷️ Vault ID: \(vault.uid)")
         print("📂 Number of categories in vault: \(vault.categories.count)")
         
-        if vault.categories.isEmpty {
-            print("📭 Vault is empty - no categories found")
-        } else {
-            print("\n🔍 RAW ARRAY ORDER (as stored in SwiftData):")
-            for categoryIndex in 0..<vault.categories.count {
-                let category = vault.categories[categoryIndex]
-                print("  [\(categoryIndex)]: '\(category.name)' (Sort Order: \(category.sortOrder))")
-            }
-            
-            let sortedCategories = vault.categories.sorted { $0.sortOrder < $1.sortOrder }
-            print("\n🔍 SORTED ORDER (by sortOrder property):")
-            for (sortedIndex, category) in sortedCategories.enumerated() {
-                print("  [\(sortedIndex)]: '\(category.name)' (Sort Order: \(category.sortOrder))")
-            }
-            
-            print("\n📋 DETAILED CATEGORY STRUCTURE (SORTED):")
-            for (categoryIndex, category) in sortedCategories.enumerated() {
-                print("\n  📁 Category \(categoryIndex + 1) (Sort Order: \(category.sortOrder)):")
-                print("     Name: '\(category.name)'")
-                print("     ID: \(category.uid)")
-                print("     Number of items: \(category.items.count)")
-                
-                if category.items.isEmpty {
-                    print("     📭 No items in this category")
-                } else {
-                    for (itemIndex, item) in category.items.enumerated() {
-                        print("     🛒 Item \(itemIndex + 1):")
-                        print("        Name: '\(item.name)'")
-                        print("        ID: \(item.id)")
-                        print("        Price options: \(item.priceOptions.count)")
-                        
-                        if item.priceOptions.isEmpty {
-                            print("        💰 No price options for this item")
-                        } else {
-                            for (priceIndex, priceOption) in item.priceOptions.enumerated() {
-                                print("        💰 Price option \(priceIndex + 1):")
-                                print("           Store: '\(priceOption.store)'")
-                                print("           Price: ₱\(priceOption.pricePerUnit.priceValue)")
-                                print("           Unit: '\(priceOption.pricePerUnit.unit)'")
-                            }
-                        }
-                        let isActive = (cartViewModel.activeCartItems[item.id] ?? 0) > 0
-                        let quantity = cartViewModel.activeCartItems[item.id] ?? 0
-                        print("        🛍️ Cart Status: \(isActive ? "ACTIVE (qty: \(quantity))" : "inactive")")
-                    }
-                }
-            }
-        }
-        let allStores = getAllStores()
-        print("\n  🏪 All available stores: \(allStores)")
+        let sortedCategories = vault.categories.sorted { $0.sortOrder < $1.sortOrder }
         
-        print("\n  🛒 Cart Summary:")
-        print("     Active items: \(cartViewModel.activeCartItems.count)")
-        for (itemId, quantity) in cartViewModel.activeCartItems {
-            if let item = vaultService.findItemById(itemId) {
-                print("     - \(item.name): \(quantity)")
-            } else {
-                print("     - Unknown item (\(itemId)): \(quantity)")
+        for (categoryIndex, category) in sortedCategories.enumerated() {
+            print("\n  📁 Category \(categoryIndex + 1): '\(category.name)'")
+            print("     Number of items: \(category.items.count)")
+            
+            for (itemIndex, item) in category.items.enumerated() {
+                print("     🛒 Item \(itemIndex + 1): '\(item.name)'")
             }
-        }
-        
-        // ✅ NEW: Show which cart we're adding to (if any)
-        if let existingCart = existingCart {
-            print("\n  🎯 Vault Mode: Adding to existing cart '\(existingCart.name)'")
-            print("     Cart items: \(existingCart.cartItems.count)")
-        } else {
-            print("\n  🎯 Vault Mode: Creating new cart")
         }
         
         print("===== END VAULT DEBUG INFO =====")
     }
     
-    private func getAllStores() -> [String] {
-        guard let vault = vaultService.vault else { return [] }
+    private func startButtonBounce() {
+        withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {
+            buttonScale = 0.95
+        }
         
-        let allStores = vault.categories.flatMap { category in
-            category.items.flatMap { item in
-                item.priceOptions.map { $0.store }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.5)) {
+                buttonScale = 1.1
             }
         }
         
-        return Array(Set(allStores)).sorted()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                buttonScale = 1.0
+            }
+        }
+    }
+    
+    private func findAndHighlightFirstItem() {
+        guard let vault = vaultService.vault else { return }
+        
+        for category in vault.categories {
+            if let firstItem = category.items.first {
+                firstItemId = firstItem.id
+                showFirstItemTooltip = true
+                break
+            }
+        }
     }
 }
 
-struct ClearBackgroundView: UIViewRepresentable {
-    func makeUIView(context: Context) -> UIView {
-        let view = UIView()
-        view.backgroundColor = .clear
-        return view
+struct CelebrationView: View {
+    @Binding var isPresented: Bool
+    @State private var showing = false
+    @State private var opacity: Double = 0
+    
+    var body: some View {
+        ZStack(alignment: .bottom) {
+            Color.clear
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    dismissCelebration()
+                }
+            
+            VStack(spacing: 0) {
+                Spacer()
+                
+                LottieView(animation: .named("Celebration"))
+                    .playbackMode(.playing(.fromProgress(0, toProgress: 1, loopMode: .playOnce)))
+                    .scaleEffect(1.1)
+                    .allowsHitTesting(false)
+                    .frame(height: 400)
+                    .offset(y: 200)
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Welcome to Your Vault!")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(.white)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.black)
+                        .shadow(color: .black.opacity(0.3), radius: 20, x: 0, y: 10)
+                )
+                .padding(.bottom, 100)
+                .scaleEffect(showing ? 1 : 0)
+                .opacity(opacity)
+            }
+        }
+        .ignoresSafeArea()
+        .onAppear {
+            withAnimation(.spring(response: 0.6, dampingFraction: 0.6)) {
+                showing = true
+                opacity = 1
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                dismissCelebration()
+            }
+        }
     }
     
-    func updateUIView(_ uiView: UIView, context: Context) {}
+    private func dismissCelebration() {
+        withAnimation(.spring(response: 0.6, dampingFraction: 0.6)) {
+            showing = false
+            opacity = 0
+        }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            isPresented = false
+        }
+    }
+}
+
+struct FirstItemTooltip: View {
+    let itemId: String
+    @Binding var isPresented: Bool
+    @Environment(VaultService.self) private var vaultService
+    
+    @State private var itemFrame: CGRect = .zero
+    @State private var showing = false
+    
+    private var item: Item? {
+        vaultService.findItemById(itemId)
+    }
+    
+    var body: some View {
+        GeometryReader { geometry in
+            Color.clear
+                .onAppear {
+                    findItemFrame()
+                }
+                .overlay(
+                    ZStack {
+                        if let item = item, showing {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Your first item! 🎉")
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundColor(.black)
+                                
+                                Text("Continue adding items to build your grocery collection")
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundColor(.black.opacity(0.8))
+                                    .multilineTextAlignment(.leading)
+                                
+                                Text("Tap anywhere to continue")
+                                    .font(.system(size: 10, weight: .medium))
+                                    .foregroundColor(.gray)
+                            }
+                            .padding(12)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(Color.white)
+                                    .shadow(color: .black.opacity(0.2), radius: 8, x: 0, y: 4)
+                            )
+                            .overlay(
+                                Triangle()
+                                    .fill(Color.white)
+                                    .frame(width: 12, height: 8)
+                                    .rotationEffect(.degrees(180))
+                                    .offset(y: 6)
+                                , alignment: .top
+                            )
+                            .position(x: geometry.size.width / 2, y: itemFrame.maxY + 80)
+                        }
+                    }
+                )
+        }
+        .onTapGesture {
+            dismissTooltip()
+        }
+        .onAppear {
+            withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
+                showing = true
+            }
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
+                dismissTooltip()
+            }
+        }
+    }
+    
+    private func findItemFrame() {
+        itemFrame = CGRect(x: UIScreen.main.bounds.width / 2 - 50,
+                          y: UIScreen.main.bounds.height / 2,
+                          width: 100, height: 50)
+    }
+    
+    private func dismissTooltip() {
+        withAnimation(.easeOut(duration: 0.3)) {
+            showing = false
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            isPresented = false
+        }
+    }
+}
+
+struct Triangle: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: rect.midX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+        path.closeSubpath()
+        return path
+    }
 }

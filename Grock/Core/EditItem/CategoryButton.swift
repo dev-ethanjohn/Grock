@@ -49,14 +49,7 @@ struct CategoryButton: View {
                     }
                 }
             }
-            .onTapGesture {
-                if showTooltip {
-                    withAnimation(.easeOut(duration: 0.2)) {
-                        showTooltip = false
-                    }
-                }
-            }
-            .padding(.trailing, 8)
+            // Remove the onTapGesture that hides tooltip
         }
     }
 }

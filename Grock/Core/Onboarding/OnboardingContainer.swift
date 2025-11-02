@@ -61,12 +61,14 @@ struct OnboardingContainer: View {
                 ))
             }
 
+            // In OnboardingContainer - FIXED:
             if step == .firstItem {
                 OnboardingFirstItemView(
                     viewModel: viewModel,
                     onFinish: {
-                        viewModel.saveInitialData(vaultService: vaultService)
+                        // ❌ REMOVE THIS: viewModel.saveInitialData(vaultService: vaultService)
                         
+                        // Only save to UserDefaults for preloading
                         UserDefaults.standard.set([
                             "itemName": viewModel.itemName,
                             "categoryName": viewModel.categoryName,
@@ -150,15 +152,14 @@ struct OnboardingCompletedHomeView: View {
         guard let data = UserDefaults.standard.dictionary(forKey: "onboardingItemData"),
               let itemName = data["itemName"] as? String,
               let categoryName = data["categoryName"] as? String,
-              let portion = data["portion"] as? Double,
               let category = vaultService.vault?.categories.first(where: { $0.name == categoryName }),
               let item = category.items.first(where: { $0.name == itemName }) else {
             print("⚠️ Could not preload onboarding item")
             return
         }
         
-        cartViewModel.activeCartItems[item.id] = portion
-        print("✅ Preloaded onboarding item '\(itemName)' with portion \(portion) into activeCartItems")
+        cartViewModel.activeCartItems[item.id] = 1.0
+        print("✅ Preloaded onboarding item '\(itemName)' with DEFAULT quantity 1 into activeCartItems")
         
         UserDefaults.standard.removeObject(forKey: "onboardingItemData")
     }

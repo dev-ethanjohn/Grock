@@ -12,15 +12,16 @@ struct ItemNameInput: View {
     var itemNameFieldIsFocused: FocusState<Bool>.Binding
     @Binding var selectedCategory: GroceryCategory?
     let selectedCategoryEmoji: String
+    let showTooltip: Bool // Add this
     
     @State private var fillAnimation: CGFloat = 0.0
     @State private var fieldScale: CGFloat = 1.0
-    @State private var showTooltip = false
+    // Remove @State private var showTooltip = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             ZStack(alignment: .trailing) {
-                if showTooltip && selectedCategory == nil {
+                if showTooltip && selectedCategory == nil { // Use the passed-in value
                     TooltipPopover()
                         .offset(x: -10, y: -32)
                         .transition(.asymmetric(
@@ -62,7 +63,7 @@ struct ItemNameInput: View {
                             CategoryButton(
                                 selectedCategory: $selectedCategory,
                                 selectedCategoryEmoji: selectedCategoryEmoji,
-                                showTooltip: $showTooltip
+                                showTooltip: .constant(false) // Remove tooltip control from here
                             )
                         )
                 }
@@ -103,26 +104,9 @@ struct ItemNameInput: View {
                 }
             }
             
-            if newValue != nil {
-                withAnimation(.easeOut(duration: 0.3)) {
-                    showTooltip = false
-                }
-            }
+            // Remove the tooltip hiding logic from here
         }
-        .onAppear {
-            if selectedCategory == nil {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                        showTooltip = true
-                    }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
-                        withAnimation(.easeOut(duration: 0.3)) {
-                            showTooltip = false
-                        }
-                    }
-                }
-            }
-        }
+        // Remove the onAppear that shows the tooltip
     }
     
     private func startFieldBounce() {

@@ -32,6 +32,4 @@ class OnboardingViewModel {
             unit: unit
         )
     }
-    
-    
 }
