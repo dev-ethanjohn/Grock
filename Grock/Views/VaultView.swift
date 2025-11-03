@@ -171,8 +171,12 @@ struct VaultView: View {
         }
         .animation(.easeInOut(duration: 0.3), value: showCartConfirmation)
         .fullScreenCover(isPresented: $showCelebration) {
-            CelebrationView(isPresented: $showCelebration)
-                .presentationBackground(.clear)
+            CelebrationView(
+                isPresented: $showCelebration,
+                title: "Welcome to Your Vault!",
+                subtitle: nil
+            )
+            .presentationBackground(.clear)
         }
         .onChange(of: showCelebration) { oldValue, newValue in
             if newValue {

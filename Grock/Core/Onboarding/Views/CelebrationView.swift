@@ -1,27 +1,22 @@
-//
-//  CelebrationView.swift
-//  Grock
-//
-//  Created by Ethan John Paguntalan on 11/3/25.
-//
-
 import SwiftUI
 import Lottie
 
-
 struct CelebrationView: View {
     @Binding var isPresented: Bool
+    let title: String
+    let subtitle: String?
+    
     @State private var showing = false
     @State private var opacity: Double = 0
     
+    init(isPresented: Binding<Bool>, title: String, subtitle: String? = nil) {
+        self._isPresented = isPresented
+        self.title = title
+        self.subtitle = subtitle
+    }
+    
     var body: some View {
         ZStack(alignment: .bottom) {
-            Color.clear
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    dismissCelebration()
-                }
-            
             VStack(spacing: 0) {
                 Spacer()
                 
@@ -32,15 +27,23 @@ struct CelebrationView: View {
                     .frame(height: 400)
                     .offset(y: 200)
                 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Welcome to Your Vault!")
-                        .font(.system(size: 14, weight: .bold))
+                VStack(alignment: .center, spacing: 4) {
+                    Text(title)
+                        .font(.system(size: 16, weight: .bold))
                         .foregroundColor(.white)
+                        .multilineTextAlignment(.center)
+                    
+                    if let subtitle = subtitle {
+                        Text(subtitle)
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.white.opacity(0.9))
+                            .multilineTextAlignment(.center)
+                    }
                 }
                 .padding(.horizontal, 16)
-                .padding(.vertical, 8)
+                .padding(.vertical, subtitle != nil ? 12 : 8)
                 .background(
-                    RoundedRectangle(cornerRadius: 8)
+                    RoundedRectangle(cornerRadius: 12)
                         .fill(Color.black)
                         .shadow(color: .black.opacity(0.3), radius: 20, x: 0, y: 10)
                 )
@@ -48,6 +51,7 @@ struct CelebrationView: View {
                 .scaleEffect(showing ? 1 : 0)
                 .opacity(opacity)
             }
+            .padding(.horizontal, 40)
         }
         .ignoresSafeArea()
         .onAppear {
@@ -55,7 +59,7 @@ struct CelebrationView: View {
                 showing = true
                 opacity = 1
             }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
                 dismissCelebration()
             }
         }
@@ -74,13 +78,17 @@ struct CelebrationView: View {
 }
 
 #Preview {
-    struct CelebrationViewPreview: View {
-        @State private var isPresented = true
+    VStack {
+        CelebrationView(
+            isPresented: .constant(true),
+            title: "Your First Shopping Cart!",
+            subtitle: "Start adding items and manage your budget"
+        )
         
-        var body: some View {
-            CelebrationView(isPresented: $isPresented)
-        }
+        CelebrationView(
+            isPresented: .constant(true),
+            title: "Welcome to Your Vault!",
+            subtitle: nil
+        )
     }
-    
-    return CelebrationViewPreview()
 }

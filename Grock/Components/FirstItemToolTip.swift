@@ -40,13 +40,12 @@ struct FirstItemTooltip: View {
                         
                     Text("Your first item! 🎉")
                         .lexendFont(16, weight: .bold)
-                        .foregroundColor(.black)
                     
                     Text("Grow your vault as you shop and it will remember prices, portions, and stores to make your next trip easier.")
                         .lexendFont(14, weight: .medium)
-                        .foregroundColor(.black.opacity(0.8))
                         .multilineTextAlignment(.center)
                 }
+                .foregroundStyle(Color(hex: "444"))
                 .frame(maxWidth: UIScreen.main.bounds.width * 0.8)
                 .offset(y: -40)
                 .opacity(showing ? 1 : 0)

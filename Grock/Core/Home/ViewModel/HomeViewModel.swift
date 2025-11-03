@@ -66,11 +66,15 @@ final class HomeViewModel {
         vaults?.forEach { modelContext.delete($0) }
 
         try? modelContext.save()
-
+        UserDefaults.standard.set(false, forKey: "hasSeenFirstShoppingCartCelebration")
+        UserDefaults.standard.set(false, forKey: "hasSeenVaultCelebration")
         UserDefaults.standard.hasCompletedOnboarding = false
+
         cartViewModel.loadCarts()
 
-        print("✅ Reset done: Vault cleared")
+        print("✅ Reset done: Vault cleared and celebration flags reset")
+        print("   - hasSeenFirstShoppingCartCelebration: false")
+        print("   - hasSeenVaultCelebration: false")
     }
     
     func loadCarts() {

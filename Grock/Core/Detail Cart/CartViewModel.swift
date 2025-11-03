@@ -161,4 +161,9 @@ class CartViewModel {
             newUnit: targetUnit
         )
     }
+    
+    func isFirstCart(_ cart: Cart) -> Bool {
+        let sortedCarts = carts.sorted { $0.createdAt < $1.createdAt }
+        return sortedCarts.first?.id == cart.id
+    }
 }

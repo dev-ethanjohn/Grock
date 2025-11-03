@@ -28,6 +28,9 @@ struct CartDetailScreen: View {
     
     @State private var previousHasItems = false
     
+    // Celebration state
+    @State private var showCelebration = false
+    
     private var cartInsights: CartInsights {
         vaultService.getCartInsights(cart: cart)
     }
@@ -124,6 +127,7 @@ struct CartDetailScreen: View {
         }
         .onAppear {
             previousHasItems = hasItems
+            checkAndShowCelebration()
         }
         .onChange(of: hasItems) { oldValue, newValue in
             if oldValue != newValue {
@@ -132,6 +136,13 @@ struct CartDetailScreen: View {
                 }
             }
         }
+        .fullScreenCover(isPresented: $showCelebration) {
+               CelebrationView(
+                   isPresented: $showCelebration,
+                   title: "WOW! Your First Shopping Cart! 🎉",
+               )
+               .presentationBackground(.clear)
+           }
         .navigationBarBackButtonHidden(true)
         .sheet(item: $itemToEdit) { item in
             EditItemSheet(
@@ -501,4 +512,35 @@ struct CartDetailScreen: View {
             vaultService.updateCartTotals(cart: cart)
         }
     }
+    
+    private func checkAndShowCelebration() {
+        // Use a different key to avoid conflicts
+        let hasSeenCelebration = UserDefaults.standard.bool(forKey: "hasSeenFirstShoppingCartCelebration")
+        
+        print("🎉 Cart Celebration Debug:")
+        print("   - hasSeenCelebration: \(hasSeenCelebration)")
+        print("   - Total carts: \(cartViewModel.carts.count)")
+        print("   - Current cart name: \(cart.name)")
+        print("   - Current cart ID: \(cart.id)")
+        
+        guard !hasSeenCelebration else {
+            print("⏭️ Skipping first cart celebration - already seen")
+            return
+        }
+        
+        // Check if this is the first cart
+        let isFirstCart = cartViewModel.carts.count == 1 || cartViewModel.isFirstCart(cart)
+        print("   - Is first cart: \(isFirstCart)")
+        
+        if isFirstCart {
+            print("🎉 First cart celebration triggered!")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                showCelebration = true
+            }
+            UserDefaults.standard.set(true, forKey: "hasSeenFirstShoppingCartCelebration")
+        } else {
+            print("⏭️ Not the first cart - no celebration")
+        }
+    }
+
 }
