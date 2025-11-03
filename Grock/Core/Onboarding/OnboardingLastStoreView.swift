@@ -1,10 +1,3 @@
-//
-//  OnboardingLastStoreView.swift
-//  Grock
-//
-//  Created by Ethan John Paguntalan on 9/28/25.
-//
-
 import SwiftUI
 
 struct OnboardingLastStoreView: View {
@@ -23,12 +16,22 @@ struct OnboardingLastStoreView: View {
     @State private var shakeOffset: CGFloat = 0
     @State private var showError = false
     
+    private var isValidStoreName: Bool {
+        let trimmed = viewModel.storeName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.count >= 2
+    }
+    
+    private func normalizeSpaces(_ text: String) -> String {
+        return text.replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+    }
+
     var body: some View {
         VStack {
             
             HStack {
                 Spacer()
                 Button("Skip") {
+                    viewModel.storeName = ""
                     onSkip()
                 }
                 .font(.fuzzyBold_16)
@@ -48,6 +51,7 @@ struct OnboardingLastStoreView: View {
             TextField("e.g. Walmart, SM, Costco", text: $viewModel.storeName)
                 .multilineTextAlignment(.center)
                 .autocorrectionDisabled()
+                .textInputAutocapitalization(.words)
                 .padding(.vertical, 8)
                 .overlay(
                     VStack {
@@ -62,6 +66,35 @@ struct OnboardingLastStoreView: View {
                 .opacity(showTextField ? 1.0 : 0.0)
                 .padding(.horizontal, 60)
                 .padding(.top, 28)
+                .onChange(of: viewModel.storeName) { oldValue, newValue in
+                    var processedValue = newValue
+                    
+                    if processedValue.hasPrefix(" ") {
+                        processedValue = String(processedValue.dropFirst())
+                    }
+                    
+                    processedValue = normalizeSpaces(processedValue)
+                    
+                    if processedValue != newValue {
+                        viewModel.storeName = processedValue
+                        return
+                    }
+                    
+                    if isValidStoreName {
+                        if !wasValidStoreName(oldValue) {
+                            withAnimation(.spring(duration: 0.4)) {
+                                fillAnimation = 1.0
+                            }
+                            startButtonBounce()
+                        }
+                        showError = false
+                    } else {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            fillAnimation = 0.0
+                            buttonScale = 1.0
+                        }
+                    }
+                }
             
             if showError {
                 Text("Store name needs at least 2 characters")
@@ -96,7 +129,7 @@ struct OnboardingLastStoreView: View {
                 .overlay(alignment: .topLeading) {
                     if showInfoDropdown {
                         VStack(alignment: .leading, spacing: 0) {
-                            Text("Add  store so prices match where you shop — not just estimates.")
+                            Text("Add store so prices match where you shop — not just estimates.")
                                 .font(.caption)
                                 .foregroundColor(.primary)
                                 .padding(12)
@@ -123,10 +156,12 @@ struct OnboardingLastStoreView: View {
                 Spacer()
                 
                 Button {
-                    guard viewModel.storeName.count >= 2 else {
+                    guard isValidStoreName else {
                         triggerError()
                         return
                     }
+                    
+                    viewModel.storeName = viewModel.storeName.trimmingCharacters(in: .whitespacesAndNewlines)
                     onNext()
                 } label: {
                     Text("Next")
@@ -172,7 +207,7 @@ struct OnboardingLastStoreView: View {
                 storeFieldIsFocused = true
             }
             
-            if !viewModel.storeName.isEmpty {
+            if isValidStoreName {
                 fillAnimation = 1.0
                 startButtonBounce()
             }
@@ -191,23 +226,11 @@ struct OnboardingLastStoreView: View {
                 }
             }
         }
-        .onChange(of: viewModel.storeName) { oldValue, newValue in
-            if newValue.count >= 2 {
-                if oldValue.count < 2 {
-                    withAnimation(.spring(duration: 0.4)) {
-                        fillAnimation = 1.0
-                    }
-                    startButtonBounce()
-                }
-                showError = false
-            } else {
-                withAnimation(.easeInOut(duration: 0.3)) {
-                    fillAnimation = 0.0
-                    buttonScale = 1.0
-                }
-            }
-        }
-
+    }
+    
+    private func wasValidStoreName(_ value: String) -> Bool {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.count >= 2
     }
     
     private func startButtonBounce() {
@@ -251,7 +274,12 @@ struct OnboardingLastStoreView: View {
     }
 }
 
-
 #Preview {
-    OnboardingLastStoreView(viewModel: OnboardingViewModel(), storeFieldAnimated: .constant(false), hasShownInfoDropdown: .constant(false), onNext: {}, onSkip: {})
+    OnboardingLastStoreView(
+        viewModel: OnboardingViewModel(),
+        storeFieldAnimated: .constant(false),
+        hasShownInfoDropdown: .constant(false),
+        onNext: {},
+        onSkip: {}
+    )
 }
