@@ -12,7 +12,7 @@ struct AddItemPopover: View {
     @State private var selectedCategory: GroceryCategory?
     
     @FocusState private var itemNameFieldIsFocused: Bool
-
+    
     @State private var overlayOpacity: Double = 0
     @State private var contentScale: CGFloat = 0.8
     @State private var keyboardVisible: Bool = false
@@ -55,12 +55,12 @@ struct AddItemPopover: View {
                 
                 VStack(spacing: 12) {
                     ItemNameInput(
-                                          itemName: $itemName,
-                                          itemNameFieldIsFocused: $itemNameFieldIsFocused,
-                                          selectedCategory: $selectedCategory,
-                                          selectedCategoryEmoji: selectedCategoryEmoji,
-                                          showTooltip: false 
-                                      )
+                        itemName: $itemName,
+                        itemNameFieldIsFocused: $itemNameFieldIsFocused,
+                        selectedCategory: $selectedCategory,
+                        selectedCategoryEmoji: selectedCategoryEmoji,
+                        showTooltip: false
+                    )
                     
                     DashedLine()
                         .stroke(style: StrokeStyle(lineWidth: 1, dash: [8, 4]))

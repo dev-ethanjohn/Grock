@@ -30,6 +30,9 @@ struct VaultView: View {
     @State private var debugCelebrationCount = 0
     @State private var buttonScale: CGFloat = 1.0
     
+    // NEW: Loading state to prevent animation issues
+    @State private var vaultReady = false
+    
     private var hasActiveItems: Bool {
         !cartViewModel.activeCartItems.isEmpty
     }
@@ -40,54 +43,37 @@ struct VaultView: View {
     
     var body: some View {
         ZStack(alignment: .bottom) {
-            VStack(spacing: 0) {
-//                
-//                HStack {
-//                    Spacer()
-//                    Button(action: {
-//                        debugCelebrationCount += 1
-//                        print("🎉 DEBUG: Manual celebration triggered #\(debugCelebrationCount)")
-//                        showCelebration = true
-//                    }) {
-//                        HStack(spacing: 4) {
-//                            Image(systemName: "sparkles")
-//                                .font(.system(size: 14))
-//                            Text("Test Celebration")
-//                                .font(.system(size: 12, weight: .medium))
-//                        }
-//                        .foregroundColor(.white)
-//                        .padding(.horizontal, 12)
-//                        .padding(.vertical, 6)
-//                        .background(Color.blue)
-//                        .cornerRadius(15)
-//                    }
-//                    .padding(.top, 8)
-//                    .padding(.trailing, 16)
-//                }
-//                .frame(height: 40)
-//                .background(Color.clear)
-                
-                VaultToolbarView(
-                    toolbarAppeared: $toolbarAppeared,
-                    onAddTapped: {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            showAddItemPopover = true
+            if vaultReady {
+                VStack(spacing: 0) {
+                    VaultToolbarView(
+                        toolbarAppeared: $toolbarAppeared,
+                        onAddTapped: {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                showAddItemPopover = true
+                            }
+                        }
+                    )
+                    
+                    if let vault = vaultService.vault, !vault.categories.isEmpty {
+                        VaultCategorySectionView(selectedCategory: selectedCategory) {
+                            categoryScrollView
+                        }
+                        
+                        categoryContentScrollView
+                    } else {
+                        emptyVaultView
+                    }
+                }
+            } else {
+                ProgressView()
+                    .onAppear {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                            vaultReady = true
                         }
                     }
-                )
-                
-                if let vault = vaultService.vault, !vault.categories.isEmpty {
-                    VaultCategorySectionView(selectedCategory: selectedCategory) {
-                        categoryScrollView
-                    }
-                    
-                    categoryContentScrollView
-                } else {
-                    emptyVaultView
-                }
             }
             
-            if vaultService.vault != nil && !showCelebration {
+            if vaultService.vault != nil && !showCelebration && vaultReady {
                 ZStack(alignment: .topLeading) {
                     Button(action: {
                         if existingCart != nil {
@@ -151,7 +137,6 @@ struct VaultView: View {
                 }
             }
             
-            
             if showAddItemPopover {
                 AddItemPopover(
                     isPresented: $showAddItemPopover,
@@ -196,24 +181,19 @@ struct VaultView: View {
                     createCartButtonVisible = false
                 }
             } else {
-                // Celebration ending - show button with bounce
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
                     createCartButtonVisible = true
                 }
-                // Trigger bounce after button appears
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                     if hasActiveItems {
                         startButtonBounce()
                     }
                 }
                 
-                // Celebration just ended - show first item tooltip
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                     findAndHighlightFirstItem()
-                }
             }
         }
-              .fullScreenCover(isPresented: $showCartConfirmation) {
+        .fullScreenCover(isPresented: $showCartConfirmation) {
             CartConfirmationPopover(
                 isPresented: $showCartConfirmation,
                 activeCartItems: cartViewModel.activeCartItems,
@@ -241,11 +221,12 @@ struct VaultView: View {
             printVaultStructure()
             initializeActiveItemsFromExistingCart()
             
-            if selectedCategory == nil {
-                selectedCategory = firstCategoryWithItems ?? GroceryCategory.allCases.first
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                if selectedCategory == nil {
+                    selectedCategory = firstCategoryWithItems ?? GroceryCategory.allCases.first
+                }
             }
             
-            // ✅ FIXED: Check celebration with shouldTriggerCelebration parameter
             print("🎉 VaultView onAppear - Checking celebration conditions:")
             print("🎉 shouldTriggerCelebration parameter: \(shouldTriggerCelebration)")
             
@@ -634,161 +615,5 @@ struct VaultView: View {
     }
 }
 
-struct CelebrationView: View {
-    @Binding var isPresented: Bool
-    @State private var showing = false
-    @State private var opacity: Double = 0
-    
-    var body: some View {
-        ZStack(alignment: .bottom) {
-            Color.clear
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    dismissCelebration()
-                }
-            
-            VStack(spacing: 0) {
-                Spacer()
-                
-                LottieView(animation: .named("Celebration"))
-                    .playbackMode(.playing(.fromProgress(0, toProgress: 1, loopMode: .playOnce)))
-                    .scaleEffect(1.1)
-                    .allowsHitTesting(false)
-                    .frame(height: 400)
-                    .offset(y: 200)
-                
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Welcome to Your Vault!")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(.white)
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.black)
-                        .shadow(color: .black.opacity(0.3), radius: 20, x: 0, y: 10)
-                )
-                .padding(.bottom, 100)
-                .scaleEffect(showing ? 1 : 0)
-                .opacity(opacity)
-            }
-        }
-        .ignoresSafeArea()
-        .onAppear {
-            withAnimation(.spring(response: 0.6, dampingFraction: 0.6)) {
-                showing = true
-                opacity = 1
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                dismissCelebration()
-            }
-        }
-    }
-    
-    private func dismissCelebration() {
-        withAnimation(.spring(response: 0.6, dampingFraction: 0.6)) {
-            showing = false
-            opacity = 0
-        }
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            isPresented = false
-        }
-    }
-}
 
-struct FirstItemTooltip: View {
-    let itemId: String
-    @Binding var isPresented: Bool
-    @Environment(VaultService.self) private var vaultService
-    
-    @State private var itemFrame: CGRect = .zero
-    @State private var showing = false
-    
-    private var item: Item? {
-        vaultService.findItemById(itemId)
-    }
-    
-    var body: some View {
-        GeometryReader { geometry in
-            Color.clear
-                .onAppear {
-                    findItemFrame()
-                }
-                .overlay(
-                    ZStack {
-                        if let item = item, showing {
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("Your first item! 🎉")
-                                    .font(.system(size: 14, weight: .bold))
-                                    .foregroundColor(.black)
-                                
-                                Text("Continue adding items to build your grocery collection")
-                                    .font(.system(size: 12, weight: .medium))
-                                    .foregroundColor(.black.opacity(0.8))
-                                    .multilineTextAlignment(.leading)
-                                
-                                Text("Tap anywhere to continue")
-                                    .font(.system(size: 10, weight: .medium))
-                                    .foregroundColor(.gray)
-                            }
-                            .padding(12)
-                            .background(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .fill(Color.white)
-                                    .shadow(color: .black.opacity(0.2), radius: 8, x: 0, y: 4)
-                            )
-                            .overlay(
-                                Triangle()
-                                    .fill(Color.white)
-                                    .frame(width: 12, height: 8)
-                                    .rotationEffect(.degrees(180))
-                                    .offset(y: 6)
-                                , alignment: .top
-                            )
-                            .position(x: geometry.size.width / 2, y: itemFrame.maxY + 80)
-                        }
-                    }
-                )
-        }
-        .onTapGesture {
-            dismissTooltip()
-        }
-        .onAppear {
-            withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
-                showing = true
-            }
-            
-            DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
-                dismissTooltip()
-            }
-        }
-    }
-    
-    private func findItemFrame() {
-        itemFrame = CGRect(x: UIScreen.main.bounds.width / 2 - 50,
-                          y: UIScreen.main.bounds.height / 2,
-                          width: 100, height: 50)
-    }
-    
-    private func dismissTooltip() {
-        withAnimation(.easeOut(duration: 0.3)) {
-            showing = false
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            isPresented = false
-        }
-    }
-}
 
-struct Triangle: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        path.move(to: CGPoint(x: rect.midX, y: rect.minY))
-        path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
-        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
-        path.closeSubpath()
-        return path
-    }
-}

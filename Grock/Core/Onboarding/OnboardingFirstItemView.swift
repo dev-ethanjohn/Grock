@@ -8,146 +8,11 @@
 import SwiftUI
 import SwiftData
 
-enum GroceryCategory: String, CaseIterable, Identifiable {
-    case freshProduce
-    case meatsSeafood
-    case dairyEggs
-    case frozen
-    case condimentsIngredients
-    case pantry
-    case bakeryBread
-    case beverages
-    case readyMeals
-    case personalCare
-    case health
-    case cleaningHousehold
-    case pets
-    case baby
-    case homeGarden
-    case electronicsHobbies
-    case stationery
-    
-    var id: Self { return self }
-    
-    var title: String {
-        switch self {
-        case .freshProduce:
-            return "Fresh Produce"
-        case .meatsSeafood:
-            return "Meats & Seafood"
-        case .dairyEggs:
-            return "Dairy & Eggs"
-        case .frozen:
-            return "Frozen"
-        case .condimentsIngredients:
-            return "Condiments & Ingredients"
-        case .pantry:
-            return "Pantry"
-        case .bakeryBread:
-            return "Bakery & Bread"
-        case .beverages:
-            return "Beverages"
-        case .readyMeals:
-            return "Ready Meals"
-        case .personalCare:
-            return "Personal Care"
-        case .health:
-            return "Health"
-        case .cleaningHousehold:
-            return "Cleaning & Household"
-        case .pets:
-            return "Pets"
-        case .baby:
-            return "Baby"
-        case .homeGarden:
-            return "Home & Garden"
-        case .electronicsHobbies:
-            return "Electronics & Hobbies"
-        case .stationery:
-            return "Stationery"
-        }
-    }
-    
-    var emoji: String {
-        switch self {
-        case .freshProduce:
-            return "🍏"
-        case .meatsSeafood:
-            return "🥩"
-        case .dairyEggs:
-            return "🧀"
-        case .frozen:
-            return "🧊"
-        case .condimentsIngredients:
-            return "🧂"
-        case .pantry:
-            return "🫙"
-        case .bakeryBread:
-            return "🥖"
-        case .beverages:
-            return "🥤"
-        case .readyMeals:
-            return "🍱"
-        case .personalCare:
-            return "🧴"
-        case .health:
-            return "💊"
-        case .cleaningHousehold:
-            return "🧽"
-        case .pets:
-            return "🐕"
-        case .baby:
-            return "👶"
-        case .homeGarden:
-            return "🏠"
-        case .electronicsHobbies:
-            return "🎮"
-        case .stationery:
-            return "📝"
-        }
-    }
-    
-    var pastelColor: Color {
-        switch self {
-        case .freshProduce:
-            return Color(hex: "AAFF72")
-        case .meatsSeafood:
-            return Color(hex: "FFBEBE")
-        case .dairyEggs:
-            return Color(hex: "FFE481")
-        case .frozen:
-            return Color(hex: "C5F9FF")
-        case .condimentsIngredients:
-            return Color(hex: "949494")
-        case .pantry:
-            return Color(hex: "FFF7AA")
-        case .bakeryBread:
-            return Color(hex: "F5DEB3")
-        case .beverages:
-            return Color(hex: "AAB3E0")
-        case .readyMeals:
-            return Color(hex: "FFDAB9")
-        case .personalCare:
-            return Color(hex: "FFC0CB")
-        case .health:
-            return Color(hex: "CBCAFF")
-        case .cleaningHousehold:
-            return Color(hex: "D8BFD8")
-        case .pets:
-            return Color(hex: "CAA484")
-        case .baby:
-            return Color(hex: "B0E0E6")
-        case .homeGarden:
-            return Color(hex: "AED470")
-        case .electronicsHobbies:
-            return Color(hex: "FF96CA")
-        case .stationery:
-            return Color(hex: "F3C7A3")
-        }
-    }
-}
 
 
+
+import SwiftUI
+import SwiftData
 
 import SwiftUI
 import SwiftData
@@ -215,24 +80,14 @@ struct OnboardingFirstItemView: View {
                     Spacer()
                     
                     FinishButton(isFormValid: isFormValid) {
-                        // ✅ STEP 1: Save category name
                         if let category = selectedCategory {
                             viewModel.categoryName = category.title
                         }
                         
-                        // ✅ STEP 2: Reset celebration flag (so it shows when VaultView appears)
                         UserDefaults.standard.set(false, forKey: "hasSeenVaultCelebration")
                         print("🎉 OnboardingFirstItemView: Reset celebration flag")
                         
-                        // ✅ STEP 3: Save the item to vault
                         saveInitialData()
-                        print("💾 OnboardingFirstItemView: Item saved to vault")
-                        
-                        // ✅ STEP 4: Mark onboarding as complete
-                        UserDefaults.standard.hasCompletedOnboarding = true
-                        
-                        // ✅ STEP 5: Call onFinish (which should navigate to VaultView)
-                        onFinish()
                     }
                 }
                 .padding(.vertical, 8)
@@ -272,7 +127,6 @@ struct OnboardingFirstItemView: View {
         }
     }
     
-    // ✅ FIXED: This method now gets called when finishing onboarding
     private func saveInitialData() {
         guard let category = selectedCategory,
               let price = Double(viewModel.itemPrice) else {
@@ -296,93 +150,17 @@ struct OnboardingFirstItemView: View {
         )
         
         print("✅ Item saved successfully!")
-    }
-}
-
-// MARK: - FinishButton with Celebration Reset
-struct FinishButton: View {
-    let isFormValid: Bool
-    let action: () -> Void
-    
-    @State private var fillAnimation: CGFloat = 0.0
-    @State private var buttonScale: CGFloat = 1.0
-    
-    var body: some View {
-        HStack {
-            Spacer()
-            Button(action: action) {
-                Text("Finish")
-                    .font(.fuzzyBold_16)
-                    .foregroundStyle(.white)
-                    .fontWeight(.semibold)
-                    .padding(.vertical, 4)
-                    .padding(.horizontal, 24)
-                    .background(
-                        Capsule()
-                            .fill(
-                                isFormValid
-                                ? RadialGradient(
-                                    colors: [Color.black, Color.gray.opacity(0.3)],
-                                    center: .center,
-                                    startRadius: 0,
-                                    endRadius: fillAnimation * 80
-                                )
-                                : RadialGradient(
-                                    colors: [Color.gray.opacity(0.3), Color.gray.opacity(0.3)],
-                                    center: .center,
-                                    startRadius: 0,
-                                    endRadius: 0
-                                )
-                            )
-                    )
-                    .scaleEffect(buttonScale)
-            }
-            .disabled(!isFormValid)
-        }
-        .padding(.vertical, 8)
-        .onChange(of: isFormValid) { oldValue, newValue in
-            if newValue {
-                if !oldValue {
-                    withAnimation(.spring(duration: 0.4)) {
-                        fillAnimation = 1.0
-                    }
-                    startButtonBounce()
-                }
-            } else {
-                withAnimation(.easeInOut(duration: 0.3)) {
-                    fillAnimation = 0.0
-                    buttonScale = 1.0
-                }
-            }
-        }
-        .onAppear {
-            if isFormValid {
-                fillAnimation = 1.0
-                buttonScale = 1.0
-            }
-        }
-    }
-    
-    private func startButtonBounce() {
-        withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {
-            buttonScale = 0.95
-        }
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.5)) {
-                buttonScale = 1.1
-            }
-        }
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-                buttonScale = 1.0
-            }
+            print("💾 Vault processing complete - proceeding to finish")
+            
+            UserDefaults.standard.hasCompletedOnboarding = true
+            
+            onFinish()
         }
     }
 }
 
-// MARK: - Subviews (Keep all your existing subviews exactly as they were)
 
 struct NavigationHeader: View {
     let onBack: () -> Void
@@ -442,7 +220,7 @@ struct FormContent: View {
                 showUnitPicker: $showUnitPicker
             )
             
-            PricePerUnitField(price: $viewModel.itemPrice) // Fixed: Changed from PriceInput to PricePerUnitField
+            PricePerUnitField(price: $viewModel.itemPrice)
             
             Spacer()
                 .frame(height: 80)
@@ -482,8 +260,6 @@ struct TotalDisplay: View {
         .padding(.top, 4)
     }
 }
-
-
 
 
 

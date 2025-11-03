@@ -1,13 +1,6 @@
 import SwiftUI
 import SwiftData
 
-enum OnboardingStep {
-    case welcome
-    case lastStore
-    case firstItem
-    case done
-}
-
 struct OnboardingContainer: View {
     @State private var step: OnboardingStep = .welcome
     @Environment(\.modelContext) private var modelContext
@@ -61,13 +54,10 @@ struct OnboardingContainer: View {
                 ))
             }
 
-            // In OnboardingContainer - FIXED:
             if step == .firstItem {
                 OnboardingFirstItemView(
                     viewModel: viewModel,
                     onFinish: {
-                        // ❌ REMOVE THIS: viewModel.saveInitialData(vaultService: vaultService)
-                        
                         // Only save to UserDefaults for preloading
                         UserDefaults.standard.set([
                             "itemName": viewModel.itemName,
@@ -128,7 +118,6 @@ struct OnboardingContainer: View {
     
     private func printOnboardingCompletion() {
         print("\n🎯 ONBOARDING COMPLETE - DATA CHECK")
-        // ... your existing print code
     }
 }
 
@@ -136,14 +125,13 @@ struct OnboardingCompletedHomeView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(CartViewModel.self) private var cartViewModel
     @Environment(VaultService.self) private var vaultService
-    @Environment(HomeViewModel.self) private var homeViewModel 
+    @Environment(HomeViewModel.self) private var homeViewModel
     
     var body: some View {
         HomeView(viewModel: homeViewModel)
             .onAppear {
                 preloadOnboardingItem()
                 
-                //  show vault after onboarding
                 homeViewModel.showVault = true
             }
     }
@@ -158,9 +146,11 @@ struct OnboardingCompletedHomeView: View {
             return
         }
         
-        cartViewModel.activeCartItems[item.id] = 1.0
-        print("✅ Preloaded onboarding item '\(itemName)' with DEFAULT quantity 1 into activeCartItems")
-        
-        UserDefaults.standard.removeObject(forKey: "onboardingItemData")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            cartViewModel.activeCartItems[item.id] = 1.0
+            print("✅ Preloaded onboarding item '\(itemName)' with DEFAULT quantity 1 into activeCartItems")
+            
+            UserDefaults.standard.removeObject(forKey: "onboardingItemData")
+        }
     }
 }

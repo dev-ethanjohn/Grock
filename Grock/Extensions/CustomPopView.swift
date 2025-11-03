@@ -87,4 +87,3 @@ extension GroceryCategory {
         return GroceryCategory.allCases.first { $0.title == title } ?? .freshProduce
     }
 }
-
