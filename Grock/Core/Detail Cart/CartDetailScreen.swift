@@ -502,6 +502,40 @@ struct CartDetailScreen: View {
             Spacer()
             
             HStack(spacing: 8) {
+                
+//                
+//                Menu {
+//              
+//                        Label("Add New Store", systemImage: "plus.circle.fill")
+//                    
+//                    
+//                    Divider()
+//                    
+//                    ForEach(FilterOption.allCases, id: \.self) { option in
+//                        Button(action: {
+//                            storeName = option
+//                        }) {
+//                            HStack {
+//                                Text(store)
+//                                if storeName == store {
+//                                    Image(systemName: "checkmark")
+//                                        .foregroundColor(.blue)
+//                                }
+//                            }
+//                        }
+//                    }
+//                } label: {
+//                    HStack {
+//                        Text(storeName.isEmpty ? "Select Store" : storeName)
+//                            .font(.subheadline)
+//                            .bold()
+//                            .foregroundStyle(storeName.isEmpty ? .gray : .black)
+//                        Image(systemName: "chevron.down")
+//                            .font(.system(size: 12))
+//                            .foregroundColor(.gray)
+//                    }
+//                }
+                
                 Button(action: {
                     showingFilterSheet = true
                 }) {
@@ -749,31 +783,3 @@ struct CartDetailScreen: View {
 }
 
 
-//struct CartShoppingUpdate:  View {
-//
-//    var body: some View {
-//        if cart.isShopping {
-//            VStack(alignment: .leading, spacing: 4) {
-//                Text("\(cart.fulfilledItemsCount)/\(cart.totalItemsCount) items for ₱\(animatedFulfilledAmount, specifier: "%.2f")")
-//                    .fuzzyBubblesFont(15, weight: .bold)
-//                    .foregroundColor(.gray)
-//                    .contentTransition(.numericText(value: animatedFulfilledAmount))
-//
-//                Text("\(Int(animatedFulfilledPercentage))% fulfilled")
-//                    .fuzzyBubblesFont(15, weight: .bold)
-//                    .foregroundColor(.gray)
-//                    .contentTransition(.numericText(value: animatedFulfilledPercentage))
-//            }
-//            .frame(maxWidth: .infinity, alignment: .leading)
-//            .onAppear {
-//                updateAnimatedValues()
-//            }
-//            .onChange(of: cart.fulfilledItemsCount) { oldValue, newValue in
-//                updateAnimatedValues()
-//            }
-//            .onChange(of: vaultService.getTotalFulfilledAmount(for: cart)) { oldValue, newValue in
-//                updateAnimatedValues()
-//            }
-//        }
-//    }
-//}

@@ -27,6 +27,8 @@ struct StoreNameComponent: View {
             
             Spacer()
             //TODO: own var view /viewbuilder
+            
+           
             if availableStores.isEmpty {
                 // Text field (stores = 0)
                 TextField("Enter store name", text: $storeName)

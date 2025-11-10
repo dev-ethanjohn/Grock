@@ -9,6 +9,7 @@ import SwiftUI
 
 struct UnitButton: View {
     @Binding var unit: String
+    @State private var showAddUnit = false
     
     let continuousUnits: [(abbr: String, full: String)] = [
         ("g", "grams"),
@@ -25,40 +26,73 @@ struct UnitButton: View {
         ("can", ""),
         ("bottle", ""),
         ("box", ""),
-        ("bag", "")
+        ("wrap", ""),
+        ("bag", ""),
     ]
     
     var body: some View {
         Menu {
+            //MARK: For premium users
+            //free users limit to the app's default unit params.
+            Button(action: {
+                showAddUnit = true
+            }) {
+                Label("Add New Unit", systemImage: "plus.circle.fill")
+            }
+            
+            Divider()
+            
             Section(header: Text("Weight/Volume")) {
                 ForEach(continuousUnits, id: \.abbr) { unitOption in
                     Button(action: {
                         unit = unitOption.abbr
                     }) {
                         if unitOption.full.isEmpty {
-                            Text(unitOption.abbr)
+                            HStack {
+                                Text(unitOption.abbr)
+                                if unit == unitOption.abbr {
+                                    Image(systemName: "checkmark")
+                                        .foregroundColor(.blue)
+                                }
+
+                            }
                         } else {
                             Text("\(unitOption.abbr) - \(unitOption.full)")
+                            if unit == unitOption.abbr {
+                                Image(systemName: "checkmark")
+                                    .foregroundColor(.blue)
+                            }
                         }
                     }
                 }
             }
             
-            Section(header: Text("Discrete")) {
+            Section(header: Text("Discrete/Count")) {
                 ForEach(discreteUnits, id: \.abbr) { unitOption in
                     Button(action: {
                         unit = unitOption.abbr
                     }) {
                         if unitOption.full.isEmpty {
-                            Text(unitOption.abbr)
+                            HStack {
+                                Text(unitOption.abbr)
+                                if unit == unitOption.abbr {
+                                    Image(systemName: "checkmark")
+                                        .foregroundColor(.blue)
+                                }
+
+                            }
                         } else {
                             Text("\(unitOption.abbr) - \(unitOption.full)")
+                            if unit == unitOption.abbr {
+                                Image(systemName: "checkmark")
+                                    .foregroundColor(.blue)
+                            }
                         }
                     }
                 }
             }
-            
-            Button("Clear Selection") {
+
+            Button("Clear Selection 😶") {
                 unit = ""
             }
         } label: {

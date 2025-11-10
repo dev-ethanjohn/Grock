@@ -37,7 +37,7 @@ struct ItemNameInput: View {
                 
                 // as a var view / viewbuilder
                 HStack {
-                    TextField("e.g. Tapa", text: $itemName)
+                    TextField("e.g. canned tuna", text: $itemName)
                         .font(.subheadline)
                         .bold()
                         .padding(12)

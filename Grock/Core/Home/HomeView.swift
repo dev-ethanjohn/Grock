@@ -91,8 +91,7 @@ struct HomeView: View {
             VStack(alignment: .leading, spacing: 0) {
                 if viewModel.carts.isEmpty {
                     emptyStateView
-                        .padding(.top, headerHeight)
-                        .padding(.horizontal)
+                
                 } else {
                     ScrollView {
                         Color.clear
@@ -103,12 +102,14 @@ struct HomeView: View {
                                 cartRowButton(cart: cart)
                             }
                         }
-                        .padding(.horizontal)
+                 
                     }
                 }
                 
                 Spacer()
             }
+            .frame(maxWidth: .infinity, alignment: .center)
+            .padding(.horizontal)
             
             //2
             VStack(spacing: 0) {
@@ -169,7 +170,8 @@ struct HomeView: View {
             VStack {
                 Spacer()
                 createCartButton
-                    .padding(.horizontal)
+                    .frame(maxWidth: .infinity, alignment: .center)
+          
             }
         }
         .ignoresSafeArea()
@@ -191,27 +193,6 @@ struct HomeView: View {
         }
         .buttonStyle(PlainButtonStyle())
     }
-    
-//    private var customHeader: some View {
-//        VStack(spacing: 0) {
-//            HStack {
-//                leadingToolbarButton
-//                Spacer()
-//                trailingToolbarButton
-//            }
-//            .padding(.horizontal)
-//            .padding(.top, 60)
-//            
-//            VStack(spacing: 24) {
-//                greetingText
-//                tabButtons
-//            }
-//            .padding(.horizontal)
-//            .padding(.bottom, 4)
-//        }
-//        .frame(maxWidth: .infinity)
-//        .background(headerBackground)
-//    }
     
     private var greetingText: some View {
         Text("Hi Ethan,")
@@ -348,6 +329,7 @@ struct HomeView: View {
             VaultView(onCreateCart: viewModel.onCreateCartFromVault)
                 .environment(vaultService)
                 .environment(cartViewModel)
+                .presentationCornerRadius(24)
         }
     }
     

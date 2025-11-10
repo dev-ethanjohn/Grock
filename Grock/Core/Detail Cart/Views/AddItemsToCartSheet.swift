@@ -119,18 +119,39 @@ struct AddItemsToCartSheet: View {
     }
     
     private var customToolbar: some View {
+//        HStack {
+//            if let selectedCategory = selectedCategory {
+//                Text(selectedCategory.title)
+//                    .lexendFont(13, weight: .bold)
+//            } else {
+//                Text("Add Items")
+//                    .lexendFont(13, weight: .bold)
+//            }
+//            
+//            
+//            
+//            Spacer()
+//
+//        }
+//        .padding(.horizontal)
+//        .background(Color.white)
+        
         HStack {
-            if let selectedCategory = selectedCategory {
-                Text(selectedCategory.title)
+            if let category = selectedCategory {
+                Text(category.title)
                     .lexendFont(13, weight: .bold)
+                    .contentTransition(.identity)
+                    .animation(.spring(duration: 0.3), value: selectedCategory?.id)
+                    .transition(.push(from: .leading))
             } else {
-                Text("Add Items")
-                    .lexendFont(13, weight: .bold)
+                Text("Select Category")
+                    .fuzzyBubblesFont(13, weight: .bold)
             }
-            
             Spacer()
-
         }
+//        .padding(.horizontal)
+//        .padding(.top, 8)
+//        .padding(.bottom, 4)
         .padding(.horizontal)
         .background(Color.white)
     }

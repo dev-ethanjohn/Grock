@@ -87,9 +87,9 @@ struct OnboardingFirstItemView: View {
                 .padding(.horizontal)
             }
         }
-        .sheet(isPresented: $showUnitPicker) {
-            UnitPickerView(selectedUnit: $viewModel.unit)
-        }
+//        .sheet(isPresented: $showUnitPicker) {
+//            UnitPickerView(selectedUnit: $viewModel.unit)
+//        }
         .onAppear {
             itemNameFieldIsFocused = true
             if viewModel.unit.isEmpty {
