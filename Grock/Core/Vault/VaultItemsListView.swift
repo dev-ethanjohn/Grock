@@ -40,7 +40,7 @@ struct StoreSection: View {
             header:
                 HStack {
                     Text(storeName)
-                        .font(.fuzzyBold_11)
+                        .fuzzyBubblesFont(11, weight: .bold)
                         .foregroundStyle(.white)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)

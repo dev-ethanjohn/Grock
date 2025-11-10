@@ -1,9 +1,8 @@
 import SwiftUI
 
-struct CategoryButton: View {
+struct CategoryCircularButton: View {
     @Binding var selectedCategory: GroceryCategory?
     let selectedCategoryEmoji: String
-    @Binding var showTooltip: Bool
     
     var body: some View {
         HStack {
@@ -48,37 +47,10 @@ struct CategoryButton: View {
                             .font(.system(size: 18))
                     }
                 }
+                .offset(x: -4)
             }
-            // Remove the onTapGesture that hides tooltip
         }
     }
 }
 
-struct TooltipPopover: View {
-    var body: some View {
-            HStack(spacing: 4) {
-                Text("Select category")
-                    .fuzzyBubblesFont(10, weight: .bold)
-                    .foregroundColor(.white)
-                
-                Image(systemName: "arrow.down")
-                    .font(.system(size: 9, weight: .bold))
-                    .foregroundColor(.white.opacity(0.8))
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 4)
-            .background(
-                LinearGradient(
-                    colors: [
-                        Color(red: 0.2, green: 0.2, blue: 0.25),
-                        Color(red: 0.15, green: 0.15, blue: 0.2)
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-            )
-            .cornerRadius(12)
-            .shadow(color: .black.opacity(0.2), radius: 8, x: 0, y: 4)
-            .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
-    }
-}
+

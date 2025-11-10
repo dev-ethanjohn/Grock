@@ -11,8 +11,7 @@ struct OnboardingWelcomeView: View {
                     .resizable()
                     .frame(width: 125, height: 125)
                 Text("Grock")
-                    .font(.fuzzyBold_40)
-                    .bold()
+                    .fuzzyBubblesFont(40, weight: .bold)
             }
             
             Spacer()
@@ -24,16 +23,17 @@ struct OnboardingWelcomeView: View {
                 Text("⟢   forget paper & Excel   ⟣")
                 Text("⟢   SHOP SMARTER!   ⟣")
             }
-            .font(.fuzzyRegular_18)
-            .foregroundStyle(.gray)
+            .fuzzyBubblesFont(18, weight: .regular)
+            .foregroundStyle(.black.opacity(0.7))
             .multilineTextAlignment(.center)
       
             Spacer()
             
+            //TODO: A linear glowing background + pumping to signal a clickable button ready to start
             Button("Get Started") {
                 onNext()
             }
-            .font(.fuzzyBold_16)
+            .fuzzyBubblesFont(16, weight: .bold)
             .foregroundStyle(.white)
             .padding(.vertical, 10)
             .padding(.horizontal, 24)
@@ -43,7 +43,6 @@ struct OnboardingWelcomeView: View {
         .padding()
     }
 }
-
 
 #Preview {
     OnboardingWelcomeView(onNext: {})

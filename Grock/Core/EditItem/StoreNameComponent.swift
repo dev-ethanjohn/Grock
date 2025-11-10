@@ -8,6 +8,7 @@
 import SwiftUI
 
 struct StoreNameComponent: View {
+    //TODO: Rearrange
     @Binding var storeName: String
     @Environment(VaultService.self) private var vaultService
     @FocusState private var isFocused: Bool
@@ -23,10 +24,11 @@ struct StoreNameComponent: View {
             Text("Store")
                 .font(.footnote)
                 .foregroundColor(.gray)
-            Spacer()
             
+            Spacer()
+            //TODO: own var view /viewbuilder
             if availableStores.isEmpty {
-                // Text field when no stores exist
+                // Text field (stores = 0)
                 TextField("Enter store name", text: $storeName)
                     .font(.subheadline)
                     .bold()
@@ -34,9 +36,8 @@ struct StoreNameComponent: View {
                     .multilineTextAlignment(.trailing)
                     .focused($isFocused)
             } else {
-                // Dropdown when stores exist
+                // Dropdown (stores > 0)
                 Menu {
-                    // Add New Store option
                     Button(action: {
                         newStoreName = ""
                         showAddStoreSheet = true
@@ -46,7 +47,6 @@ struct StoreNameComponent: View {
                     
                     Divider()
                     
-                    // Existing stores
                     ForEach(availableStores, id: \.self) { store in
                         Button(action: {
                             storeName = store
@@ -81,15 +81,12 @@ struct StoreNameComponent: View {
                 storeName: $newStoreName,
                 isPresented: $showAddStoreSheet,
                 onSave: { newStore in
-                    
                     vaultService.addStore(newStore)
-                    
-                    
                     storeName = newStore
                     showAddStoreSheet = false
-                    
                     print("➕ New store added and persisted: \(newStore)")
-                }            )
+                }
+            )
         }
         .onAppear {
             if storeName.isEmpty, let firstStore = availableStores.first {

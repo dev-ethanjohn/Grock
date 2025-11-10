@@ -54,7 +54,7 @@ struct CartItemRow: View {
             HStack(spacing: 0) {
                 
                 Text("\(displayQuantity)\(displayUnit) - \(item.name)")
-                    .font(.lexendRegular_15)
+                    .lexendFont(15, weight: .regular)
                 
                 Spacer()
                 

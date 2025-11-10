@@ -2,6 +2,7 @@ import SwiftUI
 import Lottie
 
 struct CelebrationView: View {
+    //TODO: reaaange
     @Binding var isPresented: Bool
     let title: String
     let subtitle: String?
@@ -27,6 +28,7 @@ struct CelebrationView: View {
                     .frame(height: 400)
                     .offset(y: 200)
                 
+                //own var view /subview
                 VStack(alignment: .center, spacing: 4) {
                     Text(title)
                         .font(.system(size: 16, weight: .bold))

@@ -12,10 +12,11 @@ import Observation
 @MainActor
 @Observable
 class OnboardingViewModel {
+    
     //form data
     var storeName: String = ""
     var itemName: String = ""
-    var itemPrice: String = "" // Changed from Double? to String
+    var itemPrice: String = ""
     var unit: String = "g"
     var categoryName: String = ""
     var portion: Double?

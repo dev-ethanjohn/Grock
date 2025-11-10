@@ -3,18 +3,57 @@ import SwiftData
 
 struct HomeView: View {
     @State private var headerHeight: CGFloat = 0
-     
+    
     @Environment(\.modelContext) private var modelContext
     @Environment(VaultService.self) private var vaultService
     @Environment(CartViewModel.self) private var cartViewModel
     
-    @State var viewModel: HomeViewModel
+    @State  var showMenu = false
+    
+    @State  var viewModel: HomeViewModel
+    @State  var isDismissed: Bool = false
+    
+    func toggleMenu() {
+        showMenu.toggle()
+    }
     
     var body: some View {
         NavigationStack {
-            ZStack {
+            ZStack(alignment: .top) {
+                
+                Color.white.ignoresSafeArea()
+                
+                MenuView()
+                    .opacity(showMenu ? 1 : 0)
+                    .offset(x: showMenu ? 0 : -300)
+                    .rotation3DEffect(.degrees(showMenu ? 0 : 30), axis: (x: 0, y: 1, z: 0))
+                
                 mainContent
+                 
+                
+                
+                MenuIcon {
+                    withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+                        print("menu tapped")
+                        toggleMenu()
+                    }
+                }
+                .padding(.top, 110)
+                .offset(x: showMenu ? 80 : -20,
+                        y: showMenu ? -60 : isDismissed ? -120 : 0)
+                .opacity(showMenu ? 1 : 0)
+                .onChange(of: showMenu) {_, newValue in
+                    if !newValue {
+                        isDismissed = true
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+                                isDismissed = false
+                            }
+                        }
+                    }
+                }
             }
+            .ignoresSafeArea()
             .sheet(isPresented: $viewModel.showVault) {
                 vaultSheet
             }
@@ -45,7 +84,10 @@ struct HomeView: View {
     
     
     private var mainContent: some View {
-        ZStack(alignment: .top) {
+        ZStack(alignment: .topLeading) {
+            
+            Color.white.ignoresSafeArea()
+            //1
             VStack(alignment: .leading, spacing: 0) {
                 if viewModel.carts.isEmpty {
                     emptyStateView
@@ -62,17 +104,32 @@ struct HomeView: View {
                             }
                         }
                         .padding(.horizontal)
-                     
-                        Color.clear
-                            .frame(height: 80)
                     }
                 }
                 
                 Spacer()
             }
             
-            customHeader
-                .background(
+            //2
+            VStack(spacing: 0) {
+                HStack {
+                    Spacer()
+                    trailingToolbarButton
+                }
+                .padding(.trailing)
+                .padding(.top, 60)
+                
+                
+                VStack(spacing: 24) {
+                    greetingText
+                    tabButtons
+                }
+                .padding(.horizontal)
+                .padding(.bottom, 4)
+            }
+            .frame(maxWidth: .infinity)
+            .background(headerBackground)
+            .background(
                     GeometryReader { geometry in
                         Color.clear
                             .onAppear {
@@ -84,13 +141,46 @@ struct HomeView: View {
                     }
                 )
             
+            HStack {
+                MenuIcon() {
+                    withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+                        print("menu tapped")
+                        toggleMenu()
+                    }
+                }
+                
+                Menu {
+                    Button(role: .destructive, action: viewModel.resetApp) {
+                        Label("Reset App (Testing)", systemImage: "arrow.counterclockwise")
+                    }
+                } label: {
+                    Image(systemName: "arrow.counterclockwise")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 24, height: 20)
+                }
+            }
+            .padding(.top, 60)
+            .padding(.leading)
+            .offset(x: showMenu ? 40 : 0, y: showMenu ? 40 : 0)
+            .opacity(showMenu ? 0 : 1)
+            
+            //3
             VStack {
                 Spacer()
                 createCartButton
                     .padding(.horizontal)
             }
         }
-        .ignoresSafeArea(edges: .top)
+        .ignoresSafeArea()
+        .mask(RoundedRectangle(cornerRadius: showMenu ? 30 : 24, style: .continuous))
+        .rotation3DEffect(.degrees(showMenu ? 30 : 0), axis: (x: 0, y: -1, z: 0))
+        .offset(x: showMenu ? 265 : 0)
+        .scaleEffect(showMenu ? 0.9 : 1)
+        .shadow(color: Color.black.opacity(0.12), radius: 10, x: -2, y: -5)
+        .shadow(color: Color.black.opacity(0.12), radius: 10, x: 2, y: 0)
+      
+        
     }
     
     private func cartRowButton(cart: Cart) -> some View {
@@ -102,26 +192,26 @@ struct HomeView: View {
         .buttonStyle(PlainButtonStyle())
     }
     
-    private var customHeader: some View {
-        VStack(spacing: 0) {
-            HStack {
-                leadingToolbarButton
-                Spacer()
-                trailingToolbarButton
-            }
-            .padding(.horizontal)
-            .padding(.top, 60)
-            
-            VStack(spacing: 24) {
-                greetingText
-                tabButtons
-            }
-            .padding(.horizontal)
-            .padding(.bottom, 4)
-        }
-        .frame(maxWidth: .infinity)
-        .background(headerBackground)
-    }
+//    private var customHeader: some View {
+//        VStack(spacing: 0) {
+//            HStack {
+//                leadingToolbarButton
+//                Spacer()
+//                trailingToolbarButton
+//            }
+//            .padding(.horizontal)
+//            .padding(.top, 60)
+//            
+//            VStack(spacing: 24) {
+//                greetingText
+//                tabButtons
+//            }
+//            .padding(.horizontal)
+//            .padding(.bottom, 4)
+//        }
+//        .frame(maxWidth: .infinity)
+//        .background(headerBackground)
+//    }
     
     private var greetingText: some View {
         Text("Hi Ethan,")
@@ -133,9 +223,9 @@ struct HomeView: View {
         ZStack {
             LinearGradient(
                 gradient: Gradient(stops: [
-                    .init(color: Color.white.opacity(0.5), location: 0),
-                    .init(color: Color.white.opacity(0.85), location: 0.2),
-                    .init(color: Color.white.opacity(1.0), location: 0.4)
+                    .init(color: Color.white.opacity(0.85), location: 0),
+                    .init(color: Color.white.opacity(0.95), location: 0.1),
+                    .init(color: Color.white.opacity(1.0), location: 0.2)
                 ]),
                 startPoint: .bottom,
                 endPoint: .top
@@ -149,9 +239,14 @@ struct HomeView: View {
                     .fill(Color.white)
                     .frame(width: 14)
             }
-            BlurView(removeAllFilters: true)
-                .blur(radius: 6, opaque: true)
+//            BlurView()
+//                .blur(radius: 6, opaque: true)
         }
+    }
+    
+    private var headerBlur: some View {
+                    BlurView(removeAllFilters: true)
+                        .blur(radius: 6, opaque: true)
     }
     
     private var tabButtons: some View {
@@ -207,26 +302,35 @@ struct HomeView: View {
                 .clipShape(Capsule())
         }
         .padding(.bottom)
-        .background(.white)
+        .padding(.bottom, 20)
     }
-    
-    private var leadingToolbarButton: some View {
-        Menu {
-            Button(role: .destructive, action: viewModel.resetApp) {
-                Label("Reset App (Testing)", systemImage: "arrow.counterclockwise")
-            }
-        } label: {
-            Image("menu")
-                .resizable()
-                .frame(width: 24, height: 20)
-        }
-    }
+//    
+//    private var leadingToolbarButton: some View {
+//        HStack {
+//            
+////            Image("menu")
+////                .resizable()
+////                .frame(width: 24, height: 20)
+//            
+//            Menu {
+//                Button(role: .destructive, action: viewModel.resetApp) {
+//                    Label("Reset App (Testing)", systemImage: "arrow.counterclockwise")
+//                }
+//            } label: {
+//                Image(systemName: "arrow.counterclockwise")
+//                    .resizable()
+//                    .scaledToFit()
+//                    .frame(width: 24, height: 20)
+//            }
+//        }
+//        
+//    }
     
     private var trailingToolbarButton: some View {
         Button(action: viewModel.handleVaultButton) {
             HStack(spacing: 8) {
                 Text("vault")
-                    .font(.fuzzyBold_13)
+                    .fuzzyBubblesFont(13, weight: .bold)
                 Image(systemName: "shippingbox")
                     .resizable()
                     .frame(width: 20, height: 20)
@@ -252,5 +356,15 @@ struct HomeView: View {
             print("🏠 Auto-selecting cart: \(mostRecentCart.name)")
             viewModel.selectedCart = mostRecentCart
         }
+    }
+}
+
+struct Blur: UIViewRepresentable {
+    var style: UIBlurEffect.Style = .systemMaterial
+    func makeUIView(context: Context) -> UIVisualEffectView {
+        return UIVisualEffectView(effect: UIBlurEffect(style: style))
+    }
+    func updateUIView(_ uiView: UIVisualEffectView, context: Context) {
+        uiView.effect = UIBlurEffect(style: style)
     }
 }

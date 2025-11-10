@@ -19,12 +19,12 @@ struct FinishButton: View {
             Spacer()
             Button(action: action) {
                 Text("Finish")
-                    .font(.fuzzyBold_16)
+                    .fuzzyBubblesFont(16, weight: .bold)
                     .foregroundStyle(.white)
-                    .fontWeight(.semibold)
                     .padding(.vertical, 4)
                     .padding(.horizontal, 24)
                     .background(
+                        //TODO: put in a viewmodifier
                         Capsule()
                             .fill(
                                 isFormValid
@@ -32,7 +32,7 @@ struct FinishButton: View {
                                     colors: [Color.black, Color.gray.opacity(0.3)],
                                     center: .center,
                                     startRadius: 0,
-                                    endRadius: fillAnimation * 80
+                                    endRadius: fillAnimation * 150
                                 )
                                 : RadialGradient(
                                     colors: [Color.gray.opacity(0.3), Color.gray.opacity(0.3)],

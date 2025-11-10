@@ -13,6 +13,7 @@ enum FilterOption: String, CaseIterable {
     case unfulfilled = "Unfulfilled"
 }
 
+//NOTE: convert from sheet to a popover / menu
 struct FilterSheet: View {
     @Binding var selectedFilter: FilterOption
     @Environment(\.dismiss) private var dismiss

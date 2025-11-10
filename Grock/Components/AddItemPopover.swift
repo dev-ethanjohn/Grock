@@ -55,11 +55,11 @@ struct AddItemPopover: View {
                 
                 VStack(spacing: 12) {
                     ItemNameInput(
-                        itemName: $itemName,
-                        itemNameFieldIsFocused: $itemNameFieldIsFocused,
-                        selectedCategory: $selectedCategory,
                         selectedCategoryEmoji: selectedCategoryEmoji,
-                        showTooltip: false
+                        showTooltip: false,
+                        itemNameFieldIsFocused: $itemNameFieldIsFocused,
+                        itemName:  $itemName,
+                        selectedCategory: $selectedCategory
                     )
                     
                     DashedLine()
@@ -91,9 +91,8 @@ struct AddItemPopover: View {
                     }
                 }) {
                     Text("Done")
-                        .font(.fuzzyBold_16)
+                        .fuzzyBubblesFont(16, weight: .bold)
                         .foregroundStyle(.white)
-                        .fontWeight(.semibold)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 10)
                         .background(

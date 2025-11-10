@@ -25,7 +25,6 @@ struct AddItemsToCartSheet: View {
                 customToolbar
                 
                 if let vault = vaultService.vault, !vault.categories.isEmpty {
-                    // Apply shadow to the category section
                     VStack(spacing: 0) {
                         categoryScrollView
                             .padding(.top, 8)
@@ -40,6 +39,7 @@ struct AddItemsToCartSheet: View {
                                     .padding(.bottom, -20)
                             )
                     )
+                    .background(.red)
                     
                     categoryContentScrollView
                 } else {
@@ -47,14 +47,12 @@ struct AddItemsToCartSheet: View {
                 }
             }
             
-            // Done button at bottom
             VStack {
                 Spacer()
                 doneButton
                     .padding(.bottom, 20)
             }
             
-            // Add Item Popover
             if showAddItemPopover {
                 Color.clear
                     .contentShape(Rectangle())
@@ -76,13 +74,40 @@ struct AddItemsToCartSheet: View {
                         )
                     },
                     onDismiss: {
-                        // Any cleanup when popover is dismissed
                     }
                 )
                 .transition(.opacity)
                 .zIndex(1)
             }
         }
+        .toolbar {
+            
+            ToolbarItem(placement: .topBarLeading) {
+                Button(action: {}) {
+                    Image("search")
+                        .resizable()
+                        .frame(width: 24, height: 24)
+                }
+            }
+            
+            ToolbarItem(placement: .topBarTrailing) {
+                Button(action: {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        showAddItemPopover = true
+                    }
+                }) {
+                    Text("Add")
+                        .fuzzyBubblesFont(13, weight: .bold)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(Color.black)
+                        .cornerRadius(20)
+                }
+            }
+        }
+        .navigationTitle("Manage Cart")
+        .navigationBarTitleDisplayMode(.inline)
         .ignoresSafeArea(.keyboard)
         .presentationDragIndicator(.visible)
         .onAppear {
@@ -104,22 +129,9 @@ struct AddItemsToCartSheet: View {
             }
             
             Spacer()
-            
-            Button(action: {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    showAddItemPopover = true
-                }
-            }) {
-                Text("Add")
-                    .font(.fuzzyBold_13)
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 4)
-                    .background(Color.black)
-                    .cornerRadius(20)
-            }
+
         }
-        .padding()
+        .padding(.horizontal)
         .background(Color.white)
     }
     
@@ -191,8 +203,8 @@ struct AddItemsToCartSheet: View {
             updateCartWithSelectedItems()
             dismiss()
         }) {
-            Text("Done")
-                .font(.fuzzyBold_16)
+            Text("Save")
+                .fuzzyBubblesFont(16, weight: .bold)
                 .foregroundColor(.white)
                 .padding(.horizontal, 24)
                 .padding(.vertical, 12)
@@ -422,7 +434,7 @@ struct AddItemsStoreSection: View {
             header:
                 HStack {
                     Text(storeName)
-                        .font(.fuzzyBold_11)
+                        .fuzzyBubblesFont(11, weight: .bold)
                         .foregroundStyle(.white)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
@@ -460,6 +472,7 @@ struct AddItemsStoreSection: View {
 
 // MARK: - VaultItemRow for Add Items Sheet (using local state)
 struct AddItemsVaultItemRow: View {
+//    let cart: Cart
     let item: Item
     let category: GroceryCategory?
     @Binding var localActiveItems: [String: Double]
@@ -516,20 +529,22 @@ struct AddItemsVaultItemRow: View {
                     .animation(.spring(response: 0.3, dampingFraction: 0.5), value: isActive)
                 
                 VStack(alignment: .leading, spacing: 0) {
+                    
                     Text(item.name)
                         .foregroundColor(isActive ? .black : Color(hex: "999"))
-                    + Text(" >")
-                        .font(.fuzzyBold_20)
-                        .foregroundStyle(Color(hex: "CCCCCC"))
+                    //TODO: fix this
+//                    + Text(" >")
+//                        .fuzzyBubblesFont(20, weight: .bold)
+//                        .foregroundStyle(Color(hex: "CCCCCC"))
                     
                     if let priceOption = item.priceOptions.first {
                         HStack(spacing: 0) {
                             Text("₱\(priceOption.pricePerUnit.priceValue, specifier: "%g")")
                             Text("/\(priceOption.pricePerUnit.unit)")
-                                .font(.lexendMedium_12)
+                                .lexendFont(12, weight: .medium)
                             Spacer()
                         }
-                        .font(.lexendMedium_12)
+                        .lexendFont(12, weight: .medium)
                         .foregroundColor(isActive ? .black : Color(hex: "999"))
                     }
                 }
@@ -655,11 +670,24 @@ struct AddItemsVaultItemRow: View {
                     offset = 0
                     isSwiped = false
                 }
+            } else {
+                showEditSheet = true
             }
             // No edit sheet in add-to-cart mode
         }
+        .sheet(isPresented: $showEditSheet) {
+            EditItemSheet(
+                item: item,
+                onSave: { updatedItem in
+                    print("✅ Updated item: \(updatedItem.name)")
+                }
+//                context: .cart
+            )
+            .environment(vaultService)
+            .presentationDetents([.medium, .fraction(0.75)])
+            .presentationCornerRadius(24)
+        }
         .contextMenu {
-            // Context menu available for ALL items (active and inactive)
             Button(role: .destructive) {
                 deleteItem()
             } label: {

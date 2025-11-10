@@ -31,6 +31,14 @@ struct CartDetailScreen: View {
     // Celebration state
     @State private var showCelebration = false
     
+    // Button animation state - FIXED
+    @State private var manageCartButtonVisible = false
+    @State private var buttonScale: CGFloat = 1.0
+    @State private var shouldBounceAfterCelebration = false // NEW: Track if we should bounce after celebration
+    
+    // Loading state
+    @State private var cartReady = false
+    
     private var cartInsights: CartInsights {
         vaultService.getCartInsights(cart: cart)
     }
@@ -41,12 +49,10 @@ struct CartDetailScreen: View {
             (cartItem, vaultService.findItemById(cartItem.itemId))
         }
         
-        // Filter out any nil stores and ensure we have valid data
         let grouped = Dictionary(grouping: cartItemsWithDetails) { cartItem, item in
             cartItem.getStore(cart: cart)
         }
         
-        // Return only non-empty groups with valid store names
         return grouped.filter { !$0.key.isEmpty && !$0.value.isEmpty }
     }
     
@@ -71,60 +77,7 @@ struct CartDetailScreen: View {
     }
     
     var body: some View {
-        GeometryReader { geometry in
-            ZStack (alignment: .bottom){
-                ZStack(alignment: .top) {
-                    VStack(spacing: 12) {
-                        modeToggleView
-                        
-                        ZStack {
-                            if hasItems {
-                                itemsListView
-                                    .transition(.scale)
-                            } else {
-                                emptyStateView
-                                    .transition(.scale)
-                            }
-                        }
-                        .animation(.spring(response: 0.3, dampingFraction: 0.85), value: hasItems)
-                        
-                        Spacer(minLength: 0)
-                        
-                    }
-                    .padding(.vertical, 40)
-                    .padding(.horizontal)
-                    .frame(maxHeight: .infinity, alignment: .top)
-                    
-                    headerView
-                }
-                
-                if hasItems {
-                    footerView
-                        .scaleEffect(shouldAnimateTransition ? 0.8 : 1)
-                        .animation(.spring(response: 0.3, dampingFraction: 0.7).delay(0.05), value: shouldAnimateTransition)
-                        .padding(.leading)
-                        .padding(.bottom, geometry.safeAreaInsets.bottom + 20)
-                }
-                
-                Button(action: {
-                    showingVaultView = true
-                }) {
-                    Image(systemName: "plus")
-                        .font(.system(size: 24, weight: .medium))
-                        .foregroundColor(.white)
-                        .frame(width: 56, height: 56)
-                        .background(Color.black)
-                        .clipShape(Circle())
-                        .shadow(color: Color.black.opacity(0.3), radius: 8, x: 0, y: 4)
-                }
-                .scaleEffect(shouldAnimateTransition ? 0 : 1)
-                .animation(.spring(response: 0.3, dampingFraction: 0.7).delay(0.1), value: shouldAnimateTransition)
-                .frame(maxWidth: .infinity, alignment: .trailing)
-                .padding(.trailing)
-                .padding(.bottom, geometry.safeAreaInsets.bottom + 20)
-                
-            }
-        }
+        content
         .onAppear {
             previousHasItems = hasItems
             checkAndShowCelebration()
@@ -137,12 +90,67 @@ struct CartDetailScreen: View {
             }
         }
         .fullScreenCover(isPresented: $showCelebration) {
-               CelebrationView(
-                   isPresented: $showCelebration,
-                   title: "WOW! Your First Shopping Cart! 🎉",
-               )
-               .presentationBackground(.clear)
-           }
+            CelebrationView(
+                isPresented: $showCelebration,
+                title: "WOW! Your First Shopping Cart! 🎉",
+            )
+            .presentationBackground(.clear)
+        }
+        //
+        //        .onChange(of: showCelebration) { oldValue, newValue in
+        //            if newValue {
+        //                // Celebration starting - hide button
+        //                withAnimation(.easeOut(duration: 0.2)) {
+        //                    createCartButtonVisible = false
+        //                }
+        //            } else {
+        //                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+        //                    createCartButtonVisible = true
+        //                }
+        //                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+        //                    if hasActiveItems {
+        //                        startButtonBounce()
+        //                    }
+        //                }
+        //
+        //                    findAndHighlightFirstItem()
+        //            }
+        //        }
+        .onChange(of: showCelebration) { oldValue, newValue in
+            if newValue {
+                // Celebration starting - hide button immediately
+                withAnimation(.easeOut(duration: 0.2)) {
+                    manageCartButtonVisible = false
+                }
+                shouldBounceAfterCelebration = true // Mark that we should bounce after
+            } else if shouldBounceAfterCelebration {
+                // Celebration finished - show button with animation and bounce
+                //                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                    manageCartButtonVisible = true
+                }
+                
+                // Bounce only after celebration
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    if hasItems {
+                        startButtonBounce()
+                    }
+                    shouldBounceAfterCelebration = false // Reset flag
+                }
+                //                }
+            }
+        }
+        // Show button normally if no celebration
+        .onChange(of: cartReady) { oldValue, newValue in
+            if newValue && !showCelebration {
+                // Cart is ready and no celebration - just show button without bounce
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                        manageCartButtonVisible = true
+                    }
+                }
+            }
+        }
         .navigationBarBackButtonHidden(true)
         .sheet(item: $itemToEdit) { item in
             EditItemSheet(
@@ -193,6 +201,179 @@ struct CartDetailScreen: View {
             FilterSheet(selectedFilter: $selectedFilter)
         }
     }
+    
+    private var content: some View {
+        GeometryReader { geometry in
+        ZStack (alignment: .bottom){
+            if cartReady {
+                ZStack(alignment: .top) {
+                    VStack(spacing: 12) {
+                        modeToggleView
+                        
+                        ZStack {
+                            if hasItems {
+                                VStack(spacing: 24) {
+                                    itemsListView
+                                        .transition(.scale)
+                                    
+                                    
+                                    footerView
+                                        .scaleEffect(shouldAnimateTransition ? 0.8 : 1)
+                                        .animation(.spring(response: 0.3, dampingFraction: 0.7).delay(0.05), value: shouldAnimateTransition)
+                                        .padding(.leading)
+                                        .padding(.bottom, geometry.safeAreaInsets.bottom + 20)
+                                }
+                              
+                                
+                                
+                            } else {
+                                emptyStateView
+                                    .transition(.scale)
+                            }
+                        }
+                        .animation(.spring(response: 0.3, dampingFraction: 0.85), value: hasItems)
+                        
+                        
+                        
+                        Spacer(minLength: 0)
+                        
+                    }
+                    .padding(.vertical, 40)
+                    .padding(.horizontal)
+                    .frame(maxHeight: .infinity, alignment: .top)
+                    
+                    headerView
+                }
+                
+                if !showCelebration {
+                    Button(action: {
+                        showingVaultView = true
+                    }) {
+                        Text("Manage Cart")
+                            .fuzzyBubblesFont(16, weight: .bold)
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 24)
+                            .padding(.vertical, 12)
+                            .background(Color.black)
+                            .cornerRadius(25)
+                    }
+                    .scaleEffect(manageCartButtonVisible ? buttonScale : 0)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.6), value: manageCartButtonVisible)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.6), value: buttonScale)
+                    .padding(.bottom, 20)
+                    .frame(maxWidth: .infinity)
+                    .onChange(of: manageCartButtonVisible) { oldValue, newValue in
+                        if newValue && !showCelebration {
+                            startButtonBounce()
+                        }
+                    }
+                    //                        .onChange(of: hasActiveItems) { oldValue, newValue in
+                    //                            if newValue && createCartButtonVisible {
+                    //                                startButtonBounce()
+                    //                            }
+                    //                        }
+                    //                        .onChange(of: showCelebration) { oldValue, newValue in
+                    //                            if newValue {
+                    //                                // Celebration starting - hide button immediately
+                    ////                                withAnimation(.easeOut(duration: 0.2)) {
+                    //                                    manageCartButtonVisible = false
+                    ////                                }
+                    //                                shouldBounceAfterCelebration = true // Mark that we should bounce after
+                    //                            } else if shouldBounceAfterCelebration {
+                    //                                // Celebration finished - show button with animation and bounce
+                    //                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    //                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                    //                                        manageCartButtonVisible = true
+                    //                                    }
+                    //
+                    //                                    // Bounce only after celebration
+                    ////                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    //                                        if hasItems {
+                    //                                            startButtonBounce()
+                    //                                        }
+                    //                                        shouldBounceAfterCelebration = false // Reset flag
+                    ////                                    }
+                    //                                }
+                    //                            }
+                    //                        }
+                }
+            } else {
+                ProgressView()
+                    .onAppear {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                            cartReady = true
+                        }
+                    }
+            }
+            
+            //                if vaultService.vault != nil && !showCelebration && vaultReady {
+            //                    ZStack(alignment: .topLeading) {
+            //                        Button(action: {
+            //                            if existingCart != nil {
+            //                                onAddItemsToCart?(cartViewModel.activeCartItems)
+            //                                dismiss()
+            //                            } else {
+            //                                withAnimation {
+            //                                    showCartConfirmation = true
+            //                                }
+            //                            }
+            //                        }) {
+            //                            Text(existingCart != nil ? "Add to Cart" : "Create cart")
+            //                                .font(.fuzzyBold_16)
+            //                                .foregroundColor(.white)
+            //                                .padding(.horizontal, 24)
+            //                                .padding(.vertical, 12)
+            //                                .background(Color.black)
+            //                                .cornerRadius(25)
+            //                        }
+            //                        .padding(.bottom, 20)
+            //                        .scaleEffect(createCartButtonVisible ? buttonScale : 0)
+            //                        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: createCartButtonVisible)
+            //                        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: buttonScale)
+            //                        .disabled(!hasActiveItems)
+            //                        .onChange(of: createCartButtonVisible) { oldValue, newValue in
+            //                            if newValue && hasActiveItems {
+            //                                startButtonBounce()
+            //                            }
+            //                        }
+            //                        .onChange(of: hasActiveItems) { oldValue, newValue in
+            //                            if newValue && createCartButtonVisible {
+            //                                startButtonBounce()
+            //                            }
+            //                        }
+            //
+            //                        if hasActiveItems {
+            //                            Text("\(cartViewModel.activeCartItems.count)")
+            //                                .font(.fuzzyBold_16)
+            //                                .contentTransition(.numericText())
+            //                                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: cartViewModel.activeCartItems.count)
+            //                                .foregroundColor(.black)
+            //                                .frame(width: 25, height: 25)
+            //                                .background(Color.white)
+            //                                .clipShape(Circle())
+            //                                .overlay(
+            //                                    Circle()
+            //                                        .stroke(Color.black, lineWidth: 2)
+            //                                )
+            //                                .offset(x: -8, y: -4)
+            //                                .scaleEffect(cartBadgeVisible ? 1 : 0)
+            //                                .animation(
+            //                                    .spring(response: 0.6, dampingFraction: 0.6),
+            //                                    value: cartBadgeVisible
+            //                                )
+            //                        }
+            //                    }
+            //                    .onChange(of: createCartButtonVisible) { oldValue, newValue in
+            //                        withAnimation(.spring(response: 0.6, dampingFraction: 0.6)) {
+            //                            cartBadgeVisible = newValue
+            //                        }
+            //                    }
+            //                }
+            
+        }
+        }
+    }
+    
     
     private var headerView: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -452,10 +633,25 @@ struct CartDetailScreen: View {
     private var footerView: some View {
         if cart.isShopping {
             VStack(alignment: .leading, spacing: 4) {
-                Text("\(cart.fulfilledItemsCount)/\(cart.totalItemsCount) items for ₱\(animatedFulfilledAmount, specifier: "%.2f")")
-                    .fuzzyBubblesFont(15, weight: .bold)
-                    .foregroundColor(.gray)
-                    .contentTransition(.numericText(value: animatedFulfilledAmount))
+                HStack(spacing: 2) {
+                    Text("\(cart.fulfilledItemsCount)")
+                        .fuzzyBubblesFont(15, weight: .bold)
+                        .foregroundColor(.gray)
+                        .contentTransition(.numericText(value: animatedFulfilledAmount))
+                    
+                    Text("/")
+                        .fuzzyBubblesFont(10, weight: .bold)
+                        .foregroundColor(Color(.systemGray3))
+                   
+                    
+                    
+                    Text("\(cart.totalItemsCount) items for ₱\(animatedFulfilledAmount, specifier: "%.2f")")
+                        .fuzzyBubblesFont(15, weight: .bold)
+                        .foregroundColor(.gray)
+                        .contentTransition(.numericText(value: animatedFulfilledAmount))
+                }
+           
+                
                 
                 Text("\(Int(animatedFulfilledPercentage))% fulfilled")
                     .fuzzyBubblesFont(15, weight: .bold)
@@ -491,14 +687,6 @@ struct CartDetailScreen: View {
         return CGFloat(progress) * totalWidth
     }
     
-    private func formatCurrency(_ value: Double) -> String {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .currency
-        formatter.currencyCode = "PHP"
-        formatter.maximumFractionDigits = value == Double(Int(value)) ? 0 : 2
-        return formatter.string(from: NSNumber(value: value)) ?? "₱\(value)"
-    }
-    
     private func updateAnimatedValues() {
         withAnimation(.smooth(duration: 0.5)) {
             animatedFulfilledAmount = vaultService.getTotalFulfilledAmount(for: cart)
@@ -514,7 +702,6 @@ struct CartDetailScreen: View {
     }
     
     private func checkAndShowCelebration() {
-        // Use a different key to avoid conflicts
         let hasSeenCelebration = UserDefaults.standard.bool(forKey: "hasSeenFirstShoppingCartCelebration")
         
         print("🎉 Cart Celebration Debug:")
@@ -528,7 +715,6 @@ struct CartDetailScreen: View {
             return
         }
         
-        // Check if this is the first cart
         let isFirstCart = cartViewModel.carts.count == 1 || cartViewModel.isFirstCart(cart)
         print("   - Is first cart: \(isFirstCart)")
         
@@ -542,5 +728,52 @@ struct CartDetailScreen: View {
             print("⏭️ Not the first cart - no celebration")
         }
     }
-
+    
+    private func startButtonBounce() {
+        withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {
+            buttonScale = 0.95
+        }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.5)) {
+                buttonScale = 1.1
+            }
+        }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                buttonScale = 1.0
+            }
+        }
+    }
 }
+
+
+//struct CartShoppingUpdate:  View {
+//
+//    var body: some View {
+//        if cart.isShopping {
+//            VStack(alignment: .leading, spacing: 4) {
+//                Text("\(cart.fulfilledItemsCount)/\(cart.totalItemsCount) items for ₱\(animatedFulfilledAmount, specifier: "%.2f")")
+//                    .fuzzyBubblesFont(15, weight: .bold)
+//                    .foregroundColor(.gray)
+//                    .contentTransition(.numericText(value: animatedFulfilledAmount))
+//
+//                Text("\(Int(animatedFulfilledPercentage))% fulfilled")
+//                    .fuzzyBubblesFont(15, weight: .bold)
+//                    .foregroundColor(.gray)
+//                    .contentTransition(.numericText(value: animatedFulfilledPercentage))
+//            }
+//            .frame(maxWidth: .infinity, alignment: .leading)
+//            .onAppear {
+//                updateAnimatedValues()
+//            }
+//            .onChange(of: cart.fulfilledItemsCount) { oldValue, newValue in
+//                updateAnimatedValues()
+//            }
+//            .onChange(of: vaultService.getTotalFulfilledAmount(for: cart)) { oldValue, newValue in
+//                updateAnimatedValues()
+//            }
+//        }
+//    }
+//}

@@ -25,7 +25,7 @@ struct VaultCategorySectionView: View {
                         .transition(.push(from: .leading))
                 } else {
                     Text("Select Category")
-                        .font(.fuzzyBold_15)
+                        .fuzzyBubblesFont(15, weight: .bold)
                 }
                 Spacer()
             }

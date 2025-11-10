@@ -1,9 +1,9 @@
 import SwiftUI
 import SwiftData
 
+//sa huli palagi,,,  song
 struct EditItemSheet: View {
     let item: Item
-//    @Binding var isPresented: Bool
     var onSave: ((Item) -> Void)?
     var context: EditContext = .vault
     
@@ -36,23 +36,14 @@ struct EditItemSheet: View {
             VStack {
                 ScrollView {
                     VStack {
-                        Spacer()
-                            .frame(height: 20)
                         
                         ItemNameInput(
-                            itemName: $itemName,
-                            itemNameFieldIsFocused: $itemNameFieldIsFocused,
-                            selectedCategory: $selectedCategory,
                             selectedCategoryEmoji: selectedCategoryEmoji,
-                            showTooltip: false 
+                            showTooltip:  false,
+                            itemNameFieldIsFocused: $itemNameFieldIsFocused,
+                            itemName: $itemName,
+                            selectedCategory: $selectedCategory
                         )
-                        
-                        DashedLine()
-                            .stroke(style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
-                            .frame(height: 1)
-                            .foregroundColor(Color(hex: "ddd"))
-                            .padding(.vertical, 2)
-                            .padding(.horizontal)
                         
                         StoreNameComponent(storeName: $storeName)
                         
@@ -61,17 +52,36 @@ struct EditItemSheet: View {
                             PricePerUnitField(price: $price)
                         }
                         
+                        DashedLine()
+                            .stroke(style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
+                            .frame(height: 1)
+                            .foregroundColor(Color(hex: "ddd"))
+                            .padding(.vertical, 6)
+                            .padding(.horizontal)
+                        
+                        
                         if context == .cart {
-                            Text("Editing this item will update prices in all active carts")
+                            HStack(spacing: 8) {
+                                RemoveButton(text: "Remove from Cart")
+                                RemoveButton(text: "Remove from Vault")
+                            }
+                            .foregroundStyle(.black)
+                        } else {
+                            RemoveButton(text: "Remove from Vault")
+                        }
+                        
+                        if context == .cart {
+                            Text("Editing this item will update prices from vault and in all active carts")
                                 .font(.caption)
                                 .foregroundColor(.gray)
                                 .padding(.top, 8)
+                                .multilineTextAlignment(.center)
                         }
                         
                         Spacer()
                             .frame(height: 80)
                     }
-                    .padding()
+                    .padding(.horizontal)
                 }
                 
                 HStack {
@@ -85,14 +95,7 @@ struct EditItemSheet: View {
             }
             .navigationTitle("Edit Item")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
-//                        isPresented = false
-                        dismiss()
-                    }
-                }
-            }
+   
         }
         .onAppear {
             initializeFormValues()
@@ -133,7 +136,6 @@ struct EditItemSheet: View {
         )
         
         onSave?(item)
-//        isPresented = false
         dismiss()
         
         // Notify about category change if needed
@@ -160,9 +162,8 @@ struct EditItemSaveButton: View {
     var body: some View {
         Button(action: action) {
             Text("Save")
-                .font(.fuzzyBold_16)
+                .fuzzyBubblesFont(16, weight: .bold)
                 .foregroundStyle(.white)
-                .fontWeight(.semibold)
                 .padding(.vertical, 4)
                 .padding(.horizontal, 24)
                 .background(
@@ -173,7 +174,7 @@ struct EditItemSaveButton: View {
                                 colors: [Color.black, Color.gray.opacity(0.3)],
                                 center: .center,
                                 startRadius: 0,
-                                endRadius: fillAnimation * 80
+                                endRadius: fillAnimation * 150
                             )
                             : RadialGradient(
                                 colors: [Color.gray.opacity(0.3), Color.gray.opacity(0.3)],
@@ -227,3 +228,5 @@ struct EditItemSaveButton: View {
         }
     }
 }
+
+

@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct OnboardingLastStoreView: View {
+    
+    //TODO: rearrange let - var - state - focusstate - binding - bindable
     @Bindable var viewModel: OnboardingViewModel
     @Binding var storeFieldAnimated: Bool
     @Binding var hasShownInfoDropdown: Bool
@@ -24,17 +26,18 @@ struct OnboardingLastStoreView: View {
     private func normalizeSpaces(_ text: String) -> String {
         return text.replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
     }
-
+    
     var body: some View {
         VStack {
             
+            //TODO: own var view / viewbuilder
             HStack {
                 Spacer()
                 Button("Skip") {
                     viewModel.storeName = ""
                     onSkip()
                 }
-                .font(.fuzzyBold_16)
+                .fuzzyBubblesFont(16, weight: .bold)
                 .foregroundColor(.secondary)
             }
             .padding(.top)
@@ -43,11 +46,9 @@ struct OnboardingLastStoreView: View {
             Spacer()
                 .frame(height: 60)
             
-            Text("Where was your last grocery trip?")
-                .font(.fuzzyBold_24)
-                .multilineTextAlignment(.center)
-
+            QuestionTitle(text: "Where was your last grocery trip?")
             
+            //TODO: own var view / viewbuilder
             TextField("e.g. Walmart, SM, Costco", text: $viewModel.storeName)
                 .multilineTextAlignment(.center)
                 .autocorrectionDisabled()
@@ -96,6 +97,7 @@ struct OnboardingLastStoreView: View {
                     }
                 }
             
+            //TODO: own var view / viewbuilder
             if showError {
                 Text("Store name needs at least 2 characters")
                     .font(.caption)
@@ -109,6 +111,7 @@ struct OnboardingLastStoreView: View {
             Spacer()
         }
         .safeAreaInset(edge: .bottom) {
+            //TODO: own var view / viewbuilder
             HStack {
                 Button(action: {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
@@ -144,12 +147,12 @@ struct OnboardingLastStoreView: View {
                         .frame(height: 200)
                         .offset(x: 12, y: -120)
                         .transition(.asymmetric(
-                               insertion: .scale(scale: 0.85, anchor: .topLeading)
-                                   .animation(.spring(response: 0.35, dampingFraction: 0.65)),
-                               removal: .scale(scale: 0.95, anchor: .topLeading)
-                                   .combined(with: .opacity)
-                                   .animation(.spring(response: 0.25, dampingFraction: 0.75))
-                           ))
+                            insertion: .scale(scale: 0.85, anchor: .topLeading)
+                                .animation(.spring(response: 0.35, dampingFraction: 0.65)),
+                            removal: .scale(scale: 0.95, anchor: .topLeading)
+                                .combined(with: .opacity)
+                                .animation(.spring(response: 0.25, dampingFraction: 0.75))
+                        ))
                     }
                 }
                 
@@ -165,26 +168,27 @@ struct OnboardingLastStoreView: View {
                     onNext()
                 } label: {
                     Text("Next")
-                        .font(.fuzzyBold_16)
+                        .fuzzyBubblesFont(16, weight: .bold)
                         .foregroundStyle(.white)
                         .fontWeight(.semibold)
                         .padding(.vertical, 4)
                         .padding(.horizontal, 24)
                         .background(
+                            //TODO: put in a viewmodifier
                             Capsule()
                                 .fill(
                                     RadialGradient(
                                         colors: [Color.black, Color.gray.opacity(0.3)],
                                         center: .center,
                                         startRadius: 0,
-                                        endRadius: fillAnimation * 80
+                                        endRadius: fillAnimation * 150
                                     )
                                 )
                         )
                         .scaleEffect(showNextButton ? buttonScale : 0.0)
                         .offset(x: shakeOffset)
                 }
-
+                
             }
             .padding(.vertical, 8)
             .padding(.horizontal)
@@ -233,6 +237,7 @@ struct OnboardingLastStoreView: View {
         return trimmed.count >= 2
     }
     
+    //TODO: add to a cokponent unified viewmodel 
     private func startButtonBounce() {
         withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {
             buttonScale = 0.95

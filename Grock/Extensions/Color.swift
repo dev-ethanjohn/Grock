@@ -34,7 +34,6 @@ extension Color {
     }
 }
 
-
 extension Color {
     func saturated(by percentage: Double) -> Color {
         UIColor(self).saturated(by: percentage).map(Color.init) ?? self

@@ -8,21 +8,25 @@
 import SwiftUI
 
 struct ItemNameInput: View {
-    @Binding var itemName: String
-    var itemNameFieldIsFocused: FocusState<Bool>.Binding
-    @Binding var selectedCategory: GroceryCategory?
+    
     let selectedCategoryEmoji: String
-    let showTooltip: Bool // Add this
+    let showTooltip: Bool
+    
+    var itemNameFieldIsFocused: FocusState<Bool>.Binding
+    
+    @Binding var itemName: String
+    @Binding var selectedCategory: GroceryCategory?
     
     @State private var fillAnimation: CGFloat = 0.0
     @State private var fieldScale: CGFloat = 1.0
-    // Remove @State private var showTooltip = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             ZStack(alignment: .trailing) {
-                if showTooltip && selectedCategory == nil { // Use the passed-in value
-                    TooltipPopover()
+                
+                // as a var view / viewbuilder
+                if showTooltip && selectedCategory == nil {
+                    CategoryTooltipPopover()
                         .offset(x: -10, y: -32)
                         .transition(.asymmetric(
                             insertion: .scale(scale: 0.8).combined(with: .opacity).combined(with: .offset(y: -10)),
@@ -31,6 +35,7 @@ struct ItemNameInput: View {
                         .zIndex(1)
                 }
                 
+                // as a var view / viewbuilder
                 HStack {
                     TextField("e.g. Tapa", text: $itemName)
                         .font(.subheadline)
@@ -60,15 +65,15 @@ struct ItemNameInput: View {
                         .focused(itemNameFieldIsFocused)
                         .scaleEffect(fieldScale)
                         .overlay(
-                            CategoryButton(
+                            CategoryCircularButton(
                                 selectedCategory: $selectedCategory,
-                                selectedCategoryEmoji: selectedCategoryEmoji,
-                                showTooltip: .constant(false) // Remove tooltip control from here
+                                selectedCategoryEmoji: selectedCategoryEmoji
                             )
                         )
                 }
             }
             
+            // as a var view / viewbuilder
             if let category = selectedCategory {
                 Text(category.title)
                     .font(.caption2)
@@ -78,6 +83,7 @@ struct ItemNameInput: View {
                     .id(category.id)
             }
         }
+        .padding(.bottom, 8)
         .animation(.spring(response: 0.4, dampingFraction: 0.6), value: selectedCategory)
         .onChange(of: selectedCategory) { oldValue, newValue in
             if newValue != nil {
@@ -104,10 +110,10 @@ struct ItemNameInput: View {
                 }
             }
             
-            // Remove the tooltip hiding logic from here
         }
-        // Remove the onAppear that shows the tooltip
     }
+    
+    //sub Views
     
     private func startFieldBounce() {
         withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {

@@ -14,7 +14,6 @@ struct VaultCategoryIcon: View {
     var body: some View {
         Button(action: action) {
             ZStack(alignment: .topTrailing) {
-                // Radial fill background with subtle scale
                 RoundedRectangle(cornerRadius: 8)
                     .fill(
                         RadialGradient(
@@ -55,7 +54,6 @@ struct VaultCategoryIcon: View {
         .opacity(hasItems ? opacityBounce : 0.4)
         .onChange(of: hasItems) { oldValue, newValue in
             if newValue {
-                // Subtle, alive animation without wobble
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
                     opacityBounce = 0.9
                     fillAnimation = 0.3
@@ -78,7 +76,6 @@ struct VaultCategoryIcon: View {
                     }
                 }
             } else {
-                // Gentle fade out
                 withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
                     opacityBounce = 0.4
                     fillAnimation = 0.0

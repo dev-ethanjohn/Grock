@@ -30,7 +30,7 @@ struct VaultToolbarView: View {
             
             Button(action: onAddTapped) {
                 Text("Add")
-                    .font(.fuzzyBold_13)
+                    .fuzzyBubblesFont(13, weight: .bold)
                     .foregroundColor(.white)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 4)

@@ -282,7 +282,7 @@ struct CartConfirmationPopover: View {
                 .font(.system(size: 40))
                 .foregroundColor(.gray)
             Text("No items selected")
-                .font(.fuzzyBold_16)
+                .fuzzyBubblesFont(16, weight: .bold)
                 .foregroundColor(.gray)
         }
         .frame(minHeight: 120)
@@ -361,7 +361,7 @@ struct CartConfirmationPopover: View {
             }
         }) {
             Text("Cancel")
-                .font(.fuzzyBold_16)
+                .fuzzyBubblesFont(16, weight: .bold)
                 .foregroundColor(.black)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 12)
@@ -387,7 +387,7 @@ struct CartConfirmationPopover: View {
             }
         })  {
             Text("Confirm")
-                .font(.fuzzyBold_16)
+                .fuzzyBubblesFont(16, weight: .bold)
                 .foregroundColor(.white)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 12)
