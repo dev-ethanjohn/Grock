@@ -163,9 +163,9 @@ enum GroceryCategory: String, CaseIterable, Identifiable {
 
 
 //MARK: Onboarding
-enum OnboardingStep {
-    case welcome
-    case lastStore
-    case firstItem
-    case done
-}
+//enum OnboardingStep {
+//    case welcome
+//    case lastStore
+//    case firstItem
+//    case done
+//}

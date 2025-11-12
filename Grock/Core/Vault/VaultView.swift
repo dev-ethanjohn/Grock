@@ -68,9 +68,9 @@ struct VaultView: View {
             } else {
                 ProgressView()
                     .onAppear {
-//                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                            vaultReady = true
-//                        }
+                        //                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                        vaultReady = true
+                        //                        }
                     }
             }
             
@@ -78,12 +78,12 @@ struct VaultView: View {
                 
                 
                 content
-              
-//                .onChange(of: createCartButtonVisible) { oldValue, newValue in
-//                    withAnimation(.spring(response: 0.6, dampingFraction: 0.6)) {
-//                        cartBadgeVisible = newValue
-//                    }
-//                }
+                
+                //                .onChange(of: createCartButtonVisible) { oldValue, newValue in
+                //                    withAnimation(.spring(response: 0.6, dampingFraction: 0.6)) {
+                //                        cartBadgeVisible = newValue
+                //                    }
+                //                }
             }
             
             if showAddItemPopover {
@@ -465,7 +465,7 @@ struct VaultView: View {
                     .foregroundColor(.white)
                     .padding(.horizontal, 24)
                     .padding(.vertical, 12)
-//                            .background(hasActiveItems ? .black : .gray)
+                //                            .background(hasActiveItems ? .black : .gray)
                     .background(
                         Capsule()
                             .fill(
@@ -486,6 +486,7 @@ struct VaultView: View {
                     )
                     .cornerRadius(25)
             }
+            .buttonStyle(.plain)
             .padding(.bottom, 20)
             .scaleEffect(createCartButtonVisible ? buttonScale : 0)
             .animation(.spring(response: 0.3, dampingFraction: 0.6), value: createCartButtonVisible)
@@ -502,7 +503,7 @@ struct VaultView: View {
                 } else {
                     withAnimation(.easeInOut(duration: 0.3)) {
                         fillAnimation = 0.0
-                        buttonScale = 1.0
+                        buttonScale = 0
                     }
                 }
             }
@@ -510,9 +511,12 @@ struct VaultView: View {
                 if hasActiveItems {
                     fillAnimation = 1.0
                     buttonScale = 1.0
+                } else {
+                    buttonScale = 0
                 }
             }
             
+            // MARK: TODO - Add 0.3 delay before it scales to 1, no delay to scale 0.
             if hasActiveItems {
                 Text("\(cartViewModel.activeCartItems.count)")
                     .fuzzyBubblesFont(16, weight: .bold)
@@ -527,18 +531,15 @@ struct VaultView: View {
                             .stroke(Color.black, lineWidth: 2)
                     )
                     .offset(x: -8, y: -4)
-//                            .scaleEffect(cartBadgeVisible ? 1 : 0)
+                    .scaleEffect(hasActiveItems ? 1 : 0)
                     .transition(.scale)
-//                            .animation(
-//                                .spring(response: 0.6, dampingFraction: 0.6),
-//                                value: cartBadgeVisible
-//                            )
+                    .animation(
+                        .spring(response: 0.6, dampingFraction: 0.6),
+                        value: cartBadgeVisible
+                    )
             }
         }
     }
-    
-    
-    // MARK: - Methods
     
     private func selectCategory(_ category: GroceryCategory, proxy: ScrollViewProxy) {
         withAnimation(.spring(response: 0.3, dampingFraction: 0.88)) {

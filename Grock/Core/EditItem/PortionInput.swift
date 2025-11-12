@@ -8,6 +8,7 @@
 import SwiftUI
 
 struct PortionInput: View {
+    //TODO: Rearrange + put in a veiw model.
     @Binding var portion: Double?
     @State private var portionString: String = ""
     @FocusState private var isFocused: Bool

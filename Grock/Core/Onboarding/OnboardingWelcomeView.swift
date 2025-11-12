@@ -1,7 +1,14 @@
+//
+//  OnboardingWelcomeView.swift
+//  Grock
+//
+//  Created by Ethan John Paguntalan on 11/6/25.
+//
+
 import SwiftUI
 
 struct OnboardingWelcomeView: View {
-    var onNext: () -> Void
+    @Bindable var viewModel: OnboardingViewModel
     
     var body: some View {
         VStack {
@@ -29,9 +36,8 @@ struct OnboardingWelcomeView: View {
       
             Spacer()
             
-            //TODO: A linear glowing background + pumping to signal a clickable button ready to start
             Button("Get Started") {
-                onNext()
+                viewModel.navigateToLastStore()
             }
             .fuzzyBubblesFont(16, weight: .bold)
             .foregroundStyle(.white)
@@ -42,8 +48,4 @@ struct OnboardingWelcomeView: View {
         }
         .padding()
     }
-}
-
-#Preview {
-    OnboardingWelcomeView(onNext: {})
 }

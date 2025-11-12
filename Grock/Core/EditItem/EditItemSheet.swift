@@ -3,6 +3,8 @@ import SwiftData
 
 //sa huli palagi,,,  song
 struct EditItemSheet: View {
+    
+    //TODO: Rearrange + put in a veiw model.
     let item: Item
     var onSave: ((Item) -> Void)?
     var context: EditContext = .vault

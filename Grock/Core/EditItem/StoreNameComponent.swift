@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct StoreNameComponent: View {
-    //TODO: Rearrange
+    //TODO: Rearrange + put in a veiw model.
     @Binding var storeName: String
     @Environment(VaultService.self) private var vaultService
     @FocusState private var isFocused: Bool

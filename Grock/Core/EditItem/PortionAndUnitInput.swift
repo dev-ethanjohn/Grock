@@ -8,6 +8,7 @@
 import SwiftUI
 
 struct PortionAndUnitInput: View {
+    //TODO: Rearrange + put in a veiw model.
     @Binding var portion: Double?
     @Binding var unit: String
     @Binding var showUnitPicker: Bool

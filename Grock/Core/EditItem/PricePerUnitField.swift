@@ -8,6 +8,7 @@
 import SwiftUI
 
 struct PricePerUnitField: View {
+    //TODO: Rearrange + put in a veiw model.
     @Binding var price: String
     @FocusState private var isFocused: Bool
     

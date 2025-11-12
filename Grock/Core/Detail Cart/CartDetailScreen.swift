@@ -2,6 +2,7 @@ import SwiftUI
 import SwiftData
 
 struct CartDetailScreen: View {
+//    MARK: put in a viewmodel + reaarange
     let cart: Cart
     @Environment(VaultService.self) private var vaultService
     @Environment(CartViewModel.self) private var cartViewModel
@@ -481,6 +482,7 @@ struct CartDetailScreen: View {
                             .animation(.easeInOut(duration: 0.2), value: cart.isPlanning)
                     }
                     .disabled(cart.isCompleted)
+                    .buttonStyle(.plain)
                     
                     Button(action: {
                         if cart.status == .planning {

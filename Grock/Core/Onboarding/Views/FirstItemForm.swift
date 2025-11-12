@@ -8,32 +8,23 @@
 import SwiftUI
 
 struct FirstItemForm: View {
-    //TODO: reaarange
-    let questionText: String
     @Bindable var viewModel: OnboardingViewModel
-    var itemNameFieldIsFocused: FocusState<Bool>.Binding
-    @Binding var selectedCategory: GroceryCategory?
-    let selectedCategoryEmoji: String
-    @Binding var showUnitPicker: Bool
-    let calculatedTotal: Double
-    @Binding var showCategoryTooltip: Bool
+    @FocusState private var itemNameFieldIsFocused: Bool
     
     var body: some View {
         VStack {
-            Spacer()
-                .frame(height: 20)
+            Spacer().frame(height: 20)
             
-            QuestionTitle(text: questionText)
+            QuestionTitle(text: viewModel.questionText)
             
-            Spacer()
-                .frame(height: 40)
+            Spacer().frame(height: 40)
             
             ItemNameInput(
-                selectedCategoryEmoji:selectedCategoryEmoji,
-                showTooltip: showCategoryTooltip,
-                itemNameFieldIsFocused:  itemNameFieldIsFocused,
-                itemName:  $viewModel.itemName ,
-                selectedCategory: $selectedCategory
+                selectedCategoryEmoji: viewModel.selectedCategoryEmoji,
+                showTooltip: viewModel.showCategoryTooltip,
+                itemNameFieldIsFocused: $itemNameFieldIsFocused,
+                itemName: $viewModel.itemName,
+                selectedCategory: $viewModel.selectedCategory
             )
             
             DashedLine()
@@ -48,18 +39,13 @@ struct FirstItemForm: View {
             PortionAndUnitInput(
                 portion: $viewModel.portion,
                 unit: $viewModel.unit,
-                showUnitPicker: $showUnitPicker
+                showUnitPicker: $viewModel.showUnitPicker
             )
             
             PricePerUnitField(price: $viewModel.itemPrice)
             
-            Spacer()
-                .frame(height: 80)
+            Spacer().frame(height: 80)
         }
         .padding()
     }
 }
-
-//#Preview {
-//    FirstItemForm()
-//}

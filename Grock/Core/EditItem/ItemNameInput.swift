@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct ItemNameInput: View {
-    
+    //TODO: Rearrange + put in a veiw model.
     let selectedCategoryEmoji: String
     let showTooltip: Bool
     
@@ -37,6 +37,7 @@ struct ItemNameInput: View {
                 
                 // as a var view / viewbuilder
                 HStack {
+                    //MARK: TODO - create dynamic placeholder text vary by selected category. // enhance -> changing related example placeholders relevant to selected category 1s-2s interval.
                     TextField("e.g. canned tuna", text: $itemName)
                         .font(.subheadline)
                         .bold()
@@ -114,7 +115,6 @@ struct ItemNameInput: View {
     }
     
     //sub Views
-    
     private func startFieldBounce() {
         withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {
             fieldScale = 0.985

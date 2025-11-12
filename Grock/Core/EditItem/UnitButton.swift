@@ -8,6 +8,7 @@
 import SwiftUI
 
 struct UnitButton: View {
+    //TODO: Rearrange + put in a veiw model.
     @Binding var unit: String
     @State private var showAddUnit = false
     
@@ -113,6 +114,8 @@ struct UnitButton: View {
             .background(Color(.systemGray6))
             .cornerRadius(12)
         }
+
+        
     }
 }
 

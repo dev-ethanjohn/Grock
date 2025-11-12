@@ -17,6 +17,10 @@ struct AddItemPopover: View {
     @State private var contentScale: CGFloat = 0.8
     @State private var keyboardVisible: Bool = false
     
+    
+    //    @State private var fillAnimation: CGFloat = 0.0
+    //    @State private var buttonScale: CGFloat = 1.0
+    
     private var selectedCategoryEmoji: String {
         selectedCategory?.emoji ?? "plus.circle.fill"
     }
@@ -77,7 +81,7 @@ struct AddItemPopover: View {
                     }
                 }
                 
-                Button(action: {
+                FormCompletionButton.doneButton(isEnabled: isFormValid, maxWidth: true) {
                     if isFormValid,
                        let category = selectedCategory,
                        let priceValue = Double(itemPrice) {
@@ -89,19 +93,10 @@ struct AddItemPopover: View {
                         )
                         dismissPopover()
                     }
-                }) {
-                    Text("Done")
-                        .fuzzyBubblesFont(16, weight: .bold)
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                        .background(
-                            Capsule()
-                                .fill(isFormValid ? Color.black : Color.gray.opacity(0.3))
-                        )
                 }
-                .disabled(!isFormValid)
                 .padding(.top)
+                .buttonStyle(.plain)
+                
             }
             .padding()
             .frame(maxWidth: .infinity)
@@ -128,6 +123,7 @@ struct AddItemPopover: View {
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
             withAnimation { keyboardVisible = false }
         }
+        //MARK: MAKE THIS BUTTON BHEVAIOR in 1 place, use oly 1 btn component for button similar style to finish
     }
     
     private func dismissPopover() {
@@ -135,4 +131,5 @@ struct AddItemPopover: View {
         isPresented = false
         onDismiss?()
     }
+    
 }

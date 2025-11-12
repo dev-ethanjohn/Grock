@@ -4,8 +4,7 @@
 //  Created by Ethan John Paguntalan on 10/10/25.
 //
 import SwiftUI
-
-// MARK: - Preference Keys and Extensions
+//    MARK: put in respective files + reaarange
 
 extension View {
     /// This `offset` is needed to get the CGRect value from the view

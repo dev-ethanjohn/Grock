@@ -2,6 +2,7 @@ import SwiftUI
 import SwiftData
 
 struct AddItemsToCartSheet: View {
+    //    MARK: put in a viewmodel + reaarange
     let cart: Cart
     @Environment(VaultService.self) private var vaultService
     @Environment(CartViewModel.self) private var cartViewModel

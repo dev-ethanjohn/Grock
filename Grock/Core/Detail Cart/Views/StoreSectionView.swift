@@ -2,6 +2,7 @@ import SwiftUI
 import SwiftData
 
 struct StoreSectionView: View {
+    //    MARK: put in a viewmodel + reaarange
     let store: String
     let items: [(cartItem: CartItem, item: Item?)]
     let cart: Cart
