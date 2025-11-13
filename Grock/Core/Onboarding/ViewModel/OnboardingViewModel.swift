@@ -54,7 +54,7 @@ class OnboardingViewModel {
     // Computed Properties
     var isValidStoreName: Bool {
         let trimmed = storeName.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.count >= 2
+        return trimmed.count >= 1
     }
     
     var isItemFormValid: Bool {

@@ -1,10 +1,3 @@
-//
-//  OnboardingContainer.swift
-//  Grock
-//
-//  Created by Ethan John Paguntalan on 11/6/25.
-//
-
 import SwiftUI
 import SwiftData
 

@@ -69,7 +69,7 @@ struct OnboardingLastStoreView: View {
     private var errorMessage: some View {
         Group {
             if viewModel.showError {
-                Text("Store name needs at least 2 characters")
+                Text("Store name needs at least 1 valid character")
                     .font(.caption)
                     .foregroundColor(Color(hex: "FF6F71"))
                     .padding(.top, 8)

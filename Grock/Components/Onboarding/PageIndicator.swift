@@ -1,10 +1,3 @@
-//
-//  PageIndicator.swift
-//  Grock
-//
-//  Created by Ethan John Paguntalan on 10/6/25.
-//
-
 import SwiftUI
 
 struct PageIndicator: View {

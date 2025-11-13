@@ -10,9 +10,15 @@ struct ContentView: View {
     init(modelContext: ModelContext) {
         let vaultService = VaultService(modelContext: modelContext)
         _vaultService = State(initialValue: vaultService)
-        _cartViewModel = State(initialValue: CartViewModel(vaultService: vaultService))
-        // ✅ FIX: Create HomeViewModel ONCE and share it
-        _homeViewModel = State(initialValue: HomeViewModel(modelContext: modelContext, cartViewModel: _cartViewModel.wrappedValue))
+        
+        let cartViewModel = CartViewModel(vaultService: vaultService)
+        _cartViewModel = State(initialValue: cartViewModel)
+        
+        _homeViewModel = State(initialValue: HomeViewModel(
+            modelContext: modelContext,
+            cartViewModel: cartViewModel,
+            vaultService: vaultService 
+        ))
     }
     
     var body: some View {
@@ -25,7 +31,7 @@ struct ContentView: View {
                 OnboardingContainer()
                     .environment(vaultService)
                     .environment(cartViewModel)
-                    .environment(homeViewModel) // ✅ FIX: Share the same HomeViewModel
+                    .environment(homeViewModel)
             }
         }
     }
