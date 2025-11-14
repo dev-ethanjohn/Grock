@@ -2,7 +2,6 @@ import SwiftUI
 import SwiftData
 
 struct CartDetailScreen: View {
-//    MARK: put in a viewmodel + reaarange
     let cart: Cart
     @Environment(VaultService.self) private var vaultService
     @Environment(CartViewModel.self) private var cartViewModel
@@ -32,10 +31,10 @@ struct CartDetailScreen: View {
     // Celebration state
     @State private var showCelebration = false
     
-    // Button animation state - FIXED
     @State private var manageCartButtonVisible = false
     @State private var buttonScale: CGFloat = 1.0
-    @State private var shouldBounceAfterCelebration = false // NEW: Track if we should bounce after celebration
+    @State private var shouldBounceAfterCelebration = false
+    
     
     // Loading state
     @State private var cartReady = false
@@ -94,59 +93,34 @@ struct CartDetailScreen: View {
             CelebrationView(
                 isPresented: $showCelebration,
                 title: "WOW! Your First Shopping Cart! 🎉",
+                subtitle: nil
             )
             .presentationBackground(.clear)
         }
-        //
-        //        .onChange(of: showCelebration) { oldValue, newValue in
-        //            if newValue {
-        //                // Celebration starting - hide button
-        //                withAnimation(.easeOut(duration: 0.2)) {
-        //                    createCartButtonVisible = false
-        //                }
-        //            } else {
-        //                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-        //                    createCartButtonVisible = true
-        //                }
-        //                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-        //                    if hasActiveItems {
-        //                        startButtonBounce()
-        //                    }
-        //                }
-        //
-        //                    findAndHighlightFirstItem()
-        //            }
-        //        }
         .onChange(of: showCelebration) { oldValue, newValue in
             if newValue {
                 // Celebration starting - hide button immediately
                 withAnimation(.easeOut(duration: 0.2)) {
                     manageCartButtonVisible = false
                 }
-                shouldBounceAfterCelebration = true // Mark that we should bounce after
             } else if shouldBounceAfterCelebration {
-                // Celebration finished - show button with animation and bounce
-                //                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                // Celebration finished - show button with animation (bounce will trigger automatically via onChange)
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
                     manageCartButtonVisible = true
                 }
-                
-                // Bounce only after celebration
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    if hasItems {
-                        startButtonBounce()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                        manageCartButtonVisible = true
                     }
                     shouldBounceAfterCelebration = false // Reset flag
                 }
-                //                }
             }
         }
-        // Show button normally if no celebration
+ 
         .onChange(of: cartReady) { oldValue, newValue in
             if newValue && !showCelebration {
-                // Cart is ready and no celebration - just show button without bounce
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                    withAnimation(.spring(response: 3.0, dampingFraction: 0.6)) {
                         manageCartButtonVisible = true
                     }
                 }
@@ -205,413 +179,243 @@ struct CartDetailScreen: View {
     
     private var content: some View {
         GeometryReader { geometry in
-        ZStack (alignment: .bottom){
-            if cartReady {
-                ZStack(alignment: .top) {
-                    VStack(spacing: 12) {
-                        modeToggleView
-                        
-                        ZStack {
-                            if hasItems {
-                                VStack(spacing: 24) {
-                                    itemsListView
+            ZStack (alignment: .bottom){
+                if cartReady {
+                    ZStack(alignment: .top) {
+                        VStack(spacing: 12) {
+                            modeToggleView
+                            
+                            ZStack {
+                                if hasItems {
+                                    VStack(spacing: 24) {
+                                        itemsListView
+                                            .transition(.scale)
+                                        
+                                        footerView
+                                            .scaleEffect(shouldAnimateTransition ? 0.8 : 1)
+                                            .animation(.spring(response: 0.3, dampingFraction: 0.7).delay(0.05), value: shouldAnimateTransition)
+                                            .padding(.leading)
+                                            .padding(.bottom, geometry.safeAreaInsets.bottom + 20)
+                                    }
+                                } else {
+                                    emptyStateView
                                         .transition(.scale)
-                                    
-                                    
-                                    footerView
-                                        .scaleEffect(shouldAnimateTransition ? 0.8 : 1)
-                                        .animation(.spring(response: 0.3, dampingFraction: 0.7).delay(0.05), value: shouldAnimateTransition)
-                                        .padding(.leading)
-                                        .padding(.bottom, geometry.safeAreaInsets.bottom + 20)
                                 }
-                              
-                                
-                                
-                            } else {
-                                emptyStateView
-                                    .transition(.scale)
+                            }
+                            .animation(.spring(response: 0.3, dampingFraction: 0.85), value: hasItems)
+                            
+                            Spacer(minLength: 0)
+                        }
+                        .padding(.vertical, 40)
+                        .padding(.horizontal)
+                        .frame(maxHeight: .infinity, alignment: .top)
+                        
+                        headerView
+                    }
+
+                    if !showCelebration {
+                        Button(action: {
+                            showingVaultView = true
+                        }) {
+                            Text("Manage Cart")
+                                .fuzzyBubblesFont(16, weight: .bold)
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 24)
+                                .padding(.vertical, 12)
+                                .background(Color.black)
+                                .cornerRadius(25)
+                        }
+                        .transition(.scale)
+                        .scaleEffect(manageCartButtonVisible ? buttonScale : 0)
+                        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: manageCartButtonVisible)
+                        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: buttonScale)
+                        .padding(.bottom, 20)
+                        .frame(maxWidth: .infinity)
+                     
+                    }
+                } else {
+                    ProgressView()
+                        .onAppear {
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                                cartReady = true
                             }
                         }
-                        .animation(.spring(response: 0.3, dampingFraction: 0.85), value: hasItems)
-                        
-                        
-                        
-                        Spacer(minLength: 0)
-                        
-                    }
-                    .padding(.vertical, 40)
-                    .padding(.horizontal)
-                    .frame(maxHeight: .infinity, alignment: .top)
-                    
-                    headerView
                 }
-                
-                if !showCelebration {
-                    Button(action: {
-                        showingVaultView = true
-                    }) {
-                        Text("Manage Cart")
-                            .fuzzyBubblesFont(16, weight: .bold)
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 24)
-                            .padding(.vertical, 12)
-                            .background(Color.black)
-                            .cornerRadius(25)
-                    }
-                    .scaleEffect(manageCartButtonVisible ? buttonScale : 0)
-                    .animation(.spring(response: 0.3, dampingFraction: 0.6), value: manageCartButtonVisible)
-                    .animation(.spring(response: 0.3, dampingFraction: 0.6), value: buttonScale)
-                    .padding(.bottom, 20)
-                    .frame(maxWidth: .infinity)
-                    .onChange(of: manageCartButtonVisible) { oldValue, newValue in
-                        if newValue && !showCelebration {
-                            startButtonBounce()
-                        }
-                    }
-                    //                        .onChange(of: hasActiveItems) { oldValue, newValue in
-                    //                            if newValue && createCartButtonVisible {
-                    //                                startButtonBounce()
-                    //                            }
-                    //                        }
-                    //                        .onChange(of: showCelebration) { oldValue, newValue in
-                    //                            if newValue {
-                    //                                // Celebration starting - hide button immediately
-                    ////                                withAnimation(.easeOut(duration: 0.2)) {
-                    //                                    manageCartButtonVisible = false
-                    ////                                }
-                    //                                shouldBounceAfterCelebration = true // Mark that we should bounce after
-                    //                            } else if shouldBounceAfterCelebration {
-                    //                                // Celebration finished - show button with animation and bounce
-                    //                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    //                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                    //                                        manageCartButtonVisible = true
-                    //                                    }
-                    //
-                    //                                    // Bounce only after celebration
-                    ////                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    //                                        if hasItems {
-                    //                                            startButtonBounce()
-                    //                                        }
-                    //                                        shouldBounceAfterCelebration = false // Reset flag
-                    ////                                    }
-                    //                                }
-                    //                            }
-                    //                        }
-                }
-            } else {
-                ProgressView()
-                    .onAppear {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                            cartReady = true
-                        }
-                    }
             }
-            
-            //                if vaultService.vault != nil && !showCelebration && vaultReady {
-            //                    ZStack(alignment: .topLeading) {
-            //                        Button(action: {
-            //                            if existingCart != nil {
-            //                                onAddItemsToCart?(cartViewModel.activeCartItems)
-            //                                dismiss()
-            //                            } else {
-            //                                withAnimation {
-            //                                    showCartConfirmation = true
-            //                                }
-            //                            }
-            //                        }) {
-            //                            Text(existingCart != nil ? "Add to Cart" : "Create cart")
-            //                                .font(.fuzzyBold_16)
-            //                                .foregroundColor(.white)
-            //                                .padding(.horizontal, 24)
-            //                                .padding(.vertical, 12)
-            //                                .background(Color.black)
-            //                                .cornerRadius(25)
-            //                        }
-            //                        .padding(.bottom, 20)
-            //                        .scaleEffect(createCartButtonVisible ? buttonScale : 0)
-            //                        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: createCartButtonVisible)
-            //                        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: buttonScale)
-            //                        .disabled(!hasActiveItems)
-            //                        .onChange(of: createCartButtonVisible) { oldValue, newValue in
-            //                            if newValue && hasActiveItems {
-            //                                startButtonBounce()
-            //                            }
-            //                        }
-            //                        .onChange(of: hasActiveItems) { oldValue, newValue in
-            //                            if newValue && createCartButtonVisible {
-            //                                startButtonBounce()
-            //                            }
-            //                        }
-            //
-            //                        if hasActiveItems {
-            //                            Text("\(cartViewModel.activeCartItems.count)")
-            //                                .font(.fuzzyBold_16)
-            //                                .contentTransition(.numericText())
-            //                                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: cartViewModel.activeCartItems.count)
-            //                                .foregroundColor(.black)
-            //                                .frame(width: 25, height: 25)
-            //                                .background(Color.white)
-            //                                .clipShape(Circle())
-            //                                .overlay(
-            //                                    Circle()
-            //                                        .stroke(Color.black, lineWidth: 2)
-            //                                )
-            //                                .offset(x: -8, y: -4)
-            //                                .scaleEffect(cartBadgeVisible ? 1 : 0)
-            //                                .animation(
-            //                                    .spring(response: 0.6, dampingFraction: 0.6),
-            //                                    value: cartBadgeVisible
-            //                                )
-            //                        }
-            //                    }
-            //                    .onChange(of: createCartButtonVisible) { oldValue, newValue in
-            //                        withAnimation(.spring(response: 0.6, dampingFraction: 0.6)) {
-            //                            cartBadgeVisible = newValue
-            //                        }
-            //                    }
-            //                }
-            
-        }
         }
     }
     
-    
-    private var headerView: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Button(action: { dismiss() }) {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 18, weight: .medium))
-                        .foregroundColor(.black)
-                }
-                Spacer()
-                Menu {
-                    if cart.isPlanning {
-                        Button("Start Shopping", systemImage: "cart") {
-                            showingStartShoppingAlert = true
-                        }
-                    } else if cart.isShopping {
-                        Button("Complete Shopping", systemImage: "checkmark.circle") {
-                            showingCompleteAlert = true
-                        }
-                    } else if cart.isCompleted {
-                        Button("Reactivate Cart", systemImage: "arrow.clockwise") {
-                            vaultService.reopenCart(cart: cart)
-                        }
-                    }
-                    Divider()
-                    
-                    Button("Delete Cart", systemImage: "trash", role: .destructive) {
-                        showingDeleteAlert = true
-                    }
-                } label: {
-                    Image(systemName: "ellipsis")
-                        .font(.system(size: 18, weight: .medium))
-                        .foregroundColor(.black)
-                }
-            }
-            
-            VStack(alignment: .leading, spacing: 8) {
-                Text(cart.name)
-                    .lexendFont(22, weight: .bold)
-                    .foregroundColor(.black)
-                
-                VStack(spacing: 8) {
-                    HStack(alignment: .center, spacing: 8) {
-                        BudgetProgressBar(cart: cart, budgetProgressColor: budgetProgressColor, progressWidth: progressWidth)
-                        
-                        Text(cart.budget.formattedCurrency)
-                            .lexendFont(14, weight: .bold)
-                            .foregroundColor(Color(hex: "333"))
-                    }
-                    .frame(height: 22)
-                }
-            }
-        }
-        .padding(.horizontal)
-        .padding(.bottom, 12)
-        .background(
-            GeometryReader { geometry in
-                Color.white
-                    .ignoresSafeArea(edges: .top)
-                    .shadow(color: Color.black.opacity(0.16), radius: 6, x: 0, y: 1)
-                    .onAppear {
-                        headerHeight = geometry.size.height
-                    }
-                    .onChange(of: geometry.size.height) {_, newValue in
-                        headerHeight = newValue
-                    }
-            }
-        )
-    }
-    
-    private var modeToggleView: some View {
-        HStack(spacing: 0) {
-            ZStack {
-                Color(hex: "EEEEEE")
-                    .frame(width: 176, height: 26)
-                    .cornerRadius(16)
-                
+        private var headerView: some View {
+            VStack(alignment: .leading, spacing: 12) {
                 HStack {
-                    if cart.isShopping {
-                        Spacer()
+                    Button(action: { dismiss() }) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundColor(.black)
                     }
-                    Color.white
-                        .frame(width: 88, height: 30)
-                        .cornerRadius(20)
-                        .shadow(color: Color.black.opacity(0.25), radius: 2, x: 0.5, y: 1)
-                    if cart.isPlanning {
-                        Spacer()
-                    }
-                }
-                .frame(width: 176)
-                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: cart.status)
-                
-                
-                HStack(spacing: 0) {
-                    Button(action: {
-                        if cart.status == .shopping {
-                            cart.status = .planning
-                            vaultService.updateCartTotals(cart: cart)
+                    Spacer()
+                    Menu {
+                        if cart.isPlanning {
+                            Button("Start Shopping", systemImage: "cart") {
+                                showingStartShoppingAlert = true
+                            }
+                        } else if cart.isShopping {
+                            Button("Complete Shopping", systemImage: "checkmark.circle") {
+                                showingCompleteAlert = true
+                            }
+                        } else if cart.isCompleted {
+                            Button("Reactivate Cart", systemImage: "arrow.clockwise") {
+                                vaultService.reopenCart(cart: cart)
+                            }
                         }
-                    }) {
-                        Text("Planning")
-                            .lexendFont(12, weight: cart.isPlanning ? .bold : .medium)
-                            .foregroundColor(cart.isPlanning ? .black : Color(hex: "999999"))
-                            .frame(width: 88, height: 26)
-                            .animation(.easeInOut(duration: 0.2), value: cart.isPlanning)
-                    }
-                    .disabled(cart.isCompleted)
-                    .buttonStyle(.plain)
-                    
-                    Button(action: {
-                        if cart.status == .planning {
-                            cart.status = .shopping
-                            vaultService.updateCartTotals(cart: cart)
-                        }
-                    }) {
-                        Text("Shopping")
-                            .lexendFont(12, weight: cart.isShopping ? .bold : .medium)
-                            .foregroundColor(cart.isShopping ? .black : Color(hex: "999999"))
-                            .frame(width: 88, height: 26)
-                            .animation(.easeInOut(duration: 0.2), value: cart.isShopping)
-                    }
-                    .disabled(cart.isCompleted)
-                }
-            }
-            .frame(width: 176, height: 30)
-            
-            Spacer()
-            
-            HStack(spacing: 8) {
-                
-//                
-//                Menu {
-//              
-//                        Label("Add New Store", systemImage: "plus.circle.fill")
-//                    
-//                    
-//                    Divider()
-//                    
-//                    ForEach(FilterOption.allCases, id: \.self) { option in
-//                        Button(action: {
-//                            storeName = option
-//                        }) {
-//                            HStack {
-//                                Text(store)
-//                                if storeName == store {
-//                                    Image(systemName: "checkmark")
-//                                        .foregroundColor(.blue)
-//                                }
-//                            }
-//                        }
-//                    }
-//                } label: {
-//                    HStack {
-//                        Text(storeName.isEmpty ? "Select Store" : storeName)
-//                            .font(.subheadline)
-//                            .bold()
-//                            .foregroundStyle(storeName.isEmpty ? .gray : .black)
-//                        Image(systemName: "chevron.down")
-//                            .font(.system(size: 12))
-//                            .foregroundColor(.gray)
-//                    }
-//                }
-                
-                Button(action: {
-                    showingFilterSheet = true
-                }) {
-                    Image(systemName: "line.3.horizontal.decrease.circle")
-                        .resizable()
-                        .frame(width: 20, height: 20)
-                        .fontWeight(.light)
-                        .foregroundColor(.black)
-                    
-                }
-                .padding(1.5)
-                .background(.white)
-                .clipShape(Circle())
-                .shadow(color: Color.black.opacity(0.4), radius: 1, x: 0, y: 0.5)
-                
-                
-                Text("|")
-                    .lexendFont(16, weight: .thin)
-                
-                Button(action: {
-                    // Future filter functionality
-                }) {
-                    Image(systemName: "circle")
-                        .resizable()
-                        .frame(width: 20, height: 20)
-                        .fontWeight(.light)
-                        .foregroundColor(.black)
-                    
-                }
-                .padding(1.5)
-                .background(.white)
-                .clipShape(Circle())
-                .shadow(color: Color.black.opacity(0.4), radius: 1, x: 0, y: 0.5)
-            }
-        }
-        .padding(.top, headerHeight)
-        .background(Color.white)
-    }
+                        Divider()
     
-    private var itemsListView: some View {
-        Group {
-            if totalItemCount <= 7 {
-                VStack(spacing: 0) {
-                    ForEach(Array(sortedStores.enumerated()), id: \.offset) { index, store in
-                        let storeItems = storeItems(for: store)
-                        if !storeItems.isEmpty {
-                            StoreSectionView(
-                                store: store,
-                                items: storeItems,
-                                cart: cart,
-                                onToggleFulfillment: { cartItem in
-                                    if cart.isShopping {
-                                        vaultService.toggleItemFulfillment(cart: cart, itemId: cartItem.itemId)
-                                    }
-                                },
-                                onEditItem: { cartItem in
-                                    if let found = vaultService.findItemById(cartItem.itemId) {
-                                        print("🟢 Setting item to edit: \(found.name)")
-                                        itemToEdit = found
-                                    }
-                                },
-                                onDeleteItem: { cartItem in
-                                    handleDeleteItem(cartItem)
-                                },
-                                isLastStore: index == sortedStores.count - 1,
-                                isInScrollableView: false
-                            )
-                            .padding(.top, index == 0 ? 0 : 20)
+                        Button("Delete Cart", systemImage: "trash", role: .destructive) {
+                            showingDeleteAlert = true
                         }
+                    } label: {
+                        Image(systemName: "ellipsis")
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundColor(.black)
                     }
                 }
-                .padding(.vertical, 12)
-            } else {
-                VerticalScrollViewWithCustomIndicator(maxHeight: 500, indicatorVerticalPadding: 12) {
+    
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(cart.name)
+                        .lexendFont(22, weight: .bold)
+                        .foregroundColor(.black)
+    
+                    VStack(spacing: 8) {
+                        HStack(alignment: .center, spacing: 8) {
+                            BudgetProgressBar(cart: cart, budgetProgressColor: budgetProgressColor, progressWidth: progressWidth)
+    
+                            Text(cart.budget.formattedCurrency)
+                                .lexendFont(14, weight: .bold)
+                                .foregroundColor(Color(hex: "333"))
+                        }
+                        .frame(height: 22)
+                    }
+                }
+            }
+            .padding(.horizontal)
+            .padding(.bottom, 12)
+            .background(
+                GeometryReader { geometry in
+                    Color.white
+                        .ignoresSafeArea(edges: .top)
+                        .shadow(color: Color.black.opacity(0.16), radius: 6, x: 0, y: 1)
+                        .onAppear {
+                            headerHeight = geometry.size.height
+                        }
+                        .onChange(of: geometry.size.height) {_, newValue in
+                            headerHeight = newValue
+                        }
+                }
+            )
+        }
+    
+        private var modeToggleView: some View {
+            HStack(spacing: 0) {
+                ZStack {
+                    Color(hex: "EEEEEE")
+                        .frame(width: 176, height: 26)
+                        .cornerRadius(16)
+    
+                    HStack {
+                        if cart.isShopping {
+                            Spacer()
+                        }
+                        Color.white
+                            .frame(width: 88, height: 30)
+                            .cornerRadius(20)
+                            .shadow(color: Color.black.opacity(0.25), radius: 2, x: 0.5, y: 1)
+                        if cart.isPlanning {
+                            Spacer()
+                        }
+                    }
+                    .frame(width: 176)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.7), value: cart.status)
+    
+    
+                    HStack(spacing: 0) {
+                        Button(action: {
+                            if cart.status == .shopping {
+                                cart.status = .planning
+                                vaultService.updateCartTotals(cart: cart)
+                            }
+                        }) {
+                            Text("Planning")
+                                .lexendFont(12, weight: cart.isPlanning ? .bold : .medium)
+                                .foregroundColor(cart.isPlanning ? .black : Color(hex: "999999"))
+                                .frame(width: 88, height: 26)
+                                .animation(.easeInOut(duration: 0.2), value: cart.isPlanning)
+                        }
+                        .disabled(cart.isCompleted)
+                        .buttonStyle(.plain)
+    
+                        Button(action: {
+                            if cart.status == .planning {
+                                cart.status = .shopping
+                                vaultService.updateCartTotals(cart: cart)
+                            }
+                        }) {
+                            Text("Shopping")
+                                .lexendFont(12, weight: cart.isShopping ? .bold : .medium)
+                                .foregroundColor(cart.isShopping ? .black : Color(hex: "999999"))
+                                .frame(width: 88, height: 26)
+                                .animation(.easeInOut(duration: 0.2), value: cart.isShopping)
+                        }
+                        .disabled(cart.isCompleted)
+                    }
+                }
+                .frame(width: 176, height: 30)
+    
+                Spacer()
+    
+                HStack(spacing: 8) {
+    
+                    Button(action: {
+                        showingFilterSheet = true
+                    }) {
+                        Image(systemName: "line.3.horizontal.decrease.circle")
+                            .resizable()
+                            .frame(width: 20, height: 20)
+                            .fontWeight(.light)
+                            .foregroundColor(.black)
+    
+                    }
+                    .padding(1.5)
+                    .background(.white)
+                    .clipShape(Circle())
+                    .shadow(color: Color.black.opacity(0.4), radius: 1, x: 0, y: 0.5)
+    
+    
+                    Text("|")
+                        .lexendFont(16, weight: .thin)
+    
+                    Button(action: {
+                        // Future filter functionality
+                    }) {
+                        Image(systemName: "circle")
+                            .resizable()
+                            .frame(width: 20, height: 20)
+                            .fontWeight(.light)
+                            .foregroundColor(.black)
+    
+                    }
+                    .padding(1.5)
+                    .background(.white)
+                    .clipShape(Circle())
+                    .shadow(color: Color.black.opacity(0.4), radius: 1, x: 0, y: 0.5)
+                }
+            }
+            .padding(.top, headerHeight)
+            .background(Color.white)
+        }
+    
+        private var itemsListView: some View {
+            Group {
+                if totalItemCount <= 7 {
                     VStack(spacing: 0) {
                         ForEach(Array(sortedStores.enumerated()), id: \.offset) { index, store in
                             let storeItems = storeItems(for: store)
@@ -626,116 +430,149 @@ struct CartDetailScreen: View {
                                         }
                                     },
                                     onEditItem: { cartItem in
-                                        if let item = vaultService.findItemById(cartItem.itemId) {
-                                            print("🟢 Setting item to edit: \(item.name)")
-                                            itemToEdit = item
+                                        if let found = vaultService.findItemById(cartItem.itemId) {
+                                            print("🟢 Setting item to edit: \(found.name)")
+                                            itemToEdit = found
                                         }
                                     },
                                     onDeleteItem: { cartItem in
                                         handleDeleteItem(cartItem)
                                     },
                                     isLastStore: index == sortedStores.count - 1,
-                                    isInScrollableView: true
+                                    isInScrollableView: false
                                 )
                                 .padding(.top, index == 0 ? 0 : 20)
                             }
                         }
                     }
                     .padding(.vertical, 12)
+                } else {
+                    VerticalScrollViewWithCustomIndicator(maxHeight: 500, indicatorVerticalPadding: 12) {
+                        VStack(spacing: 0) {
+                            ForEach(Array(sortedStores.enumerated()), id: \.offset) { index, store in
+                                let storeItems = storeItems(for: store)
+                                if !storeItems.isEmpty {
+                                    StoreSectionView(
+                                        store: store,
+                                        items: storeItems,
+                                        cart: cart,
+                                        onToggleFulfillment: { cartItem in
+                                            if cart.isShopping {
+                                                vaultService.toggleItemFulfillment(cart: cart, itemId: cartItem.itemId)
+                                            }
+                                        },
+                                        onEditItem: { cartItem in
+                                            if let item = vaultService.findItemById(cartItem.itemId) {
+                                                print("🟢 Setting item to edit: \(item.name)")
+                                                itemToEdit = item
+                                            }
+                                        },
+                                        onDeleteItem: { cartItem in
+                                            handleDeleteItem(cartItem)
+                                        },
+                                        isLastStore: index == sortedStores.count - 1,
+                                        isInScrollableView: true
+                                    )
+                                    .padding(.top, index == 0 ? 0 : 20)
+                                }
+                            }
+                        }
+                        .padding(.vertical, 12)
+                    }
                 }
             }
+            .background(Color(hex: "FAFAFA").darker(by: 0.03))
+            .cornerRadius(16)
         }
-        .background(Color(hex: "FAFAFA").darker(by: 0.03))
-        .cornerRadius(16)
-    }
     
-    private var emptyStateView: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "cart.badge.plus")
-                .font(.system(size: 48))
-                .foregroundColor(.gray.opacity(0.5))
-            
-            Text("Add items from vault")
-                .lexendFont(18, weight: .medium)
-                .foregroundColor(.gray)
-                .multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(hex: "FAFAFA").darker(by: 0.03))
-        .cornerRadius(16)
-    }
     
-    @ViewBuilder
-    private var footerView: some View {
-        if cart.isShopping {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 2) {
-                    Text("\(cart.fulfilledItemsCount)")
-                        .fuzzyBubblesFont(15, weight: .bold)
-                        .foregroundColor(.gray)
-                        .contentTransition(.numericText(value: animatedFulfilledAmount))
-                    
-                    Text("/")
-                        .fuzzyBubblesFont(10, weight: .bold)
-                        .foregroundColor(Color(.systemGray3))
-                   
-                    
-                    
-                    Text("\(cart.totalItemsCount) items for ₱\(animatedFulfilledAmount, specifier: "%.2f")")
-                        .fuzzyBubblesFont(15, weight: .bold)
-                        .foregroundColor(.gray)
-                        .contentTransition(.numericText(value: animatedFulfilledAmount))
-                }
-           
-                
-                
-                Text("\(Int(animatedFulfilledPercentage))% fulfilled")
-                    .fuzzyBubblesFont(15, weight: .bold)
+        private var emptyStateView: some View {
+            VStack(spacing: 16) {
+                Image(systemName: "cart.badge.plus")
+                    .font(.system(size: 48))
+                    .foregroundColor(.gray.opacity(0.5))
+    
+                Text("Add items from vault")
+                    .lexendFont(18, weight: .medium)
                     .foregroundColor(.gray)
-                    .contentTransition(.numericText(value: animatedFulfilledPercentage))
+                    .multilineTextAlignment(.center)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .onAppear {
-                updateAnimatedValues()
-            }
-            .onChange(of: cart.fulfilledItemsCount) { oldValue, newValue in
-                updateAnimatedValues()
-            }
-            .onChange(of: vaultService.getTotalFulfilledAmount(for: cart)) { oldValue, newValue in
-                updateAnimatedValues()
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color(hex: "FAFAFA").darker(by: 0.03))
+            .cornerRadius(16)
+        }
+    
+        @ViewBuilder
+        private var footerView: some View {
+            if cart.isShopping {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 2) {
+                        Text("\(cart.fulfilledItemsCount)")
+                            .fuzzyBubblesFont(15, weight: .bold)
+                            .foregroundColor(.gray)
+                            .contentTransition(.numericText(value: animatedFulfilledAmount))
+    
+                        Text("/")
+                            .fuzzyBubblesFont(10, weight: .bold)
+                            .foregroundColor(Color(.systemGray3))
+    
+    
+    
+                        Text("\(cart.totalItemsCount) items for ₱\(animatedFulfilledAmount, specifier: "%.2f")")
+                            .fuzzyBubblesFont(15, weight: .bold)
+                            .foregroundColor(.gray)
+                            .contentTransition(.numericText(value: animatedFulfilledAmount))
+                    }
+    
+    
+    
+                    Text("\(Int(animatedFulfilledPercentage))% fulfilled")
+                        .fuzzyBubblesFont(15, weight: .bold)
+                        .foregroundColor(.gray)
+                        .contentTransition(.numericText(value: animatedFulfilledPercentage))
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .onAppear {
+                    updateAnimatedValues()
+                }
+                .onChange(of: cart.fulfilledItemsCount) { oldValue, newValue in
+                    updateAnimatedValues()
+                }
+                .onChange(of: vaultService.getTotalFulfilledAmount(for: cart)) { oldValue, newValue in
+                    updateAnimatedValues()
+                }
             }
         }
-    }
     
-    private var budgetProgressColor: Color {
-        let progress = cart.totalSpent / cart.budget
-        if progress < 0.7 {
-            return Color(hex: "98F476")
-        } else if progress < 0.9 {
-            return .orange
-        } else {
-            return .red
+        private var budgetProgressColor: Color {
+            let progress = cart.totalSpent / cart.budget
+            if progress < 0.7 {
+                return Color(hex: "98F476")
+            } else if progress < 0.9 {
+                return .orange
+            } else {
+                return .red
+            }
         }
-    }
     
-    private func progressWidth(for totalWidth: CGFloat) -> CGFloat {
-        let progress = cart.totalSpent / cart.budget
-        return CGFloat(progress) * totalWidth
-    }
-    
-    private func updateAnimatedValues() {
-        withAnimation(.smooth(duration: 0.5)) {
-            animatedFulfilledAmount = vaultService.getTotalFulfilledAmount(for: cart)
-            animatedFulfilledPercentage = vaultService.getCurrentFulfillmentPercentage(for: cart)
+        private func progressWidth(for totalWidth: CGFloat) -> CGFloat {
+            let progress = cart.totalSpent / cart.budget
+            return CGFloat(progress) * totalWidth
         }
-    }
     
-    private func handleDeleteItem(_ cartItem: CartItem) {
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-            vaultService.removeItemFromCart(cart: cart, itemId: cartItem.itemId)
-            vaultService.updateCartTotals(cart: cart)
+        private func updateAnimatedValues() {
+            withAnimation(.smooth(duration: 0.5)) {
+                animatedFulfilledAmount = vaultService.getTotalFulfilledAmount(for: cart)
+                animatedFulfilledPercentage = vaultService.getCurrentFulfillmentPercentage(for: cart)
+            }
         }
-    }
+    
+        private func handleDeleteItem(_ cartItem: CartItem) {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                vaultService.removeItemFromCart(cart: cart, itemId: cartItem.itemId)
+                vaultService.updateCartTotals(cart: cart)
+            }
+        }
     
     private func checkAndShowCelebration() {
         let hasSeenCelebration = UserDefaults.standard.bool(forKey: "hasSeenFirstShoppingCartCelebration")
@@ -748,6 +585,7 @@ struct CartDetailScreen: View {
         
         guard !hasSeenCelebration else {
             print("⏭️ Skipping first cart celebration - already seen")
+            manageCartButtonVisible = true
             return
         }
         
@@ -764,24 +602,4 @@ struct CartDetailScreen: View {
             print("⏭️ Not the first cart - no celebration")
         }
     }
-    
-    private func startButtonBounce() {
-        withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {
-            buttonScale = 0.95
-        }
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.5)) {
-                buttonScale = 1.1
-            }
-        }
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-                buttonScale = 1.0
-            }
-        }
-    }
 }
-
-

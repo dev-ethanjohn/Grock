@@ -63,22 +63,44 @@ struct EditItemSheet: View {
                         
                         
                         if context == .cart {
-                            HStack(spacing: 8) {
-                                RemoveButton(text: "Remove from Cart")
-                                RemoveButton(text: "Remove from Vault")
+                            HStack(spacing: 0) {
+                                
+                                Text("Remove from Cart")
+                                    .lexendFont(14, weight: .medium)
+                                    .foregroundStyle(.red)
+                                    .padding(.vertical)
+                                    .frame(maxWidth: .infinity, alignment: .center)
+                                
+                                Text("|")
+                                    .lexendFont(16, weight: .thin)
+                                
+                                Text("Remove from Vault")
+                                    .lexendFont(14, weight: .medium)
+                                    .foregroundStyle(.red)
+                                    .padding(.vertical)
+                                    .frame(maxWidth: .infinity, alignment: .center)
                             }
                             .foregroundStyle(.black)
+                            
+                            //                            MARK:BUG: AFTER CLICKING SAVE ON EDITSHEET, the row returns a duplicate row.
                         } else {
-                            RemoveButton(text: "Remove from Vault")
+                            HStack(spacing: 8) {
+                                //                                RemoveButton(text: "Remove from Vault")
+                                
+                                Text("Remove from Vault")
+                                    .lexendFont(14, weight: .medium)
+                                
+                                Image(systemName: "trash")
+                                    .lexendFont(12, weight: .bold)
+                                
+                                
+                            }
+                            .foregroundStyle(.red)
+                            .padding(.vertical)
+                            
                         }
                         
-                        if context == .cart {
-                            Text("Editing this item will update prices from vault and in all active carts")
-                                .font(.caption)
-                                .foregroundColor(.gray)
-                                .padding(.top, 8)
-                                .multilineTextAlignment(.center)
-                        }
+                    
                         
                         Spacer()
                             .frame(height: 80)
@@ -86,21 +108,45 @@ struct EditItemSheet: View {
                     .padding(.horizontal)
                 }
                 
-                HStack {
-                    Spacer()
-                    EditItemSaveButton(isEditFormValid: isEditFormValid) {
-                        saveChanges()
-                    }
-                }
-                .padding(.horizontal)
-                .padding(.bottom, 20)
+//                HStack {
+//                    if context == .cart {
+//                        Text("Editing this item will update prices from vault and in all active carts")
+//                            .font(.caption)
+//                            .foregroundColor(.gray)
+//                            .padding(.top, 8)
+//                            .multilineTextAlignment(.center)
+//                    }
+//                    Spacer()
+//                    EditItemSaveButton(isEditFormValid: isEditFormValid) {
+//                        saveChanges()
+//                    }
+//                }
+//                .padding(.horizontal)
+//                .padding(.bottom, 20)
             }
             .navigationTitle("Edit Item")
             .navigationBarTitleDisplayMode(.inline)
-   
+            
         }
         .onAppear {
             initializeFormValues()
+        }
+        .safeAreaInset(edge: .bottom) {
+            HStack {
+                if context == .cart {
+                    Text("Editing this item will update prices from vault and in all active carts")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                        .padding(.top, 8)
+                        .multilineTextAlignment(.center)
+                }
+                Spacer()
+                EditItemSaveButton(isEditFormValid: isEditFormValid) {
+                    saveChanges()
+                }
+            }
+            .padding(.horizontal)
+            .padding(.bottom, 12)
         }
     }
     
@@ -153,6 +199,99 @@ struct EditItemSheet: View {
         }
     }
 }
+
+//import SwiftUI
+//import SwiftData
+//
+//struct EditItemSheet: View {
+//    @State private var viewModel: EditItemViewModel
+//    var onSave: ((Item) -> Void)?
+//    
+//    @Environment(\.dismiss) private var dismiss
+//    
+//    init(item: Item, context: EditContext = .vault, vaultService: VaultService, onSave: ((Item) -> Void)? = nil) {
+//        self.onSave = onSave
+//        self._viewModel = State(wrappedValue: EditItemViewModel(
+//            item: item,
+//            context: context,
+//            vaultService: vaultService
+//        ))
+//    }
+//    
+//    var body: some View {
+//        NavigationView {
+//            VStack {
+//                ScrollView {
+//                    VStack {
+//                        ItemNameInput(
+//                            selectedCategoryEmoji: viewModel.selectedCategoryEmoji,
+//                            showTooltip: false,
+//                            itemNameFieldIsFocused: $viewModel.itemNameFieldIsFocused,
+//                            itemName: $viewModel.itemName,
+//                            selectedCategory: $viewModel.selectedCategory
+//                        )
+//                        
+//                        StoreNameComponent(
+//                            storeName: $viewModel.storeName,
+//                            availableStores: viewModel.availableStores,
+//                            showAddStoreSheet: $viewModel.showAddStoreSheet,
+//                            newStoreName: $viewModel.newStoreName,
+//                            onAddStore: { viewModel.addNewStore() }
+//                        )
+//                        
+//                        HStack(spacing: 8) {
+//                            UnitButton(unit: $viewModel.unit)
+//                            PricePerUnitField(price: $viewModel.price)
+//                        }
+//                        
+//                        DashedLine()
+//                            .stroke(style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
+//                            .frame(height: 1)
+//                            .foregroundColor(Color(hex: "ddd"))
+//                            .padding(.vertical, 6)
+//                            .padding(.horizontal)
+//                        
+//                        if viewModel.context == .cart {
+//                            HStack(spacing: 8) {
+//                                RemoveButton(text: "Remove from Cart")
+//                                RemoveButton(text: "Remove from Vault")
+//                            }
+//                            .foregroundStyle(.black)
+//                        } else {
+//                            RemoveButton(text: "Remove from Vault")
+//                        }
+//                        
+//                        if viewModel.context == .cart {
+//                            Text("Editing this item will update prices from vault and in all active carts")
+//                                .font(.caption)
+//                                .foregroundColor(.gray)
+//                                .padding(.top, 8)
+//                                .multilineTextAlignment(.center)
+//                        }
+//                        
+//                        Spacer()
+//                            .frame(height: 80)
+//                    }
+//                    .padding(.horizontal)
+//                }
+//                
+//                HStack {
+//                    Spacer()
+//                    EditItemSaveButton(isEditFormValid: viewModel.isFormValid) {
+//                        if viewModel.saveChanges() {
+//                            onSave?(viewModel.item)
+//                            dismiss()
+//                        }
+//                    }
+//                }
+//                .padding(.horizontal)
+//                .padding(.bottom, 20)
+//            }
+//            .navigationTitle("Edit Item")
+//            .navigationBarTitleDisplayMode(.inline)
+//        }
+//    }
+//}
 
 struct EditItemSaveButton: View {
     let isEditFormValid: Bool

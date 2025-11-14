@@ -9,6 +9,5 @@ struct FinishButton: View {
             Spacer()
             FormCompletionButton.finishButton(isEnabled: isFormValid, action: action)
         }
-        .padding(.vertical, 8)
     }
 }

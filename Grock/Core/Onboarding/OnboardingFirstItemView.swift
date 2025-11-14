@@ -41,7 +41,7 @@ struct OnboardingFirstItemView: View {
             Spacer()
             finishButton
         }
-        .padding(.vertical, 8)
+        .padding(.vertical, 12)
         .padding(.horizontal)
     }
     

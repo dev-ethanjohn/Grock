@@ -84,7 +84,7 @@ struct ItemNameInput: View {
                     .id(category.id)
             }
         }
-        .padding(.bottom, 8)
+//        .padding(.bottom, 8)
         .animation(.spring(response: 0.4, dampingFraction: 0.6), value: selectedCategory)
         .onChange(of: selectedCategory) { oldValue, newValue in
             if newValue != nil {

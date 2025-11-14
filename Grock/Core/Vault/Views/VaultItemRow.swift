@@ -59,7 +59,7 @@ struct VaultItemRow: View {
                     onDelete?()
                 }
             } label: {
-                Label("Delete", systemImage: "trash")
+                Label("Remove", systemImage: "trash")
             }
             
             Button {
@@ -163,10 +163,10 @@ struct VaultItemRow: View {
                     
                     VStack {
                         Image(systemName: "trash")
-                            .font(.title2)
+                            .font(.subheadline)
                             .foregroundColor(.white)
-                        Text("Delete")
-                            .font(.caption)
+                        Text("Remove")
+                            .font(.footnote)
                             .foregroundColor(.white)
                     }
                 }

@@ -1,8 +1,3 @@
-//
-//  VaultCategorySectionView.swift
-//  Grock
-//
-
 import SwiftUI
 
 struct VaultCategorySectionView: View {

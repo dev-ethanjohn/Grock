@@ -59,6 +59,7 @@ class OnboardingViewModel {
     
     var isItemFormValid: Bool {
         !itemName.isEmpty &&
+        isValidStoreName &&
         Double(itemPrice) != nil &&
         portion != nil &&
         !unit.isEmpty &&

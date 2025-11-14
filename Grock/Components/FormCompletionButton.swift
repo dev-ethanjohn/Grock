@@ -52,9 +52,8 @@ struct FormCompletionButton: View {
             Text(title)
                 .fuzzyBubblesFont(16, weight: .bold)
                 .foregroundStyle(isEnabled ? .white : Color(.systemGray3))
-                .padding(.vertical, 10)
-                .padding(.horizontal, 24)
-//                .frame(maxWidth: .infinity)
+                .padding(.vertical, 6)
+                .padding(.horizontal, 20)
                 .frame(maxWidth: maxWidth ? .infinity : nil)
                 .background(
                     Capsule()
@@ -94,13 +93,13 @@ struct FormCompletionButton: View {
     private func handleEnabledStateChange(oldValue: Bool, newValue: Bool) {
         if newValue {
             if !oldValue {
-                withAnimation(.spring(duration: 0.4)) {
+                withAnimation(.spring(duration: 0.6)) {
                     fillAnimation = 1.0
                 }
                 startButtonBounce()
             }
         } else {
-            withAnimation(.easeInOut(duration: 0.3)) {
+            withAnimation(.easeInOut(duration: 0.5)) {
                 fillAnimation = 0.0
                 buttonScale = 1.0
             }
@@ -169,8 +168,3 @@ extension FormCompletionButton {
         )
     }
 }
-
-
-//#Preview {
-//    AnimatedGradientButton()
-//}

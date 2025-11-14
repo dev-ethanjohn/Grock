@@ -99,3 +99,86 @@ struct StoreNameComponent: View {
 }
 
 
+
+//import SwiftUI
+//
+//struct StoreNameComponent: View {
+//    @Binding var storeName: String
+//    let availableStores: [String]
+//    @Binding var showAddStoreSheet: Bool
+//    @Binding var newStoreName: String
+//    let onAddStore: () -> Void
+//    
+//    @FocusState private var isFocused: Bool
+//    
+//    var body: some View {
+//        HStack {
+//            Text("Store")
+//                .font(.footnote)
+//                .foregroundColor(.gray)
+//            
+//            Spacer()
+//            
+//            if availableStores.isEmpty {
+//                // Text field (stores = 0)
+//                TextField("Enter store name", text: $storeName)
+//                    .font(.subheadline)
+//                    .bold()
+//                    .foregroundColor(.black)
+//                    .multilineTextAlignment(.trailing)
+//                    .focused($isFocused)
+//            } else {
+//                // Dropdown (stores > 0)
+//                Menu {
+//                    Button(action: {
+//                        newStoreName = ""
+//                        showAddStoreSheet = true
+//                    }) {
+//                        Label("Add New Store", systemImage: "plus.circle.fill")
+//                    }
+//                    
+//                    Divider()
+//                    
+//                    ForEach(availableStores, id: \.self) { store in
+//                        Button(action: {
+//                            storeName = store
+//                        }) {
+//                            HStack {
+//                                Text(store)
+//                                if storeName == store {
+//                                    Image(systemName: "checkmark")
+//                                        .foregroundColor(.blue)
+//                                }
+//                            }
+//                        }
+//                    }
+//                } label: {
+//                    HStack {
+//                        Text(storeName.isEmpty ? "Select Store" : storeName)
+//                            .font(.subheadline)
+//                            .bold()
+//                            .foregroundStyle(storeName.isEmpty ? .gray : .black)
+//                        Image(systemName: "chevron.down")
+//                            .font(.system(size: 12))
+//                            .foregroundColor(.gray)
+//                    }
+//                }
+//            }
+//        }
+//        .padding(12)
+//        .background(Color(.systemGray6))
+//        .cornerRadius(12)
+//        .sheet(isPresented: $showAddStoreSheet) {
+//            AddStoreSheet(
+//                storeName: $newStoreName,
+//                isPresented: $showAddStoreSheet,
+//                onSave: onAddStore
+//            )
+//        }
+//        .onAppear {
+//            if storeName.isEmpty, let firstStore = availableStores.first {
+//                storeName = firstStore
+//            }
+//        }
+//    }
+//}

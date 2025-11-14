@@ -17,10 +17,6 @@ struct AddItemPopover: View {
     @State private var contentScale: CGFloat = 0.8
     @State private var keyboardVisible: Bool = false
     
-    
-    //    @State private var fillAnimation: CGFloat = 0.0
-    //    @State private var buttonScale: CGFloat = 1.0
-    
     private var selectedCategoryEmoji: String {
         selectedCategory?.emoji ?? "plus.circle.fill"
     }
@@ -81,6 +77,26 @@ struct AddItemPopover: View {
                     }
                 }
                 
+                if isFormValid {
+                    Image(systemName: "chevron.down.dotted.2")
+                        .font(.body)
+                        .symbolEffect(.wiggle.down.byLayer, options: .repeat(.continuous))
+                        .scaleEffect(1.0)
+                        .padding(.vertical, 8)
+                        .padding(.top, 4)
+                        .foregroundStyle(Color(.systemGray))
+                        .transition(
+                            .asymmetric(
+                                insertion: .scale(scale: 0.8, anchor: .center)
+                                    .combined(with: .opacity)
+                                    .animation(.spring(response: 0.4, dampingFraction: 0.6, blendDuration: 0.2)),
+                                removal: .scale(scale: 0.8, anchor: .center)
+                                    .combined(with: .opacity)
+                                    .animation(.spring(response: 0.3, dampingFraction: 0.7, blendDuration: 0.1))
+                            )
+                        )
+                }
+                
                 FormCompletionButton.doneButton(isEnabled: isFormValid, maxWidth: true) {
                     if isFormValid,
                        let category = selectedCategory,
@@ -94,7 +110,7 @@ struct AddItemPopover: View {
                         dismissPopover()
                     }
                 }
-                .padding(.top)
+                .padding(.top, isFormValid ? 4 : 20)
                 .buttonStyle(.plain)
                 
             }
@@ -105,7 +121,8 @@ struct AddItemPopover: View {
             .padding(.horizontal, UIScreen.main.bounds.width * 0.038)
             .scaleEffect(contentScale)
             .offset(y: keyboardVisible ? UIScreen.main.bounds.height * 0.12 : 0)
-            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: keyboardVisible)
+            .animation(.spring(response: 0.2, dampingFraction: 0.7, blendDuration: 0.1), value: isFormValid)
+            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: keyboardVisible)
             .frame(maxHeight: .infinity, alignment: keyboardVisible ? .top : .center)
         }
         .onAppear {
@@ -118,12 +135,15 @@ struct AddItemPopover: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
-            withAnimation { keyboardVisible = true }
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                keyboardVisible = true
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
-            withAnimation { keyboardVisible = false }
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                keyboardVisible = false
+            }
         }
-        //MARK: MAKE THIS BUTTON BHEVAIOR in 1 place, use oly 1 btn component for button similar style to finish
     }
     
     private func dismissPopover() {
@@ -131,5 +151,4 @@ struct AddItemPopover: View {
         isPresented = false
         onDismiss?()
     }
-    
 }
