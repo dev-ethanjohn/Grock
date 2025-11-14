@@ -23,7 +23,8 @@ struct MenuItem: Codable, Identifiable {
         MenuItem(title: "Share Idea", iconName: "lightbulb"),
         MenuItem(title: "Rate Us", iconName: "star")
     ]
-    
+//    MARK: Reiterate design 
+//
     static let infoMenuItems: [MenuItem] = [
         MenuItem(title: "Privacy", iconName: "lock.shield"),
         MenuItem(title: "App Roadmap", iconName: "map"),

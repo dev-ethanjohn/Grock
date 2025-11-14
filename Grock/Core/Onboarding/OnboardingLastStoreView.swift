@@ -24,7 +24,7 @@ struct OnboardingLastStoreView: View {
         .onAppear {
             viewModel.animateStoreFieldAppearance()
             viewModel.showInfoDropdownWithDelay()
-            storeFieldIsFocused = viewModel.storeFieldIsFocused
+            storeFieldIsFocused = true
         }
         .onChange(of: viewModel.storeName) { oldValue, newValue in
             processStoreNameChange(newValue)

@@ -79,11 +79,11 @@ struct VaultView: View {
                 
                 content
                 
-                //                .onChange(of: createCartButtonVisible) { oldValue, newValue in
-                //                    withAnimation(.spring(response: 0.6, dampingFraction: 0.6)) {
-                //                        cartBadgeVisible = newValue
-                //                    }
-                //                }
+//                                .onChange(of: createCartButtonVisible) { oldValue, newValue in
+//                                    withAnimation(.spring(response: 0.6, dampingFraction: 0.6)) {
+//                                        cartBadgeVisible = newValue
+//                                    }
+//                                }
             }
             
             if showAddItemPopover {

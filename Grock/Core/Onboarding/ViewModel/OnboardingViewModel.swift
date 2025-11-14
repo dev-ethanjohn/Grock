@@ -40,10 +40,6 @@ class OnboardingViewModel {
         }
     }
     
-    // Focus State
-    var itemNameFieldIsFocused = false
-    var storeFieldIsFocused = false
-    
     // Animation States
     var showTextField = false
     var showNextButton = false
@@ -182,12 +178,10 @@ class OnboardingViewModel {
             withAnimation(.spring(response: 0.4, dampingFraction: 0.8).delay(0.2)) {
                 showNextButton = true
             }
-            storeFieldIsFocused = true
             storeFieldAnimated = true
         } else {
             showTextField = true
             showNextButton = true
-            storeFieldIsFocused = true
         }
     }
     

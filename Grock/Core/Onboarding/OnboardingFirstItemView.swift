@@ -11,7 +11,7 @@ struct OnboardingFirstItemView: View {
             FirstItemBackHeader(onBack: viewModel.navigateBack)
             
             ScrollView {
-                FirstItemForm(viewModel: viewModel)
+                FirstItemForm(viewModel: viewModel, itemNameFieldIsFocused: $itemNameFieldIsFocused )
             }
             .safeAreaInset(edge: .bottom) {
                 bottomButtons

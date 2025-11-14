@@ -1,14 +1,6 @@
-//
-//  ItemNameInput.swift
-//  Grock
-//
-//  Created by Ethan John Paguntalan on 10/17/25.
-//
-
 import SwiftUI
 
 struct ItemNameInput: View {
-    //TODO: Rearrange + put in a veiw model.
     let selectedCategoryEmoji: String
     let showTooltip: Bool
     
@@ -24,7 +16,6 @@ struct ItemNameInput: View {
         VStack(alignment: .leading, spacing: 4) {
             ZStack(alignment: .trailing) {
                 
-                // as a var view / viewbuilder
                 if showTooltip && selectedCategory == nil {
                     CategoryTooltipPopover()
                         .offset(x: -10, y: -32)
@@ -35,9 +26,7 @@ struct ItemNameInput: View {
                         .zIndex(1)
                 }
                 
-                // as a var view / viewbuilder
                 HStack {
-                    //MARK: TODO - create dynamic placeholder text vary by selected category. // enhance -> changing related example placeholders relevant to selected category 1s-2s interval.
                     TextField("e.g. canned tuna", text: $itemName)
                         .font(.subheadline)
                         .bold()
@@ -74,7 +63,6 @@ struct ItemNameInput: View {
                 }
             }
             
-            // as a var view / viewbuilder
             if let category = selectedCategory {
                 Text(category.title)
                     .font(.caption2)
@@ -84,7 +72,6 @@ struct ItemNameInput: View {
                     .id(category.id)
             }
         }
-//        .padding(.bottom, 8)
         .animation(.spring(response: 0.4, dampingFraction: 0.6), value: selectedCategory)
         .onChange(of: selectedCategory) { oldValue, newValue in
             if newValue != nil {
@@ -110,11 +97,9 @@ struct ItemNameInput: View {
                     fieldScale = 1.0
                 }
             }
-            
         }
     }
     
-    //sub Views
     private func startFieldBounce() {
         withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {
             fieldScale = 0.985

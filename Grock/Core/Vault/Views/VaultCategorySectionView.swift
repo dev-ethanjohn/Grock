@@ -8,7 +8,7 @@ struct VaultCategorySectionView: View {
         self.selectedCategory = selectedCategory
         self.categoryScrollView = AnyView(categoryScrollView())
     }
-
+    
     var body: some View {
         VStack(spacing: 4) {
             HStack {
@@ -37,8 +37,8 @@ struct VaultCategorySectionView: View {
                         .mask(
                             Rectangle()
                                 .padding(.bottom, -20)
-                        )
                 )
+            )
         }
     }
 }
