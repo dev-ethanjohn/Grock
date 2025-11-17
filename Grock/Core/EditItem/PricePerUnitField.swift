@@ -25,6 +25,7 @@ struct PricePerUnitField: View {
                     .foregroundStyle(price.isEmpty ? .gray : .black)
                 
                 Text(price.isEmpty ? "0" : price)
+                    .normalizedNumber($price)
                     .foregroundStyle(price.isEmpty ? .gray : .black)
                     .scalableText()
                     .overlay(

@@ -129,22 +129,6 @@ class OnboardingViewModel {
     }
     
     // Store Name Methods
-    //MARK: TODO: put in a universal viewmodel method for all text inputs includng store name input
-    func normalizeSpaces(_ text: String) -> String {
-        return text.replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
-    }
-    
-    func processStoreNameInput(_ newValue: String) -> String {
-        var processedValue = newValue
-        
-        if processedValue.hasPrefix(" ") {
-            processedValue = String(processedValue.dropFirst())
-        }
-        
-        processedValue = normalizeSpaces(processedValue)
-        return processedValue
-    }
-    
     func triggerStoreNameError() {
         let generator = UINotificationFeedbackGenerator()
         generator.notificationOccurred(.error)

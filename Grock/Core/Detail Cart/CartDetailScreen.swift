@@ -2,6 +2,7 @@ import SwiftUI
 import SwiftData
 
 struct CartDetailScreen: View {
+    
     let cart: Cart
     @Environment(VaultService.self) private var vaultService
     @Environment(CartViewModel.self) private var cartViewModel
@@ -35,7 +36,6 @@ struct CartDetailScreen: View {
     @State private var buttonScale: CGFloat = 1.0
     @State private var shouldBounceAfterCelebration = false
     
-    
     // Loading state
     @State private var cartReady = false
     
@@ -48,11 +48,9 @@ struct CartDetailScreen: View {
         let cartItemsWithDetails = sortedCartItems.map { cartItem in
             (cartItem, vaultService.findItemById(cartItem.itemId))
         }
-        
         let grouped = Dictionary(grouping: cartItemsWithDetails) { cartItem, item in
             cartItem.getStore(cart: cart)
         }
-        
         return grouped.filter { !$0.key.isEmpty && !$0.value.isEmpty }
     }
     
@@ -175,75 +173,76 @@ struct CartDetailScreen: View {
         .sheet(isPresented: $showingFilterSheet) {
             FilterSheet(selectedFilter: $selectedFilter)
         }
+        
     }
     
     private var content: some View {
         GeometryReader { geometry in
-            ZStack (alignment: .bottom){
-                if cartReady {
-                    ZStack(alignment: .top) {
-                        VStack(spacing: 12) {
-                            modeToggleView
-                            
-                            ZStack {
-                                if hasItems {
-                                    VStack(spacing: 24) {
-                                        itemsListView
-                                            .transition(.scale)
-                                        
-                                        footerView
-                                            .scaleEffect(shouldAnimateTransition ? 0.8 : 1)
-                                            .animation(.spring(response: 0.3, dampingFraction: 0.7).delay(0.05), value: shouldAnimateTransition)
-                                            .padding(.leading)
-                                            .padding(.bottom, geometry.safeAreaInsets.bottom + 20)
-                                    }
-                                } else {
-                                    emptyStateView
-                                        .transition(.scale)
-                                }
-                            }
-                            .animation(.spring(response: 0.3, dampingFraction: 0.85), value: hasItems)
-                            
-                            Spacer(minLength: 0)
-                        }
-                        .padding(.vertical, 40)
-                        .padding(.horizontal)
-                        .frame(maxHeight: .infinity, alignment: .top)
-                        
-                        headerView
-                    }
+                ZStack (alignment: .bottom){
+                    if cartReady {
+                        ZStack(alignment: .top) {
+                            VStack(spacing: 12) {
+                                modeToggleView
 
-                    if !showCelebration {
-                        Button(action: {
-                            showingVaultView = true
-                        }) {
-                            Text("Manage Cart")
-                                .fuzzyBubblesFont(16, weight: .bold)
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 24)
-                                .padding(.vertical, 12)
-                                .background(Color.black)
-                                .cornerRadius(25)
+                                ZStack {
+                                    if hasItems {
+                                        VStack(spacing: 24) {
+                                            itemsListView
+                                                .transition(.scale)
+                                            
+                                            footerView
+                                                .scaleEffect(shouldAnimateTransition ? 0.8 : 1)
+                                                .animation(.spring(response: 0.3, dampingFraction: 0.7).delay(0.05), value: shouldAnimateTransition)
+                                                .padding(.leading)
+                                                .padding(.bottom, geometry.safeAreaInsets.bottom + 20)
+                                        }
+                                    } else {
+                                        emptyStateView
+                                            .transition(.scale)
+                                    }
+                                }
+                                .animation(.spring(response: 0.3, dampingFraction: 0.85), value: hasItems)
+                                
+                                Spacer(minLength: 0)
+                            }
+                            .padding(.vertical, 40)
+                            .padding(.horizontal)
+                            .frame(maxHeight: .infinity, alignment: .top)
+                            
+                            headerView
                         }
-                        .transition(.scale)
-                        .scaleEffect(manageCartButtonVisible ? buttonScale : 0)
-                        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: manageCartButtonVisible)
-                        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: buttonScale)
-                        .padding(.bottom, 20)
-                        .frame(maxWidth: .infinity)
-                     
-                    }
-                } else {
-                    ProgressView()
-                        .onAppear {
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                                cartReady = true
+
+                        if !showCelebration {
+                            Button(action: {
+                                showingVaultView = true
+                            }) {
+                                Text("Manage Cart")
+                                    .fuzzyBubblesFont(16, weight: .bold)
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 24)
+                                    .padding(.vertical, 12)
+                                    .background(Color.black)
+                                    .cornerRadius(25)
+                            }
+                            .transition(.scale)
+                            .scaleEffect(manageCartButtonVisible ? buttonScale : 0)
+                            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: manageCartButtonVisible)
+                            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: buttonScale)
+                            .padding(.bottom, 20)
+                            .frame(maxWidth: .infinity)
+                         
+                        }
+                    } else {
+                        ProgressView()
+                            .onAppear {
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.0) {
+                                    cartReady = true
                             }
                         }
+                    }
                 }
             }
         }
-    }
     
         private var headerView: some View {
             VStack(alignment: .leading, spacing: 12) {
@@ -279,6 +278,7 @@ struct CartDetailScreen: View {
                             .foregroundColor(.black)
                     }
                 }
+                .padding(.top)
     
                 VStack(alignment: .leading, spacing: 8) {
                     Text(cart.name)
@@ -388,7 +388,29 @@ struct CartDetailScreen: View {
                     .background(.white)
                     .clipShape(Circle())
                     .shadow(color: Color.black.opacity(0.4), radius: 1, x: 0, y: 0.5)
-    
+                    
+                    
+//                    Menu {
+//                        Section {
+//                           Text("Hello")
+//                        }
+//                    } label: {
+////                        Button(action: {
+////                            showingFilterSheet = true
+////                        }) {
+//                            Image(systemName: "line.3.horizontal.decrease.circle")
+//                                .resizable()
+//                                .frame(width: 20, height: 20)
+//                                .fontWeight(.light)
+//                                .foregroundColor(.black)
+//        
+////                        }
+//                        .padding(1.5)
+//                        .background(.white)
+//                        .clipShape(Circle())
+//                        .shadow(color: Color.black.opacity(0.4), radius: 1, x: 0, y: 0.5)
+//                    }
+
     
                     Text("|")
                         .lexendFont(16, weight: .thin)

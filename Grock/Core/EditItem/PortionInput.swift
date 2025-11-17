@@ -1,14 +1,6 @@
-//
-//  PortionInput.swift
-//  Grock
-//
-//  Created by Ethan John Paguntalan on 10/17/25.
-//
-
 import SwiftUI
 
 struct PortionInput: View {
-    //TODO: Rearrange + put in a veiw model.
     @Binding var portion: Double?
     @State private var portionString: String = ""
     @FocusState private var isFocused: Bool
@@ -19,9 +11,10 @@ struct PortionInput: View {
                 .font(.footnote)
                 .foregroundColor(.gray)
             Spacer()
-            TextField("0", text: $portionString)
+            TextField("0.0", text: $portionString)
                 .multilineTextAlignment(.trailing)
-                .numbersOnly($portionString, includeDecimal: true, maxDigits: 5)
+                .keyboardType(.decimalPad)
+                .normalizedNumber($portionString, allowDecimal: true, maxDecimalPlaces: 2)
                 .font(.subheadline)
                 .bold()
                 .fixedSize(horizontal: true, vertical: false)
@@ -43,8 +36,3 @@ struct PortionInput: View {
         }
     }
 }
-
-
-//#Preview {
-//    PortionInput()
-//}

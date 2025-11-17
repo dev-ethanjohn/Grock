@@ -27,7 +27,9 @@ struct OnboardingLastStoreView: View {
             storeFieldIsFocused = true
         }
         .onChange(of: viewModel.storeName) { oldValue, newValue in
-            processStoreNameChange(newValue)
+            if viewModel.isValidStoreName {
+                viewModel.showError = false
+            }
         }
     }
     
@@ -47,6 +49,7 @@ struct OnboardingLastStoreView: View {
     
     private var storeNameField: some View {
         TextField("e.g. Walmart, SM, Costco", text: $viewModel.storeName)
+            .normalizedText($viewModel.storeName) 
             .multilineTextAlignment(.center)
             .autocorrectionDisabled()
             .textInputAutocapitalization(.words)
@@ -150,21 +153,8 @@ struct OnboardingLastStoreView: View {
                 return
             }
             
-            viewModel.storeName = viewModel.storeName.trimmingCharacters(in: .whitespacesAndNewlines)
+            // No need to trim manually - normalized binding already handles this
             viewModel.navigateToFirstItemDataScreen()
-        }
-    }
-    
-    private func processStoreNameChange(_ newValue: String) {
-        let processedValue = viewModel.processStoreNameInput(newValue)
-        
-        if processedValue != newValue {
-            viewModel.storeName = processedValue
-            return
-        }
-        
-        if viewModel.isValidStoreName {
-            viewModel.showError = false
         }
     }
 }

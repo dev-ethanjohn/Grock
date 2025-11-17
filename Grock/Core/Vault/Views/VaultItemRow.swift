@@ -235,6 +235,7 @@ struct VaultItemRow: View {
                         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: textValue)
                     
                     TextField("", text: $textValue)
+                        .normalizedNumber($textValue)
                         .font(.system(size: 15, weight: .bold))
                         .foregroundColor(.clear)
                         .multilineTextAlignment(.center)

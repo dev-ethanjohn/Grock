@@ -44,16 +44,25 @@ struct HomeView: View {
                 
                 menuIcon
             }
+            .clipShape(RoundedRectangle(cornerRadius: 24))
             .ignoresSafeArea()
             .sheet(isPresented: $viewModel.showVault) {
                           vaultSheet
-                      }
+            }
             .fullScreenCover(item: $viewModel.selectedCart) { cart in
                 CartDetailScreen(cart: cart)
                     .onDisappear {
                         viewModel.selectedCart = nil
                     }
+                    .presentationCornerRadius(24)
             }
+            //TODO: USE this, but fix the celeberation + manage button. 
+//            .navigationDestination(item: $viewModel.selectedCart, destination: { cart in
+//                CartDetailScreen(cart: cart)
+//                    .onDisappear {
+//                        viewModel.selectedCart = nil
+//                    }
+//            })
             .onAppear {
                 viewModel.loadCarts()
                 print("🏠 HomeView appeared - carts: \(viewModel.carts.count)")
@@ -71,8 +80,8 @@ struct HomeView: View {
                           // Animate scale immediately when showVault changes
                           withAnimation(.easeInOut(duration: 0.15)) {
                               vaultButtonScale = newValue ? 0.9 : 1.0
-                          }
-                      }
+                }
+            }
         }
     }
     
@@ -80,7 +89,6 @@ struct HomeView: View {
     private var mainContent: some View {
         ZStack(alignment: .topLeading) {
             Color.white.ignoresSafeArea()
-            
             
             tabsOnly()
             
@@ -103,15 +111,12 @@ struct HomeView: View {
         .shadow(color: Color.black.opacity(0.12), radius: 10, x: 2, y: 0)
     }
     
-    
     @ViewBuilder
     private func tabsOnly() -> some View {
         GeometryReader {
             let size = $0.size
             
             TabView(selection: $activeTab) {
-                
-                
                 ActiveCarts(viewModel: viewModel)
                     .tag(CartTabsModel.Tab.active)
                     .frame(width: size.width, height: size.height)
@@ -137,7 +142,6 @@ struct HomeView: View {
                 }
             }
         }
-        
     }
     
     @ViewBuilder
@@ -218,7 +222,6 @@ struct HomeView: View {
             progress = -offsetX / size.width
         }
     }
-    
     
     private var menuIcon: some View {
         MenuIcon {

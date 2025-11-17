@@ -13,13 +13,13 @@ struct FirstItemForm: View {
             Spacer().frame(height: 40)
             
             ItemNameInput(
-                        selectedCategoryEmoji: viewModel.selectedCategoryEmoji,
-                        showTooltip: viewModel.showCategoryTooltip,
-                        itemNameFieldIsFocused: itemNameFieldIsFocused, 
-                        itemName: $viewModel.itemName,
-                        selectedCategory: $viewModel.selectedCategory
-                    )
-                    
+                selectedCategoryEmoji: viewModel.selectedCategoryEmoji,
+                showTooltip: viewModel.showCategoryTooltip,
+                itemNameFieldIsFocused: itemNameFieldIsFocused,
+                itemName: $viewModel.itemName,
+                selectedCategory: $viewModel.selectedCategory
+            )
+            
             DashedLine()
                 .stroke(style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
                 .frame(height: 1)

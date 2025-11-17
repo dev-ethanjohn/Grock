@@ -32,6 +32,7 @@ struct StoreNameComponent: View {
             if availableStores.isEmpty {
                 // Text field (stores = 0)
                 TextField("Enter store name", text: $storeName)
+                    .normalizedText($storeName)
                     .font(.subheadline)
                     .bold()
                     .foregroundColor(.black)
