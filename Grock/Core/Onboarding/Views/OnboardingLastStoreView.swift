@@ -26,8 +26,8 @@ struct OnboardingLastStoreView: View {
             viewModel.showInfoDropdownWithDelay()
             storeFieldIsFocused = true
         }
-        .onChange(of: viewModel.storeName) { oldValue, newValue in
-            if viewModel.isValidStoreName {
+        .onChange(of: viewModel.formViewModel.storeName) { oldValue, newValue in
+            if viewModel.formViewModel.isValidStoreName {
                 viewModel.showError = false
             }
         }
@@ -48,8 +48,8 @@ struct OnboardingLastStoreView: View {
     }
     
     private var storeNameField: some View {
-        TextField("e.g. Walmart, SM, Costco", text: $viewModel.storeName)
-            .normalizedText($viewModel.storeName) 
+        TextField("e.g. Walmart, SM, Costco", text: $viewModel.formViewModel.storeName)
+            .normalizedText($viewModel.formViewModel.storeName)
             .multilineTextAlignment(.center)
             .autocorrectionDisabled()
             .textInputAutocapitalization(.words)
@@ -76,9 +76,13 @@ struct OnboardingLastStoreView: View {
                     .font(.caption)
                     .foregroundColor(Color(hex: "FF6F71"))
                     .padding(.top, 8)
-                    .scaleEffect(viewModel.showError ? 1.0 : 0)
-                    .transition(.move(edge: .trailing).combined(with: .opacity))
-                    .animation(.easeInOut(duration: 0.25), value: viewModel.showError)
+                    .transition(.asymmetric(
+                        insertion: .scale(scale: 0.8, anchor: .center)
+                            .animation(.spring(response: 0.2, dampingFraction: 0.7)),
+                        removal: .scale(scale: 0.8, anchor: .center)
+                            .combined(with: .opacity)
+                            .animation(.spring(response: 0.2, dampingFraction: 0.75))
+                    ))
             }
         }
     }
@@ -135,25 +139,25 @@ struct OnboardingLastStoreView: View {
         .offset(x: 12, y: -120)
         .transition(.asymmetric(
             insertion: .scale(scale: 0.85, anchor: .topLeading)
-                .animation(.spring(response: 0.35, dampingFraction: 0.65)),
+                .combined(with: .opacity)
+                .animation(.spring(response: 0.3, dampingFraction: 0.5)),
             removal: .scale(scale: 0.95, anchor: .topLeading)
                 .combined(with: .opacity)
-                .animation(.spring(response: 0.25, dampingFraction: 0.75))
+                .animation(.spring(response: 0.15, dampingFraction: 0.75))
         ))
     }
     
     private var nextButton: some View {
         FormCompletionButton.nextButton(
-            isEnabled: viewModel.isValidStoreName,
+            isEnabled: viewModel.formViewModel.isValidStoreName,
             appearanceScale: viewModel.showNextButton ? 1.0 : 0.0,
             shakeOffset: viewModel.shakeOffset
         ) {
-            guard viewModel.isValidStoreName else {
+            guard viewModel.formViewModel.isValidStoreName else {
                 viewModel.triggerStoreNameError()
                 return
             }
             
-            // No need to trim manually - normalized binding already handles this
             viewModel.navigateToFirstItemDataScreen()
         }
     }

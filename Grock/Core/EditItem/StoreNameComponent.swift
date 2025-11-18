@@ -1,19 +1,12 @@
-//
-//  StoreNameComponent.swift
-//  Grock
-//
-//  Created by Ethan John Paguntalan on 10/17/25.
-//
-
 import SwiftUI
 
 struct StoreNameComponent: View {
-    //TODO: Rearrange + put in a veiw model.
     @Binding var storeName: String
     @Environment(VaultService.self) private var vaultService
     @FocusState private var isFocused: Bool
     @State private var showAddStoreSheet = false
     @State private var newStoreName = ""
+    let hasError: Bool // Remove default value, make it required
     
     private var availableStores: [String] {
         vaultService.getAllStores()
@@ -26,8 +19,6 @@ struct StoreNameComponent: View {
                 .foregroundColor(.gray)
             
             Spacer()
-            //TODO: own var view /viewbuilder
-            
            
             if availableStores.isEmpty {
                 // Text field (stores = 0)
@@ -79,6 +70,13 @@ struct StoreNameComponent: View {
         .padding(12)
         .background(Color(.systemGray6))
         .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(
+                    Color(hex: "#FA003F"),
+                    lineWidth: hasError ? 2.0 : 0
+                )
+        )
         .sheet(isPresented: $showAddStoreSheet) {
             AddStoreSheet(
                 storeName: $newStoreName,
@@ -98,88 +96,3 @@ struct StoreNameComponent: View {
         }
     }
 }
-
-
-
-//import SwiftUI
-//
-//struct StoreNameComponent: View {
-//    @Binding var storeName: String
-//    let availableStores: [String]
-//    @Binding var showAddStoreSheet: Bool
-//    @Binding var newStoreName: String
-//    let onAddStore: () -> Void
-//    
-//    @FocusState private var isFocused: Bool
-//    
-//    var body: some View {
-//        HStack {
-//            Text("Store")
-//                .font(.footnote)
-//                .foregroundColor(.gray)
-//            
-//            Spacer()
-//            
-//            if availableStores.isEmpty {
-//                // Text field (stores = 0)
-//                TextField("Enter store name", text: $storeName)
-//                    .font(.subheadline)
-//                    .bold()
-//                    .foregroundColor(.black)
-//                    .multilineTextAlignment(.trailing)
-//                    .focused($isFocused)
-//            } else {
-//                // Dropdown (stores > 0)
-//                Menu {
-//                    Button(action: {
-//                        newStoreName = ""
-//                        showAddStoreSheet = true
-//                    }) {
-//                        Label("Add New Store", systemImage: "plus.circle.fill")
-//                    }
-//                    
-//                    Divider()
-//                    
-//                    ForEach(availableStores, id: \.self) { store in
-//                        Button(action: {
-//                            storeName = store
-//                        }) {
-//                            HStack {
-//                                Text(store)
-//                                if storeName == store {
-//                                    Image(systemName: "checkmark")
-//                                        .foregroundColor(.blue)
-//                                }
-//                            }
-//                        }
-//                    }
-//                } label: {
-//                    HStack {
-//                        Text(storeName.isEmpty ? "Select Store" : storeName)
-//                            .font(.subheadline)
-//                            .bold()
-//                            .foregroundStyle(storeName.isEmpty ? .gray : .black)
-//                        Image(systemName: "chevron.down")
-//                            .font(.system(size: 12))
-//                            .foregroundColor(.gray)
-//                    }
-//                }
-//            }
-//        }
-//        .padding(12)
-//        .background(Color(.systemGray6))
-//        .cornerRadius(12)
-//        .sheet(isPresented: $showAddStoreSheet) {
-//            AddStoreSheet(
-//                storeName: $newStoreName,
-//                isPresented: $showAddStoreSheet,
-//                onSave: onAddStore
-//            )
-//        }
-//        .onAppear {
-//            if storeName.isEmpty, let firstStore = availableStores.first {
-//                storeName = firstStore
-//            }
-//        }
-//    }
-//}

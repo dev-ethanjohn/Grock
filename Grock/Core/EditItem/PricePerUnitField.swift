@@ -1,15 +1,9 @@
-//
-//  PricePerUnit.swift
-//  Grock
-//
-//  Created by Ethan John Paguntalan on 10/17/25.
-//
-
 import SwiftUI
 
 struct PricePerUnitField: View {
-    //TODO: Rearrange + put in a veiw model.
     @Binding var price: String
+    let hasError: Bool
+    
     @FocusState private var isFocused: Bool
     
     var body: some View {
@@ -44,13 +38,16 @@ struct PricePerUnitField: View {
         .padding(12)
         .background(Color(.systemGray6))
         .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(
+                    Color(hex: "#FA003F"),
+                    lineWidth: hasError ? 2.0 : 0
+                )
+        )
         .contentShape(Rectangle())
         .onTapGesture {
             isFocused = true
         }
     }
 }
-
-//#Preview {
-//    PricePerUnit()
-//}

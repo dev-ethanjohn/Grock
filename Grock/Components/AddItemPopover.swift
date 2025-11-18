@@ -5,28 +5,13 @@ struct AddItemPopover: View {
     var onSave: ((String, GroceryCategory, String, String, Double) -> Void)?
     var onDismiss: (() -> Void)?
     
-    @State private var itemName: String = ""
-    @State private var storeName: String = ""
-    @State private var unit: String = "g"
-    @State private var itemPrice: String = ""
-    @State private var selectedCategory: GroceryCategory?
+    @State private var formViewModel = ItemFormViewModel(requiresPortion: false, requiresStore: true)
     
     @FocusState private var itemNameFieldIsFocused: Bool
     
     @State private var overlayOpacity: Double = 0
     @State private var contentScale: CGFloat = 0.8
     @State private var keyboardVisible: Bool = false
-    
-    private var selectedCategoryEmoji: String {
-        selectedCategory?.emoji ?? "plus.circle.fill"
-    }
-    
-    private var isFormValid: Bool {
-        !itemName.isEmpty &&
-        Double(itemPrice) != nil &&
-        !unit.isEmpty &&
-        selectedCategory != nil
-    }
     
     var body: some View {
         ZStack {
@@ -53,31 +38,13 @@ struct AddItemPopover: View {
                 }
                 .padding(.bottom)
                 
-                VStack(spacing: 12) {
-                    ItemNameInput(
-                        selectedCategoryEmoji: selectedCategoryEmoji,
-                        showTooltip: false,
-                        itemNameFieldIsFocused: $itemNameFieldIsFocused,
-                        itemName:  $itemName,
-                        selectedCategory: $selectedCategory
-                    )
-                    
-                    DashedLine()
-                        .stroke(style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
-                        .frame(height: 1)
-                        .foregroundColor(Color(hex: "ddd"))
-                        .padding(.vertical, 2)
-                        .padding(.horizontal)
-                    
-                    StoreNameComponent(storeName: $storeName)
-                    
-                    HStack(spacing: 12) {
-                        UnitButton(unit: $unit)
-                        PricePerUnitField(price: $itemPrice)
-                    }
-                }
+                ItemFormContent(
+                    formViewModel: formViewModel,
+                    itemNameFieldIsFocused: $itemNameFieldIsFocused,
+                    showCategoryTooltip: false
+                )
                 
-                if isFormValid {
+                if formViewModel.isFormValid {
                     Image(systemName: "chevron.down.dotted.2")
                         .font(.body)
                         .symbolEffect(.wiggle.down.byLayer, options: .repeat(.continuous))
@@ -97,11 +64,11 @@ struct AddItemPopover: View {
                         )
                 }
                 
-                FormCompletionButton.doneButton(isEnabled: isFormValid, maxWidth: true) {
-                    if isFormValid,
-                       let category = selectedCategory,
-                       let priceValue = Double(itemPrice) {
-                        onSave?(itemName, category, storeName, unit, priceValue)
+                FormCompletionButton.doneButton(isEnabled: formViewModel.isFormValid, maxWidth: true) {
+                    if formViewModel.attemptSubmission(),
+                       let category = formViewModel.selectedCategory,
+                       let priceValue = Double(formViewModel.itemPrice) {
+                        onSave?(formViewModel.itemName, category, formViewModel.storeName, formViewModel.unit, priceValue)
                         NotificationCenter.default.post(
                             name: NSNotification.Name("ItemCategoryChanged"),
                             object: nil,
@@ -110,7 +77,7 @@ struct AddItemPopover: View {
                         dismissPopover()
                     }
                 }
-                .padding(.top, isFormValid ? 4 : 20)
+                .padding(.top, formViewModel.isFormValid ? 4 : 20)
                 .buttonStyle(.plain)
                 
             }
@@ -121,8 +88,9 @@ struct AddItemPopover: View {
             .padding(.horizontal, UIScreen.main.bounds.width * 0.038)
             .scaleEffect(contentScale)
             .offset(y: keyboardVisible ? UIScreen.main.bounds.height * 0.12 : 0)
-            .animation(.spring(response: 0.2, dampingFraction: 0.7, blendDuration: 0.1), value: isFormValid)
+            .animation(.spring(response: 0.2, dampingFraction: 0.7, blendDuration: 0.1), value: formViewModel.isFormValid)
             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: keyboardVisible)
+            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: formViewModel.firstMissingField)
             .frame(maxHeight: .infinity, alignment: keyboardVisible ? .top : .center)
         }
         .onAppear {
@@ -133,6 +101,9 @@ struct AddItemPopover: View {
             withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                 contentScale = 1
             }
+        }
+        .onDisappear {
+            formViewModel.resetForm()
         }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
             withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {

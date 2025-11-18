@@ -7,6 +7,123 @@
 
 import SwiftUI
 
+//struct FormCompletionButton: View {
+//    let title: String
+//    let isEnabled: Bool
+//    let action: () -> Void
+//    let maxWidth: Bool
+//    
+//    // Animation parameters
+//    let maxRadius: CGFloat
+//    let bounceScale: (min: CGFloat, mid: CGFloat, max: CGFloat)
+//    let bounceTiming: (initial: Double, mid: Double, final: Double)
+//    
+//    // New parameters for additional animations
+//    let appearanceScale: CGFloat
+//    let shakeOffset: CGFloat
+//    
+//    @State private var fillAnimation: CGFloat = 0.0
+//    @State private var buttonScale: CGFloat = 1.0
+//    
+//    init(
+//        title: String,
+//        isEnabled: Bool,
+//        maxRadius: CGFloat = 150,
+//        bounceScale: (min: CGFloat, mid: CGFloat, max: CGFloat) = (0.95, 1.1, 1.0),
+//        bounceTiming: (initial: Double, mid: Double, final: Double) = (0.1, 0.3, 0.3),
+//        maxWidth: Bool = false,
+//        appearanceScale: CGFloat = 1.0,
+//        shakeOffset: CGFloat = 0,
+//        action: @escaping () -> Void
+//    ) {
+//        self.title = title
+//        self.isEnabled = isEnabled
+//        self.maxRadius = maxRadius
+//        self.bounceScale = bounceScale
+//        self.bounceTiming = bounceTiming
+//        self.maxWidth = maxWidth
+//        self.appearanceScale = appearanceScale
+//        self.shakeOffset = shakeOffset
+//        self.action = action
+//    }
+//    
+//    var body: some View {
+//        Button(action: action) {
+//            Text(title)
+//                .fuzzyBubblesFont(16, weight: .bold)
+//                .foregroundStyle(isEnabled ? .white : Color(.systemGray3))
+//                .padding(.vertical, 6)
+//                .padding(.horizontal, 20)
+//                .frame(maxWidth: maxWidth ? .infinity : nil)
+//                .background(
+//                    Capsule()
+//                        .fill(
+//                            isEnabled
+//                            ? RadialGradient(
+//                                colors: [Color.black, Color(.systemGray6)],
+//                                center: .center,
+//                                startRadius: 0,
+//                                endRadius: fillAnimation * maxRadius
+//                            )
+//                            : RadialGradient(
+//                                colors: [     Color(.systemGray6),Color(.systemGray6)],
+//                                center: .center,
+//                                startRadius: 0,
+//                                endRadius: 0
+//                            )
+//                        )
+//                )
+//                .scaleEffect(buttonScale)
+//        }
+//        .frame(maxWidth: maxWidth ? .infinity : nil)
+//        .disabled(!isEnabled)
+//        .scaleEffect(appearanceScale)
+//        .offset(x: shakeOffset)
+//        .onChange(of: isEnabled) { oldValue, newValue in
+//            handleEnabledStateChange(oldValue: oldValue, newValue: newValue)
+//        }
+//        .onAppear {
+//            if isEnabled {
+//                fillAnimation = 1.0
+//                buttonScale = 1.0
+//            }
+//        }
+//    }
+//    
+//    private func handleEnabledStateChange(oldValue: Bool, newValue: Bool) {
+//        if newValue {
+//            if !oldValue {
+//                withAnimation(.spring(duration: 0.6)) {
+//                    fillAnimation = 1.0
+//                }
+//                startButtonBounce()
+//            }
+//        } else {
+//            withAnimation(.easeInOut(duration: 0.5)) {
+//                fillAnimation = 0.0
+//                buttonScale = 1.0
+//            }
+//        }
+//    }
+//    
+//    private func startButtonBounce() {
+//        withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {
+//            buttonScale = bounceScale.min
+//        }
+//        
+//        DispatchQueue.main.asyncAfter(deadline: .now() + bounceTiming.initial) {
+//            withAnimation(.spring(response: 0.3, dampingFraction: 0.5)) {
+//                buttonScale = bounceScale.mid
+//            }
+//        }
+//        
+//        DispatchQueue.main.asyncAfter(deadline: .now() + bounceTiming.mid) {
+//            withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+//                buttonScale = bounceScale.max
+//            }
+//        }
+//    }
+//}
 struct FormCompletionButton: View {
     let title: String
     let isEnabled: Bool
@@ -66,7 +183,7 @@ struct FormCompletionButton: View {
                                 endRadius: fillAnimation * maxRadius
                             )
                             : RadialGradient(
-                                colors: [     Color(.systemGray6),Color(.systemGray6)],
+                                colors: [Color(.systemGray5), Color(.systemGray6)],
                                 center: .center,
                                 startRadius: 0,
                                 endRadius: 0
@@ -74,9 +191,14 @@ struct FormCompletionButton: View {
                         )
                 )
                 .scaleEffect(buttonScale)
+                .overlay(
+                    !isEnabled ?
+                    Capsule()
+                        .stroke(Color(.systemGray4), lineWidth: 1)
+                    : nil
+                )
         }
         .frame(maxWidth: maxWidth ? .infinity : nil)
-        .disabled(!isEnabled)
         .scaleEffect(appearanceScale)
         .offset(x: shakeOffset)
         .onChange(of: isEnabled) { oldValue, newValue in
@@ -125,7 +247,6 @@ struct FormCompletionButton: View {
     }
 }
 
-// Convenience extension for common button styles
 extension FormCompletionButton {
     static func finishButton(isEnabled: Bool, action: @escaping () -> Void) -> FormCompletionButton {
         FormCompletionButton(

@@ -1,10 +1,3 @@
-//
-//  EditItemViewModel.swift
-//  Grock
-//
-//  Created by Ethan John Paguntalan on 11/13/25.
-//
-
 import Foundation
 import SwiftUI
 import SwiftData

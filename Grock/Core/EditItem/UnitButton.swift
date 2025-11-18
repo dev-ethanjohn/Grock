@@ -1,15 +1,9 @@
-//
-//  UnitButton.swift
-//  Grock
-//
-//  Created by Ethan John Paguntalan on 10/17/25.
-//
-
 import SwiftUI
 
 struct UnitButton: View {
-    //TODO: Rearrange + put in a veiw model.
     @Binding var unit: String
+    let hasError: Bool
+    
     @State private var showAddUnit = false
     
     let continuousUnits: [(abbr: String, full: String)] = [
@@ -33,8 +27,6 @@ struct UnitButton: View {
     
     var body: some View {
         Menu {
-            //MARK: For premium users
-            //free users limit to the app's default unit params.
             Button(action: {
                 showAddUnit = true
             }) {
@@ -55,7 +47,6 @@ struct UnitButton: View {
                                     Image(systemName: "checkmark")
                                         .foregroundColor(.blue)
                                 }
-
                             }
                         } else {
                             Text("\(unitOption.abbr) - \(unitOption.full)")
@@ -80,7 +71,6 @@ struct UnitButton: View {
                                     Image(systemName: "checkmark")
                                         .foregroundColor(.blue)
                                 }
-
                             }
                         } else {
                             Text("\(unitOption.abbr) - \(unitOption.full)")
@@ -113,12 +103,13 @@ struct UnitButton: View {
             .padding(12)
             .background(Color(.systemGray6))
             .cornerRadius(12)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(
+                        Color(hex: "#FA003F"),
+                        lineWidth: hasError ? 2.0 : 0
+                    )
+            )
         }
-
-        
     }
 }
-
-//#Preview {
-//    UnitButton()
-//}

@@ -6,12 +6,16 @@ struct OnboardingFirstItemView: View {
     @Environment(VaultService.self) private var vaultService
     @FocusState private var itemNameFieldIsFocused: Bool
     
+    private var formViewModel: ItemFormViewModel {
+        viewModel.formViewModel
+    }
+    
     var body: some View {
         VStack {
             FirstItemBackHeader(onBack: viewModel.navigateBack)
             
             ScrollView {
-                FirstItemForm(viewModel: viewModel, itemNameFieldIsFocused: $itemNameFieldIsFocused )
+                FirstItemForm(viewModel: viewModel, itemNameFieldIsFocused: $itemNameFieldIsFocused)
             }
             .safeAreaInset(edge: .bottom) {
                 bottomButtons
@@ -19,16 +23,12 @@ struct OnboardingFirstItemView: View {
         }
         .onAppear {
             itemNameFieldIsFocused = true
-            if viewModel.unit.isEmpty {
-                viewModel.unit = "g"
+            if formViewModel.unit.isEmpty {
+                formViewModel.unit = "g"
             }
-            if !viewModel.categoryName.isEmpty {
-                viewModel.selectedCategory = GroceryCategory.allCases.first { $0.title == viewModel.categoryName }
-            }
-            
             viewModel.showCategoryTooltipWithDelay()
         }
-        .onChange(of: viewModel.selectedCategory) { _, newValue in
+        .onChange(of: formViewModel.selectedCategory) { _, newValue in
             if newValue != nil {
                 viewModel.showCategoryTooltip = false
             }
@@ -46,15 +46,18 @@ struct OnboardingFirstItemView: View {
     }
     
     private var finishButton: some View {
-        FinishButton(isFormValid: viewModel.isItemFormValid) {
-            saveItemAndComplete()
+        FinishButton(isFormValid: formViewModel.isFormValid) {
+            if formViewModel.attemptSubmission() {
+                saveItemAndComplete()
+            } else {
+                let generator = UINotificationFeedbackGenerator()
+                generator.notificationOccurred(.warning)
+            }
         }
     }
     
     private func saveItemAndComplete() {
-        guard let category = viewModel.selectedCategory else { return }
         
-        viewModel.categoryName = category.title
         UserDefaults.standard.set(false, forKey: "hasSeenVaultCelebration")
         print("🎉 OnboardingFirstItemView: Reset celebration flag")
         
@@ -62,25 +65,25 @@ struct OnboardingFirstItemView: View {
     }
     
     private func saveInitialData() {
-        guard let category = viewModel.selectedCategory,
-              let price = Double(viewModel.itemPrice) else {
+        guard let category = formViewModel.selectedCategory,
+              let price = Double(formViewModel.itemPrice) else {
             print("❌ Failed to save item - invalid data")
             return
         }
         
         print("💾 Saving item to vault:")
-        print("   Name: \(viewModel.itemName)")
+        print("   Name: \(formViewModel.itemName)")
         print("   Category: \(category.title)")
-        print("   Store: \(viewModel.storeName)")
+        print("   Store: \(formViewModel.storeName)")
         print("   Price: ₱\(price)")
-        print("   Unit: \(viewModel.unit)")
+        print("   Unit: \(formViewModel.unit)")
         
         vaultService.addItem(
-            name: viewModel.itemName,
+            name: formViewModel.itemName,
             to: category,
-            store: viewModel.storeName,
+            store: formViewModel.storeName,
             price: price,
-            unit: viewModel.unit
+            unit: formViewModel.unit
         )
         
         print("✅ Item saved successfully!")

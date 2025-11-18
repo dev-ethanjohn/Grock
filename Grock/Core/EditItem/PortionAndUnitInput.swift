@@ -1,25 +1,16 @@
-//
-//  PortionUnitInput.swift
-//  Grock
-//
-//  Created by Ethan John Paguntalan on 10/17/25.
-//
-
 import SwiftUI
 
 struct PortionAndUnitInput: View {
-    //TODO: Rearrange + put in a veiw model.
     @Binding var portion: Double?
     @Binding var unit: String
     @Binding var showUnitPicker: Bool
+    let hasPortionError: Bool
+    let hasUnitError: Bool
     
     var body: some View {
         HStack(spacing: 8) {
-            PortionInput(portion: $portion)
-            UnitButton(unit: $unit)
+            PortionInput(portion: $portion, hasError: hasPortionError)
+            UnitButton(unit: $unit, hasError: hasUnitError)
         }
     }
 }
-//#Preview {
-//    PortionAndUnitInput()
-//}

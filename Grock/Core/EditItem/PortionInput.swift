@@ -2,6 +2,8 @@ import SwiftUI
 
 struct PortionInput: View {
     @Binding var portion: Double?
+    let hasError: Bool
+    
     @State private var portionString: String = ""
     @FocusState private var isFocused: Bool
     
@@ -30,6 +32,13 @@ struct PortionInput: View {
         .padding(12)
         .background(Color(.systemGray6))
         .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(
+                    Color(hex: "#FA003F"),
+                    lineWidth: hasError ? 2.0 : 0
+                )
+        )
         .contentShape(Rectangle())
         .onTapGesture {
             isFocused = true

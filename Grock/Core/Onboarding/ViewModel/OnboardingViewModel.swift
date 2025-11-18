@@ -14,31 +14,15 @@ enum OnboardingStep {
 @Observable
 class OnboardingViewModel {
     
-    // Form Data
-    var storeName: String = ""
-    var itemName: String = ""
-    var itemPrice: String = ""
-    var unit: String = "g"
-    var categoryName: String = ""
-    var portion: Double?
-    
-    // UI State
+    // Onboarding-specific state
     var currentStep: OnboardingStep = .welcome
     var storeFieldAnimated = false
     var hasShownInfoDropdown = false
     var showPageIndicator = false
-    var showUnitPicker = false
     var showCategoryTooltip = false
     
-    // Selected Category (UI State)
-    var selectedCategory: GroceryCategory? = nil {
-        didSet {
-            if let category = selectedCategory {
-                categoryName = category.title
-                showCategoryTooltip = false
-            }
-        }
-    }
+    // Form data using shared ViewModel
+    var formViewModel = ItemFormViewModel(requiresPortion: true, requiresStore: true)
     
     // Animation States
     var showTextField = false
@@ -48,35 +32,17 @@ class OnboardingViewModel {
     var shakeOffset: CGFloat = 0
     
     // Computed Properties
-    var isValidStoreName: Bool {
-        let trimmed = storeName.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.count >= 1
-    }
-    
-    var isItemFormValid: Bool {
-        !itemName.isEmpty &&
-        isValidStoreName &&
-        Double(itemPrice) != nil &&
-        portion != nil &&
-        !unit.isEmpty &&
-        selectedCategory != nil
-    }
-    
     var calculatedTotal: Double {
-        let portionValue = portion ?? 0
-        let priceValue = Double(itemPrice) ?? 0
+        let portionValue = formViewModel.portion ?? 0
+        let priceValue = Double(formViewModel.itemPrice) ?? 0
         return portionValue * priceValue
     }
     
-    var selectedCategoryEmoji: String {
-        selectedCategory?.emoji ?? "plus.circle.fill"
-    }
-    
     var questionText: String {
-        if storeName.isEmpty {
+        if formViewModel.storeName.isEmpty {
             return "One item you usually buy for grocery"
         } else {
-            return "One item you bought from \(storeName)"
+            return "One item you bought from \(formViewModel.storeName)"
         }
     }
     
@@ -200,29 +166,29 @@ class OnboardingViewModel {
     
     // Data Methods
     func saveInitialData(vaultService: VaultService) {
-        guard let category = GroceryCategory.allCases.first(where: { $0.title == categoryName }),
-              let price = Double(itemPrice) else { return }
+        guard let category = GroceryCategory.allCases.first(where: { $0.title == formViewModel.selectedCategory?.title }),
+              let price = Double(formViewModel.itemPrice) else { return }
         
         vaultService.addItem(
-            name: itemName,
+            name: formViewModel.itemName,
             to: category,
-            store: storeName,
+            store: formViewModel.storeName,
             price: price,
-            unit: unit
+            unit: formViewModel.unit
         )
     }
     
     func saveOnboardingItemData() {
         UserDefaults.standard.set([
-            "itemName": itemName,
-            "categoryName": categoryName,
-            "portion": portion ?? 1.0 //NOTE: check logic where 1 active item quantity on first appear vault view
+            "itemName": formViewModel.itemName,
+            "categoryName": formViewModel.selectedCategory?.title ?? "",
+            "portion": formViewModel.portion ?? 1.0
         ] as [String: Any], forKey: "onboardingItemData")
         
         UserDefaults.standard.hasCompletedOnboarding = true
     }
     
     func resetForSkip() {
-        storeName = ""
+        formViewModel.storeName = ""
     }
 }
