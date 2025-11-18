@@ -6,6 +6,8 @@ struct OnboardingFirstItemView: View {
     @Environment(VaultService.self) private var vaultService
     @FocusState private var itemNameFieldIsFocused: Bool
     
+    @State private var finishButtonShakeOffset: CGFloat = 0
+    
     private var formViewModel: ItemFormViewModel {
         viewModel.formViewModel
     }
@@ -52,6 +54,20 @@ struct OnboardingFirstItemView: View {
             } else {
                 let generator = UINotificationFeedbackGenerator()
                 generator.notificationOccurred(.warning)
+                
+                triggerFinishButtonShake()
+            }
+        }
+        .offset(x: finishButtonShakeOffset)
+    }
+    
+    private func triggerFinishButtonShake() {
+        let shakeSequence = [0, -8, 8, -6, 6, -4, 4, 0]
+        for (index, offset) in shakeSequence.enumerated() {
+            DispatchQueue.main.asyncAfter(deadline: .now() + Double(index) * 0.05) {
+                withAnimation(.linear(duration: 0.05)) {
+                    self.finishButtonShakeOffset = CGFloat(offset)
+                }
             }
         }
     }

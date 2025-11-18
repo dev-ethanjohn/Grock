@@ -5,6 +5,8 @@ struct UnitButton: View {
     let hasError: Bool
     
     @State private var showAddUnit = false
+
+    var shakeOffset: CGFloat = 0
     
     let continuousUnits: [(abbr: String, full: String)] = [
         ("g", "grams"),
@@ -111,5 +113,6 @@ struct UnitButton: View {
                     )
             )
         }
+        .offset(x: shakeOffset) // Apply shake here
     }
 }

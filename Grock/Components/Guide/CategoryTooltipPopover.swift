@@ -1,10 +1,3 @@
-//
-//  CategoryTooltipPopover.swift
-//  Grock
-//
-//  Created by Ethan John Paguntalan on 11/6/25.
-//
-
 import SwiftUI
 
 struct CategoryTooltipPopover: View {
@@ -17,7 +10,7 @@ struct CategoryTooltipPopover: View {
                     .font(.system(size: 7, weight: .black))
             }
             .foregroundColor(.white)
-            .padding(.horizontal, 10)
+            .padding(.horizontal, 18)
             .padding(.vertical, 4)
             .background(
                 LinearGradient(
@@ -33,6 +26,7 @@ struct CategoryTooltipPopover: View {
             .shadow(color: .black.opacity(0.3), radius: 6, x: 0, y: 5)
     }
 }
+
 #Preview {
     CategoryTooltipPopover()
         .scaleEffect(2.5)

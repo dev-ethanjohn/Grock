@@ -36,6 +36,13 @@ struct ItemFormContent: View {
     
     @State private var showUnitPicker = false
     
+    // Shake states for each field
+    @State private var itemNameShakeOffset: CGFloat = 0
+    @State private var storeNameShakeOffset: CGFloat = 0
+    @State private var portionShakeOffset: CGFloat = 0
+    @State private var unitShakeOffset: CGFloat = 0
+    @State private var priceShakeOffset: CGFloat = 0
+    
     var body: some View {
         VStack {
             VStack(alignment: .leading, spacing: 4) {
@@ -54,10 +61,16 @@ struct ItemFormContent: View {
                     itemName: $formViewModel.itemName,
                     selectedCategory: $formViewModel.selectedCategory
                 )
+                .offset(x: itemNameShakeOffset)
             }
             .onChange(of: formViewModel.itemName) { oldValue, newValue in
                 if !newValue.isEmpty {
                     formViewModel.clearErrorForField("Item Name")
+                }
+            }
+            .onChange(of: formViewModel.invalidSubmissionCount) { oldValue, newValue in
+                if newValue > oldValue && formViewModel.firstMissingField == "Item Name" {
+                    triggerFieldShake(field: "Item Name")
                 }
             }
             
@@ -74,6 +87,7 @@ struct ItemFormContent: View {
                         storeName: $formViewModel.storeName,
                         hasError: formViewModel.attemptedSubmission && formViewModel.firstMissingField == "Store Name"
                     )
+                    .offset(x: storeNameShakeOffset)
                     
                     if formViewModel.attemptedSubmission && formViewModel.firstMissingField == "Store Name" {
                         validationError("Store name is required")
@@ -85,6 +99,11 @@ struct ItemFormContent: View {
                         formViewModel.clearErrorForField("Store Name")
                     }
                 }
+                .onChange(of: formViewModel.invalidSubmissionCount) { oldValue, newValue in
+                    if newValue > oldValue && formViewModel.firstMissingField == "Store Name" {
+                        triggerFieldShake(field: "Store Name")
+                    }
+                }
             }
             
             if formViewModel.requiresPortion {
@@ -94,7 +113,9 @@ struct ItemFormContent: View {
                         unit: $formViewModel.unit,
                         showUnitPicker: $showUnitPicker,
                         hasPortionError: formViewModel.attemptedSubmission && formViewModel.firstMissingField == "Portion",
-                        hasUnitError: formViewModel.attemptedSubmission && formViewModel.firstMissingField == "Unit"
+                        hasUnitError: formViewModel.attemptedSubmission && formViewModel.firstMissingField == "Unit",
+                        portionShakeOffset: portionShakeOffset,
+                        unitShakeOffset: unitShakeOffset
                     )
                     
                     if formViewModel.attemptedSubmission {
@@ -123,6 +144,14 @@ struct ItemFormContent: View {
                         formViewModel.clearErrorForField("Unit")
                     }
                 }
+                .onChange(of: formViewModel.invalidSubmissionCount) { oldValue, newValue in
+                    if newValue > oldValue && formViewModel.firstMissingField == "Portion" {
+                        triggerFieldShake(field: "Portion")
+                    }
+                    if newValue > oldValue && formViewModel.firstMissingField == "Unit" {
+                        triggerFieldShake(field: "Unit")
+                    }
+                }
             }
             
             VStack(alignment: .trailing, spacing: 4) {
@@ -132,16 +161,20 @@ struct ItemFormContent: View {
                             unit: $formViewModel.unit,
                             hasError: formViewModel.attemptedSubmission && formViewModel.firstMissingField == "Unit"
                         )
+                        .offset(x: unitShakeOffset)
+                        
                         PricePerUnitField(
                             price: $formViewModel.itemPrice,
                             hasError: formViewModel.attemptedSubmission && formViewModel.firstMissingField == "Price"
                         )
+                        .offset(x: priceShakeOffset)
                     }
                 } else {
                     PricePerUnitField(
                         price: $formViewModel.itemPrice,
                         hasError: formViewModel.attemptedSubmission && formViewModel.firstMissingField == "Price"
                     )
+                    .offset(x: priceShakeOffset)
                 }
                 
                 if formViewModel.attemptedSubmission && formViewModel.firstMissingField == "Price" {
@@ -153,9 +186,71 @@ struct ItemFormContent: View {
                     formViewModel.clearErrorForField("Price")
                 }
             }
+            .onChange(of: formViewModel.invalidSubmissionCount) { oldValue, newValue in
+                if newValue > oldValue && formViewModel.firstMissingField == "Price" {
+                    triggerFieldShake(field: "Price")
+                }
+                if newValue > oldValue && formViewModel.firstMissingField == "Unit" {
+                    triggerFieldShake(field: "Unit")
+                }
+            }
         }
         .animation(.spring(response: 0.4, dampingFraction: 0.7), value: formViewModel.attemptedSubmission)
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: formViewModel.firstMissingField)
+    }
+    
+    private func triggerFieldShake(field: String) {
+        let shakeSequence = [0, -8, 8, -6, 6, -4, 4, 0]
+        
+        switch field {
+        case "Item Name":
+            for (index, offset) in shakeSequence.enumerated() {
+                DispatchQueue.main.asyncAfter(deadline: .now() + Double(index) * 0.05) {
+                    withAnimation(.linear(duration: 0.05)) {
+                        self.itemNameShakeOffset = CGFloat(offset)
+                    }
+                }
+            }
+            
+        case "Store Name":
+            for (index, offset) in shakeSequence.enumerated() {
+                DispatchQueue.main.asyncAfter(deadline: .now() + Double(index) * 0.05) {
+                    withAnimation(.linear(duration: 0.05)) {
+                        self.storeNameShakeOffset = CGFloat(offset)
+                    }
+                }
+            }
+            
+        case "Portion":
+            for (index, offset) in shakeSequence.enumerated() {
+                DispatchQueue.main.asyncAfter(deadline: .now() + Double(index) * 0.05) {
+                    withAnimation(.linear(duration: 0.05)) {
+                        self.portionShakeOffset = CGFloat(offset)
+                    }
+                }
+            }
+            
+        case "Unit":
+            for (index, offset) in shakeSequence.enumerated() {
+                DispatchQueue.main.asyncAfter(deadline: .now() + Double(index) * 0.05) {
+                    withAnimation(.linear(duration: 0.05)) {
+                        self.unitShakeOffset = CGFloat(offset)
+                    }
+                }
+            }
+            
+        case "Price":
+            for (index, offset) in shakeSequence.enumerated() {
+                DispatchQueue.main.asyncAfter(deadline: .now() + Double(index) * 0.05) {
+                    withAnimation(.linear(duration: 0.05)) {
+                        self.priceShakeOffset = CGFloat(offset)
+                    }
+                }
+            }
+            
+        default:
+            break
+        }
     }
     
     private func validationError(_ message: String) -> some View {

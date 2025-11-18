@@ -1,10 +1,3 @@
-//
-//  CartItemRow.swift
-//  Grock
-//
-//  Created by Ethan John Paguntalan on 10/11/25.
-//
-
 import SwiftUI
 
 struct CartItemRow: View {

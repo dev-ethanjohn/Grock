@@ -10,7 +10,7 @@ struct CategoryErrorPopover: View {
                 .font(.system(size: 7, weight: .black))
         }
         .foregroundColor(.white)
-        .padding(.horizontal, 10)
+        .padding(.horizontal, 18)
         .padding(.vertical, 4)
         .background(
             Color(hex: "#FA003F")
