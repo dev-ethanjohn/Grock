@@ -294,7 +294,7 @@ struct CartConfirmationPopover: View {
     
     private var itemsListView: some View {
         Group {
-            if activeItemsWithDetails.count <= 7 {
+            if activeItemsWithDetails.count <= 5 {
                 // Just use VStack for small number of items
                 VStack(spacing: 0) {
                     ForEach(Array(activeItemsWithDetails.enumerated()), id: \.element.item.id) { index, data in

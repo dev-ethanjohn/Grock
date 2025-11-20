@@ -92,20 +92,19 @@ struct CartItemRowView: View {
                     .buttonStyle(.plain)
                     .transition(.scale(scale: 0.1, anchor: .center).combined(with: .opacity))
                     .frame(maxHeight: .infinity, alignment: .top)
-                    .padding(.top, 2.5)
+                    .padding(.top, 2.75)
                 }
                 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("\(quantityString) \(itemName)")
                         .lexendFont(17, weight: .regular)
-                        .foregroundColor(Color(hex: "231F30"))
                         .lineLimit(1)
                     
                     Text("\(formatCurrency(price)) / \(unit)")
-                        .lexendFont(12, weight: .medium)
-                        .foregroundColor(Color(hex: "666666"))
+                        .lexendFont(12)
                 }
                 .opacity(cartItem.isFulfilled ? 0.5 : 1.0)
+                .foregroundColor(Color(hex: "231F30"))
                 
                 Spacer()
                 

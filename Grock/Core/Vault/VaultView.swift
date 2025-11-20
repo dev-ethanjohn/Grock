@@ -75,7 +75,6 @@ struct VaultView: View {
             
             if vaultService.vault != nil && !showCelebration && vaultReady {
                 
-                
                 content
                 
             }
@@ -446,94 +445,119 @@ struct VaultView: View {
     }
     
     private var content: some View {
-        ZStack(alignment: .topLeading) {
-            Button(action: {
-                if existingCart != nil {
-                    onAddItemsToCart?(cartViewModel.activeCartItems)
-                    dismiss()
-                } else {
-                    withAnimation {
-                        showCartConfirmation = true
+        VStack {
+            Spacer()
+            ZStack(alignment: .bottom) {
+                
+                ZStack {
+                    LinearGradient(
+                        gradient: Gradient(stops: [
+                            .init(color: Color(hex: "#ffffff").opacity(0), location: 0),
+                            .init(color: Color(hex: "#ffffff").opacity(0.85), location: 0.3),
+                            .init(color: Color(hex: "#ffffff").opacity(1), location: 0.5),
+                        ]),
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    
+                    BlurView()
+                        .blur(radius: 8, opaque: true)
+              
+                }
+                .frame(height: 100)
+                .opacity(0.7)
+                
+                Button(action: {
+                    if existingCart != nil {
+                        onAddItemsToCart?(cartViewModel.activeCartItems)
+                        dismiss()
+                    } else {
+                        withAnimation {
+                            showCartConfirmation = true
+                        }
+                    }
+                }) {
+                    Text(existingCart != nil ? "Add to Cart" : "Create cart")
+                        .fuzzyBubblesFont(16, weight: .bold)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 12)
+                        .background(
+                            Capsule()
+                                .fill(
+                                    hasActiveItems
+                                    ? RadialGradient(
+                                        colors: [Color.black, Color.gray.opacity(0.3)],
+                                        center: .center,
+                                        startRadius: 0,
+                                        endRadius: fillAnimation * 300
+                                    )
+                                    : RadialGradient(
+                                        colors: [Color.gray.opacity(0.3), Color.gray.opacity(0.3)],
+                                        center: .center,
+                                        startRadius: 0,
+                                        endRadius: 0
+                                    )
+                                )
+                        )
+                        .cornerRadius(25)
+                }
+                .overlay(alignment: .topLeading, content: {
+                    if hasActiveItems {
+                        Text("\(cartViewModel.activeCartItems.count)")
+                            .fuzzyBubblesFont(16, weight: .bold)
+                            .contentTransition(.numericText())
+                            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: cartViewModel.activeCartItems.count)
+                            .foregroundColor(.black)
+                            .frame(width: 25, height: 25)
+                            .background(Color.white)
+                            .clipShape(Circle())
+                            .overlay(
+                                Circle()
+                                    .stroke(Color.black, lineWidth: 2)
+                            )
+                            .offset(x: -8, y: -4)
+                            .scaleEffect(createCartButtonVisible ? 1 : 0)
+                            .animation(
+                                .spring(response: 0.3, dampingFraction: 0.6),
+                                value: createCartButtonVisible
+                            )
+                    }
+                })
+                .buttonStyle(.solid)
+                .padding(.bottom, 40)
+                .scaleEffect(createCartButtonVisible ? buttonScale : 0)
+                .animation(.spring(response: 0.3, dampingFraction: 0.6), value: createCartButtonVisible)
+                .animation(.spring(response: 0.3, dampingFraction: 0.6), value: buttonScale)
+                .disabled(!hasActiveItems)
+                .onChange(of: hasActiveItems) { oldValue, newValue in
+                    if newValue {
+                        if !oldValue {
+                            withAnimation(.spring(duration: 0.4)) {
+                                fillAnimation = 1.0
+                            }
+                            startButtonBounce()
+                        }
+                    } else {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            fillAnimation = 0.0
+                            buttonScale = 0
+                        }
                     }
                 }
-            }) {
-                Text(existingCart != nil ? "Add to Cart" : "Create cart")
-                    .fuzzyBubblesFont(16, weight: .bold)
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 12)
-                    .background(
-                        Capsule()
-                            .fill(
-                                hasActiveItems
-                                ? RadialGradient(
-                                    colors: [Color.black, Color.gray.opacity(0.3)],
-                                    center: .center,
-                                    startRadius: 0,
-                                    endRadius: fillAnimation * 300
-                                )
-                                : RadialGradient(
-                                    colors: [Color.gray.opacity(0.3), Color.gray.opacity(0.3)],
-                                    center: .center,
-                                    startRadius: 0,
-                                    endRadius: 0
-                                )
-                            )
-                    )
-                    .cornerRadius(25)
-            }
-            .buttonStyle(.solid)
-            .padding(.bottom, 20)
-            .scaleEffect(createCartButtonVisible ? buttonScale : 0)
-            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: createCartButtonVisible)
-            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: buttonScale)
-            .disabled(!hasActiveItems)
-            .onChange(of: hasActiveItems) { oldValue, newValue in
-                if newValue {
-                    if !oldValue {
-                        withAnimation(.spring(duration: 0.4)) {
-                            fillAnimation = 1.0
-                        }
-                        startButtonBounce()
-                    }
-                } else {
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        fillAnimation = 0.0
+                .onAppear {
+                    if hasActiveItems {
+                        fillAnimation = 1.0
+                        buttonScale = 1.0
+                    } else {
                         buttonScale = 0
                     }
                 }
             }
-            .onAppear {
-                if hasActiveItems {
-                    fillAnimation = 1.0
-                    buttonScale = 1.0
-                } else {
-                    buttonScale = 0
-                }
-            }
-            
-   
-            if hasActiveItems {
-                Text("\(cartViewModel.activeCartItems.count)")
-                    .fuzzyBubblesFont(16, weight: .bold)
-                    .contentTransition(.numericText())
-                    .animation(.spring(response: 0.3, dampingFraction: 0.7), value: cartViewModel.activeCartItems.count)
-                    .foregroundColor(.black)
-                    .frame(width: 25, height: 25)
-                    .background(Color.white)
-                    .clipShape(Circle())
-                    .overlay(
-                        Circle()
-                            .stroke(Color.black, lineWidth: 2)
-                    )
-                    .offset(x: -8, y: -4)
-                    .scaleEffect(createCartButtonVisible ? 1 : 0)
-                    .animation(
-                        .spring(response: 0.3, dampingFraction: 0.6),
-                        value: createCartButtonVisible
-                    )
-            }
+            .frame(maxWidth: .infinity)
         }
+        .ignoresSafeArea(.all, edges: .bottom)
+    
     }
     
     private func selectCategory(_ category: GroceryCategory, proxy: ScrollViewProxy) {

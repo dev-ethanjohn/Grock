@@ -297,26 +297,26 @@ struct VaultItemRow: View {
         .padding(.vertical, 8)
         .background(.white)
         .animation(.spring(response: 0.4, dampingFraction: 0.7), value: isActive)
-        .offset(x: offset)
-        .gesture(
-            DragGesture()
-                .onChanged { value in
-                    if value.translation.width < 0 {
-                        offset = value.translation.width
-                    }
-                }
-                .onEnded { value in
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                        if value.translation.width < -100 {
-                            offset = -80
-                            isSwiped = true
-                        } else {
-                            offset = 0
-                            isSwiped = false
-                        }
-                    }
-                }
-        )
+//        .offset(x: offset)
+//        .gesture(
+//            DragGesture()
+//                .onChanged { value in
+//                    if value.translation.width < 0 {
+//                        offset = value.translation.width
+//                    }
+//                }
+//                .onEnded { value in
+//                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+//                        if value.translation.width < -100 {
+//                            offset = -80
+//                            isSwiped = true
+//                        } else {
+//                            offset = 0
+//                            isSwiped = false
+//                        }
+//                    }
+//                }
+//        )
     }
 }
 
