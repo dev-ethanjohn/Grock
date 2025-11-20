@@ -2,6 +2,8 @@ import SwiftUI
 
 struct AddItemPopover: View {
     @Binding var isPresented: Bool
+    @Binding var createCartButtonVisible: Bool
+    
     var onSave: ((String, GroceryCategory, String, String, Double) -> Void)?
     var onDismiss: (() -> Void)?
     
@@ -64,7 +66,10 @@ struct AddItemPopover: View {
                         )
                 }
                 
-                FormCompletionButton.doneButton(isEnabled: formViewModel.isFormValid, maxWidth: true) {
+                FormCompletionButton.doneButton(isEnabled: formViewModel.isFormValid,
+                                                verticalPadding: 12,
+                                                maxWidth: true)
+                {
                     if formViewModel.attemptSubmission(),
                        let category = formViewModel.selectedCategory,
                        let priceValue = Double(formViewModel.itemPrice) {
@@ -104,6 +109,10 @@ struct AddItemPopover: View {
         }
         .onDisappear {
             formViewModel.resetForm()
+            
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                createCartButtonVisible = true
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
             withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {

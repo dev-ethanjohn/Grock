@@ -48,7 +48,7 @@ struct OnboardingLastStoreView: View {
     }
     
     private var storeNameField: some View {
-        TextField("e.g. Walmart, SM, Costco", text: $viewModel.formViewModel.storeName)
+        TextField("e.g. Public Market...", text: $viewModel.formViewModel.storeName)
             .normalizedText($viewModel.formViewModel.storeName)
             .multilineTextAlignment(.center)
             .autocorrectionDisabled()
@@ -150,6 +150,7 @@ struct OnboardingLastStoreView: View {
     private var nextButton: some View {
         FormCompletionButton.nextButton(
             isEnabled: viewModel.formViewModel.isValidStoreName,
+            cornerRadius: 50,
             appearanceScale: viewModel.showNextButton ? 1.0 : 0.0,
             shakeOffset: viewModel.shakeOffset
         ) {

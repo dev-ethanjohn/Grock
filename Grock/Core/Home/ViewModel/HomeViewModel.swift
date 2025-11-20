@@ -23,6 +23,7 @@ final class HomeViewModel {
     // MARK: - UI State
     var selectedTab: Int = 0
     var showVault: Bool = false
+//    var showCreateCartPopover: Bool = false
     var selectedCart: Cart?
     var pendingSelectedCart: Cart? = nil
     
@@ -76,15 +77,36 @@ final class HomeViewModel {
     }
     
     // MARK: - User Actions
-    func handleCreateCart() {
-        print("🏠 Create cart button tapped")
-        showVault = true
-    }
+//    func handleCreateCart() {
+//        print("🏠 Create cart button tapped")
+//        showCreateCartPopover = true
+//    }
     
     func handleVaultButton() {
         print("🏠 Vault button tapped")
         showVault = true
     }
+
+    // Add this method to HomeViewModel
+    func createEmptyCart(title: String, budget: Double) {
+        print("🏠 HomeViewModel: Creating empty cart '\(title)' with budget \(budget)")
+        
+        if let newCart = cartViewModel.createEmptyCart(name: title, budget: budget) {
+            print("✅ Empty cart created: \(newCart.name)")
+            // Auto-select the new cart
+            selectedCart = newCart
+        }
+    }
+    
+    func handleCreateCartConfirmation(title: String, budget: Double) {
+        createEmptyCart(title: title, budget: budget)
+//        showCreateCartPopover = false
+    }
+
+    func handleCreateCartCancellation() {
+//        showCreateCartPopover = false
+    }
+
     
     func toggleMenu() {
         showMenu.toggle()

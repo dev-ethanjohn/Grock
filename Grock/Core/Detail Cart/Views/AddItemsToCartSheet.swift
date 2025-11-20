@@ -11,6 +11,7 @@ struct AddItemsToCartSheet: View {
     @State private var selectedCategory: GroceryCategory?
     @State private var toolbarAppeared = false
     @State private var showAddItemPopover = false
+    @State private var createCartButtonVisible = true
     
     // Use LOCAL state for active items in this sheet
     @State private var localActiveItems: [String: Double] = [:]
@@ -65,6 +66,7 @@ struct AddItemsToCartSheet: View {
                 
                 AddItemPopover(
                     isPresented: $showAddItemPopover,
+                    createCartButtonVisible: $createCartButtonVisible,
                     onSave: { itemName, category, store, unit, price in
                         vaultService.addItem(
                             name: itemName,
@@ -120,22 +122,22 @@ struct AddItemsToCartSheet: View {
     }
     
     private var customToolbar: some View {
-//        HStack {
-//            if let selectedCategory = selectedCategory {
-//                Text(selectedCategory.title)
-//                    .lexendFont(13, weight: .bold)
-//            } else {
-//                Text("Add Items")
-//                    .lexendFont(13, weight: .bold)
-//            }
-//            
-//            
-//            
-//            Spacer()
-//
-//        }
-//        .padding(.horizontal)
-//        .background(Color.white)
+        //        HStack {
+        //            if let selectedCategory = selectedCategory {
+        //                Text(selectedCategory.title)
+        //                    .lexendFont(13, weight: .bold)
+        //            } else {
+        //                Text("Add Items")
+        //                    .lexendFont(13, weight: .bold)
+        //            }
+        //
+        //
+        //
+        //            Spacer()
+        //
+        //        }
+        //        .padding(.horizontal)
+        //        .background(Color.white)
         
         HStack {
             if let category = selectedCategory {
@@ -150,9 +152,9 @@ struct AddItemsToCartSheet: View {
             }
             Spacer()
         }
-//        .padding(.horizontal)
-//        .padding(.top, 8)
-//        .padding(.bottom, 4)
+        //        .padding(.horizontal)
+        //        .padding(.top, 8)
+        //        .padding(.bottom, 4)
         .padding(.horizontal)
         .background(Color.white)
     }
@@ -338,7 +340,7 @@ struct AddItemsToCartSheet: View {
         
         return foundCategory.items.count
     }
-
+    
     private func hasItems(in category: GroceryCategory) -> Bool {
         return getTotalItemCount(for: category) > 0
     }
@@ -494,7 +496,7 @@ struct AddItemsStoreSection: View {
 
 // MARK: - VaultItemRow for Add Items Sheet (using local state)
 struct AddItemsVaultItemRow: View {
-//    let cart: Cart
+    //    let cart: Cart
     let item: Item
     let category: GroceryCategory?
     @Binding var localActiveItems: [String: Double]
@@ -555,9 +557,9 @@ struct AddItemsVaultItemRow: View {
                     Text(item.name)
                         .foregroundColor(isActive ? .black : Color(hex: "999"))
                     //TODO: fix this
-//                    + Text(" >")
-//                        .fuzzyBubblesFont(20, weight: .bold)
-//                        .foregroundStyle(Color(hex: "CCCCCC"))
+                    //                    + Text(" >")
+                    //                        .fuzzyBubblesFont(20, weight: .bold)
+                    //                        .foregroundStyle(Color(hex: "CCCCCC"))
                     
                     if let priceOption = item.priceOptions.first {
                         HStack(spacing: 0) {
@@ -703,7 +705,7 @@ struct AddItemsVaultItemRow: View {
                 onSave: { updatedItem in
                     print("✅ Updated item: \(updatedItem.name)")
                 }
-//                context: .cart
+                //                context: .cart
             )
             .environment(vaultService)
             .presentationDetents([.medium, .fraction(0.75)])

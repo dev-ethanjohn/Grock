@@ -1,54 +1,67 @@
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct HomeView: View {
     @Environment(VaultService.self) private var vaultService
     @Environment(CartViewModel.self) private var cartViewModel
     @State private var viewModel: HomeViewModel
-    
+
     @State private var tabs: [CartTabsModel] = [
         .init(id: CartTabsModel.Tab.active),
         .init(id: CartTabsModel.Tab.completed),
-        .init(id: CartTabsModel.Tab.statistics)
+        .init(id: CartTabsModel.Tab.statistics),
     ]
-    
+
+    @State private var showCreateCartPopover = false
+
     @State private var activeTab: CartTabsModel.Tab = .active
     @State private var tabBarScrollState: CartTabsModel.Tab?
     @State private var progress: CGFloat = .zero
     @State private var isDragging: Bool = false
     @State private var delayTask: DispatchWorkItem?
-    
+
     //create post trasnsition/animation interaction
     @State private var showCreatePost: Bool = false
     @State private var isAnimating = false
     @State private var isScalingDown = false
-    
+
     @State private var vaultButtonScale: CGFloat = 1.0
-    
-    
+
     init(viewModel: HomeViewModel) {
         self._viewModel = State(initialValue: viewModel)
     }
-    
+
     var body: some View {
         NavigationStack {
             ZStack(alignment: .top) {
                 Color.white.ignoresSafeArea()
-                
+
                 MenuView()
                     .opacity(viewModel.showMenu ? 1 : 0)
                     .offset(x: viewModel.showMenu ? 0 : -300)
-                    .rotation3DEffect(.degrees(viewModel.showMenu ? 0 : 30), axis: (x: 0, y: 1, z: 0))
-                
+                    .rotation3DEffect(
+                        .degrees(viewModel.showMenu ? 0 : 30),
+                        axis: (x: 0, y: 1, z: 0)
+                    )
+
                 mainContent
-                
+
                 menuIcon
             }
             .clipShape(RoundedRectangle(cornerRadius: 24))
             .ignoresSafeArea()
             .sheet(isPresented: $viewModel.showVault) {
-                          vaultSheet
+                vaultSheet
             }
+            .overlay {
+                if showCreateCartPopover {
+                    Color.black.opacity(0.4)
+                        .ignoresSafeArea()
+                        .transition(.opacity)
+
+                }
+            }
+            .animation(.easeInOut(duration: 0.3), value: showCreateCartPopover)
             .fullScreenCover(item: $viewModel.selectedCart) { cart in
                 CartDetailScreen(cart: cart)
                     .onDisappear {
@@ -56,13 +69,19 @@ struct HomeView: View {
                     }
                     .presentationCornerRadius(24)
             }
-            //TODO: USE this, but fix the celeberation + manage button. 
-//            .navigationDestination(item: $viewModel.selectedCart, destination: { cart in
-//                CartDetailScreen(cart: cart)
-//                    .onDisappear {
-//                        viewModel.selectedCart = nil
-//                    }
-//            })
+            .fullScreenCover(isPresented: $showCreateCartPopover) {
+                CreateCartPopover(
+                    isPresented: $showCreateCartPopover,
+                    onConfirm: { title, budget in
+                        viewModel.createEmptyCart(title: title, budget: budget)
+                        showCreateCartPopover = false
+                    },
+                    onCancel: {
+                        showCreateCartPopover = false
+                    }
+                )
+                .presentationBackground(.clear)
+            }
             .onAppear {
                 viewModel.loadCarts()
                 print("🏠 HomeView appeared - carts: \(viewModel.carts.count)")
@@ -74,28 +93,30 @@ struct HomeView: View {
                 }
             }
             .onChange(of: viewModel.selectedCart) { oldValue, newValue in
-                print("🔄 HomeView: selectedCart changed to \(newValue?.name ?? "nil")")
+                print(
+                    "🔄 HomeView: selectedCart changed to \(newValue?.name ?? "nil")"
+                )
             }
             .onChange(of: viewModel.showVault) { oldValue, newValue in
-                          // Animate scale immediately when showVault changes
-                          withAnimation(.easeInOut(duration: 0.15)) {
-                              vaultButtonScale = newValue ? 0.9 : 1.0
+                // Animate scale immediately when showVault changes
+                withAnimation(.easeInOut(duration: 0.15)) {
+                    vaultButtonScale = newValue ? 0.9 : 1.0
                 }
             }
         }
     }
-    
+
     // MARK: - Main Components
     private var mainContent: some View {
         ZStack(alignment: .topLeading) {
             Color.white.ignoresSafeArea()
-            
+
             tabsOnly()
-            
+
             headerView
-            
+
             homeMenu
-            
+
             VStack {
                 Spacer()
                 createCartButton
@@ -103,35 +124,43 @@ struct HomeView: View {
             }
         }
         .ignoresSafeArea()
-        .mask(RoundedRectangle(cornerRadius: viewModel.showMenu ? 30 : 24, style: .continuous))
-        .rotation3DEffect(.degrees(viewModel.showMenu ? 30 : 0), axis: (x: 0, y: -1, z: 0))
+        .mask(
+            RoundedRectangle(
+                cornerRadius: viewModel.showMenu ? 30 : 24,
+                style: .continuous
+            )
+        )
+        .rotation3DEffect(
+            .degrees(viewModel.showMenu ? 30 : 0),
+            axis: (x: 0, y: -1, z: 0)
+        )
         .offset(x: viewModel.showMenu ? 265 : 0)
         .scaleEffect(viewModel.showMenu ? 0.9 : 1)
         .shadow(color: Color.black.opacity(0.12), radius: 10, x: -2, y: -5)
         .shadow(color: Color.black.opacity(0.12), radius: 10, x: 2, y: 0)
     }
-    
+
     @ViewBuilder
     private func tabsOnly() -> some View {
         GeometryReader {
             let size = $0.size
-            
+
             TabView(selection: $activeTab) {
                 ActiveCarts(viewModel: viewModel)
                     .tag(CartTabsModel.Tab.active)
                     .frame(width: size.width, height: size.height)
                     .rect { tabProgress(.active, rect: $0, size: size) }
-                
+
                 Text("Completed")
                     .tag(CartTabsModel.Tab.completed)
                     .frame(width: size.width, height: size.height)
                     .rect { tabProgress(.completed, rect: $0, size: size) }
-                
+
                 Text("Statistics")
                     .tag(CartTabsModel.Tab.statistics)
                     .frame(width: size.width, height: size.height)
                     .rect { tabProgress(.statistics, rect: $0, size: size) }
-                
+
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
             .allowsHitTesting(!isDragging)
@@ -143,7 +172,7 @@ struct HomeView: View {
             }
         }
     }
-    
+
     @ViewBuilder
     func exploreTabBar() -> some View {
         HStack(spacing: 20) {
@@ -154,23 +183,37 @@ struct HomeView: View {
                 .scrollTargetLayout()
                 .padding(.leading, 2)
             }
-            .scrollPosition(id: .init(get: {
-                return tabBarScrollState
-            }, set: { _ in
-                
-            }), anchor: .center)
+            .scrollPosition(
+                id: .init(
+                    get: {
+                        return tabBarScrollState
+                    },
+                    set: { _ in
+
+                    }
+                ),
+                anchor: .center
+            )
             .overlay(alignment: .bottom) {
                 ZStack(alignment: .leading) {
                     Rectangle()
                         .fill(.clear)
                         .frame(height: 0.5)
-                    
-                    let inputRange = tabs.indices.compactMap { return CGFloat($0) }
+
+                    let inputRange = tabs.indices.compactMap {
+                        return CGFloat($0)
+                    }
                     let ouputRange = tabs.compactMap { return $0.size.width }
                     let outputPositionRange = tabs.compactMap { return $0.minX }
-                    let indicatorWidth = progress.interpolate(inputRange: inputRange, outputRange: ouputRange)
-                    let indicatorPosition = progress.interpolate(inputRange: inputRange, outputRange: outputPositionRange)
-                    
+                    let indicatorWidth = progress.interpolate(
+                        inputRange: inputRange,
+                        outputRange: ouputRange
+                    )
+                    let indicatorPosition = progress.interpolate(
+                        inputRange: inputRange,
+                        outputRange: outputPositionRange
+                    )
+
                     Capsule()
                         .fill(Color.black)
                         .frame(width: indicatorWidth, height: 2)
@@ -180,33 +223,45 @@ struct HomeView: View {
             .scrollIndicators(.hidden)
         }
     }
-    
+
     private func tabsCart() -> some View {
         ForEach($tabs) { $tab in
             Button(action: {
                 delayTask?.cancel()
                 delayTask = nil
-                
+
                 isDragging = true
-                
+
                 withAnimation(.easeInOut(duration: 0.3)) {
                     activeTab = tab.id
                     tabBarScrollState = tab.id
-                    progress = CGFloat(tabs.firstIndex(where: { $0.id == tab.id }) ?? 0)
+                    progress = CGFloat(
+                        tabs.firstIndex(where: { $0.id == tab.id }) ?? 0
+                    )
                 }
-                
+
                 delayTask = .init { isDragging = false }
-                
-                if let delayTask { DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: delayTask) }
+
+                if let delayTask {
+                    DispatchQueue.main.asyncAfter(
+                        deadline: .now() + 0.3,
+                        execute: delayTask
+                    )
+                }
             }) {
                 Text(tab.id.rawValue)
                     .lexendFont(14, weight: .medium)
                     .padding(.top, 8)
                     .padding(.bottom, 10)
-                    .foregroundStyle(activeTab == tab.id ? Color.black : Color(.systemGray))
+                    .foregroundStyle(
+                        activeTab == tab.id ? Color.black : Color(.systemGray)
+                    )
                     .contentShape(.rect)
                     .scaleEffect(activeTab == tab.id ? 1.05 : 1.0)
-                    .animation(.spring(response: 0.4, dampingFraction: 0.4), value: activeTab)
+                    .animation(
+                        .spring(response: 0.4, dampingFraction: 0.4),
+                        value: activeTab
+                    )
             }
             .buttonStyle(.plain)
             .rect { rect in
@@ -215,14 +270,16 @@ struct HomeView: View {
             }
         }
     }
-    
+
     func tabProgress(_ tab: CartTabsModel.Tab, rect: CGRect, size: CGSize) {
-        if let index = tabs.firstIndex(where: { $0.id == activeTab }), activeTab == tab, !isDragging {
+        if let index = tabs.firstIndex(where: { $0.id == activeTab }),
+            activeTab == tab, !isDragging
+        {
             let offsetX = rect.minX - (size.width * CGFloat(index))
             progress = -offsetX / size.width
         }
     }
-    
+
     private var menuIcon: some View {
         MenuIcon {
             withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
@@ -237,9 +294,7 @@ struct HomeView: View {
         )
         .opacity(viewModel.menuIconOpacity)
     }
-    
- 
-    
+
     private var headerView: some View {
         VStack(spacing: 0) {
             HStack {
@@ -248,7 +303,7 @@ struct HomeView: View {
             }
             .padding(.trailing)
             .padding(.top, 60)
-            
+
             VStack(spacing: 12) {
                 greetingText
                 exploreTabBar()
@@ -270,7 +325,7 @@ struct HomeView: View {
             }
         )
     }
-    
+
     private var homeMenu: some View {
         HStack {
             MenuIcon {
@@ -278,10 +333,13 @@ struct HomeView: View {
                     viewModel.toggleMenu()
                 }
             }
-            
+
             Menu {
                 Button(role: .destructive, action: viewModel.resetApp) {
-                    Label("Reset App (Testing)", systemImage: "arrow.counterclockwise")
+                    Label(
+                        "Reset App (Testing)",
+                        systemImage: "arrow.counterclockwise"
+                    )
                 }
             } label: {
                 Image(systemName: "arrow.counterclockwise")
@@ -295,14 +353,14 @@ struct HomeView: View {
         .offset(x: viewModel.showMenu ? 40 : 0, y: viewModel.showMenu ? 40 : 0)
         .opacity(viewModel.showMenu ? 0 : 1)
     }
-    
+
     private var headerBackground: some View {
         ZStack {
             LinearGradient(
                 gradient: Gradient(stops: [
                     .init(color: Color.white.opacity(0.85), location: 0),
                     .init(color: Color.white.opacity(0.95), location: 0.1),
-                    .init(color: Color.white.opacity(1.0), location: 0.2)
+                    .init(color: Color.white.opacity(1.0), location: 0.2),
                 ]),
                 startPoint: .bottom,
                 endPoint: .top
@@ -318,25 +376,25 @@ struct HomeView: View {
             }
         }
     }
-    
+
     private var greetingText: some View {
         Text("Hi Ethan,")
             .lexendFont(36, weight: .bold)
             .frame(maxWidth: .infinity, alignment: .leading)
     }
-    
-//    private var tabButtons: some View {
-//        HStack(spacing: 4) {
-//            tabButton(title: "Planned", tabIndex: 0)
-//            tabButton(title: "History", tabIndex: 1)
-//        }
-//        .frame(maxWidth: .infinity, alignment: .leading)
-//    }
-    
 
-    
+    //    private var tabButtons: some View {
+    //        HStack(spacing: 4) {
+    //            tabButton(title: "Planned", tabIndex: 0)
+    //            tabButton(title: "History", tabIndex: 1)
+    //        }
+    //        .frame(maxWidth: .infinity, alignment: .leading)
+    //    }
+
     private var createCartButton: some View {
-        Button(action: viewModel.handleCreateCart) {
+        Button(action: {
+            showCreateCartPopover = true
+        }) {
             Text("Create Cart")
                 .fuzzyBubblesFont(18, weight: .bold)
                 .padding(.vertical, 12)
@@ -348,7 +406,7 @@ struct HomeView: View {
         .padding(.bottom)
         .padding(.bottom, 20)
     }
-    
+
     private var trailingToolbarButton: some View {
         Button(action: {
             withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
@@ -374,7 +432,7 @@ struct HomeView: View {
                         colors: [
                             .white.opacity(0.2),
                             .clear,
-                            .black.opacity(0.1)
+                            .black.opacity(0.1),
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
@@ -390,9 +448,11 @@ struct HomeView: View {
             )
             .scaleEffect(viewModel.showVault ? 0 : 1.0)
         }
-        .buttonStyle(VaultCoordinatedButtonStyle(showVault: viewModel.showVault))
+        .buttonStyle(
+            VaultCoordinatedButtonStyle(showVault: viewModel.showVault)
+        )
     }
-    
+
     private var vaultSheet: some View {
         NavigationStack {
             VaultView(onCreateCart: viewModel.onCreateCartFromVault)
@@ -409,24 +469,30 @@ struct HomeView: View {
                 .padding(.horizontal, 16)
                 .padding(.vertical, 4)
                 .background(viewModel.selectedTab == tabIndex ? .black : .clear)
-                .foregroundColor(viewModel.selectedTab == tabIndex ? .white : .black)
+                .foregroundColor(
+                    viewModel.selectedTab == tabIndex ? .white : .black
+                )
                 .clipShape(Capsule())
         }
     }
 }
 
-
 struct VaultCoordinatedButtonStyle: ButtonStyle {
     let showVault: Bool
-    
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .scaleEffect(
-                configuration.isPressed ? 0 :
-                    showVault ? 0.5 : 1.0
+                configuration.isPressed ? 0 : showVault ? 0.5 : 1.0
             )
-            .animation(.spring(response: 0.3, dampingFraction: 0.75), value: configuration.isPressed)
-            .animation(.spring(response: 0.3, dampingFraction: 0.75), value: showVault)
+            .animation(
+                .spring(response: 0.3, dampingFraction: 0.75),
+                value: configuration.isPressed
+            )
+            .animation(
+                .spring(response: 0.3, dampingFraction: 0.75),
+                value: showVault
+            )
             .brightness(configuration.isPressed ? -0.2 : 0)
     }
 }

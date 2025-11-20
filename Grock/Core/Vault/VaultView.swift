@@ -51,6 +51,7 @@ struct VaultView: View {
                         onAddTapped: {
                             withAnimation(.easeInOut(duration: 0.2)) {
                                 showAddItemPopover = true
+                                createCartButtonVisible = false
                             }
                         }
                     )
@@ -68,9 +69,7 @@ struct VaultView: View {
             } else {
                 ProgressView()
                     .onAppear {
-                        //                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                         vaultReady = true
-                        //                        }
                     }
             }
             
@@ -79,16 +78,12 @@ struct VaultView: View {
                 
                 content
                 
-//                                .onChange(of: createCartButtonVisible) { oldValue, newValue in
-//                                    withAnimation(.spring(response: 0.6, dampingFraction: 0.6)) {
-//                                        cartBadgeVisible = newValue
-//                                    }
-//                                }
             }
             
             if showAddItemPopover {
                 AddItemPopover(
                     isPresented: $showAddItemPopover,
+                    createCartButtonVisible: $createCartButtonVisible, // Add this line
                     onSave: { itemName, category, store, unit, price in
                         vaultService.addItem(
                             name: itemName,
@@ -99,7 +94,9 @@ struct VaultView: View {
                         )
                     },
                     onDismiss: {
-                        showCreateCartButton()
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                            createCartButtonVisible = true
+                        }
                     }
                 )
                 .transition(.opacity)
@@ -465,7 +462,6 @@ struct VaultView: View {
                     .foregroundColor(.white)
                     .padding(.horizontal, 24)
                     .padding(.vertical, 12)
-                //                            .background(hasActiveItems ? .black : .gray)
                     .background(
                         Capsule()
                             .fill(
@@ -486,7 +482,7 @@ struct VaultView: View {
                     )
                     .cornerRadius(25)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.solid)
             .padding(.bottom, 20)
             .scaleEffect(createCartButtonVisible ? buttonScale : 0)
             .animation(.spring(response: 0.3, dampingFraction: 0.6), value: createCartButtonVisible)
@@ -516,7 +512,7 @@ struct VaultView: View {
                 }
             }
             
-            // MARK: TODO - Add 0.3 delay before it scales to 1, no delay to scale 0.
+   
             if hasActiveItems {
                 Text("\(cartViewModel.activeCartItems.count)")
                     .fuzzyBubblesFont(16, weight: .bold)
@@ -531,11 +527,10 @@ struct VaultView: View {
                             .stroke(Color.black, lineWidth: 2)
                     )
                     .offset(x: -8, y: -4)
-                    .scaleEffect(hasActiveItems ? 1 : 0)
-                    .transition(.scale)
+                    .scaleEffect(createCartButtonVisible ? 1 : 0)
                     .animation(
-                        .spring(response: 0.6, dampingFraction: 0.6),
-                        value: cartBadgeVisible
+                        .spring(response: 0.3, dampingFraction: 0.6),
+                        value: createCartButtonVisible
                     )
             }
         }
@@ -661,3 +656,17 @@ struct VaultView: View {
 
 
 
+
+
+// Add this extension somewhere in your project
+extension ButtonStyle where Self == SolidButtonStyle {
+    static var solid: SolidButtonStyle { SolidButtonStyle() }
+}
+
+struct SolidButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
+            .animation(.interactiveSpring(), value: configuration.isPressed)
+    }
+}

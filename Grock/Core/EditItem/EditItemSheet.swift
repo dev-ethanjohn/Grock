@@ -1,7 +1,6 @@
 import SwiftUI
 import SwiftData
 
-//sa huli palagi,,,  song
 struct EditItemSheet: View {
     let item: Item
     var onSave: ((Item) -> Void)?
@@ -25,13 +24,6 @@ struct EditItemSheet: View {
                             itemNameFieldIsFocused: $itemNameFieldIsFocused,
                             showCategoryTooltip: false
                         )
-                        
-                        DashedLine()
-                            .stroke(style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
-                            .frame(height: 1)
-                            .foregroundColor(Color(hex: "ddd"))
-                            .padding(.vertical, 6)
-                            .padding(.horizontal)
                         
                         if context == .cart {
                             HStack(spacing: 0) {
@@ -88,6 +80,9 @@ struct EditItemSheet: View {
                 EditItemSaveButton(isEditFormValid: formViewModel.isFormValid) {
                     if formViewModel.attemptSubmission() {
                         saveChanges()
+                    } else {
+                        let generator = UINotificationFeedbackGenerator()
+                        generator.notificationOccurred(.warning)
                     }
                 }
             }
@@ -134,6 +129,3 @@ struct EditItemSheet: View {
         }
     }
 }
-
-
-

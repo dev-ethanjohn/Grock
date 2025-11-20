@@ -34,7 +34,6 @@ struct EditItemSaveButton: View {
                 )
                 .scaleEffect(buttonScale)
         }
-        .disabled(!isEditFormValid)
         .onChange(of: isEditFormValid) { oldValue, newValue in
             if newValue {
                 if !oldValue {

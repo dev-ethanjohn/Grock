@@ -175,8 +175,11 @@ struct CartConfirmationPopover: View {
     
     @State private var cartTitle: String = ""
     @State private var budget: String = ""
+    
     @FocusState private var focusedField: Field?
     @State private var showing = false
+    
+    
     
     private enum Field {
         case title, budget
@@ -248,6 +251,7 @@ struct CartConfirmationPopover: View {
     private var titleSection: some View {
         VStack(spacing: 0) {
             TextField("Shopping List", text: $cartTitle)
+                .normalizedText($cartTitle)
                 .lexendFont(20, weight: .semibold)
                 .foregroundColor(.black)
                 .multilineTextAlignment(.leading)
@@ -331,6 +335,9 @@ struct CartConfirmationPopover: View {
                     .lexendFont(16, weight: .medium)
             }
             
+            Divider()
+                .padding(.vertical, 6)
+            
             budgetRow
                 .padding(.bottom)
         }
@@ -349,8 +356,6 @@ struct CartConfirmationPopover: View {
     private var cancelButton: some View {
         Button(action: {
             focusedField = nil
-            
-            // This stays EXACTLY the same
             withAnimation(.interpolatingSpring(mass: 1.0, stiffness: 100, damping: 10, initialVelocity: 0)) {
                 showing = false
             }
@@ -364,13 +369,22 @@ struct CartConfirmationPopover: View {
                 .foregroundColor(.black)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 12)
-                .background(Color.gray.opacity(0.2))
+                .background(.white)
                 .cornerRadius(10)
         }
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Color(.systemGray4), lineWidth: 1)
+        )
     }
     
     private var confirmButton: some View {
-        Button(action: {
+        FormCompletionButton.createCartButton(
+            isEnabled: canConfirm,
+            cornerRadius: 10,
+            verticalPadding: 12,
+            maxWidth: true
+        ) {
             focusedField = nil
             
             withAnimation(.interpolatingSpring(mass: 1.0, stiffness: 100, damping: 10, initialVelocity: 0)) {
@@ -384,23 +398,21 @@ struct CartConfirmationPopover: View {
                     onConfirm(cartTitle, budgetValue)
                 }
             }
-        })  {
-            Text("Confirm")
-                .fuzzyBubblesFont(16, weight: .bold)
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
-                .background(canConfirm ? Color.black : Color.gray)
-                .cornerRadius(10)
         }
-        .disabled(!canConfirm)
     }
     
     private var budgetRow: some View {
         HStack {
-            Text("Budget:")
-                .lexendFont(16)
+            HStack(spacing: 6) {
+                Text("Budget")
+                Text("(Optional) :")
+                    .foregroundStyle(Color(.systemGray))
+            }
+            .lexendFont(16)
+            
+
             Spacer()
+                
             
             HStack(spacing: 4) {
                 Text("₱")
@@ -413,6 +425,7 @@ struct CartConfirmationPopover: View {
                     .multilineTextAlignment(.trailing)
                     .overlay(
                         TextField("0", text: $budget)
+                            .normalizedNumber($budget)
                             .multilineTextAlignment(.trailing)
                             .keyboardType(.decimalPad)
                             .fixedSize(horizontal: true, vertical: false)

@@ -167,4 +167,33 @@ class CartViewModel {
         let sortedCarts = carts.sorted { $0.createdAt < $1.createdAt }
         return sortedCarts.first?.id == cart.id
     }
+    
+    
+    func createEmptyCart(name: String, budget: Double) -> Cart? {
+        print("🛒 CartViewModel: Creating empty cart '\(name)' with budget \(budget)")
+        
+        let newCart = vaultService.createCartWithActiveItems(
+            name: name,
+            budget: budget,
+            activeItems: [:]
+        )
+        
+        print("🛒 CartViewModel: Empty cart created by VaultService - ID: \(newCart.id), Name: \(newCart.name)")
+        print("🛒 CartViewModel: Cart items count: \(newCart.cartItems.count)")
+
+        loadCarts()
+        
+        if let foundCart = carts.first(where: { $0.id == newCart.id }) {
+            print("✅ CartViewModel: Empty cart found in carts list - setting as current")
+            self.currentCart = foundCart
+        } else {
+            print("⚠️ CartViewModel: Empty cart not found in carts list, using newly created one")
+            self.currentCart = newCart
+            self.carts.append(newCart)
+        }
+        
+        print("✅ CartViewModel: Empty cart creation complete - returning cart")
+        return currentCart
+    }
+    
 }

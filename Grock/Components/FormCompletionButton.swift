@@ -5,13 +5,14 @@ struct FormCompletionButton: View {
     let isEnabled: Bool
     let action: () -> Void
     let maxWidth: Bool
+    let cornerRadius: CGFloat
+    let verticalPadding: CGFloat
     
     // Animation parameters
     let maxRadius: CGFloat
     let bounceScale: (min: CGFloat, mid: CGFloat, max: CGFloat)
     let bounceTiming: (initial: Double, mid: Double, final: Double)
     
-    // New parameters for additional animations
     let appearanceScale: CGFloat
     let shakeOffset: CGFloat
     
@@ -21,6 +22,8 @@ struct FormCompletionButton: View {
     init(
         title: String,
         isEnabled: Bool,
+        cornerRadius: CGFloat = 50,
+        verticalPadding: CGFloat = 6,
         maxRadius: CGFloat = 150,
         bounceScale: (min: CGFloat, mid: CGFloat, max: CGFloat) = (0.95, 1.1, 1.0),
         bounceTiming: (initial: Double, mid: Double, final: Double) = (0.1, 0.3, 0.3),
@@ -31,6 +34,8 @@ struct FormCompletionButton: View {
     ) {
         self.title = title
         self.isEnabled = isEnabled
+        self.cornerRadius = cornerRadius
+        self.verticalPadding = verticalPadding
         self.maxRadius = maxRadius
         self.bounceScale = bounceScale
         self.bounceTiming = bounceTiming
@@ -45,11 +50,11 @@ struct FormCompletionButton: View {
             Text(title)
                 .fuzzyBubblesFont(16, weight: .bold)
                 .foregroundStyle(isEnabled ? .white : Color(.systemGray3))
-                .padding(.vertical, 6)
+                .padding(.vertical, verticalPadding)
                 .padding(.horizontal, 20)
                 .frame(maxWidth: maxWidth ? .infinity : nil)
                 .background(
-                    Capsule()
+                    RoundedRectangle(cornerRadius: cornerRadius)
                         .fill(
                             isEnabled
                             ? RadialGradient(
@@ -69,7 +74,7 @@ struct FormCompletionButton: View {
                 .scaleEffect(buttonScale)
                 .overlay(
                     !isEnabled ?
-                    Capsule()
+                    RoundedRectangle(cornerRadius: cornerRadius)
                         .stroke(Color(.systemGray4), lineWidth: 1)
                     : nil
                 )
@@ -125,10 +130,17 @@ struct FormCompletionButton: View {
 }
 
 extension FormCompletionButton {
-    static func finishButton(isEnabled: Bool, action: @escaping () -> Void) -> FormCompletionButton {
+    static func finishButton(
+        isEnabled: Bool,
+        cornerRadius: CGFloat = 10,
+        verticalPadding: CGFloat = 6,
+        action: @escaping () -> Void
+    ) -> FormCompletionButton {
         FormCompletionButton(
             title: "Finish",
             isEnabled: isEnabled,
+            cornerRadius: cornerRadius,
+            verticalPadding: verticalPadding,
             maxRadius: 150,
             bounceScale: (0.95, 1.1, 1.0),
             bounceTiming: (0.1, 0.3, 0.3),
@@ -136,10 +148,18 @@ extension FormCompletionButton {
         )
     }
     
-    static func doneButton(isEnabled: Bool,maxWidth: Bool = false, action: @escaping () -> Void) -> FormCompletionButton {
+    static func doneButton(
+        isEnabled: Bool,
+        cornerRadius: CGFloat = 10,
+        verticalPadding: CGFloat = 6,
+        maxWidth: Bool = false,
+        action: @escaping () -> Void
+    ) -> FormCompletionButton {
         FormCompletionButton(
             title: "Done",
             isEnabled: isEnabled,
+            cornerRadius: cornerRadius,
+            verticalPadding: verticalPadding,
             maxRadius: 1000,
             bounceScale: (0.98, 1.05, 1.0),
             bounceTiming: (0.1, 0.3, 0.3),
@@ -150,6 +170,8 @@ extension FormCompletionButton {
     
     static func nextButton(
         isEnabled: Bool,
+        cornerRadius: CGFloat = 10,
+        verticalPadding: CGFloat = 6,
         appearanceScale: CGFloat = 1.0,
         shakeOffset: CGFloat = 0,
         action: @escaping () -> Void
@@ -157,6 +179,8 @@ extension FormCompletionButton {
         FormCompletionButton(
             title: "Next",
             isEnabled: isEnabled,
+            cornerRadius: cornerRadius,
+            verticalPadding: verticalPadding,
             maxRadius: 150,
             bounceScale: (0.95, 1.1, 1.0),
             bounceTiming: (0.1, 0.3, 0.3),
@@ -165,4 +189,46 @@ extension FormCompletionButton {
             action: action
         )
     }
+    
+    static func createEmptyCartButton(
+        isEnabled: Bool,
+        cornerRadius: CGFloat = 10,
+        verticalPadding: CGFloat = 6,
+        maxWidth: Bool = false,
+        action: @escaping () -> Void
+    ) -> FormCompletionButton {
+        FormCompletionButton(
+            title: "Create",
+            isEnabled: isEnabled,
+            cornerRadius: cornerRadius,
+            verticalPadding: verticalPadding,
+            maxRadius: 1000,
+            bounceScale: (0.98, 1.05, 1.0),
+            bounceTiming: (0.1, 0.3, 0.3),
+            maxWidth: maxWidth,
+            action: action
+        )
+    }
+    
+    
+    static func createCartButton(
+        isEnabled: Bool,
+        cornerRadius: CGFloat = 10,
+        verticalPadding: CGFloat = 6,
+        maxWidth: Bool = false,
+        action: @escaping () -> Void
+    ) -> FormCompletionButton {
+        FormCompletionButton(
+            title: "Create",
+            isEnabled: isEnabled,
+            cornerRadius: cornerRadius,
+            verticalPadding: verticalPadding,
+            maxRadius: 1000,
+            bounceScale: (0.98, 1.05, 1.0),
+            bounceTiming: (0.1, 0.3, 0.3),
+            maxWidth: maxWidth,
+            action: action
+        )
+    }
+
 }
