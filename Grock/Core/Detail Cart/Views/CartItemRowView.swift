@@ -48,6 +48,8 @@ struct CartItemRowView: View {
     
     var body: some View {
         ZStack(alignment: .trailing) {
+            
+//            delete
             HStack {
                 Spacer()
                 Button(action: {

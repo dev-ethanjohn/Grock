@@ -167,7 +167,7 @@ struct VaultView: View {
             .presentationBackground(.clear)
         }
         .onAppear {
-            printVaultStructure()
+//            printVaultStructure()
             initializeActiveItemsFromExistingCart()
             
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
@@ -223,14 +223,14 @@ struct VaultView: View {
             
             if newValue != oldValue {
                 print("🔄 Vault changed - reprinting structure:")
-                printVaultStructure()
+//                printVaultStructure()
             }
         }
         .onChange(of: showAddItemPopover) { oldValue, newValue in
             if !newValue {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                     print("📝 After adding item - updated vault structure:")
-                    printVaultStructure()
+//                    printVaultStructure()
                 }
             }
         }
@@ -396,7 +396,6 @@ struct VaultView: View {
         }
     }
     
-    // MARK: - Category Items View
     struct CategoryItemsView: View {
         let category: GroceryCategory
         let onDeleteItem: (Item) -> Void
@@ -408,7 +407,8 @@ struct VaultView: View {
             guard let vault = vaultService.vault,
                   let foundCategory = vault.categories.first(where: { $0.name == category.title })
             else { return [] }
-            return foundCategory.items
+            // ADDED: Sort by id for stable order (prevents shuffling after deletion)
+            return foundCategory.items.sorted { $0.id < $1.id }
         }
         
         private var availableStores: [String] {
@@ -615,37 +615,39 @@ struct VaultView: View {
     
     private func deleteItem(_ item: Item) {
         print("🗑️ Deleting item: '\(item.name)'")
-        vaultService.deleteItem(item)
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            print("🔄 After deletion - updated vault structure:")
-            printVaultStructure()
-        }
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+              // Your deletion logic here
+              vaultService.deleteItem(item)
+          }
+//        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+//            print("🔄 After deletion - updated vault structure:")
+//            printVaultStructure()
+//        }
     }
     
-    private func printVaultStructure() {
-        print("\n🔍 ===== VAULT STRUCTURE DEBUG INFO =====")
-        guard let vault = vaultService.vault else {
-            print("❌ No vault found in VaultService!")
-            return
-        }
-        
-        print("🏷️ Vault ID: \(vault.uid)")
-        print("📂 Number of categories in vault: \(vault.categories.count)")
-        
-        let sortedCategories = vault.categories.sorted { $0.sortOrder < $1.sortOrder }
-        
-        for (categoryIndex, category) in sortedCategories.enumerated() {
-            print("\n  📁 Category \(categoryIndex + 1): '\(category.name)'")
-            print("     Number of items: \(category.items.count)")
-            
-            for (itemIndex, item) in category.items.enumerated() {
-                print("     🛒 Item \(itemIndex + 1): '\(item.name)'")
-            }
-        }
-        
-        print("===== END VAULT DEBUG INFO =====")
-    }
+//    private func printVaultStructure() {
+//        print("\n🔍 ===== VAULT STRUCTURE DEBUG INFO =====")
+//        guard let vault = vaultService.vault else {
+//            print("❌ No vault found in VaultService!")
+//            return
+//        }
+//        
+//        print("🏷️ Vault ID: \(vault.uid)")
+//        print("📂 Number of categories in vault: \(vault.categories.count)")
+//        
+//        let sortedCategories = vault.categories.sorted { $0.sortOrder < $1.sortOrder }
+//        
+//        for (categoryIndex, category) in sortedCategories.enumerated() {
+//            print("\n  📁 Category \(categoryIndex + 1): '\(category.name)'")
+//            print("     Number of items: \(category.items.count)")
+//            
+//            for (itemIndex, item) in category.items.enumerated() {
+//                print("     🛒 Item \(itemIndex + 1): '\(item.name)'")
+//            }
+//        }
+//        
+//        print("===== END VAULT DEBUG INFO =====")
+//    }
     
     private func startButtonBounce() {
         withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {

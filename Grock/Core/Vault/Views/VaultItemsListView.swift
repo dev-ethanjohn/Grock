@@ -10,18 +10,20 @@ struct VaultItemsListView: View {
     var body: some View {
         List {
             ForEach(availableStores, id: \.self) { store in
+                let storeItems = itemsForStore(store)
                 StoreSection(
                     storeName: store,
-                    items: itemsForStore(store),
+                    items: storeItems,
                     category: category,
-                    onDeleteItem: onDeleteItem
+                    onDeleteItem: onDeleteItem,
+                    isLastStore: store == availableStores.last
                 )
             }
         }
         .listStyle(PlainListStyle())
         .listSectionSpacing(16)
-        
     }
+    
     private func itemsForStore(_ store: String) -> [Item] {
         items.filter { item in
             item.priceOptions.contains { $0.store == store }
@@ -34,35 +36,38 @@ struct StoreSection: View {
     let items: [Item]
     let category: GroceryCategory?
     var onDeleteItem: ((Item) -> Void)?
+    let isLastStore: Bool
+    
+    private var itemsWithStableIdentifiers: [(id: String, item: Item)] {
+        items.map { ($0.id, $0) }
+    }
     
     var body: some View {
         Section(
-            header:
-                HStack {
-                    Text(storeName)
-                        .fuzzyBubblesFont(11, weight: .bold)
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(category?.pastelColor.saturated(by: 0.3).darker(by: 0.5) ?? Color.primary)
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
-                    Spacer()
-                }
-                .padding(.leading)
-                .listRowInsets(EdgeInsets())
-            
+            header: HStack {
+                Text(storeName)
+                    .fuzzyBubblesFont(11, weight: .bold)
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(category?.pastelColor.saturated(by: 0.3).darker(by: 0.5) ?? Color.primary)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                Spacer()
+            }
+            .padding(.leading)
+            .listRowInsets(EdgeInsets())
         ) {
-            ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+            ForEach(itemsWithStableIdentifiers, id: \.id) { tuple in
                 VStack(spacing: 0) {
                     VaultItemRow(
-                        item: item,
+                        item: tuple.item,
                         category: category,
                         onDelete: {
-                            onDeleteItem?(item)
+                            onDeleteItem?(tuple.item)
                         }
                     )
                     
-                    if index < items.count - 1 {
+                    if tuple.id != itemsWithStableIdentifiers.last?.id {
                         DashedLine()
                             .stroke(style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
                             .frame(height: 1)
