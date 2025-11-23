@@ -34,6 +34,9 @@ struct VaultView: View {
     // NEW: Loading state to prevent animation issues
     @State private var vaultReady = false
     
+    // Add duplicate error state
+    @State private var duplicateError: String?
+    
     private var hasActiveItems: Bool {
         !cartViewModel.activeCartItems.isEmpty
     }
@@ -82,15 +85,22 @@ struct VaultView: View {
             if showAddItemPopover {
                 AddItemPopover(
                     isPresented: $showAddItemPopover,
-                    createCartButtonVisible: $createCartButtonVisible, // Add this line
+                    createCartButtonVisible: $createCartButtonVisible,
                     onSave: { itemName, category, store, unit, price in
-                        vaultService.addItem(
+                        let success = vaultService.addItem(
                             name: itemName,
                             to: category,
                             store: store,
                             price: price,
                             unit: unit
                         )
+                        
+                        if success {
+                            print("✅ Item added to vault: \(itemName)")
+                        } else {
+                            print("❌ Failed to add item - duplicate name: \(itemName)")
+                            // You might want to show an alert here
+                        }
                     },
                     onDismiss: {
                         withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {

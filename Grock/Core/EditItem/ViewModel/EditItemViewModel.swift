@@ -25,6 +25,9 @@ class EditItemViewModel {
     var newStoreName = ""
     var itemNameFieldIsFocused = false
     
+    // MARK: - Error State
+    var duplicateError: String?
+    
     // MARK: - Computed Properties
     var selectedCategoryEmoji: String {
         selectedCategory?.emoji ?? "plus.circle.fill"
@@ -39,6 +42,10 @@ class EditItemViewModel {
         selectedCategory != nil &&
         !storeName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
         Double(price) != nil
+    }
+    
+    var isFormValidForSave: Bool {
+        isFormValid && duplicateError == nil
     }
     
     // MARK: - Initialization
@@ -83,11 +90,19 @@ class EditItemViewModel {
         guard let priceValue = Double(price),
               let selectedCategory = selectedCategory else { return false }
         
+        // Validate for duplicates (excluding current item)
+        let validation = vaultService.validateItemName(itemName, excluding: item.id)
+        if !validation.isValid {
+            duplicateError = validation.errorMessage
+            print("❌ Cannot save item: \(validation.errorMessage ?? "Unknown error")")
+            return false
+        }
+        
         // Store the old category for comparison
         let oldCategoryName = vaultService.vault?.categories.first(where: { $0.items.contains(where: { $0.id == item.id }) })?.name
         
         // Update the item in the vault
-        vaultService.updateItem(
+        let success = vaultService.updateItem(
             item: item,
             newName: itemName.trimmingCharacters(in: .whitespacesAndNewlines),
             newCategory: selectedCategory,
@@ -96,23 +111,42 @@ class EditItemViewModel {
             newUnit: unit
         )
         
-        // Notify about category change if needed
-        if oldCategoryName != selectedCategory.title {
-            NotificationCenter.default.post(
-                name: NSNotification.Name("ItemCategoryChanged"),
-                object: nil,
-                userInfo: [
-                    "newCategory": selectedCategory,
-                    "itemId": item.id
-                ]
-            )
+        if success {
+            duplicateError = nil
+            
+            // Notify about category change if needed
+            if oldCategoryName != selectedCategory.title {
+                NotificationCenter.default.post(
+                    name: NSNotification.Name("ItemCategoryChanged"),
+                    object: nil,
+                    userInfo: [
+                        "newCategory": selectedCategory,
+                        "itemId": item.id
+                    ]
+                )
+            }
+        } else {
+            duplicateError = "Failed to update item. Please try again."
         }
         
-        return true
+        return success
     }
     
     // MARK: - Helper Methods
     func selectStore(_ store: String) {
         storeName = store
+    }
+    
+    func clearDuplicateError() {
+        duplicateError = nil
+    }
+    
+    func validateItemName() {
+        let validation = vaultService.validateItemName(itemName, excluding: item.id)
+        if !validation.isValid {
+            duplicateError = validation.errorMessage
+        } else {
+            duplicateError = nil
+        }
     }
 }

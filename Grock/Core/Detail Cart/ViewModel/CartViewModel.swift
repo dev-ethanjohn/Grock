@@ -2,7 +2,6 @@ import Foundation
 import SwiftUI
 import Observation
 
-
 @MainActor
 @Observable
 class CartViewModel {
@@ -13,6 +12,9 @@ class CartViewModel {
     var error: Error?
     var activeCartItems: [String: Double] = [:]
     var shouldAutoShowVaultAfterOnboarding = false
+    
+    // Add duplicate error state
+    var duplicateError: String?
     
     private let vaultService: VaultService
     
@@ -134,9 +136,9 @@ class CartViewModel {
         newStore: String? = nil,
         newPrice: Double? = nil,
         newUnit: String? = nil
-    ) {
+    ) -> Bool {
         // Find the item first
-        guard let item = vaultService.findItemById(itemId) else { return }
+        guard let item = vaultService.findItemById(itemId) else { return false }
         
         // Get current category - use the first available GroceryCategory as default
         var currentGroceryCategory: GroceryCategory = GroceryCategory.allCases.first!
@@ -152,8 +154,8 @@ class CartViewModel {
         let targetPrice = newPrice ?? item.priceOptions.first(where: { $0.store == targetStore })?.pricePerUnit.priceValue ?? 0.0
         let targetUnit = newUnit ?? item.priceOptions.first(where: { $0.store == targetStore })?.pricePerUnit.unit ?? "piece"
         
-        // Use existing updateItem method
-        vaultService.updateItem(
+        // Use existing updateItem method and handle the return value
+        let success = vaultService.updateItem(
             item: item,
             newName: newName ?? item.name,
             newCategory: newCategory ?? currentGroceryCategory,
@@ -161,13 +163,21 @@ class CartViewModel {
             newPrice: targetPrice,
             newUnit: targetUnit
         )
+        
+        if !success {
+            duplicateError = "An item with this name already exists"
+            print("❌ Failed to update item from cart - duplicate name")
+        } else {
+            duplicateError = nil
+        }
+        
+        return success
     }
     
     func isFirstCart(_ cart: Cart) -> Bool {
         let sortedCarts = carts.sorted { $0.createdAt < $1.createdAt }
         return sortedCarts.first?.id == cart.id
     }
-    
     
     func createEmptyCart(name: String, budget: Double) -> Cart? {
         print("🛒 CartViewModel: Creating empty cart '\(name)' with budget \(budget)")
@@ -196,4 +206,7 @@ class CartViewModel {
         return currentCart
     }
     
+    func clearDuplicateError() {
+        duplicateError = nil
+    }
 }

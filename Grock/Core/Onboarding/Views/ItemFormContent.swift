@@ -13,7 +13,9 @@ struct FirstItemForm: View {
             ItemFormContent(
                 formViewModel: viewModel.formViewModel,
                 itemNameFieldIsFocused: itemNameFieldIsFocused,
-                showCategoryTooltip: viewModel.showCategoryTooltip
+                showCategoryTooltip: viewModel.showCategoryTooltip,
+                duplicateError: viewModel.duplicateError,
+                isCheckingDuplicate: viewModel.isCheckingDuplicate
             )
             
             Spacer().frame(height: 80)
@@ -27,12 +29,12 @@ struct FirstItemForm: View {
     }
 }
 
-import SwiftUI
-
 struct ItemFormContent: View {
     @Bindable var formViewModel: ItemFormViewModel
     var itemNameFieldIsFocused: FocusState<Bool>.Binding
     var showCategoryTooltip: Bool = false
+    var duplicateError: String? = nil
+    var isCheckingDuplicate: Bool = false
     
     @State private var showUnitPicker = false
     
@@ -51,12 +53,18 @@ struct ItemFormContent: View {
                         .padding(.leading, 8)
                 }
                 
+                if let duplicateError = duplicateError {
+                    validationError(duplicateError)
+                        .padding(.leading, 8)
+                }
+                
                 ItemNameInput(
                     selectedCategoryEmoji: formViewModel.selectedCategoryEmoji,
                     showTooltip: showCategoryTooltip,
-                    showItemNameError: formViewModel.attemptedSubmission && formViewModel.firstMissingField == "Item Name",
+                    showItemNameError: (formViewModel.attemptedSubmission && formViewModel.firstMissingField == "Item Name") || duplicateError != nil,
                     showCategoryError: formViewModel.attemptedSubmission && formViewModel.firstMissingField == "Category",
                     invalidAttemptCount: formViewModel.invalidSubmissionCount,
+                    isCheckingDuplicate: isCheckingDuplicate, duplicateError: duplicateError,
                     itemNameFieldIsFocused: itemNameFieldIsFocused,
                     itemName: $formViewModel.itemName,
                     selectedCategory: $formViewModel.selectedCategory
@@ -197,6 +205,7 @@ struct ItemFormContent: View {
         }
         .animation(.spring(response: 0.4, dampingFraction: 0.7), value: formViewModel.attemptedSubmission)
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: formViewModel.firstMissingField)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: duplicateError)
     }
     
     private func triggerFieldShake(field: String) {

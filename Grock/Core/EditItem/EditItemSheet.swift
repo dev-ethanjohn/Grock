@@ -14,6 +14,8 @@ struct EditItemSheet: View {
     
     @FocusState private var itemNameFieldIsFocused: Bool
     
+    @State private var duplicateError: String?
+    
     var body: some View {
         NavigationView {
             VStack {
@@ -22,7 +24,8 @@ struct EditItemSheet: View {
                         ItemFormContent(
                             formViewModel: formViewModel,
                             itemNameFieldIsFocused: $itemNameFieldIsFocused,
-                            showCategoryTooltip: false
+                            showCategoryTooltip: false,
+                            duplicateError: duplicateError
                         )
                         
                         if context == .cart {
@@ -67,6 +70,12 @@ struct EditItemSheet: View {
         .onAppear {
             initializeFormValues()
         }
+        .onChange(of: formViewModel.itemName) { oldValue, newValue in
+            // Clear duplicate error when user starts typing
+            if duplicateError != nil {
+                duplicateError = nil
+            }
+        }
         .safeAreaInset(edge: .bottom) {
             HStack {
                 if context == .cart {
@@ -77,7 +86,7 @@ struct EditItemSheet: View {
                         .multilineTextAlignment(.center)
                 }
                 Spacer()
-                EditItemSaveButton(isEditFormValid: formViewModel.isFormValid) {
+                EditItemSaveButton(isEditFormValid: formViewModel.isFormValid && duplicateError == nil) {
                     if formViewModel.attemptSubmission() {
                         saveChanges()
                     } else {
@@ -90,6 +99,7 @@ struct EditItemSheet: View {
             .padding(.bottom, 12)
         }
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: formViewModel.firstMissingField)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: duplicateError)
     }
     
     private func initializeFormValues() {
@@ -100,11 +110,20 @@ struct EditItemSheet: View {
         guard let priceValue = Double(formViewModel.itemPrice),
               let selectedCategory = formViewModel.selectedCategory else { return }
         
+        // Validate for duplicates (excluding current item)
+        let validation = vaultService.validateItemName(formViewModel.itemName, excluding: item.id)
+        if !validation.isValid {
+            duplicateError = validation.errorMessage
+            let generator = UINotificationFeedbackGenerator()
+            generator.notificationOccurred(.error)
+            return
+        }
+        
         // Store the old category for comparison
         let oldCategoryName = vaultService.vault?.categories.first(where: { $0.items.contains(where: { $0.id == item.id }) })?.name
         
         // Update the item in the vault
-        vaultService.updateItem(
+        let success = vaultService.updateItem(
             item: item,
             newName: formViewModel.itemName.trimmingCharacters(in: .whitespacesAndNewlines),
             newCategory: selectedCategory,
@@ -113,19 +132,23 @@ struct EditItemSheet: View {
             newUnit: formViewModel.unit
         )
         
-        onSave?(item)
-        dismiss()
-        
-        // Notify about category change if needed
-        if oldCategoryName != selectedCategory.title {
-            NotificationCenter.default.post(
-                name: NSNotification.Name("ItemCategoryChanged"),
-                object: nil,
-                userInfo: [
-                    "newCategory": selectedCategory,
-                    "itemId": item.id
-                ]
-            )
+        if success {
+            onSave?(item)
+            dismiss()
+            
+            // Notify about category change if needed
+            if oldCategoryName != selectedCategory.title {
+                NotificationCenter.default.post(
+                    name: NSNotification.Name("ItemCategoryChanged"),
+                    object: nil,
+                    userInfo: [
+                        "newCategory": selectedCategory,
+                        "itemId": item.id
+                    ]
+                )
+            }
+        } else {
+            duplicateError = "Failed to update item. Please try again."
         }
     }
 }

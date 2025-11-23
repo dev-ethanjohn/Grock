@@ -7,6 +7,8 @@ struct AddItemPopover: View {
     var onSave: ((String, GroceryCategory, String, String, Double) -> Void)?
     var onDismiss: (() -> Void)?
     
+    @Environment(VaultService.self) private var vaultService
+    
     @State private var formViewModel = ItemFormViewModel(requiresPortion: false, requiresStore: true)
     
     @FocusState private var itemNameFieldIsFocused: Bool
@@ -14,6 +16,11 @@ struct AddItemPopover: View {
     @State private var overlayOpacity: Double = 0
     @State private var contentScale: CGFloat = 0.8
     @State private var keyboardVisible: Bool = false
+    
+    // Duplicate validation state
+    @State private var duplicateError: String?
+    @State private var isCheckingDuplicate = false
+    @State private var duplicateCheckTask: Task<Void, Never>?
     
     var body: some View {
         ZStack {
@@ -43,10 +50,12 @@ struct AddItemPopover: View {
                 ItemFormContent(
                     formViewModel: formViewModel,
                     itemNameFieldIsFocused: $itemNameFieldIsFocused,
-                    showCategoryTooltip: false
+                    showCategoryTooltip: false,
+                    duplicateError: duplicateError,
+                    isCheckingDuplicate: isCheckingDuplicate
                 )
                 
-                if formViewModel.isFormValid {
+                if formViewModel.isFormValid && duplicateError == nil {
                     Image(systemName: "chevron.down.dotted.2")
                         .font(.body)
                         .symbolEffect(.wiggle.down.byLayer, options: .repeat(.continuous))
@@ -66,13 +75,24 @@ struct AddItemPopover: View {
                         )
                 }
                 
-                FormCompletionButton.doneButton(isEnabled: formViewModel.isFormValid,
-                                                verticalPadding: 12,
-                                                maxWidth: true)
-                {
+                FormCompletionButton.doneButton(
+                    isEnabled: formViewModel.isFormValid && duplicateError == nil,
+                    verticalPadding: 12,
+                    maxWidth: true
+                ) {
                     if formViewModel.attemptSubmission(),
                        let category = formViewModel.selectedCategory,
                        let priceValue = Double(formViewModel.itemPrice) {
+                        
+                        // Final duplicate check before saving
+                        let validation = vaultService.validateItemName(formViewModel.itemName)
+                        if !validation.isValid {
+                            duplicateError = validation.errorMessage
+                            let generator = UINotificationFeedbackGenerator()
+                            generator.notificationOccurred(.error)
+                            return
+                        }
+                        
                         onSave?(formViewModel.itemName, category, formViewModel.storeName, formViewModel.unit, priceValue)
                         NotificationCenter.default.post(
                             name: NSNotification.Name("ItemCategoryChanged"),
@@ -96,6 +116,7 @@ struct AddItemPopover: View {
             .animation(.spring(response: 0.2, dampingFraction: 0.7, blendDuration: 0.1), value: formViewModel.isFormValid)
             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: keyboardVisible)
             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: formViewModel.firstMissingField)
+            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: duplicateError)
             .frame(maxHeight: .infinity, alignment: keyboardVisible ? .top : .center)
         }
         .onAppear {
@@ -109,10 +130,15 @@ struct AddItemPopover: View {
         }
         .onDisappear {
             formViewModel.resetForm()
+            duplicateError = nil
+            duplicateCheckTask?.cancel()
             
             withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
                 createCartButtonVisible = true
             }
+        }
+        .onChange(of: formViewModel.itemName) { oldValue, newValue in
+            performRealTimeDuplicateCheck(newValue)
         }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
             withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
@@ -126,7 +152,48 @@ struct AddItemPopover: View {
         }
     }
     
+    private func performRealTimeDuplicateCheck(_ itemName: String) {
+        // Cancel previous check
+        duplicateCheckTask?.cancel()
+        
+        let trimmedName = itemName.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // Clear error if empty
+        guard !trimmedName.isEmpty else {
+            duplicateError = nil
+            isCheckingDuplicate = false
+            return
+        }
+        
+        // Show loading only after a short delay to avoid flickering
+        duplicateCheckTask = Task {
+            // Small delay before showing loading indicator
+            try? await Task.sleep(nanoseconds: 300_000_000) // 0.3 seconds
+            if !Task.isCancelled {
+                await MainActor.run {
+                    isCheckingDuplicate = true
+                }
+            }
+            
+            // Additional delay for debounce (total 0.5 seconds)
+            try? await Task.sleep(nanoseconds: 200_000_000)
+            
+            if !Task.isCancelled {
+                let validation = vaultService.validateItemName(trimmedName)
+                await MainActor.run {
+                    isCheckingDuplicate = false
+                    if validation.isValid {
+                        duplicateError = nil
+                    } else {
+                        duplicateError = validation.errorMessage
+                    }
+                }
+            }
+        }
+    }
+    
     private func dismissPopover() {
+        duplicateCheckTask?.cancel()
         itemNameFieldIsFocused = false
         isPresented = false
         onDismiss?()

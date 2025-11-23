@@ -6,6 +6,8 @@ struct ItemNameInput: View {
     let showItemNameError: Bool
     let showCategoryError: Bool
     let invalidAttemptCount: Int
+    let isCheckingDuplicate: Bool
+    let duplicateError: String?
     
     var itemNameFieldIsFocused: FocusState<Bool>.Binding
     
@@ -15,6 +17,10 @@ struct ItemNameInput: View {
     @State private var fillAnimation: CGFloat = 0.0
     @State private var fieldScale: CGFloat = 1.0
     @State private var shakeOffset: CGFloat = 0
+    
+    private var shouldShowErrorStyling: Bool {
+        showItemNameError || duplicateError != nil
+    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -53,7 +59,6 @@ struct ItemNameInput: View {
                         .font(.subheadline)
                         .bold()
                         .padding(12)
-                        .padding(.trailing, 44)
                         .background(backgroundView)
                         .cornerRadius(40)
                         .focused(itemNameFieldIsFocused)
@@ -62,16 +67,18 @@ struct ItemNameInput: View {
                             RoundedRectangle(cornerRadius: 40)
                                 .stroke(
                                     Color(hex: "#FA003F"),
-                                    lineWidth: showItemNameError ? 2.0 : 0
+                                    lineWidth: shouldShowErrorStyling ? 2.0 : 0
                                 )
                         )
+
                         .overlay(
                             CategoryCircularButton(
                                 selectedCategory: $selectedCategory,
                                 selectedCategoryEmoji: selectedCategoryEmoji,
                                 hasError: showCategoryError && selectedCategory == nil
                             )
-                            .offset(x: shakeOffset)
+                            .offset(x: shakeOffset),
+                            alignment: .trailing
                         )
                 }
             }
@@ -86,6 +93,8 @@ struct ItemNameInput: View {
             }
         }
         .animation(.spring(response: 0.4, dampingFraction: 0.6), value: selectedCategory)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isCheckingDuplicate)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: duplicateError)
         .onChange(of: selectedCategory) { oldValue, newValue in
             handleCategoryChange(oldValue: oldValue, newValue: newValue)
         }
@@ -114,7 +123,7 @@ struct ItemNameInput: View {
     
     private var backgroundView: some View {
         Group {
-            if showItemNameError {
+            if shouldShowErrorStyling {
                 Color(hex: "#FF2C2C").opacity(0.05)
             } else if selectedCategory == nil {
                 Color(.systemGray6).brightness(0.03)
@@ -130,7 +139,7 @@ struct ItemNameInput: View {
                 )
             }
         }
-        .brightness(showItemNameError ? 0 : -0.03)
+        .brightness(shouldShowErrorStyling ? 0 : -0.03)
     }
     
     private func handleCategoryChange(oldValue: GroceryCategory?, newValue: GroceryCategory?) {

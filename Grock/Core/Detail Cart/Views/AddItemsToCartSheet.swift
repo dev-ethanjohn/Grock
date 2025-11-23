@@ -2,7 +2,6 @@ import SwiftUI
 import SwiftData
 
 struct AddItemsToCartSheet: View {
-    //    MARK: put in a viewmodel + reaarange
     let cart: Cart
     @Environment(VaultService.self) private var vaultService
     @Environment(CartViewModel.self) private var cartViewModel
@@ -15,6 +14,9 @@ struct AddItemsToCartSheet: View {
     
     // Use LOCAL state for active items in this sheet
     @State private var localActiveItems: [String: Double] = [:]
+    
+    // Add duplicate error state
+    @State private var duplicateError: String?
     
     private var hasActiveItems: Bool {
         !localActiveItems.isEmpty
@@ -68,13 +70,20 @@ struct AddItemsToCartSheet: View {
                     isPresented: $showAddItemPopover,
                     createCartButtonVisible: $createCartButtonVisible,
                     onSave: { itemName, category, store, unit, price in
-                        vaultService.addItem(
+                        let success = vaultService.addItem(
                             name: itemName,
                             to: category,
                             store: store,
                             price: price,
                             unit: unit
                         )
+                        
+                        if success {
+                            print("✅ Item added successfully: \(itemName)")
+                        } else {
+                            print("❌ Failed to add item - duplicate name: \(itemName)")
+                            // You might want to show an alert here
+                        }
                     },
                     onDismiss: {
                     }
@@ -84,7 +93,6 @@ struct AddItemsToCartSheet: View {
             }
         }
         .toolbar {
-            
             ToolbarItem(placement: .topBarLeading) {
                 Button(action: {}) {
                     Image("search")
@@ -122,23 +130,6 @@ struct AddItemsToCartSheet: View {
     }
     
     private var customToolbar: some View {
-        //        HStack {
-        //            if let selectedCategory = selectedCategory {
-        //                Text(selectedCategory.title)
-        //                    .lexendFont(13, weight: .bold)
-        //            } else {
-        //                Text("Add Items")
-        //                    .lexendFont(13, weight: .bold)
-        //            }
-        //
-        //
-        //
-        //            Spacer()
-        //
-        //        }
-        //        .padding(.horizontal)
-        //        .background(Color.white)
-        
         HStack {
             if let category = selectedCategory {
                 Text(category.title)
@@ -152,9 +143,6 @@ struct AddItemsToCartSheet: View {
             }
             Spacer()
         }
-        //        .padding(.horizontal)
-        //        .padding(.top, 8)
-        //        .padding(.bottom, 4)
         .padding(.horizontal)
         .background(Color.white)
     }
@@ -556,10 +544,6 @@ struct AddItemsVaultItemRow: View {
                     
                     Text(item.name)
                         .foregroundColor(isActive ? .black : Color(hex: "999"))
-                    //TODO: fix this
-                    //                    + Text(" >")
-                    //                        .fuzzyBubblesFont(20, weight: .bold)
-                    //                        .foregroundStyle(Color(hex: "CCCCCC"))
                     
                     if let priceOption = item.priceOptions.first {
                         HStack(spacing: 0) {
