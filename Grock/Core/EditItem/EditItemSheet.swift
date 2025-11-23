@@ -15,6 +15,7 @@ struct EditItemSheet: View {
     @FocusState private var itemNameFieldIsFocused: Bool
     
     @State private var duplicateError: String?
+    @State private var validationTask: Task<Void, Never>?
     
     var body: some View {
         NavigationView {
@@ -25,7 +26,10 @@ struct EditItemSheet: View {
                             formViewModel: formViewModel,
                             itemNameFieldIsFocused: $itemNameFieldIsFocused,
                             showCategoryTooltip: false,
-                            duplicateError: duplicateError
+                            duplicateError: duplicateError,
+                            onStoreChange: {
+                                  triggerRealTimeValidation() // Call your existing validation method
+                              }
                         )
                         
                         if context == .cart {
@@ -71,11 +75,12 @@ struct EditItemSheet: View {
             initializeFormValues()
         }
         .onChange(of: formViewModel.itemName) { oldValue, newValue in
-            // Clear duplicate error when user starts typing
-            if duplicateError != nil {
-                duplicateError = nil
-            }
-        }
+                  triggerRealTimeValidation()
+              }
+              .onChange(of: formViewModel.storeName) { oldValue, newValue in
+                  triggerRealTimeValidation()
+              }
+     
         .safeAreaInset(edge: .bottom) {
             HStack {
                 if context == .cart {
@@ -111,7 +116,7 @@ struct EditItemSheet: View {
               let selectedCategory = formViewModel.selectedCategory else { return }
         
         // Validate for duplicates (excluding current item)
-        let validation = vaultService.validateItemName(formViewModel.itemName, excluding: item.id)
+        let validation = vaultService.validateItemName(formViewModel.itemName, store: formViewModel.storeName, excluding: item.id)
         if !validation.isValid {
             duplicateError = validation.errorMessage
             let generator = UINotificationFeedbackGenerator()
@@ -151,4 +156,33 @@ struct EditItemSheet: View {
             duplicateError = "Failed to update item. Please try again."
         }
     }
+    
+    private func triggerRealTimeValidation() {
+        validationTask?.cancel()
+        
+        let itemName = formViewModel.itemName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let storeName = formViewModel.storeName.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        guard !itemName.isEmpty && !storeName.isEmpty else {
+            duplicateError = nil
+            return
+        }
+        
+        validationTask = Task {
+            // Debounce the validation
+            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+            
+            if !Task.isCancelled {
+                let validation = vaultService.validateItemName(itemName, store: storeName, excluding: item.id)
+                await MainActor.run {
+                    if !validation.isValid {
+                        duplicateError = validation.errorMessage
+                    } else {
+                        duplicateError = nil
+                    }
+                }
+            }
+        }
+    }
+    
 }

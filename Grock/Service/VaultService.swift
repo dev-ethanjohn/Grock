@@ -141,38 +141,45 @@ extension VaultService {
 extension VaultService {
     
     /// Checks if an item name already exists in the vault (case insensitive, trimmed)
-    func isItemNameDuplicate(_ name: String, excluding itemId: String? = nil) -> Bool {
-        guard let vault = vault else { return false }
-        
-        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        
-        for category in vault.categories {
-            for item in category.items {
-                // If we're excluding an item (during edit), skip it
-                if let excludedId = itemId, item.id == excludedId {
-                    continue
-                }
-                
-                let existingName = item.name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-                if existingName == trimmedName {
-                    return true
-                }
-            }
-        }
-        
-        return false
-    }
+    func isItemNameDuplicate(_ name: String, store: String, excluding itemId: String? = nil) -> Bool {
+         guard let vault = vault else { return false }
+         
+         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+         let trimmedStore = store.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+         
+         for category in vault.categories {
+             for item in category.items {
+                 // If we're excluding an item (during edit), skip it
+                 if let excludedId = itemId, item.id == excludedId {
+                     continue
+                 }
+                 
+                 let existingName = item.name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                 
+                 // Check if this item has a price option for the same store
+                 let hasSameStore = item.priceOptions.contains { priceOption in
+                     priceOption.store.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == trimmedStore
+                 }
+                 
+                 if existingName == trimmedName && hasSameStore {
+                     return true
+                 }
+             }
+         }
+         
+         return false
+     }
     
     /// Validates if an item name is available (not empty and not duplicate)
-    func validateItemName(_ name: String, excluding itemId: String? = nil) -> (isValid: Bool, errorMessage: String?) {
+    func validateItemName(_ name: String, store: String, excluding itemId: String? = nil) -> (isValid: Bool, errorMessage: String?) {
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         
         if trimmedName.isEmpty {
             return (false, "Item name cannot be empty")
         }
         
-        if isItemNameDuplicate(trimmedName, excluding: itemId) {
-            return (false, "An item with this name already exists")
+        if isItemNameDuplicate(trimmedName, store: store, excluding: itemId) {
+            return (false, "An item with this name already exists at \(store)")
         }
         
         return (true, nil)
@@ -185,19 +192,20 @@ extension VaultService {
     /// Adds a new item to the specified category
     func addItem(
         name: String,
-        to category: GroceryCategory,
-        store: String,
-        price: Double,
-        unit: String
-    ) -> Bool { // Return Bool to indicate success
-        guard let vault = vault else { return false }
-        
-        // Validate the item name
-        let validation = validateItemName(name)
-        guard validation.isValid else {
-            print("❌ Cannot add item: \(validation.errorMessage ?? "Unknown error")")
-            return false
-        }
+            to category: GroceryCategory,
+            store: String,
+            price: Double,
+            unit: String
+        ) -> Bool {
+            guard let vault = vault else { return false }
+            
+            // ✅ Now validate per store, not vault-wide
+            let validation = validateItemName(name, store: store)
+            guard validation.isValid else {
+                print("❌ Cannot add item: \(validation.errorMessage ?? "Unknown error")")
+                return false
+            }
+            
         
         let targetCategory: Category
         if let existingCategory = getCategory(category) {
@@ -225,11 +233,11 @@ extension VaultService {
         newStore: String,
         newPrice: Double,
         newUnit: String
-    ) -> Bool { // Return Bool to indicate success
+    ) -> Bool {
         guard let vault = vault else { return false }
         
-        // Validate the new item name
-        let validation = validateItemName(newName, excluding: item.id)
+        // ✅ Now validate per store, not vault-wide
+        let validation = validateItemName(newName, store: newStore, excluding: item.id)
         guard validation.isValid else {
             print("❌ Cannot update item: \(validation.errorMessage ?? "Unknown error")")
             return false

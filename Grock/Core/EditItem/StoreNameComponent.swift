@@ -6,7 +6,10 @@ struct StoreNameComponent: View {
     @FocusState private var isFocused: Bool
     @State private var showAddStoreSheet = false
     @State private var newStoreName = ""
-    let hasError: Bool // Remove default value, make it required
+    let hasError: Bool
+    
+    //to notify parent when store changes
+    var onStoreChange: (() -> Void)?
     
     private var availableStores: [String] {
         vaultService.getAllStores()
@@ -44,6 +47,8 @@ struct StoreNameComponent: View {
                     ForEach(availableStores, id: \.self) { store in
                         Button(action: {
                             storeName = store
+                            // ADD THIS: Notify parent that store changed
+                            onStoreChange?()
                         }) {
                             HStack {
                                 Text(store)
@@ -86,6 +91,7 @@ struct StoreNameComponent: View {
                     storeName = newStore
                     showAddStoreSheet = false
                     print("➕ New store added and persisted: \(newStore)")
+                    onStoreChange?()
                 }
             )
         }
@@ -93,6 +99,9 @@ struct StoreNameComponent: View {
             if storeName.isEmpty, let firstStore = availableStores.first {
                 storeName = firstStore
             }
+        }
+        .onChange(of: storeName) { oldValue, newValue in
+            onStoreChange?()
         }
     }
 }

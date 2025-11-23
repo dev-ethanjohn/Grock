@@ -3,6 +3,7 @@ import SwiftUI
 struct FirstItemForm: View {
     @Bindable var viewModel: OnboardingViewModel
     var itemNameFieldIsFocused: FocusState<Bool>.Binding
+    @Environment(VaultService.self) private var vaultService
     
     var body: some View {
         VStack {
@@ -15,12 +16,21 @@ struct FirstItemForm: View {
                 itemNameFieldIsFocused: itemNameFieldIsFocused,
                 showCategoryTooltip: viewModel.showCategoryTooltip,
                 duplicateError: viewModel.duplicateError,
-                isCheckingDuplicate: viewModel.isCheckingDuplicate
+                isCheckingDuplicate: viewModel.isCheckingDuplicate,
+                onStoreChange: { 
+                    viewModel.checkForDuplicateItemName(viewModel.formViewModel.itemName, vaultService: vaultService)
+                }
             )
             
             Spacer().frame(height: 80)
         }
         .padding()
+        .onChange(of: viewModel.formViewModel.itemName) { oldValue, newValue in
+            viewModel.checkForDuplicateItemName(newValue, vaultService: vaultService)
+        }
+        .onChange(of: viewModel.formViewModel.storeName) { oldValue, newValue in
+            viewModel.checkForDuplicateItemName(viewModel.formViewModel.itemName, vaultService: vaultService)
+        }
         .onChange(of: viewModel.formViewModel.selectedCategory) { oldValue, newValue in
             if newValue != nil {
                 viewModel.formViewModel.resetValidation()
@@ -35,6 +45,7 @@ struct ItemFormContent: View {
     var showCategoryTooltip: Bool = false
     var duplicateError: String? = nil
     var isCheckingDuplicate: Bool = false
+    var onStoreChange: (() -> Void)? = nil 
     
     @State private var showUnitPicker = false
     
@@ -92,9 +103,10 @@ struct ItemFormContent: View {
                 
                 VStack(alignment: .leading, spacing: 4) {
                     StoreNameComponent(
-                        storeName: $formViewModel.storeName,
-                        hasError: formViewModel.attemptedSubmission && formViewModel.firstMissingField == "Store Name"
-                    )
+                          storeName: $formViewModel.storeName,
+                          hasError: formViewModel.attemptedSubmission && formViewModel.firstMissingField == "Store Name",
+                          onStoreChange: onStoreChange 
+                      )
                     .offset(x: storeNameShakeOffset)
                     
                     if formViewModel.attemptedSubmission && formViewModel.firstMissingField == "Store Name" {

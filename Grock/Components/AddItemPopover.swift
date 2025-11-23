@@ -52,7 +52,10 @@ struct AddItemPopover: View {
                     itemNameFieldIsFocused: $itemNameFieldIsFocused,
                     showCategoryTooltip: false,
                     duplicateError: duplicateError,
-                    isCheckingDuplicate: isCheckingDuplicate
+                    isCheckingDuplicate: isCheckingDuplicate,
+                    onStoreChange: {
+                        performRealTimeDuplicateCheck(formViewModel.itemName)
+                    }
                 )
                 
                 if formViewModel.isFormValid && duplicateError == nil {
@@ -85,7 +88,7 @@ struct AddItemPopover: View {
                        let priceValue = Double(formViewModel.itemPrice) {
                         
                         // Final duplicate check before saving
-                        let validation = vaultService.validateItemName(formViewModel.itemName)
+                        let validation = vaultService.validateItemName(formViewModel.itemName, store: formViewModel.storeName)
                         if !validation.isValid {
                             duplicateError = validation.errorMessage
                             let generator = UINotificationFeedbackGenerator()
@@ -140,6 +143,9 @@ struct AddItemPopover: View {
         .onChange(of: formViewModel.itemName) { oldValue, newValue in
             performRealTimeDuplicateCheck(newValue)
         }
+        .onChange(of: formViewModel.storeName) { oldValue, newValue in
+            performRealTimeDuplicateCheck(formViewModel.itemName)
+        }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
             withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                 keyboardVisible = true
@@ -153,33 +159,29 @@ struct AddItemPopover: View {
     }
     
     private func performRealTimeDuplicateCheck(_ itemName: String) {
-        // Cancel previous check
         duplicateCheckTask?.cancel()
         
         let trimmedName = itemName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let storeName = formViewModel.storeName
         
-        // Clear error if empty
         guard !trimmedName.isEmpty else {
             duplicateError = nil
             isCheckingDuplicate = false
             return
         }
         
-        // Show loading only after a short delay to avoid flickering
         duplicateCheckTask = Task {
-            // Small delay before showing loading indicator
-            try? await Task.sleep(nanoseconds: 300_000_000) // 0.3 seconds
+            try? await Task.sleep(nanoseconds: 300_000_000)
             if !Task.isCancelled {
                 await MainActor.run {
                     isCheckingDuplicate = true
                 }
             }
             
-            // Additional delay for debounce (total 0.5 seconds)
             try? await Task.sleep(nanoseconds: 200_000_000)
             
             if !Task.isCancelled {
-                let validation = vaultService.validateItemName(trimmedName)
+                let validation = vaultService.validateItemName(trimmedName, store: storeName)
                 await MainActor.run {
                     isCheckingDuplicate = false
                     if validation.isValid {

@@ -88,15 +88,15 @@ class EditItemViewModel {
     // MARK: - Save Operations
     func saveChanges() -> Bool {
         guard let priceValue = Double(price),
-              let selectedCategory = selectedCategory else { return false }
-        
-        // Validate for duplicates (excluding current item)
-        let validation = vaultService.validateItemName(itemName, excluding: item.id)
-        if !validation.isValid {
-            duplicateError = validation.errorMessage
-            print("❌ Cannot save item: \(validation.errorMessage ?? "Unknown error")")
-            return false
-        }
+                let selectedCategory = selectedCategory else { return false }
+          
+          // Validate for duplicates (excluding current item) - ADD STORE PARAMETER
+          let validation = vaultService.validateItemName(itemName, store: storeName, excluding: item.id)
+          if !validation.isValid {
+              duplicateError = validation.errorMessage
+              print("❌ Cannot save item: \(validation.errorMessage ?? "Unknown error")")
+              return false
+          }
         
         // Store the old category for comparison
         let oldCategoryName = vaultService.vault?.categories.first(where: { $0.items.contains(where: { $0.id == item.id }) })?.name
@@ -142,11 +142,12 @@ class EditItemViewModel {
     }
     
     func validateItemName() {
-        let validation = vaultService.validateItemName(itemName, excluding: item.id)
-        if !validation.isValid {
-            duplicateError = validation.errorMessage
-        } else {
-            duplicateError = nil
-        }
+        let validation = vaultService.validateItemName(itemName, store: storeName, excluding: item.id)
+           
+           if !validation.isValid {
+               duplicateError = validation.errorMessage
+           } else {
+               duplicateError = nil
+           }
     }
 }
