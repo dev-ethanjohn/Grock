@@ -124,6 +124,9 @@ struct EditItemSheet: View {
             return
         }
         
+        // Store the old store name before updating
+        let oldStoreName = item.priceOptions.first?.store ?? ""
+        
         // Store the old category for comparison
         let oldCategoryName = vaultService.vault?.categories.first(where: { $0.items.contains(where: { $0.id == item.id }) })?.name
         
@@ -138,6 +141,13 @@ struct EditItemSheet: View {
         )
         
         if success {
+            // ✅ PRESERVE THE OLD STORE in vault stores
+            if !oldStoreName.isEmpty {
+                vaultService.ensureStoreExists(oldStoreName)
+            }
+            // ✅ ENSURE THE NEW STORE exists in vault stores
+            vaultService.ensureStoreExists(formViewModel.storeName)
+            
             onSave?(item)
             dismiss()
             

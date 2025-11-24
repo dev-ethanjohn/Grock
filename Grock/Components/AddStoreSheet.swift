@@ -1,15 +1,7 @@
-//
-//  AddStoreSheet.swift
-//  Grock
-//
-//  Created by Ethan John Paguntalan on 11/6/25.
-//
-
 import SwiftUI
 
 //NOTE: LIMIT TO ONLY 1 store for free users
 struct AddStoreSheet: View {
-    //TODO:  rearange
     @Binding var storeName: String
     @Binding var isPresented: Bool
     var onSave: ((String) -> Void)?
@@ -26,6 +18,7 @@ struct AddStoreSheet: View {
                 TextField("Enter store name", text: $storeName)
                     .font(.subheadline)
                     .bold()
+                    .normalizedText($storeName)
                     .padding(12)
                     .background(Color(.systemGray6))
                     .cornerRadius(8)

@@ -625,39 +625,17 @@ struct VaultView: View {
     
     private func deleteItem(_ item: Item) {
         print("🗑️ Deleting item: '\(item.name)'")
+        
+        //Remove from active cart items
+        cartViewModel.activeCartItems.removeValue(forKey: item.id)
+        
+        // elete from vault
         withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-              // Your deletion logic here
-              vaultService.deleteItem(item)
-          }
-//        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-//            print("🔄 After deletion - updated vault structure:")
-//            printVaultStructure()
-//        }
+            vaultService.deleteItem(item)
+        }
+        
+        print("🔄 Active items after deletion: \(cartViewModel.activeCartItems.count)")
     }
-    
-//    private func printVaultStructure() {
-//        print("\n🔍 ===== VAULT STRUCTURE DEBUG INFO =====")
-//        guard let vault = vaultService.vault else {
-//            print("❌ No vault found in VaultService!")
-//            return
-//        }
-//        
-//        print("🏷️ Vault ID: \(vault.uid)")
-//        print("📂 Number of categories in vault: \(vault.categories.count)")
-//        
-//        let sortedCategories = vault.categories.sorted { $0.sortOrder < $1.sortOrder }
-//        
-//        for (categoryIndex, category) in sortedCategories.enumerated() {
-//            print("\n  📁 Category \(categoryIndex + 1): '\(category.name)'")
-//            print("     Number of items: \(category.items.count)")
-//            
-//            for (itemIndex, item) in category.items.enumerated() {
-//                print("     🛒 Item \(itemIndex + 1): '\(item.name)'")
-//            }
-//        }
-//        
-//        print("===== END VAULT DEBUG INFO =====")
-//    }
     
     private func startButtonBounce() {
         withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {
@@ -691,18 +669,3 @@ struct VaultView: View {
 }
 
 
-
-
-
-// Add this extension somewhere in your project
-extension ButtonStyle where Self == SolidButtonStyle {
-    static var solid: SolidButtonStyle { SolidButtonStyle() }
-}
-
-struct SolidButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
-            .animation(.interactiveSpring(), value: configuration.isPressed)
-    }
-}

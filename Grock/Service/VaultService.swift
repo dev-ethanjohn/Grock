@@ -227,53 +227,56 @@ extension VaultService {
     
     /// Updates an existing item with new properties
     func updateItem(
-        item: Item,
-        newName: String,
-        newCategory: GroceryCategory,
-        newStore: String,
-        newPrice: Double,
-        newUnit: String
-    ) -> Bool {
-        guard let vault = vault else { return false }
-        
-        // ✅ Now validate per store, not vault-wide
-        let validation = validateItemName(newName, store: newStore, excluding: item.id)
-        guard validation.isValid else {
-            print("❌ Cannot update item: \(validation.errorMessage ?? "Unknown error")")
-            return false
-        }
-        
-        // 1. Update item properties
-        item.name = newName.trimmingCharacters(in: .whitespacesAndNewlines)
-        
-        // 2. Update price options
-        if let existingPriceOption = item.priceOptions.first(where: { $0.store == newStore }) {
-            existingPriceOption.pricePerUnit = PricePerUnit(priceValue: newPrice, unit: newUnit)
-        } else {
-            let newPriceOption = PriceOption(
-                store: newStore,
-                pricePerUnit: PricePerUnit(priceValue: newPrice, unit: newUnit)
-            )
-            item.priceOptions.append(newPriceOption)
-        }
-        
-        // 3. Update category if needed
-        let currentCategory = vault.categories.first { $0.items.contains(where: { $0.id == item.id }) }
-        let targetCategory = getCategory(newCategory) ?? Category(name: newCategory.title)
-        
-        if currentCategory?.name != targetCategory.name {
-            currentCategory?.items.removeAll { $0.id == item.id }
-            
-            if !vault.categories.contains(where: { $0.name == targetCategory.name }) {
-                vault.categories.append(targetCategory)
-            }
-            targetCategory.items.append(item)
-        }
-        
-        saveContext()
-        updateActiveCartsContainingItem(itemId: item.id)
-        return true
-    }
+         item: Item,
+         newName: String,
+         newCategory: GroceryCategory,
+         newStore: String,
+         newPrice: Double,
+         newUnit: String
+     ) -> Bool {
+         guard let vault = vault else { return false }
+         
+         // Validate the new item name
+         let validation = validateItemName(newName, store: newStore, excluding: item.id)
+         guard validation.isValid else {
+             print("❌ Cannot update item: \(validation.errorMessage ?? "Unknown error")")
+             return false
+         }
+         
+         // 1. Update item properties
+         item.name = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+         
+         // 2. UPDATE SPECIFIC PRICE OPTION (not replace all)
+         if let existingPriceOption = item.priceOptions.first {
+             // Update the existing price option with new store, price, and unit
+             existingPriceOption.store = newStore
+             existingPriceOption.pricePerUnit = PricePerUnit(priceValue: newPrice, unit: newUnit)
+         } else {
+             // If no price options exist, create a new one
+             let newPriceOption = PriceOption(
+                 store: newStore,
+                 pricePerUnit: PricePerUnit(priceValue: newPrice, unit: newUnit)
+             )
+             item.priceOptions = [newPriceOption]
+         }
+         
+         // 3. Update category if needed
+         let currentCategory = vault.categories.first { $0.items.contains(where: { $0.id == item.id }) }
+         let targetCategory = getCategory(newCategory) ?? Category(name: newCategory.title)
+         
+         if currentCategory?.name != targetCategory.name {
+             currentCategory?.items.removeAll { $0.id == item.id }
+             
+             if !vault.categories.contains(where: { $0.name == targetCategory.name }) {
+                 vault.categories.append(targetCategory)
+             }
+             targetCategory.items.append(item)
+         }
+         
+         saveContext()
+         updateActiveCartsContainingItem(itemId: item.id)
+         return true
+     }
     
     /// Updates item properties from cart context
     func updateItemFromCart(
@@ -363,32 +366,42 @@ extension VaultService {
     
     /// Adds a new store to the vault
     func addStore(_ storeName: String) {
-        guard let vault = vault else { return }
-        
-        let trimmedStore = storeName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedStore.isEmpty else { return }
-        
-        if !vault.stores.contains(where: { $0.name == trimmedStore }) {
-            let newStore = Store(name: trimmedStore)
-            vault.stores.append(newStore)
-            vault.stores.sort { $0.name < $1.name }
-            saveContext()
-        }
-    }
+          guard let vault = vault else { return }
+          
+          let trimmedStore = storeName.trimmingCharacters(in: .whitespacesAndNewlines)
+          guard !trimmedStore.isEmpty else { return }
+          
+          if !vault.stores.contains(where: { $0.name.lowercased() == trimmedStore.lowercased() }) {
+              let newStore = Store(name: trimmedStore)
+              vault.stores.append(newStore)
+              vault.stores.sort { $0.name < $1.name }
+              saveContext()
+              print("➕ Store added to vault: \(trimmedStore)")
+          }
+      }
     
     /// Retrieves all unique store names from vault and items
     func getAllStores() -> [String] {
-        guard let vault = vault else { return [] }
-        
-        let vaultStores = vault.stores.map { $0.name }
-        let itemStores = vault.categories.flatMap { category in
-            category.items.flatMap { item in
-                item.priceOptions.map { $0.store }
-            }
-        }
-        
-        let allStores = Array(Set(itemStores + vaultStores)).sorted()
-        return allStores
+         guard let vault = vault else { return [] }
+         
+         // Get stores from vault (persisted stores)
+         let vaultStores = vault.stores.map { $0.name }
+         
+         // Also include stores from current items (for backward compatibility)
+         let itemStores = vault.categories.flatMap { category in
+             category.items.flatMap { item in
+                 item.priceOptions.map { $0.store }
+             }
+         }
+         
+         // Combine and remove duplicates
+         let allStores = Array(Set(itemStores + vaultStores)).sorted()
+         return allStores
+     }
+    
+    /// Ensures a store exists in the vault (used when editing items)
+    func ensureStoreExists(_ storeName: String) {
+        addStore(storeName)
     }
 }
 

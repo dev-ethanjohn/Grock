@@ -96,6 +96,9 @@ struct AddItemPopover: View {
                             return
                         }
                         
+                        // ENSURE THE STORE exists in vault stores before saving
+                        vaultService.ensureStoreExists(formViewModel.storeName)
+                        
                         onSave?(formViewModel.itemName, category, formViewModel.storeName, formViewModel.unit, priceValue)
                         NotificationCenter.default.post(
                             name: NSNotification.Name("ItemCategoryChanged"),

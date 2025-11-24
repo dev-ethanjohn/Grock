@@ -87,6 +87,10 @@ struct VaultItemRow: View {
         .onChange(of: isDeleting) { _, newValue in
             if newValue && !deletionCompleted {
                 deletionCompleted = true
+                
+                //Remove from active items BEFORE calling onDelete
+                cartViewModel.activeCartItems.removeValue(forKey: item.id)
+                
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                     onDelete()
                 }
