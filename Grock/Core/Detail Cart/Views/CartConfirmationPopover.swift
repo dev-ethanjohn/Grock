@@ -241,7 +241,6 @@ struct CartConfirmationPopover: View {
             }
         }
         .onTapGesture {
-            // Dismiss keyboard when tapping outside
             focusedField = nil
         }
     }

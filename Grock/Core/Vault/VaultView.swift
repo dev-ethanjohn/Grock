@@ -37,13 +37,30 @@ struct VaultView: View {
     // Add duplicate error state
     @State private var duplicateError: String?
     
-    private var hasActiveItems: Bool {
-        !cartViewModel.activeCartItems.isEmpty
+    // Chevron navigation
+    @State private var showLeftChevron = false
+    @State private var showRightChevron = false
+    
+    // Track navigation direction for slide animations
+    @State private var navigationDirection: NavigationDirection = .none
+    
+    enum NavigationDirection {
+        case left, right, none
     }
     
     // guide
     @State private var showFirstItemTooltip = false
     @State private var firstItemId: String? = nil
+    
+    private var totalVaultItemsCount: Int {
+         guard let vault = vaultService.vault else { return 0 }
+         return vault.categories.reduce(0) { $0 + $1.items.count }
+     }
+     
+    
+    private var hasActiveItems: Bool {
+        !cartViewModel.activeCartItems.isEmpty
+    }
     
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -65,10 +82,12 @@ struct VaultView: View {
                         }
                         
                         categoryContentScrollView
+                            .frame(maxHeight: .infinity)
                     } else {
                         emptyVaultView
                     }
                 }
+                .frame(maxHeight: .infinity)
             } else {
                 ProgressView()
                     .onAppear {
@@ -115,6 +134,7 @@ struct VaultView: View {
                 }
             }
         }
+        .frame(maxHeight: .infinity)
         .ignoresSafeArea(.keyboard)
         .toolbar(.hidden)
         .overlay {
@@ -184,6 +204,7 @@ struct VaultView: View {
                 if selectedCategory == nil {
                     selectedCategory = firstCategoryWithItems ?? GroceryCategory.allCases.first
                 }
+                updateChevronVisibility()
             }
             
             print("🎉 VaultView onAppear - Checking celebration conditions:")
@@ -220,6 +241,7 @@ struct VaultView: View {
                         selectedCategory = newCategory
                     }
                     print("🔄 Auto-switched to category: \(newCategory.title)")
+                    updateChevronVisibility()
                 }
             }
         }
@@ -230,6 +252,7 @@ struct VaultView: View {
             if selectedCategory == nil {
                 selectedCategory = firstCategoryWithItems ?? GroceryCategory.allCases.first
             }
+            updateChevronVisibility()
             
             if newValue != oldValue {
                 print("🔄 Vault changed - reprinting structure:")
@@ -244,10 +267,51 @@ struct VaultView: View {
                 }
             }
         }
+        .onChange(of: selectedCategory) { oldValue, newValue in
+            updateChevronVisibility()
+        }
         .overlay {
             if showFirstItemTooltip, let firstItemId = firstItemId {
                 FirstItemTooltip(itemId: firstItemId, isPresented: $showFirstItemTooltip)
             }
+        }
+    }
+    
+    // MARK: - Chevron Navigation Methods
+    
+    private func updateChevronVisibility() {
+        guard let currentCategory = selectedCategory,
+              let currentIndex = GroceryCategory.allCases.firstIndex(of: currentCategory) else {
+            showLeftChevron = false
+            showRightChevron = false
+            return
+        }
+        
+        showLeftChevron = currentIndex > 0
+        showRightChevron = currentIndex < GroceryCategory.allCases.count - 1
+    }
+    
+    private func navigateToPreviousCategory() {
+        guard let currentCategory = selectedCategory,
+              let currentIndex = GroceryCategory.allCases.firstIndex(of: currentCategory),
+              currentIndex > 0 else { return }
+        
+        let previousCategory = GroceryCategory.allCases[currentIndex - 1]
+        navigationDirection = .left
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+            selectedCategory = previousCategory
+        }
+    }
+    
+    private func navigateToNextCategory() {
+        guard let currentCategory = selectedCategory,
+              let currentIndex = GroceryCategory.allCases.firstIndex(of: currentCategory),
+              currentIndex < GroceryCategory.allCases.count - 1 else { return }
+        
+        let nextCategory = GroceryCategory.allCases[currentIndex + 1]
+        navigationDirection = .right
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+            selectedCategory = nextCategory
         }
     }
     
@@ -351,6 +415,12 @@ struct VaultView: View {
                                 itemCount: getItemCount(for: category),
                                 hasItems: hasItems(in: category),
                                 action: {
+                                    // Update navigation direction based on category selection
+                                    if let current = selectedCategory,
+                                       let currentIndex = GroceryCategory.allCases.firstIndex(of: current),
+                                       let newIndex = GroceryCategory.allCases.firstIndex(of: category) {
+                                        navigationDirection = newIndex > currentIndex ? .right : .left
+                                    }
                                     selectCategory(category, proxy: proxy)
                                 }
                             )
@@ -382,28 +452,35 @@ struct VaultView: View {
     
     private var categoryContentScrollView: some View {
         GeometryReader { geometry in
-            ScrollView(.horizontal, showsIndicators: false) {
-                LazyHStack(spacing: 0) {
-                    ForEach(GroceryCategory.allCases, id: \.self) { category in
-                        CategoryItemsView(
-                            category: category,
-                            onDeleteItem: deleteItem
-                        )
-                        .frame(width: geometry.size.width, height: geometry.size.height)
-                        .id(category.id)
-                    }
+            // Remove the ScrollView and just show the current selected category with slide transition
+            if let selectedCategory = selectedCategory {
+                CategoryItemsView(
+                    category: selectedCategory,
+                    onDeleteItem: deleteItem
+                )
+                .frame(width: geometry.size.width, height: geometry.size.height)
+                .id(selectedCategory.id) // Important for proper view updates
+                .transition(.asymmetric(
+                    insertion: navigationDirection == .right ?
+                        .move(edge: .trailing) :
+                        .move(edge: .leading),
+                    removal: navigationDirection == .right ?
+                        .move(edge: .leading) :
+                        .move(edge: .trailing)
+                ))
+            } else {
+                // Fallback view if no category is selected
+                VStack {
+                    Spacer()
+                    Text("Select a category")
+                        .foregroundColor(.gray)
+                    Spacer()
                 }
-                .scrollTargetLayout()
-            }
-            .scrollPosition(id: $selectedCategory)
-            .scrollTargetBehavior(.paging)
-            .animation(.spring(response: 0.35, dampingFraction: 0.9), value: selectedCategory)
-            .onAppear {
-                if selectedCategory == nil {
-                    selectedCategory = firstCategoryWithItems ?? GroceryCategory.allCases.first
-                }
+                .frame(width: geometry.size.width, height: geometry.size.height)
             }
         }
+        .frame(maxHeight: .infinity)
+        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: selectedCategory)
     }
     
     struct CategoryItemsView: View {
@@ -417,7 +494,6 @@ struct VaultView: View {
             guard let vault = vaultService.vault,
                   let foundCategory = vault.categories.first(where: { $0.name == category.title })
             else { return [] }
-            // ADDED: Sort by id for stable order (prevents shuffling after deletion)
             return foundCategory.items.sorted { $0.id < $1.id }
         }
         
@@ -442,6 +518,7 @@ struct VaultView: View {
                     )
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         
         private var emptyCategoryView: some View {
@@ -451,6 +528,8 @@ struct VaultView: View {
                     .foregroundColor(.gray)
                 Spacer()
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .transition(.scale(scale: 0.8).combined(with: .opacity)) // Scale transition only for empty state
         }
     }
     
@@ -459,87 +538,136 @@ struct VaultView: View {
             Spacer()
             ZStack(alignment: .bottom) {
                 
-                ZStack {
-                    LinearGradient(
-                        gradient: Gradient(stops: [
-                            .init(color: Color(hex: "#ffffff").opacity(0), location: 0),
-                            .init(color: Color(hex: "#ffffff").opacity(0.85), location: 0.3),
-                            .init(color: Color(hex: "#ffffff").opacity(1), location: 0.5),
-                        ]),
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                    
-                    BlurView()
-                        .blur(radius: 8, opaque: true)
-              
-                }
-                .frame(height: 100)
-                .opacity(0.7)
-                
-                Button(action: {
-                    if existingCart != nil {
-                        onAddItemsToCart?(cartViewModel.activeCartItems)
-                        dismiss()
-                    } else {
-                        withAnimation {
-                            showCartConfirmation = true
-                        }
-                    }
-                }) {
-                    Text(existingCart != nil ? "Add to Cart" : "Create cart")
-                        .fuzzyBubblesFont(16, weight: .bold)
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 24)
-                        .padding(.vertical, 12)
-                        .background(
-                            Capsule()
-                                .fill(
-                                    hasActiveItems
-                                    ? RadialGradient(
-                                        colors: [Color.black, Color.gray.opacity(0.3)],
-                                        center: .center,
-                                        startRadius: 0,
-                                        endRadius: fillAnimation * 300
-                                    )
-                                    : RadialGradient(
-                                        colors: [Color.gray.opacity(0.3), Color.gray.opacity(0.3)],
-                                        center: .center,
-                                        startRadius: 0,
-                                        endRadius: 0
-                                    )
-                                )
+                // *to avoid the black tinkiring after celebration view
+                if totalVaultItemsCount >= 2 {
+                    ZStack {
+                        LinearGradient(
+                            gradient: Gradient(stops: [
+                                .init(color: Color(hex: "#ffffff").opacity(0), location: 0),
+                                .init(color: Color(hex: "#ffffff").opacity(0.95), location: 0.2),
+                                .init(color: Color(hex: "#ffffff").opacity(1), location: 0.4),
+                            ]),
+                            startPoint: .top,
+                            endPoint: .bottom
                         )
-                        .cornerRadius(25)
-                }
-                .overlay(alignment: .topLeading, content: {
-                    if hasActiveItems {
-                        Text("\(cartViewModel.activeCartItems.count)")
-                            .fuzzyBubblesFont(16, weight: .bold)
-                            .contentTransition(.numericText())
-                            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: cartViewModel.activeCartItems.count)
-                            .foregroundColor(.black)
-                            .frame(width: 25, height: 25)
-                            .background(Color.white)
-                            .clipShape(Circle())
-                            .overlay(
-                                Circle()
-                                    .stroke(Color.black, lineWidth: 2)
-                            )
-                            .offset(x: -8, y: -4)
-                            .scaleEffect(createCartButtonVisible ? 1 : 0)
-                            .animation(
-                                .spring(response: 0.3, dampingFraction: 0.6),
-                                value: createCartButtonVisible
-                            )
+                        
+                        BlurView()
+                            .blur(radius: 8, opaque: true)
                     }
-                })
-                .buttonStyle(.solid)
+                    .frame(height: 120)
+                    .opacity(0.7)
+                }
+                
+                HStack {
+                    if showLeftChevron {
+                        Button(action: navigateToPreviousCategory) {
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundColor(.black)
+                                .frame(width: 44, height: 44)
+                                .background(
+                                    Circle()
+                                        .fill(Material.thin)
+                                        .shadow(color: .black.opacity(0.25), radius: 2, x: 0, y: 2)
+                                )
+                        }
+                        .transition(.scale.combined(with: .opacity))
+                        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: showLeftChevron)
+                    } else {
+                        Circle()
+                            .fill(Color.clear)
+                            .frame(width: 44, height: 44)
+                    }
+                    
+                    Spacer()
+                    
+                    Button(action: {
+                        if existingCart != nil {
+                            onAddItemsToCart?(cartViewModel.activeCartItems)
+                            dismiss()
+                        } else {
+                            withAnimation {
+                                showCartConfirmation = true
+                            }
+                        }
+                    }) {
+                        Text(existingCart != nil ? "Add to Cart" : "Create cart")
+                            .fuzzyBubblesFont(16, weight: .bold)
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 24)
+                            .padding(.vertical, 12)
+                            .background(
+                                Capsule()
+                                    .fill(
+                                        hasActiveItems
+                                        ? RadialGradient(
+                                            colors: [Color.black, Color.gray.opacity(0.3)],
+                                            center: .center,
+                                            startRadius: 0,
+                                            endRadius: fillAnimation * 300
+                                        )
+                                        : RadialGradient(
+                                            colors: [Color.gray.opacity(0.3), Color.gray.opacity(0.3)],
+                                            center: .center,
+                                            startRadius: 0,
+                                            endRadius: 0
+                                        )
+                                    )
+                            )
+                            .cornerRadius(25)
+                    }
+                    .overlay(alignment: .topLeading, content: {
+                        if hasActiveItems {
+                            Text("\(cartViewModel.activeCartItems.count)")
+                                .fuzzyBubblesFont(16, weight: .bold)
+                                .contentTransition(.numericText())
+                                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: cartViewModel.activeCartItems.count)
+                                .foregroundColor(.black)
+                                .frame(width: 25, height: 25)
+                                .background(Color.white)
+                                .clipShape(Circle())
+                                .overlay(
+                                    Circle()
+                                        .stroke(Color.black, lineWidth: 2)
+                                )
+                                .offset(x: -8, y: -4)
+                                .scaleEffect(createCartButtonVisible ? 1 : 0)
+                                .animation(
+                                    .spring(response: 0.3, dampingFraction: 0.6),
+                                    value: createCartButtonVisible
+                                )
+                        }
+                    })
+                    .buttonStyle(.solid)
+                    .scaleEffect(createCartButtonVisible ? buttonScale : 0)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.6), value: createCartButtonVisible)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.6), value: buttonScale)
+                    .disabled(!hasActiveItems)
+                    
+                    Spacer()
+                    
+                    if showRightChevron {
+                        Button(action: navigateToNextCategory) {
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundColor(.black)
+                                .frame(width: 44, height: 44)
+                                .background(
+                                    Circle()
+                                        .fill(Material.thin)
+                                        .shadow(color: .black.opacity(0.25), radius: 2, x: 0, y: 2)
+                                )
+                        }
+                        .transition(.scale.combined(with: .opacity))
+                        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: showRightChevron)
+                    } else {
+                        Circle()
+                            .fill(Color.clear)
+                            .frame(width: 44, height: 44)
+                    }
+                }
+                .padding(.horizontal, 20)
                 .padding(.bottom, 40)
-                .scaleEffect(createCartButtonVisible ? buttonScale : 0)
-                .animation(.spring(response: 0.3, dampingFraction: 0.6), value: createCartButtonVisible)
-                .animation(.spring(response: 0.3, dampingFraction: 0.6), value: buttonScale)
-                .disabled(!hasActiveItems)
                 .onChange(of: hasActiveItems) { oldValue, newValue in
                     if newValue {
                         if !oldValue {
@@ -567,11 +695,10 @@ struct VaultView: View {
             .frame(maxWidth: .infinity)
         }
         .ignoresSafeArea(.all, edges: .bottom)
-    
     }
     
     private func selectCategory(_ category: GroceryCategory, proxy: ScrollViewProxy) {
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.88)) {
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
             selectedCategory = category
         }
         
@@ -629,7 +756,7 @@ struct VaultView: View {
         //Remove from active cart items
         cartViewModel.activeCartItems.removeValue(forKey: item.id)
         
-        // elete from vault
+        // Delete from vault
         withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
             vaultService.deleteItem(item)
         }
@@ -667,5 +794,3 @@ struct VaultView: View {
         }
     }
 }
-
-

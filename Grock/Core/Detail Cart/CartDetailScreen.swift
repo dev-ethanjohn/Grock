@@ -87,34 +87,17 @@ struct CartDetailScreen: View {
                 }
             }
         }
-        .fullScreenCover(isPresented: $showCelebration) {
-            CelebrationView(
-                isPresented: $showCelebration,
-                title: "WOW! Your First Shopping Cart! 🎉",
-                subtitle: nil
-            )
-            .presentationBackground(.clear)
-        }
-        .onChange(of: showCelebration) { oldValue, newValue in
-            if newValue {
-                // Celebration starting - hide button immediately
-                withAnimation(.easeOut(duration: 0.2)) {
-                    manageCartButtonVisible = false
-                }
-            } else if shouldBounceAfterCelebration {
-                // Celebration finished - show button with animation (bounce will trigger automatically via onChange)
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                    manageCartButtonVisible = true
-                }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                        manageCartButtonVisible = true
-                    }
-                    shouldBounceAfterCelebration = false // Reset flag
-                }
+        .overlay {
+            if showCelebration {
+                CelebrationView(
+                    isPresented: $showCelebration,
+                    title: "WOW! Your First Shopping Cart! 🎉",
+                    subtitle: nil
+                )
+                .transition(.scale)
+                .zIndex(1000)
             }
-        }
- 
+        } 
         .onChange(of: cartReady) { oldValue, newValue in
             if newValue && !showCelebration {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {

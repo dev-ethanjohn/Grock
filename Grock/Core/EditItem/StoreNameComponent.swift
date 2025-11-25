@@ -6,10 +6,10 @@ struct StoreNameComponent: View {
     @FocusState private var isFocused: Bool
     @State private var showAddStoreSheet = false
     @State private var newStoreName = ""
+    @State private var showDropdown = false
     let hasError: Bool
     
-    //to notify parent when store changes
-    var onStoreChange: (() -> Void)?
+    var onStoreChange: (() -> Void)? //to notify parent when store changes
     
     private var availableStores: [String] {
         vaultService.getAllStores()
@@ -23,7 +23,7 @@ struct StoreNameComponent: View {
             
             Spacer()
            
-            if availableStores.isEmpty {
+            if availableStores.isEmpty || !showDropdown {
                 // Text field (stores = 0)
                 TextField("Enter store name", text: $storeName)
                     .normalizedText($storeName)
@@ -33,7 +33,7 @@ struct StoreNameComponent: View {
                     .multilineTextAlignment(.trailing)
                     .focused($isFocused)
             } else {
-                // Dropdown (stores > 0)
+                // Dropdown (stores >0)
                 Menu {
                     Button(action: {
                         newStoreName = ""
@@ -47,7 +47,7 @@ struct StoreNameComponent: View {
                     ForEach(availableStores, id: \.self) { store in
                         Button(action: {
                             storeName = store
-                            // ADD THIS: Notify parent that store changed
+                            //Notify parent that store changed
                             onStoreChange?()
                         }) {
                             HStack {
@@ -92,12 +92,33 @@ struct StoreNameComponent: View {
                     showAddStoreSheet = false
                     print("➕ New store added and persisted: \(newStore)")
                     onStoreChange?()
+                    
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        showDropdown = true
+                    }
                 }
             )
         }
         .onAppear {
             if storeName.isEmpty, let firstStore = availableStores.first {
                 storeName = firstStore
+            }
+            if !availableStores.isEmpty {
+                showDropdown = true
+            } else {
+                showDropdown = false
+            }
+        }
+        .onChange(of: availableStores) { oldValue, newValue in
+            if oldValue.isEmpty && !newValue.isEmpty {
+                showDropdown = false
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    showDropdown = true
+                }
+            } else if !newValue.isEmpty {
+                showDropdown = true
+            } else {
+                showDropdown = false
             }
         }
         .onChange(of: storeName) { oldValue, newValue in
