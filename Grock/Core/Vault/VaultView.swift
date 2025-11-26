@@ -556,7 +556,7 @@ struct VaultView: View {
                         //                        BlurView()
                         //                            .blur(radius: 10, opaque: true)
                     }
-                    .frame(height: 120)
+                    .frame(height: 150)
                     .allowsHitTesting(false)
                 }
                 

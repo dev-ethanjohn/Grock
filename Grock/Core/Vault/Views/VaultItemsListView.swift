@@ -8,6 +8,10 @@ struct VaultItemsListView: View {
     let category: GroceryCategory?
     var onDeleteItem: ((Item) -> Void)?
     
+    private var showEndIndicator: Bool {
+        items.count >= 16
+    }
+    
     var body: some View {
         List {
             ForEach(availableStores.indices, id: \.self) { index in
@@ -26,6 +30,20 @@ struct VaultItemsListView: View {
                 .padding(.bottom, store == availableStores.last ? 0 : 20)
                 .listRowInsets(EdgeInsets())
                 .listRowSeparator(.hidden)
+            }
+            
+            if showEndIndicator {
+                HStack {
+                    Spacer()
+                    Text("You've reached the end.")
+                        .fuzzyBubblesFont(14, weight: .regular)
+                        .foregroundColor(.gray.opacity(0.8))
+                        .padding(.vertical, 32)
+                    Spacer()
+                }
+                .listRowInsets(EdgeInsets())
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
             }
         }
         .listStyle(PlainListStyle())
