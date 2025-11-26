@@ -2,6 +2,12 @@ import SwiftUI
 import SwiftData
 import Lottie
 
+extension UIApplication {
+    func endEditing() {
+        sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+    }
+}
+
 struct VaultView: View {
     @Environment(VaultService.self) private var vaultService
     @Environment(CartViewModel.self) private var cartViewModel
@@ -59,9 +65,13 @@ struct VaultView: View {
         return vault.categories.reduce(0) { $0 + $1.items.count }
     }
     
-    
     private var hasActiveItems: Bool {
         !cartViewModel.activeCartItems.isEmpty
+    }
+    @State private var isKeyboardShowing = false
+    
+    private func dismissKeyboard() {
+        UIApplication.shared.endEditing()
     }
     
     var body: some View {
@@ -79,29 +89,29 @@ struct VaultView: View {
                     )
                     
                     if let vault = vaultService.vault, !vault.categories.isEmpty {
-                          ZStack(alignment: .top) {
-                              categoryContentScrollView
-                                  .frame(maxHeight: .infinity)
-                                  .padding(.top, categorySectionHeight)
-                                  .zIndex(0)
-                              
-                              VaultCategorySectionView(selectedCategory: selectedCategory) {
-                                  categoryScrollView
-                              }
-                              .background(
-                                  GeometryReader { geo in
-                                      Color.clear
-                                          .onAppear {
-                                              categorySectionHeight = geo.size.height
-                                          }
-                                          .onChange(of: geo.size.height) { _, newValue in
-                                              categorySectionHeight = newValue
-                                          }
-                                  }
-                              )
-                              .zIndex(1)
-                          }
-                      }
+                        ZStack(alignment: .top) {
+                            categoryContentScrollView
+                                .frame(maxHeight: .infinity)
+                                .padding(.top, categorySectionHeight)
+                                .zIndex(0)
+                            
+                            VaultCategorySectionView(selectedCategory: selectedCategory) {
+                                categoryScrollView
+                            }
+                            .background(
+                                GeometryReader { geo in
+                                    Color.clear
+                                        .onAppear {
+                                            categorySectionHeight = geo.size.height
+                                        }
+                                        .onChange(of: geo.size.height) { _, newValue in
+                                            categorySectionHeight = newValue
+                                        }
+                                }
+                            )
+                            .zIndex(1)
+                        }
+                    }
                 }
                 .frame(maxHeight: .infinity)
             } else {
@@ -152,6 +162,7 @@ struct VaultView: View {
         .frame(maxHeight: .infinity)
         .ignoresSafeArea(.keyboard)
         .toolbar(.hidden)
+        .interactiveDismissDisabled(isKeyboardShowing)
         .overlay {
             if showCartConfirmation {
                 Color.black.opacity(0.4)
@@ -259,9 +270,27 @@ struct VaultView: View {
                     updateChevronVisibility()
                 }
             }
+            
+            //keyboard
+            NotificationCenter.default.addObserver(
+                forName: UIResponder.keyboardWillShowNotification,
+                object: nil,
+                queue: .main
+            ) { _ in
+                isKeyboardShowing = true
+            }
+            
+            NotificationCenter.default.addObserver(
+                forName: UIResponder.keyboardWillHideNotification,
+                object: nil,
+                queue: .main
+            ) { _ in
+                isKeyboardShowing = false
+            }
         }
         .onDisappear {
             NotificationCenter.default.removeObserver(self)
+            dismissKeyboard()
         }
         .onChange(of: vaultService.vault) { oldValue, newValue in
             if selectedCategory == nil {
@@ -516,16 +545,16 @@ struct VaultView: View {
                         LinearGradient(
                             gradient: Gradient(stops: [
                                 .init(color: Color.white.opacity(0.0), location: 0.0),
-                                .init(color: Color.white.opacity(0.5), location: 0.25),
-                                .init(color: Color.white.opacity(0.85), location: 0.55),
+                                .init(color: Color.white.opacity(0.6), location: 0.25),
+                                .init(color: Color.white.opacity(0.95), location: 0.55),
                                 .init(color: Color.white.opacity(1.0), location: 1.0),
                             ]),
                             startPoint: .top,
                             endPoint: .bottom
                         )
                         
-                        BlurView()
-                            .blur(radius: 10, opaque: true)
+                        //                        BlurView()
+                        //                            .blur(radius: 10, opaque: true)
                     }
                     .frame(height: 120)
                     .allowsHitTesting(false)
