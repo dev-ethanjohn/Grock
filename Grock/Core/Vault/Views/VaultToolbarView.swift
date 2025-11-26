@@ -1,10 +1,3 @@
-//
-//  VaultToolbarView.swift
-//  Grock
-//
-//  Created by Ethan John Paguntalan on 10/5/25.
-//
-
 import SwiftUI
 
 struct VaultToolbarView: View {

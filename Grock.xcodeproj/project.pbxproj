@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		4C76BFED2ED6B13400F98D86 /* SwiftUIIntrospect in Frameworks */ = {isa = PBXBuildFile; productRef = 4C76BFEC2ED6B13400F98D86 /* SwiftUIIntrospect */; };
 		4CA669322EB55D3F00769F3F /* Lottie in Frameworks */ = {isa = PBXBuildFile; productRef = 4CA669312EB55D3F00769F3F /* Lottie */; };
 /* End PBXBuildFile section */
 
@@ -42,6 +43,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				4CA669322EB55D3F00769F3F /* Lottie in Frameworks */,
+				4C76BFED2ED6B13400F98D86 /* SwiftUIIntrospect in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -85,6 +87,7 @@
 			name = Grock;
 			packageProductDependencies = (
 				4CA669312EB55D3F00769F3F /* Lottie */,
+				4C76BFEC2ED6B13400F98D86 /* SwiftUIIntrospect */,
 			);
 			productName = Grock;
 			productReference = 4C07F7B82E88245000B46866 /* Grock.app */;
@@ -116,6 +119,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				4CA669302EB55D3F00769F3F /* XCRemoteSwiftPackageReference "lottie-ios" */,
+				4C76BFEB2ED6B13400F98D86 /* XCRemoteSwiftPackageReference "swiftui-introspect" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 4C07F7B92E88245000B46866 /* Products */;
@@ -353,6 +357,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		4C76BFEB2ED6B13400F98D86 /* XCRemoteSwiftPackageReference "swiftui-introspect" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/siteline/swiftui-introspect";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 26.0.0;
+			};
+		};
 		4CA669302EB55D3F00769F3F /* XCRemoteSwiftPackageReference "lottie-ios" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/airbnb/lottie-ios.git";
@@ -364,6 +376,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		4C76BFEC2ED6B13400F98D86 /* SwiftUIIntrospect */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 4C76BFEB2ED6B13400F98D86 /* XCRemoteSwiftPackageReference "swiftui-introspect" */;
+			productName = SwiftUIIntrospect;
+		};
 		4CA669312EB55D3F00769F3F /* Lottie */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 4CA669302EB55D3F00769F3F /* XCRemoteSwiftPackageReference "lottie-ios" */;

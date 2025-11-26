@@ -51,7 +51,7 @@ struct VaultCategoryIcon: View {
             }
             .padding(4)
         }
-        .opacity(hasItems ? opacityBounce : 0.4)
+        .opacity(hasItems ? opacityBounce : 0.3)
         .onChange(of: hasItems) { oldValue, newValue in
             if newValue {
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {

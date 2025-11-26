@@ -44,6 +44,8 @@ struct VaultView: View {
     // Track navigation direction for slide animations
     @State private var navigationDirection: NavigationDirection = .none
     
+    @State private var categorySectionHeight: CGFloat = 0
+    
     enum NavigationDirection {
         case left, right, none
     }
@@ -53,10 +55,10 @@ struct VaultView: View {
     @State private var firstItemId: String? = nil
     
     private var totalVaultItemsCount: Int {
-         guard let vault = vaultService.vault else { return 0 }
-         return vault.categories.reduce(0) { $0 + $1.items.count }
-     }
-     
+        guard let vault = vaultService.vault else { return 0 }
+        return vault.categories.reduce(0) { $0 + $1.items.count }
+    }
+    
     
     private var hasActiveItems: Bool {
         !cartViewModel.activeCartItems.isEmpty
@@ -77,15 +79,29 @@ struct VaultView: View {
                     )
                     
                     if let vault = vaultService.vault, !vault.categories.isEmpty {
-                        VaultCategorySectionView(selectedCategory: selectedCategory) {
-                            categoryScrollView
-                        }
-                        
-                        categoryContentScrollView
-                            .frame(maxHeight: .infinity)
-                    } else {
-                        emptyVaultView
-                    }
+                          ZStack(alignment: .top) {
+                              categoryContentScrollView
+                                  .frame(maxHeight: .infinity)
+                                  .padding(.top, categorySectionHeight)
+                                  .zIndex(0)
+                              
+                              VaultCategorySectionView(selectedCategory: selectedCategory) {
+                                  categoryScrollView
+                              }
+                              .background(
+                                  GeometryReader { geo in
+                                      Color.clear
+                                          .onAppear {
+                                              categorySectionHeight = geo.size.height
+                                          }
+                                          .onChange(of: geo.size.height) { _, newValue in
+                                              categorySectionHeight = newValue
+                                          }
+                                  }
+                              )
+                              .zIndex(1)
+                          }
+                      }
                 }
                 .frame(maxHeight: .infinity)
             } else {
@@ -118,7 +134,6 @@ struct VaultView: View {
                             print("✅ Item added to vault: \(itemName)")
                         } else {
                             print("❌ Failed to add item - duplicate name: \(itemName)")
-                            // You might want to show an alert here
                         }
                     },
                     onDismiss: {
@@ -197,7 +212,7 @@ struct VaultView: View {
             .presentationBackground(.clear)
         }
         .onAppear {
-//            printVaultStructure()
+            //            printVaultStructure()
             initializeActiveItemsFromExistingCart()
             
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
@@ -256,14 +271,14 @@ struct VaultView: View {
             
             if newValue != oldValue {
                 print("🔄 Vault changed - reprinting structure:")
-//                printVaultStructure()
+                //                printVaultStructure()
             }
         }
         .onChange(of: showAddItemPopover) { oldValue, newValue in
             if !newValue {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                     print("📝 After adding item - updated vault structure:")
-//                    printVaultStructure()
+                    //                    printVaultStructure()
                 }
             }
         }
@@ -359,40 +374,6 @@ struct VaultView: View {
         hasInitializedFromExistingCart = true
     }
     
-    private var emptyVaultView: some View {
-        VStack(spacing: 20) {
-            Spacer()
-            
-            Image(systemName: "shippingbox")
-                .font(.system(size: 60))
-                .foregroundColor(.gray)
-            
-            Text("Your vault is empty")
-                .font(.title2)
-                .foregroundColor(.gray)
-            
-            Text("Add your first item to get started")
-                .font(.body)
-                .foregroundColor(.gray.opacity(0.8))
-            
-            Button(action: {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    showAddItemPopover = true
-                }
-            }) {
-                Text("Add First Item")
-                    .font(.headline)
-                    .foregroundColor(.white)
-                    .padding()
-                    .background(Color.black)
-                    .cornerRadius(12)
-            }
-            .padding(.top, 20)
-            
-            Spacer()
-        }
-        .padding()
-    }
     
     private var categoryScrollView: some View {
         ScrollViewReader { proxy in
@@ -412,7 +393,7 @@ struct VaultView: View {
                             VaultCategoryIcon(
                                 category: category,
                                 isSelected: selectedCategory == category,
-                                itemCount: getItemCount(for: category),
+                                itemCount: getActiveItemCount(for: category),
                                 hasItems: hasItems(in: category),
                                 action: {
                                     // Update navigation direction based on category selection
@@ -463,20 +444,11 @@ struct VaultView: View {
                 .transition(.asymmetric(
                     insertion: navigationDirection == .right ?
                         .move(edge: .trailing) :
-                        .move(edge: .leading),
+                            .move(edge: .leading),
                     removal: navigationDirection == .right ?
                         .move(edge: .leading) :
-                        .move(edge: .trailing)
+                            .move(edge: .trailing)
                 ))
-            } else {
-                // Fallback view if no category is selected
-                VStack {
-                    Spacer()
-                    Text("Select a category")
-                        .foregroundColor(.gray)
-                    Spacer()
-                }
-                .frame(width: geometry.size.width, height: geometry.size.height)
             }
         }
         .frame(maxHeight: .infinity)
@@ -524,12 +496,12 @@ struct VaultView: View {
         private var emptyCategoryView: some View {
             VStack {
                 Spacer()
-                Text("No items yet in this category")
+                Text("No items yet in \(category.title) \(category.emoji)")
                     .foregroundColor(.gray)
                 Spacer()
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .transition(.scale(scale: 0.8).combined(with: .opacity)) // Scale transition only for empty state
+            .transition(.scale(scale: 0.8).combined(with: .opacity))
         }
     }
     
@@ -543,20 +515,22 @@ struct VaultView: View {
                     ZStack {
                         LinearGradient(
                             gradient: Gradient(stops: [
-                                .init(color: Color(hex: "#ffffff").opacity(0), location: 0),
-                                .init(color: Color(hex: "#ffffff").opacity(0.95), location: 0.2),
-                                .init(color: Color(hex: "#ffffff").opacity(1), location: 0.4),
+                                .init(color: Color.white.opacity(0.0), location: 0.0),
+                                .init(color: Color.white.opacity(0.5), location: 0.25),
+                                .init(color: Color.white.opacity(0.85), location: 0.55),
+                                .init(color: Color.white.opacity(1.0), location: 1.0),
                             ]),
                             startPoint: .top,
                             endPoint: .bottom
                         )
                         
                         BlurView()
-                            .blur(radius: 8, opaque: true)
+                            .blur(radius: 10, opaque: true)
                     }
                     .frame(height: 120)
-                    .opacity(0.7)
+                    .allowsHitTesting(false)
                 }
+                
                 
                 HStack {
                     if showLeftChevron {
@@ -727,7 +701,7 @@ struct VaultView: View {
         return nil
     }
     
-    private func getItemCount(for category: GroceryCategory) -> Int {
+    private func getActiveItemCount(for category: GroceryCategory) -> Int {
         guard let vault = vaultService.vault else { return 0 }
         guard let foundCategory = vault.categories.first(where: { $0.name == category.title }) else { return 0 }
         
