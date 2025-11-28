@@ -60,6 +60,12 @@ struct VaultView: View {
     @State private var showFirstItemTooltip = false
     @State private var firstItemId: String? = nil
     
+    // Track keyboard state for immediate dismissal
+    @FocusState private var isAnyFieldFocused: Bool
+    
+    // Track keyboard visibility to prevent sheet dismissal
+    @State private var isKeyboardVisible = false
+    
     private var totalVaultItemsCount: Int {
         guard let vault = vaultService.vault else { return 0 }
         return vault.categories.reduce(0) { $0 + $1.items.count }
@@ -68,7 +74,6 @@ struct VaultView: View {
     private var hasActiveItems: Bool {
         !cartViewModel.activeCartItems.isEmpty
     }
-    @State private var isKeyboardShowing = false
     
     private func dismissKeyboard() {
         UIApplication.shared.endEditing()
@@ -81,6 +86,8 @@ struct VaultView: View {
                     VaultToolbarView(
                         toolbarAppeared: $toolbarAppeared,
                         onAddTapped: {
+                            // Dismiss keyboard immediately
+                            dismissKeyboard()
                             withAnimation(.easeInOut(duration: 0.2)) {
                                 showAddItemPopover = true
                                 createCartButtonVisible = false
@@ -97,6 +104,10 @@ struct VaultView: View {
                             
                             VaultCategorySectionView(selectedCategory: selectedCategory) {
                                 categoryScrollView
+                            }
+                            .onTapGesture {
+                                // Dismiss keyboard when tapping category section
+                                dismissKeyboard()
                             }
                             .background(
                                 GeometryReader { geo in
@@ -122,9 +133,7 @@ struct VaultView: View {
             }
             
             if vaultService.vault != nil && !showCelebration && vaultReady {
-                
                 content
-                
             }
             
             if showAddItemPopover {
@@ -162,7 +171,8 @@ struct VaultView: View {
         .frame(maxHeight: .infinity)
         .ignoresSafeArea(.keyboard)
         .toolbar(.hidden)
-        .interactiveDismissDisabled(isKeyboardShowing)
+        // Prevent sheet dismissal when keyboard is visible
+        .interactiveDismissDisabled(isKeyboardVisible)
         .overlay {
             if showCartConfirmation {
                 Color.black.opacity(0.4)
@@ -181,7 +191,6 @@ struct VaultView: View {
         }
         .onChange(of: showCelebration) { oldValue, newValue in
             if newValue {
-                // Celebration starting - hide button
                 withAnimation(.easeOut(duration: 0.2)) {
                     createCartButtonVisible = false
                 }
@@ -223,7 +232,6 @@ struct VaultView: View {
             .presentationBackground(.clear)
         }
         .onAppear {
-            //            printVaultStructure()
             initializeActiveItemsFromExistingCart()
             
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
@@ -271,13 +279,13 @@ struct VaultView: View {
                 }
             }
             
-            //keyboard
+            // Track keyboard visibility to prevent sheet dismissal
             NotificationCenter.default.addObserver(
                 forName: UIResponder.keyboardWillShowNotification,
                 object: nil,
                 queue: .main
             ) { _ in
-                isKeyboardShowing = true
+                isKeyboardVisible = true
             }
             
             NotificationCenter.default.addObserver(
@@ -285,7 +293,7 @@ struct VaultView: View {
                 object: nil,
                 queue: .main
             ) { _ in
-                isKeyboardShowing = false
+                isKeyboardVisible = false
             }
         }
         .onDisappear {
@@ -300,14 +308,12 @@ struct VaultView: View {
             
             if newValue != oldValue {
                 print("🔄 Vault changed - reprinting structure:")
-                //                printVaultStructure()
             }
         }
         .onChange(of: showAddItemPopover) { oldValue, newValue in
             if !newValue {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                     print("📝 After adding item - updated vault structure:")
-                    //                    printVaultStructure()
                 }
             }
         }
@@ -336,6 +342,9 @@ struct VaultView: View {
     }
     
     private func navigateToPreviousCategory() {
+        // Dismiss keyboard immediately
+        dismissKeyboard()
+        
         guard let currentCategory = selectedCategory,
               let currentIndex = GroceryCategory.allCases.firstIndex(of: currentCategory),
               currentIndex > 0 else { return }
@@ -348,6 +357,9 @@ struct VaultView: View {
     }
     
     private func navigateToNextCategory() {
+        // Dismiss keyboard immediately
+        dismissKeyboard()
+        
         guard let currentCategory = selectedCategory,
               let currentIndex = GroceryCategory.allCases.firstIndex(of: currentCategory),
               currentIndex < GroceryCategory.allCases.count - 1 else { return }
@@ -425,7 +437,9 @@ struct VaultView: View {
                                 itemCount: getActiveItemCount(for: category),
                                 hasItems: hasItems(in: category),
                                 action: {
-                                    // Update navigation direction based on category selection
+                                    // Dismiss keyboard immediately when tapping category
+                                    dismissKeyboard()
+                                    
                                     if let current = selectedCategory,
                                        let currentIndex = GroceryCategory.allCases.firstIndex(of: current),
                                        let newIndex = GroceryCategory.allCases.firstIndex(of: category) {
@@ -462,14 +476,13 @@ struct VaultView: View {
     
     private var categoryContentScrollView: some View {
         GeometryReader { geometry in
-            // Remove the ScrollView and just show the current selected category with slide transition
             if let selectedCategory = selectedCategory {
                 CategoryItemsView(
                     category: selectedCategory,
                     onDeleteItem: deleteItem
                 )
                 .frame(width: geometry.size.width, height: geometry.size.height)
-                .id(selectedCategory.id) // Important for proper view updates
+                .id(selectedCategory.id)
                 .transition(.asymmetric(
                     insertion: navigationDirection == .right ?
                         .move(edge: .trailing) :
@@ -495,7 +508,6 @@ struct VaultView: View {
             guard let vault = vaultService.vault,
                   let foundCategory = vault.categories.first(where: { $0.name == category.title })
             else { return [] }
-            // ✅ Sort by createdAt descending (newest first)
             return foundCategory.items.sorted { $0.createdAt > $1.createdAt }
         }
         private var availableStores: [String] {
@@ -539,7 +551,6 @@ struct VaultView: View {
             Spacer()
             ZStack(alignment: .bottom) {
                 
-                // *to avoid the black tinkiring after celebration view
                 if totalVaultItemsCount >= 2 {
                     ZStack {
                         LinearGradient(
@@ -552,14 +563,10 @@ struct VaultView: View {
                             startPoint: .top,
                             endPoint: .bottom
                         )
-                        
-                        //                        BlurView()
-                        //                            .blur(radius: 10, opaque: true)
                     }
                     .frame(height: 150)
                     .allowsHitTesting(false)
                 }
-                
                 
                 HStack {
                     if showLeftChevron {
@@ -585,6 +592,9 @@ struct VaultView: View {
                     Spacer()
                     
                     Button(action: {
+                        // Dismiss keyboard immediately
+                        dismissKeyboard()
+                        
                         if existingCart != nil {
                             onAddItemsToCart?(cartViewModel.activeCartItems)
                             dismiss()
@@ -756,10 +766,8 @@ struct VaultView: View {
     private func deleteItem(_ item: Item) {
         print("🗑️ Deleting item: '\(item.name)'")
         
-        //Remove from active cart items
         cartViewModel.activeCartItems.removeValue(forKey: item.id)
         
-        // Delete from vault
         withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
             vaultService.deleteItem(item)
         }

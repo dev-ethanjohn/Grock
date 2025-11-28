@@ -55,6 +55,9 @@ struct VaultItemRow: View {
         .opacity(appearOpacity)
         .offset(y: slideInOffset)
         .onTapGesture {
+            // Prevent tap when keyboard is open
+            guard !isFocused else { return }
+            
             if isSwiped {
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                     dragPosition = 0
@@ -64,6 +67,8 @@ struct VaultItemRow: View {
                 showEditSheet = true
             }
         }
+        // Disable interaction when keyboard is visible
+        .allowsHitTesting(!isFocused)
         .sheet(isPresented: $showEditSheet) {
             EditItemSheet(
                 item: item,
@@ -257,7 +262,7 @@ struct VaultItemRow: View {
         .background(.white)
         .animation(.spring(response: 0.4, dampingFraction: 0.7), value: isActive)
         .offset(x: totalOffset)
-        .gesture(swipeGesture)
+        .gesture(isFocused ? nil : swipeGesture) // Disable swipe when keyboard is open
         .disabled(isDeleting)
     }
     
@@ -320,7 +325,7 @@ struct VaultItemRow: View {
         }
         .buttonStyle(.plain)
         .contentShape(Rectangle())
-        .disabled(currentQuantity <= 0)
+        .disabled(currentQuantity <= 0 || isFocused) // Disable when keyboard is open
         .opacity(currentQuantity <= 0 ? 0.5 : 1)
     }
     
@@ -405,6 +410,7 @@ struct VaultItemRow: View {
         .clipShape(Circle())
         .contentShape(Circle())
         .buttonStyle(.plain)
+        .disabled(isFocused) // Disable when keyboard is open
     }
     
     private var swipeGesture: some Gesture {

@@ -28,8 +28,8 @@ struct EditItemSheet: View {
                             showCategoryTooltip: false,
                             duplicateError: duplicateError,
                             onStoreChange: {
-                                  triggerRealTimeValidation() // Call your existing validation method
-                              }
+                                triggerRealTimeValidation()
+                            }
                         )
                         
                         if context == .cart {
@@ -75,12 +75,11 @@ struct EditItemSheet: View {
             initializeFormValues()
         }
         .onChange(of: formViewModel.itemName) { oldValue, newValue in
-                  triggerRealTimeValidation()
-              }
-              .onChange(of: formViewModel.storeName) { oldValue, newValue in
-                  triggerRealTimeValidation()
-              }
-     
+            triggerRealTimeValidation()
+        }
+        .onChange(of: formViewModel.storeName) { oldValue, newValue in
+            triggerRealTimeValidation()
+        }
         .safeAreaInset(edge: .bottom) {
             HStack {
                 if context == .cart {
@@ -194,5 +193,4 @@ struct EditItemSheet: View {
             }
         }
     }
-    
 }
