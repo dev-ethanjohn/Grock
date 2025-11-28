@@ -2,6 +2,12 @@ import Foundation
 import SwiftData
 import Observation
 
+extension Category {
+    var sortedItems: [Item] {
+        items.sorted { $0.createdAt > $1.createdAt }  // ✅ Newest first
+    }
+}
+
 // MARK: - Vault Service
 /// Main service class for managing user vault, categories, items, stores, and shopping carts
 @MainActor
@@ -192,20 +198,18 @@ extension VaultService {
     /// Adds a new item to the specified category
     func addItem(
         name: String,
-            to category: GroceryCategory,
-            store: String,
-            price: Double,
-            unit: String
-        ) -> Bool {
-            guard let vault = vault else { return false }
-            
-            // ✅ Now validate per store, not vault-wide
-            let validation = validateItemName(name, store: store)
-            guard validation.isValid else {
-                print("❌ Cannot add item: \(validation.errorMessage ?? "Unknown error")")
-                return false
-            }
-            
+        to category: GroceryCategory,
+        store: String,
+        price: Double,
+        unit: String
+    ) -> Bool {
+        guard let vault = vault else { return false }
+        
+        let validation = validateItemName(name, store: store)
+        guard validation.isValid else {
+            print("❌ Cannot add item: \(validation.errorMessage ?? "Unknown error")")
+            return false
+        }
         
         let targetCategory: Category
         if let existingCategory = getCategory(category) {
@@ -219,11 +223,13 @@ extension VaultService {
         let priceOption = PriceOption(store: store, pricePerUnit: pricePerUnit)
         let newItem = Item(name: name.trimmingCharacters(in: .whitespacesAndNewlines))
         newItem.priceOptions = [priceOption]
+        // createdAt is automatically set to Date() in init
         
-        targetCategory.items.append(newItem)
+        targetCategory.items.append(newItem)  // ✅ Just append, sorting handles order
         saveContext()
         return true
     }
+
     
     /// Updates an existing item with new properties
     func updateItem(

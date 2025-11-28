@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import SwiftUIIntrospect
 
 struct VaultItemRow: View {
@@ -15,6 +16,10 @@ struct VaultItemRow: View {
     @State private var isDeleting: Bool = false
     @State private var isNewlyAdded: Bool = true
     @State private var deletionCompleted = false
+    
+    @State private var appearScale: CGFloat = 0.9
+    @State private var appearOpacity: Double = 0
+    @State private var slideInOffset: CGFloat = 20
 
     private var currentQuantity: Double {
         cartViewModel.activeCartItems[item.id] ?? 0
@@ -29,7 +34,7 @@ struct VaultItemRow: View {
 
     private var totalOffset: CGFloat {
         if isDeleting {
-            return -400
+            return -UIScreen.main.bounds.width // slide completely off screen
         } else {
             let proposed = dragPosition + dragOffset
             return max(proposed, -80)
@@ -46,6 +51,9 @@ struct VaultItemRow: View {
             itemFrontRow
         }
         .contentShape(Rectangle())
+        .scaleEffect(appearScale)
+        .opacity(appearOpacity)
+        .offset(y: slideInOffset)
         .onTapGesture {
             if isSwiped {
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
@@ -89,10 +97,9 @@ struct VaultItemRow: View {
             if newValue && !deletionCompleted {
                 deletionCompleted = true
                 
-                //Remove from active items BEFORE calling onDelete
                 cartViewModel.activeCartItems.removeValue(forKey: item.id)
                 
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
                     onDelete()
                 }
             }
@@ -104,12 +111,22 @@ struct VaultItemRow: View {
             deletionCompleted = false
 
             if isNewlyAdded {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    withAnimation(.easeIn(duration: 0.2)) {
-                        isNewlyAdded = false
-                    }
+                withAnimation(.spring(response: 0.25, dampingFraction: 0.75)) {
+                    appearScale = 1.0
+                    appearOpacity = 1.0
+                    slideInOffset = 0
                 }
+                
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    isNewlyAdded = false
+                }
+            } else {
+                // Item already exists, show immediately
+                appearScale = 1.0
+                appearOpacity = 1.0
+                slideInOffset = 0
             }
+            
             // Initialize textValue on appear
             if textValue.isEmpty || textValue != formatValue(currentQuantity) {
                 textValue = formatValue(currentQuantity)
@@ -118,14 +135,17 @@ struct VaultItemRow: View {
         .onDisappear {
             isNewlyAdded = true
         }
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: totalOffset)
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isDeleting)
+        .animation(.spring(response: 0.35, dampingFraction: 0.75), value: totalOffset)
+        .animation(.spring(response: 0.4, dampingFraction: 0.7), value: isDeleting)
     }
 
     private func triggerDeletion() {
         guard !isDeleting && !deletionCompleted else { return }
+        
+        let generator = UIImpactFeedbackGenerator(style: .medium)
+        generator.impactOccurred()
 
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
             isDeleting = true
         }
     }
@@ -141,6 +161,9 @@ struct VaultItemRow: View {
         let clamped = min(newValue, 100)
         cartViewModel.updateActiveItem(itemId: item.id, quantity: clamped)
         textValue = formatValue(clamped)
+        
+        let generator = UIImpactFeedbackGenerator(style: .light)
+        generator.impactOccurred()
     }
 
     private func handleMinus() {
@@ -154,6 +177,9 @@ struct VaultItemRow: View {
         let clamped = max(newValue, 0)
         cartViewModel.updateActiveItem(itemId: item.id, quantity: clamped)
         textValue = formatValue(clamped)
+        
+        let generator = UIImpactFeedbackGenerator(style: .light)
+        generator.impactOccurred()
     }
 
     private func commitTextField() {
@@ -248,7 +274,6 @@ struct VaultItemRow: View {
         }
     }
 
-    
     private var itemDetails: some View {
         VStack(alignment: .leading, spacing: 0) {
             Text(item.name)
@@ -272,11 +297,13 @@ struct VaultItemRow: View {
         HStack(spacing: 8) {
             if isActive {
                 minusButton
+                    .transition(.scale.combined(with: .opacity))
                 quantityTextField
+                    .transition(.scale.combined(with: .opacity))
             }
             plusButton
         }
-        .animation(.spring(response: 0.2, dampingFraction: 0.7), value: isActive)
+        .animation(.spring(response: 0.35, dampingFraction: 0.7), value: isActive)
         .padding(.top, 6)
     }
     
@@ -338,7 +365,6 @@ struct VaultItemRow: View {
                 }
             }
             .introspect(.textField, on: .iOS(.v16, .v17, .v18)) { textField in
-                // Always set the toolbar, even if it exists
                 let toolbar = TransparentToolbar(
                     onClose: { [weak textField] in
                         DispatchQueue.main.async {
@@ -425,7 +451,6 @@ struct VaultItemRow: View {
 }
 
 // MARK: - Transparent UIKit Toolbar
-
 private class TransparentToolbar: UIView {
     private let onClose: () -> Void
     private let onSubmit: () -> Void
@@ -433,7 +458,7 @@ private class TransparentToolbar: UIView {
     init(onClose: @escaping () -> Void, onSubmit: @escaping () -> Void) {
         self.onClose = onClose
         self.onSubmit = onSubmit
-        super.init(frame: CGRect(x: 0, y: 0, width: UIScreen.main.bounds.width, height: 44))
+        super.init(frame: CGRect(x: 0, y: 0, width: UIScreen.main.bounds.width, height: 60))
         setupToolbar()
     }
     
@@ -442,21 +467,39 @@ private class TransparentToolbar: UIView {
     }
     
     private func setupToolbar() {
-        backgroundColor = .clear // Transparent background
+        backgroundColor = .clear
         
-        let closeButton = UIButton(type: .system)
-        closeButton.setTitle("X", for: .normal)
-        closeButton.setTitleColor(.systemRed, for: .normal)
-        closeButton.titleLabel?.font = UIFont.boldSystemFont(ofSize: 18)
-        closeButton.addTarget(self, action: #selector(closeTapped), for: .touchUpInside)
+        // Add gradient layer
+        let gradientLayer = CAGradientLayer()
+        gradientLayer.frame = bounds
+        gradientLayer.colors = [
+            UIColor.white.withAlphaComponent(0.0).cgColor,
+            UIColor.white.withAlphaComponent(0.6).cgColor,
+            UIColor.white.withAlphaComponent(0.95).cgColor,
+            UIColor.white.withAlphaComponent(1.0).cgColor
+        ]
+        gradientLayer.locations = [0.0, 0.25, 0.55, 1.0]
+        gradientLayer.startPoint = CGPoint(x: 0.5, y: 0.0)
+        gradientLayer.endPoint = CGPoint(x: 0.5, y: 1.0)
+        layer.insertSublayer(gradientLayer, at: 0)
         
-        let submitButton = UIButton(type: .system)
-        submitButton.setTitle("Submit", for: .normal)
-        submitButton.setTitleColor(.systemBlue, for: .normal)
-        submitButton.titleLabel?.font = UIFont.boldSystemFont(ofSize: 16)
-        submitButton.addTarget(self, action: #selector(submitTapped), for: .touchUpInside)
+        var config = UIButton.Configuration.filled()
+        config.baseBackgroundColor = .black
+        config.baseForegroundColor = .white
+        config.contentInsets = NSDirectionalEdgeInsets(top: 6, leading: 20, bottom: 6, trailing: 20)
+        config.cornerStyle = .capsule
         
-        let stackView = UIStackView(arrangedSubviews: [closeButton, UIView(), submitButton])
+        // Set attributed title with custom font
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: UIFont(name: "FuzzyBubbles-Bold", size: 16) ?? UIFont.boldSystemFont(ofSize: 16),
+            .foregroundColor: UIColor.white
+        ]
+        config.attributedTitle = AttributedString(NSAttributedString(string: "Save", attributes: attributes))
+        
+        let saveButton = UIButton(configuration: config)
+        saveButton.addTarget(self, action: #selector(submitTapped), for: .touchUpInside)
+        
+        let stackView = UIStackView(arrangedSubviews: [UIView(), saveButton])
         stackView.axis = .horizontal
         stackView.distribution = .fill
         stackView.alignment = .center
@@ -468,10 +511,7 @@ private class TransparentToolbar: UIView {
             stackView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 16),
             stackView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -16),
             stackView.topAnchor.constraint(equalTo: topAnchor),
-            stackView.bottomAnchor.constraint(equalTo: bottomAnchor),
-            
-            closeButton.widthAnchor.constraint(equalToConstant: 44),
-            submitButton.widthAnchor.constraint(equalToConstant: 80)
+            stackView.bottomAnchor.constraint(equalTo: bottomAnchor)
         ])
     }
     

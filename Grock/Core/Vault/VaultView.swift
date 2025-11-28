@@ -495,9 +495,9 @@ struct VaultView: View {
             guard let vault = vaultService.vault,
                   let foundCategory = vault.categories.first(where: { $0.name == category.title })
             else { return [] }
-            return foundCategory.items.sorted { $0.id < $1.id }
+            // ✅ Sort by createdAt descending (newest first)
+            return foundCategory.items.sorted { $0.createdAt > $1.createdAt }
         }
-        
         private var availableStores: [String] {
             let allStores = categoryItems.flatMap { item in
                 item.priceOptions.map { $0.store }
