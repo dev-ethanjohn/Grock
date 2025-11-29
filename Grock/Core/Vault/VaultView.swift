@@ -66,6 +66,9 @@ struct VaultView: View {
     // Track keyboard visibility to prevent sheet dismissal
     @State private var isKeyboardVisible = false
     
+    @State private var showDismissConfirmation = false
+//    @State private var showCancelConfirmation = false
+    
     private var totalVaultItemsCount: Int {
         guard let vault = vaultService.vault else { return 0 }
         return vault.categories.reduce(0) { $0 + $1.items.count }
@@ -86,14 +89,25 @@ struct VaultView: View {
                     VaultToolbarView(
                         toolbarAppeared: $toolbarAppeared,
                         onAddTapped: {
-                            // Dismiss keyboard immediately
                             dismissKeyboard()
                             withAnimation(.easeInOut(duration: 0.2)) {
                                 showAddItemPopover = true
                                 createCartButtonVisible = false
                             }
-                        }
+                        },
+                        onDismissTapped: {
+                            if hasActiveItems {
+                                showDismissConfirmation = true
+                            } else {
+                                dismiss()
+                            }
+                        },
+                        onClearTapped: {
+                            cartViewModel.activeCartItems.removeAll()
+                        },
+                        showClearButton: hasActiveItems
                     )
+                    
                     
                     if let vault = vaultService.vault, !vault.categories.isEmpty {
                         ZStack(alignment: .top) {
@@ -180,6 +194,17 @@ struct VaultView: View {
                     .transition(.opacity)
             }
         }
+        .customActionSheet(
+                isPresented: $showDismissConfirmation,
+                title: "Leave Vault?",
+                message: "You have \(cartViewModel.activeCartItems.count) selected item(s) that will be lost if you leave.",
+                primaryAction: {
+                    cartViewModel.activeCartItems.removeAll()
+                    dismiss()
+                },
+                secondaryAction: {
+                }
+            )
         .animation(.easeInOut(duration: 0.3), value: showCartConfirmation)
         .fullScreenCover(isPresented: $showCelebration) {
             CelebrationView(
@@ -301,14 +326,11 @@ struct VaultView: View {
             dismissKeyboard()
         }
         .onChange(of: vaultService.vault) { oldValue, newValue in
+            // Only set if we truly don't have a selection
             if selectedCategory == nil {
                 selectedCategory = firstCategoryWithItems ?? GroceryCategory.allCases.first
             }
             updateChevronVisibility()
-            
-            if newValue != oldValue {
-                print("🔄 Vault changed - reprinting structure:")
-            }
         }
         .onChange(of: showAddItemPopover) { oldValue, newValue in
             if !newValue {
@@ -731,15 +753,15 @@ struct VaultView: View {
     private var firstCategoryWithItems: GroceryCategory? {
         guard let vault = vaultService.vault else { return nil }
         
-        for category in vault.categories {
-            if !category.items.isEmpty {
-                return GroceryCategory.allCases.first { $0.title == category.name }
+        // Always check in GroceryCategory.allCases order, not vault.categories order
+        for groceryCategory in GroceryCategory.allCases {
+            if let vaultCategory = vault.categories.first(where: { $0.name == groceryCategory.title }),
+               !vaultCategory.items.isEmpty {
+                return groceryCategory
             }
         }
-        
         return nil
     }
-    
     private func getActiveItemCount(for category: GroceryCategory) -> Int {
         guard let vault = vaultService.vault else { return 0 }
         guard let foundCategory = vault.categories.first(where: { $0.name == category.title }) else { return 0 }

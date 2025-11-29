@@ -459,8 +459,10 @@ struct HomeView: View {
                 .environment(vaultService)
                 .environment(cartViewModel)
                 .presentationCornerRadius(24)
+                .interactiveDismissDisabled(cartViewModel.hasActiveItems)
         }
     }
+
 
     private func tabButton(title: String, tabIndex: Int) -> some View {
         Button(action: { viewModel.selectedTab = tabIndex }) {
@@ -496,3 +498,5 @@ struct VaultCoordinatedButtonStyle: ButtonStyle {
             .brightness(configuration.isPressed ? -0.2 : 0)
     }
 }
+
+

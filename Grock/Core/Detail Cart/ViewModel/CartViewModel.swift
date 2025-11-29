@@ -209,4 +209,9 @@ class CartViewModel {
     func clearDuplicateError() {
         duplicateError = nil
     }
+    
+    func clearActiveItems() {
+        activeCartItems.removeAll()
+    }
 }
+
