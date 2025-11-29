@@ -9,10 +9,29 @@ struct StoreNameComponent: View {
     @State private var showDropdown = false
     let hasError: Bool
     
-    var onStoreChange: (() -> Void)? //to notify parent when store changes
+    var onStoreChange: (() -> Void)?
+    
+    // Track last selected store across sessions
+    @AppStorage("lastSelectedStore") private var lastSelectedStore: String = ""
     
     private var availableStores: [String] {
         vaultService.getAllStores()
+    }
+    
+    //Prioritize last selected store, then most recent
+    private var defaultStore: String? {
+        // 1. If lastSelectedStore exists and is still valid, use it
+        if !lastSelectedStore.isEmpty && availableStores.contains(where: { $0.lowercased() == lastSelectedStore.lowercased() }) {
+            return lastSelectedStore
+        }
+        
+        // 2. Otherwise, use most recently added store
+        if let recentStore = vaultService.getMostRecentStore() {
+            return recentStore
+        }
+        
+        // 3. Fallback to first alphabetical store
+        return availableStores.first
     }
     
     var body: some View {
@@ -47,7 +66,8 @@ struct StoreNameComponent: View {
                     ForEach(availableStores, id: \.self) { store in
                         Button(action: {
                             storeName = store
-                            //Notify parent that store changed
+                            // Save the selected store
+                            lastSelectedStore = store
                             onStoreChange?()
                         }) {
                             HStack {
@@ -89,6 +109,8 @@ struct StoreNameComponent: View {
                 onSave: { newStore in
                     vaultService.addStore(newStore)
                     storeName = newStore
+                    //  Save newly added store as last selected
+                    lastSelectedStore = newStore
                     showAddStoreSheet = false
                     print("➕ New store added and persisted: \(newStore)")
                     onStoreChange?()
@@ -100,9 +122,11 @@ struct StoreNameComponent: View {
             )
         }
         .onAppear {
-            if storeName.isEmpty, let firstStore = availableStores.first {
-                storeName = firstStore
+            //  Use defaultStore computed property
+            if storeName.isEmpty, let store = defaultStore {
+                storeName = store
             }
+            
             if !availableStores.isEmpty {
                 showDropdown = true
             } else {
@@ -120,8 +144,18 @@ struct StoreNameComponent: View {
             } else {
                 showDropdown = false
             }
+            
+            //  Update to default store when stores change (only if empty)
+            if storeName.isEmpty, let store = defaultStore {
+                storeName = store
+                onStoreChange?()
+            }
         }
         .onChange(of: storeName) { oldValue, newValue in
+            //  Update last selected whenever store changes
+            if !newValue.isEmpty {
+                lastSelectedStore = newValue
+            }
             onStoreChange?()
         }
     }

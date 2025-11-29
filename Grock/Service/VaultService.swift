@@ -372,38 +372,69 @@ extension VaultService {
     
     /// Adds a new store to the vault
     func addStore(_ storeName: String) {
-          guard let vault = vault else { return }
-          
-          let trimmedStore = storeName.trimmingCharacters(in: .whitespacesAndNewlines)
-          guard !trimmedStore.isEmpty else { return }
-          
-          if !vault.stores.contains(where: { $0.name.lowercased() == trimmedStore.lowercased() }) {
-              let newStore = Store(name: trimmedStore)
-              vault.stores.append(newStore)
-              vault.stores.sort { $0.name < $1.name }
-              saveContext()
-              print("➕ Store added to vault: \(trimmedStore)")
-          }
-      }
+        guard let vault = vault else { return }
+        
+        let trimmedStore = storeName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedStore.isEmpty else { return }
+        
+        // Check if store already exists (case-insensitive)
+        if !vault.stores.contains(where: { $0.name.lowercased() == trimmedStore.lowercased() }) {
+            let newStore = Store(name: trimmedStore)
+            // ✅ Insert at beginning for most recent first ordering
+            vault.stores.insert(newStore, at: 0)
+            saveContext()
+            print("➕ Store added to vault: \(trimmedStore)")
+        } else {
+            print("⚠️ Store already exists: \(trimmedStore)")
+        }
+    }
     
-    /// Retrieves all unique store names from vault and items
+    /// Retrieves all unique store names, sorted by most recent first
     func getAllStores() -> [String] {
-         guard let vault = vault else { return [] }
-         
-         // Get stores from vault (persisted stores)
-         let vaultStores = vault.stores.map { $0.name }
-         
-         // Also include stores from current items (for backward compatibility)
-         let itemStores = vault.categories.flatMap { category in
-             category.items.flatMap { item in
-                 item.priceOptions.map { $0.store }
-             }
-         }
-         
-         // Combine and remove duplicates
-         let allStores = Array(Set(itemStores + vaultStores)).sorted()
-         return allStores
-     }
+        guard let vault = vault else { return [] }
+        
+        // Get stores from vault (persisted stores) - sorted by createdAt descending
+        let sortedVaultStores = vault.stores.sorted { $0.createdAt > $1.createdAt }
+        let vaultStoreNames = sortedVaultStores.map { $0.name }
+        
+        // Also include stores from current items (for backward compatibility)
+        let itemStores = vault.categories.flatMap { category in
+            category.items.flatMap { item in
+                item.priceOptions.map { $0.store }
+            }
+        }
+        
+        //  Create ordered set: vault stores first (by recency), then unique item stores alphabetically
+        var orderedStores: [String] = []
+        var seenStores = Set<String>()
+        
+        // Add vault stores in order (most recent first)
+        for storeName in vaultStoreNames {
+            let lowercased = storeName.lowercased()
+            if !seenStores.contains(lowercased) {
+                orderedStores.append(storeName)
+                seenStores.insert(lowercased)
+            }
+        }
+        
+        // Add any stores from items that aren't in vault (alphabetically)
+        let uniqueItemStores = Array(Set(itemStores))
+            .filter { !seenStores.contains($0.lowercased()) }
+            .sorted()
+        
+        orderedStores.append(contentsOf: uniqueItemStores)
+        
+        return orderedStores
+    }
+    
+    /// Gets the most recently added store
+    func getMostRecentStore() -> String? {
+        guard let vault = vault else { return nil }
+        
+        // Sort by creation date and get the most recent
+        let sortedStores = vault.stores.sorted { $0.createdAt > $1.createdAt }
+        return sortedStores.first?.name
+    }
     
     /// Ensures a store exists in the vault (used when editing items)
     func ensureStoreExists(_ storeName: String) {

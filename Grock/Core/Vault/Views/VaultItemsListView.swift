@@ -1,3 +1,100 @@
+//import SwiftUI
+//
+//struct VaultItemsListView: View {
+//    let items: [Item]
+//    let availableStores: [String]
+//    @Binding var selectedStore: String?
+//    let category: GroceryCategory?
+//    var onDeleteItem: ((Item) -> Void)?
+//    
+//    var body: some View {
+//        List {
+//            ForEach(availableStores, id: \.self) { store in
+//                let storeItems = itemsForStore(store)
+//                StoreSection(
+//                    storeName: store,
+//                    items: storeItems,
+//                    category: category,
+//                    onDeleteItem: onDeleteItem,
+//                    isLastStore: store == availableStores.last
+//                )
+//            }
+//        }
+//        .listStyle(PlainListStyle())
+//        .listSectionSpacing(16)
+//    }
+//    
+//    private func itemsForStore(_ store: String) -> [Item] {
+//        items.filter { item in
+//            item.priceOptions.contains { $0.store == store }
+//        }
+//    }
+//}
+//
+//// MARK: - Enhanced StoreSection with Animations
+//struct StoreSection: View {
+//    let storeName: String
+//    let items: [Item]
+//    let category: GroceryCategory?
+//    var onDeleteItem: ((Item) -> Void)?
+//    let isLastStore: Bool
+//    
+//    private var itemsWithStableIdentifiers: [(id: String, item: Item)] {
+//        items.map { ($0.id, $0) }
+//    }
+//    
+//    var body: some View {
+//        Section(
+//            header: HStack {
+//                Text(storeName)
+//                    .fuzzyBubblesFont(11, weight: .bold)
+//                    .foregroundStyle(.white)
+//                    .padding(.horizontal, 8)
+//                    .padding(.vertical, 3)
+//                    .background(category?.pastelColor.saturated(by: 0.3).darker(by: 0.5) ?? Color.primary)
+//                    .clipShape(RoundedRectangle(cornerRadius: 6))
+//                Spacer()
+//            }
+//            .padding(.leading)
+//            .listRowInsets(EdgeInsets())
+//        ) {
+//            ForEach(itemsWithStableIdentifiers, id: \.id) { tuple in
+//                VStack(spacing: 0) {
+//                    VaultItemRow(
+//                        item: tuple.item,
+//                        category: category,
+//                        onDelete: {
+//                            onDeleteItem?(tuple.item)
+//                        }
+//                    )
+//                    
+//                    if tuple.id != itemsWithStableIdentifiers.last?.id {
+//                        DashedLine()
+//                            .stroke(style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
+//                            .frame(height: 1)
+//                            .foregroundColor(Color(hex: "ddd"))
+//                            .padding(.horizontal, 16)
+//                            .padding(.leading, 14)
+//                    }
+//                }
+//                .listRowInsets(EdgeInsets())
+//                .listRowSeparator(.hidden)
+//                // ✨ ADD THESE ANIMATIONS
+//                .transition(.asymmetric(
+//                    insertion: .move(edge: .top)
+//                        .combined(with: .opacity)
+//                        .combined(with: .scale(scale: 0.95, anchor: .top)),
+//                    removal: .move(edge: .leading)
+//                        .combined(with: .opacity)
+//                ))
+//                .animation(.spring(response: 0.4, dampingFraction: 0.75), value: itemsWithStableIdentifiers.map { $0.id })
+//            }
+//        }
+//    }
+//}
+//
+//
+
 import SwiftUI
 
 struct VaultItemsListView: View {
@@ -6,6 +103,10 @@ struct VaultItemsListView: View {
     @Binding var selectedStore: String?
     let category: GroceryCategory?
     var onDeleteItem: ((Item) -> Void)?
+    
+    private var showEndIndicator: Bool {
+        items.count >= 6
+    }
     
     var body: some View {
         List {
@@ -19,9 +120,36 @@ struct VaultItemsListView: View {
                     isLastStore: store == availableStores.last
                 )
             }
+            
+            if showEndIndicator {
+                HStack {
+                    Spacer()
+                    Text("You've reached the end.")
+                        .fuzzyBubblesFont(14, weight: .regular)
+                        .foregroundColor(.gray.opacity(0.8))
+                        .padding(.vertical, 32)
+                    Spacer()
+                }
+                .listRowInsets(EdgeInsets())
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
+            }
+            
+            if !availableStores.isEmpty {
+                Color.clear
+                    .frame(height: 100)
+                    .listRowInsets(EdgeInsets())
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+            }
         }
         .listStyle(PlainListStyle())
         .listSectionSpacing(16)
+        .safeAreaInset(edge: .bottom) {
+            if !availableStores.isEmpty {
+                Color.clear.frame(height: 20)
+            }
+        }
     }
     
     private func itemsForStore(_ store: String) -> [Item] {
@@ -79,7 +207,6 @@ struct StoreSection: View {
                 }
                 .listRowInsets(EdgeInsets())
                 .listRowSeparator(.hidden)
-                // ✨ ADD THESE ANIMATIONS
                 .transition(.asymmetric(
                     insertion: .move(edge: .top)
                         .combined(with: .opacity)
@@ -92,56 +219,3 @@ struct StoreSection: View {
         }
     }
 }
-
-
-//struct StoreSection: View {
-//    let storeName: String
-//    let items: [Item]
-//    let category: GroceryCategory?
-//    var onDeleteItem: ((Item) -> Void)?
-//    let isLastStore: Bool
-//    
-//    private var itemsWithStableIdentifiers: [(id: String, item: Item)] {
-//        items.map { ($0.id, $0) }
-//    }
-//    
-//    var body: some View {
-//        Section(
-//            header: HStack {
-//                Text(storeName)
-//                    .fuzzyBubblesFont(11, weight: .bold)
-//                    .foregroundStyle(.white)
-//                    .padding(.horizontal, 8)
-//                    .padding(.vertical, 3)
-//                    .background(category?.pastelColor.saturated(by: 0.3).darker(by: 0.5) ?? Color.primary)
-//                    .clipShape(RoundedRectangle(cornerRadius: 6))
-//                Spacer()
-//            }
-//            .padding(.leading)
-//            .listRowInsets(EdgeInsets())
-//        ) {
-//            ForEach(itemsWithStableIdentifiers, id: \.id) { tuple in
-//                VStack(spacing: 0) {
-//                    VaultItemRow(
-//                        item: tuple.item,
-//                        category: category,
-//                        onDelete: {
-//                            onDeleteItem?(tuple.item)
-//                        }
-//                    )
-//                    
-//                    if tuple.id != itemsWithStableIdentifiers.last?.id {
-//                        DashedLine()
-//                            .stroke(style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
-//                            .frame(height: 1)
-//                            .foregroundColor(Color(hex: "ddd"))
-//                            .padding(.horizontal, 16)
-//                            .padding(.leading, 14)
-//                    }
-//                }
-//                .listRowInsets(EdgeInsets())
-//                .listRowSeparator(.hidden)
-//            }
-//        }
-//    }
-//}
