@@ -58,9 +58,9 @@ struct HomeView: View {
                     onConfirm: { title, budget in
                         showCreateCartPopover = false
                         
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+//                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
                             viewModel.createEmptyCart(title: title, budget: budget)
-                        }
+//                        }
                     },
                     onCancel: {
                         showCreateCartPopover = false
@@ -70,11 +70,10 @@ struct HomeView: View {
             .fullScreenCover(item: $viewModel.selectedCart) { cart in
                 CartDetailScreen(cart: cart)
                     .onDisappear {
-                        // Mark that we're ready to show the new cart in the list
                         if viewModel.pendingCartToShow != nil {
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+//                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                                 viewModel.completePendingCartDisplay()
-                            }
+//                            }
                         }
                         viewModel.selectedCart = nil
                     }

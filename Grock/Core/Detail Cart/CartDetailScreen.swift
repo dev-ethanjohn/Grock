@@ -501,9 +501,10 @@ struct CartDetailScreen: View {
                     .lexendFont(18, weight: .medium)
                     .foregroundColor(.gray)
                     .multilineTextAlignment(.center)
+                    .padding(.bottom, 40)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color(hex: "FAFAFA").darker(by: 0.03))
+//            .background(Color(hex: "FAFAFA").darker(by: 0.03))
             .cornerRadius(16)
         }
     
