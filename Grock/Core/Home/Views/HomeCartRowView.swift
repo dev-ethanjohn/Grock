@@ -5,6 +5,8 @@ struct HomeCartRowView: View {
     let cart: Cart
     let vaultService: VaultService?
     
+    @State private var appeared = false
+    
     private var itemCount: Int {
         cart.cartItems.count
     }
@@ -58,6 +60,13 @@ struct HomeCartRowView: View {
                 .stroke(Color(hex: "CACACA"), lineWidth: 1)
         )
         .padding(1)
+        .scaleEffect(appeared ? 1.0 : 0.95)
+        .opacity(appeared ? 1.0 : 0)
+        .onAppear {
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+                appeared = true
+            }
+        }
     }
     
     private var headerRow: some View {

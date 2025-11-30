@@ -1,15 +1,87 @@
-// CreateCartPopover.swift
 import SwiftUI
 
-struct CreateCartPopover: View {
+struct CustomPopoverModifier<PopoverContent: View>: ViewModifier {
     @Binding var isPresented: Bool
+    let onDismiss: (() -> Void)?
+    let content: () -> PopoverContent
+    
+    @State private var scale: CGFloat = 0.3
+    @State private var opacity: CGFloat = 0
+    
+    func body(content: Content) -> some View {
+        ZStack {
+            content
+            
+            if isPresented {
+                // Full screen dimmed background
+                Color.black.opacity(0.4)
+                    .ignoresSafeArea()
+                    .opacity(opacity)
+                    .onTapGesture {
+                        dismissPopover()
+                    }
+                
+                // Popover content (centered)
+                self.content()
+                    .scaleEffect(scale, anchor: .bottom)
+                    .opacity(opacity)
+            }
+        }
+        .onChange(of: isPresented) { oldValue, newValue in
+            if newValue {
+                presentPopover()
+            }
+        }
+    }
+    
+    private func presentPopover() {
+        // Reset to initial state first (without animation)
+        scale = 0.3
+        opacity = 0
+        
+        // Then animate to final state
+        withAnimation(.interpolatingSpring(mass: 0.6, stiffness: 170, damping: 12, initialVelocity: 0)) {
+            scale = 1.0
+            opacity = 1
+        }
+    }
+    
+    private func dismissPopover() {
+        withAnimation(.interpolatingSpring(mass: 0.5, stiffness: 200, damping: 15, initialVelocity: 0)) {
+            scale = 0.3
+            opacity = 0
+        }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+            isPresented = false
+            onDismiss?()
+        }
+    }
+}
+
+extension View {
+    func customPopover<Content: View>(
+        isPresented: Binding<Bool>,
+        onDismiss: (() -> Void)? = nil,
+        @ViewBuilder content: @escaping () -> Content
+    ) -> some View {
+        self.modifier(
+            CustomPopoverModifier(
+                isPresented: isPresented,
+                onDismiss: onDismiss,
+                content: content
+            )
+        )
+    }
+}
+
+struct CreateCartPopover: View {
     let onConfirm: (String, Double) -> Void
     let onCancel: () -> Void
     
     @State private var cartTitle: String = ""
     @State private var budget: String = ""
     @FocusState private var focusedField: Field?
-    @State private var showing = false
     
     private enum Field {
         case title, budget
@@ -31,24 +103,12 @@ struct CreateCartPopover: View {
                 buttonsSection
             }
             .frame(width: UIScreen.main.bounds.width * 0.92)
-            .presentationBackground(.clear)
             .background(Color.white)
             .clipShape(RoundedRectangle(cornerRadius: 12))
             .shadow(color: .black.opacity(0.2), radius: 8, x: 0, y: 4)
         }
-        .frame(maxHeight: UIScreen.main.bounds.height * 1)
-        .frame(width: UIScreen.main.bounds.width * 1)
-        .background(Color.white.opacity(0.01))
-        .scaleEffect(showing ? 1 : 0)
         .onAppear {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
-                showing = true
-            }
-            
             focusedField = .title
-        }
-        .onTapGesture {
-            focusedField = nil
         }
     }
 
@@ -92,14 +152,7 @@ struct CreateCartPopover: View {
     private var cancelButton: some View {
         Button(action: {
             focusedField = nil
-            
-            withAnimation(.interpolatingSpring(mass: 1.0, stiffness: 100, damping: 10, initialVelocity: 0)) {
-                showing = false
-            }
-            
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                onCancel()
-            }
+            onCancel()
         }) {
             Text("Cancel")
                 .fuzzyBubblesFont(16, weight: .bold)
@@ -123,14 +176,7 @@ struct CreateCartPopover: View {
             maxWidth: true
         ) {
             focusedField = nil
-            
-            withAnimation(.interpolatingSpring(mass: 1.0, stiffness: 100, damping: 10, initialVelocity: 0)) {
-                showing = false
-            }
-            
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                onConfirm(cartTitle, budgetValue)
-            }
+            onConfirm(cartTitle, budgetValue)
         }
     }
     

@@ -10,17 +10,21 @@ import SwiftUI
 struct ActiveCarts: View {
     @Environment(VaultService.self) private var vaultService
     @Bindable var viewModel: HomeViewModel
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             if viewModel.hasCarts {
                 cartListView
+                    .transition(.scale(scale: 0.8).combined(with: .opacity))
             } else {
                 emptyStateView
+                    .transition(.scale(scale: 0.9).combined(with: .opacity))
             }
             Spacer()
         }
         .frame(maxWidth: .infinity, alignment: .center)
         .padding(.horizontal)
+        .animation(.spring(response: 0.5, dampingFraction: 0.7), value: viewModel.hasCarts)
     }
     
     private var cartListView: some View {
@@ -29,8 +33,17 @@ struct ActiveCarts: View {
                 .frame(height: viewModel.headerHeight)
             
             LazyVStack(spacing: 12) {
-                ForEach(viewModel.displayedCarts) { cart in
+                ForEach(Array(viewModel.displayedCarts.enumerated()), id: \.element.id) { index, cart in
                     cartRowButton(cart: cart)
+                        .transition(.asymmetric(
+                            insertion: .scale(scale: 0.8).combined(with: .opacity),
+                            removal: .scale(scale: 0.9).combined(with: .opacity)
+                        ))
+                        .animation(
+                            .spring(response: 0.5, dampingFraction: 0.7)
+                            .delay(Double(index) * 0.05),
+                            value: viewModel.displayedCarts.count
+                        )
                 }
             }
         }
@@ -43,6 +56,7 @@ struct ActiveCarts: View {
             Image(systemName: "cart")
                 .font(.system(size: 60))
                 .foregroundColor(.gray)
+                .scaleEffect(viewModel.hasCarts ? 0.8 : 1.0)
             
             Text("No carts yet!")
                 .font(.title2)
@@ -66,7 +80,4 @@ struct ActiveCarts: View {
         }
         .buttonStyle(PlainButtonStyle())
     }
-    
-    
 }
-

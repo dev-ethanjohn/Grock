@@ -53,34 +53,32 @@ struct HomeView: View {
             .sheet(isPresented: $viewModel.showVault) {
                 vaultSheet
             }
-            .overlay {
-                if showCreateCartPopover {
-                    Color.black.opacity(0.4)
-                        .ignoresSafeArea()
-                        .transition(.opacity)
-
-                }
-            }
-            .animation(.easeInOut(duration: 0.3), value: showCreateCartPopover)
-            .fullScreenCover(item: $viewModel.selectedCart) { cart in
-                CartDetailScreen(cart: cart)
-                    .onDisappear {
-                        viewModel.selectedCart = nil
-                    }
-                    .presentationCornerRadius(24)
-            }
-            .fullScreenCover(isPresented: $showCreateCartPopover) {
+            .customPopover(isPresented: $showCreateCartPopover) {
                 CreateCartPopover(
-                    isPresented: $showCreateCartPopover,
                     onConfirm: { title, budget in
-                        viewModel.createEmptyCart(title: title, budget: budget)
                         showCreateCartPopover = false
+                        
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                            viewModel.createEmptyCart(title: title, budget: budget)
+                        }
                     },
                     onCancel: {
                         showCreateCartPopover = false
                     }
                 )
-                .presentationBackground(.clear)
+            }
+            .fullScreenCover(item: $viewModel.selectedCart) { cart in
+                CartDetailScreen(cart: cart)
+                    .onDisappear {
+                        // Mark that we're ready to show the new cart in the list
+                        if viewModel.pendingCartToShow != nil {
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                viewModel.completePendingCartDisplay()
+                            }
+                        }
+                        viewModel.selectedCart = nil
+                    }
+                    .presentationCornerRadius(24)
             }
             .onAppear {
                 viewModel.loadCarts()
@@ -383,14 +381,6 @@ struct HomeView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    //    private var tabButtons: some View {
-    //        HStack(spacing: 4) {
-    //            tabButton(title: "Planned", tabIndex: 0)
-    //            tabButton(title: "History", tabIndex: 1)
-    //        }
-    //        .frame(maxWidth: .infinity, alignment: .leading)
-    //    }
-
     private var createCartButton: some View {
         Button(action: {
             showCreateCartPopover = true
@@ -498,5 +488,3 @@ struct VaultCoordinatedButtonStyle: ButtonStyle {
             .brightness(configuration.isPressed ? -0.2 : 0)
     }
 }
-
-

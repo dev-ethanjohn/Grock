@@ -18,14 +18,16 @@ final class HomeViewModel {
     private let modelContext: ModelContext
     private let cartViewModel: CartViewModel
     private let vaultService: VaultService
-    // Remove vaultService dependency - we get it from cartViewModel
     
     // MARK: - UI State
     var selectedTab: Int = 0
     var showVault: Bool = false
-//    var showCreateCartPopover: Bool = false
     var selectedCart: Cart?
     var pendingSelectedCart: Cart? = nil
+    
+    // New: Pending cart display management (Using String since Cart.id is String)
+    var pendingCartToShow: Cart? = nil
+    private var hiddenCartIds: Set<String> = []
     
     // MARK: - Animation States
     var showMenu = false
@@ -34,13 +36,19 @@ final class HomeViewModel {
     
     // MARK: - Computed Properties
     var displayedCarts: [Cart] {
+        let baseCarts: [Cart]
         switch selectedTab {
         case 0:
-            return cartViewModel.activeCarts.sorted { $0.createdAt > $1.createdAt }
+            baseCarts = cartViewModel.activeCarts.sorted { $0.createdAt > $1.createdAt }
         case 1:
-            return cartViewModel.completedCarts.sorted { $0.createdAt > $1.createdAt }
+            baseCarts = cartViewModel.completedCarts.sorted { $0.createdAt > $1.createdAt }
         default:
-            return []
+            baseCarts = []
+        }
+        
+        // Filter out hidden carts
+        return baseCarts.filter { cart in
+            !hiddenCartIds.contains(cart.id)
         }
     }
     
@@ -57,7 +65,7 @@ final class HomeViewModel {
     }
     
     var hasCarts: Bool {
-        !carts.isEmpty
+        !displayedCarts.isEmpty
     }
     
     // MARK: - Initialization
@@ -77,37 +85,47 @@ final class HomeViewModel {
     }
     
     // MARK: - User Actions
-//    func handleCreateCart() {
-//        print("🏠 Create cart button tapped")
-//        showCreateCartPopover = true
-//    }
-    
     func handleVaultButton() {
         print("🏠 Vault button tapped")
         showVault = true
     }
 
-    // Add this method to HomeViewModel
+    // Updated: Create empty cart with hiding logic
     func createEmptyCart(title: String, budget: Double) {
         print("🏠 HomeViewModel: Creating empty cart '\(title)' with budget \(budget)")
         
         if let newCart = cartViewModel.createEmptyCart(name: title, budget: budget) {
             print("✅ Empty cart created: \(newCart.name)")
-            // Auto-select the new cart
+            
+            // Hide from list initially
+            hiddenCartIds.insert(newCart.id)
+            pendingCartToShow = newCart
+            
+            // Auto-select the new cart to open detail screen
             selectedCart = newCart
+        }
+    }
+    
+    // New: Complete pending cart display after detail screen dismissal
+    func completePendingCartDisplay() {
+        guard let cart = pendingCartToShow else { return }
+        
+        print("🎯 HomeViewModel: Showing cart in list - \(cart.name)")
+        
+        withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+            hiddenCartIds.remove(cart.id)
+            pendingCartToShow = nil
         }
     }
     
     func handleCreateCartConfirmation(title: String, budget: Double) {
         createEmptyCart(title: title, budget: budget)
-//        showCreateCartPopover = false
     }
 
     func handleCreateCartCancellation() {
-//        showCreateCartPopover = false
+        // Nothing to do here
     }
 
-    
     func toggleMenu() {
         showMenu.toggle()
         
@@ -128,7 +146,7 @@ final class HomeViewModel {
     }
     
     func getVaultService(for cart: Cart) -> VaultService? {
-        return vaultService 
+        return vaultService
     }
     
     func onCreateCartFromVault(_ createdCart: Cart) {
@@ -198,6 +216,10 @@ final class HomeViewModel {
         UserDefaults.standard.set(false, forKey: "hasSeenFirstShoppingCartCelebration")
         UserDefaults.standard.set(false, forKey: "hasSeenVaultCelebration")
         UserDefaults.standard.hasCompletedOnboarding = false
+
+        // Clear hidden cart state
+        hiddenCartIds.removeAll()
+        pendingCartToShow = nil
 
         // Reload carts to reflect the reset state
         cartViewModel.loadCarts()
