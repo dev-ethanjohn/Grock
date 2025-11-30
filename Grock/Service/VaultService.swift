@@ -774,3 +774,45 @@ private extension VaultService {
         print("🔄 Updated active carts with new item prices")
     }
 }
+
+
+// MARK: - Cart Duplicate Validation
+extension VaultService {
+    
+    /// Checks if a cart name already exists in the vault (case insensitive, trimmed)
+    func isCartNameDuplicate(_ name: String, excluding cartId: String? = nil) -> Bool {
+        guard let vault = vault else { return false }
+        
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        
+        for cart in vault.carts {
+            // If we're excluding a cart (during edit), skip it
+            if let excludedId = cartId, cart.id == excludedId {
+                continue
+            }
+            
+            let existingName = cart.name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            
+            if existingName == trimmedName {
+                return true
+            }
+        }
+        
+        return false
+    }
+    
+    /// Validates if a cart name is available (not empty and not duplicate)
+    func validateCartName(_ name: String, excluding cartId: String? = nil) -> (isValid: Bool, errorMessage: String?) {
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+       
+        if trimmedName.isEmpty {
+            return (false, "Cart name cannot be empty")
+        }
+       
+        if isCartNameDuplicate(trimmedName, excluding: cartId) {
+            return (false, "A cart with this name already exists")
+        }
+       
+        return (true, nil)
+    }
+}

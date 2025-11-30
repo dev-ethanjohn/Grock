@@ -82,6 +82,10 @@ struct CreateCartPopover: View {
     @State private var cartTitle: String = ""
     @State private var budget: String = ""
     @FocusState private var focusedField: Field?
+    @State private var validationError: String?
+    @State private var hasAttemptedSubmission = false
+    
+    @State private var titleShakeOffset: CGFloat = 0
     
     private enum Field {
         case title, budget
@@ -93,6 +97,10 @@ struct CreateCartPopover: View {
     
     private var canConfirm: Bool {
         !cartTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+    
+    private var shouldShowError: Bool {
+        hasAttemptedSubmission && validationError != nil
     }
     
     var body: some View {
@@ -109,11 +117,15 @@ struct CreateCartPopover: View {
         }
         .onAppear {
             focusedField = .title
+            validationError = nil
+            hasAttemptedSubmission = false
         }
+        .animation(.spring(response: 0.4, dampingFraction: 0.7), value: hasAttemptedSubmission)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: validationError)
     }
 
     private var titleSection: some View {
-        VStack(spacing: 0) {
+        VStack(alignment: .leading, spacing: 4) {
             TextField("My Monday Shopping Trip...", text: $cartTitle)
                 .lexendFont(20, weight: .semibold)
                 .foregroundColor(.black)
@@ -123,13 +135,39 @@ struct CreateCartPopover: View {
                 .onSubmit {
                     focusedField = .budget
                 }
+                .normalizedText($cartTitle)
+                .onChange(of: cartTitle) { oldValue, newValue in
+                    if hasAttemptedSubmission {
+                        validateCartTitle(newValue)
+                    }
+                }
+                .autocorrectionDisabled(true)
+                .textInputAutocapitalization(.never)
+                .offset(x: titleShakeOffset)
+            
             
             Rectangle()
                 .fill(Color.gray.opacity(0.3))
                 .frame(height: 1)
-                .offset(y: 8)
+                .offset(y: 10)
+            
+            if shouldShowError, let error = validationError {
+                validationError(error)
+                    .offset(y: 10)
+            }
+         
         }
         .padding(20)
+        .onChange(of: cartTitle) { oldValue, newValue in
+            if !newValue.isEmpty {
+                validationError = nil
+            }
+        }
+        .onChange(of: hasAttemptedSubmission) { oldValue, newValue in
+            if newValue && validationError != nil {
+                triggerTitleShake()
+            }
+        }
     }
     
     private var budgetSection: some View {
@@ -151,7 +189,6 @@ struct CreateCartPopover: View {
     
     private var cancelButton: some View {
         Button(action: {
-            focusedField = nil
             onCancel()
         }) {
             Text("Cancel")
@@ -175,8 +212,19 @@ struct CreateCartPopover: View {
             verticalPadding: 12,
             maxWidth: true
         ) {
-            focusedField = nil
-            onConfirm(cartTitle, budgetValue)
+            hasAttemptedSubmission = true
+            
+            if validateCartTitle(cartTitle) {
+                focusedField = nil
+                onConfirm(cartTitle, budgetValue)
+            } else {
+                let generator = UINotificationFeedbackGenerator()
+                generator.notificationOccurred(.error)
+                
+                if cartTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    focusedField = .title
+                }
+            }
         }
     }
     
@@ -220,5 +268,45 @@ struct CreateCartPopover: View {
             }
         }
         .padding(.bottom)
+    }
+    
+    private func triggerTitleShake() {
+        let shakeSequence = [0, -8, 8, -6, 6, -4, 4, 0]
+        
+        for (index, offset) in shakeSequence.enumerated() {
+            DispatchQueue.main.asyncAfter(deadline: .now() + Double(index) * 0.05) {
+                withAnimation(.linear(duration: 0.05)) {
+                    self.titleShakeOffset = CGFloat(offset)
+                }
+            }
+        }
+    }
+    
+    private func validationError(_ message: String) -> some View {
+        Text(message)
+            .font(.caption)
+            .foregroundColor(Color(hex: "#FA003F"))
+            .padding(.bottom, 4)
+            .transition(.asymmetric(
+                insertion: .scale(scale: 0.9, anchor: .center)
+                    .combined(with: .opacity)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.55)),
+                removal: .scale(scale: 0.9, anchor: .center)
+                    .combined(with: .opacity)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.75))
+            ))
+    }
+    
+    @discardableResult
+    private func validateCartTitle(_ title: String) -> Bool {
+        let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        if trimmedTitle.isEmpty {
+            validationError = "Cart name cannot be empty"
+            return false
+        }
+        
+        validationError = nil
+        return true
     }
 }

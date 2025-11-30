@@ -213,5 +213,13 @@ class CartViewModel {
     func clearActiveItems() {
         activeCartItems.removeAll()
     }
+    
+    func validateCartName(_ name: String, excluding cartId: String? = nil) -> (isValid: Bool, errorMessage: String?) {
+        return vaultService.validateCartName(name, excluding: cartId)
+    }
+    
+    func isCartNameDuplicate(_ name: String, excluding cartId: String? = nil) -> Bool {
+        return vaultService.isCartNameDuplicate(name, excluding: cartId)
+    }
 }
 

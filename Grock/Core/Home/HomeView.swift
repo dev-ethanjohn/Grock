@@ -56,17 +56,20 @@ struct HomeView: View {
             .customPopover(isPresented: $showCreateCartPopover) {
                 CreateCartPopover(
                     onConfirm: { title, budget in
-                        showCreateCartPopover = false
-                        
-//                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-                            viewModel.createEmptyCart(title: title, budget: budget)
-//                        }
+                        let success = viewModel.handleCreateCartConfirmation(title: title, budget: budget)
+                        if success {
+                            showCreateCartPopover = false
+                        }
+                        // If not successful, the popover will stay open
+                        // The validation error will be shown from the ViewModel's duplicateError
                     },
                     onCancel: {
                         showCreateCartPopover = false
+                        viewModel.cartViewModel.clearDuplicateError() // Clear any previous errors
                     }
                 )
             }
+
             .fullScreenCover(item: $viewModel.selectedCart) { cart in
                 CartDetailScreen(cart: cart)
                     .onDisappear {

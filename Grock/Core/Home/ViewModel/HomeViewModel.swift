@@ -16,7 +16,7 @@ final class HomeViewModel {
     
     // MARK: - Dependencies
     private let modelContext: ModelContext
-    private let cartViewModel: CartViewModel
+    let cartViewModel: CartViewModel
     private let vaultService: VaultService
     
     // MARK: - UI State
@@ -90,23 +90,32 @@ final class HomeViewModel {
         showVault = true
     }
 
-    // Updated: Create empty cart with hiding logic
-    func createEmptyCart(title: String, budget: Double) {
-        print("🏠 HomeViewModel: Creating empty cart '\(title)' with budget \(budget)")
-        
-        if let newCart = cartViewModel.createEmptyCart(name: title, budget: budget) {
-            print("✅ Empty cart created: \(newCart.name)")
-            
-            // Hide from list initially
-            hiddenCartIds.insert(newCart.id)
-            pendingCartToShow = newCart
-            
-            // Auto-select the new cart to open detail screen
-            selectedCart = newCart
-        }
-    }
-    
-    // New: Complete pending cart display after detail screen dismissal
+    // Create empty cart with hiding logic
+    func createEmptyCart(title: String, budget: Double) -> Bool {
+         print("🏠 HomeViewModel: Creating empty cart '\(title)' with budget \(budget)")
+         
+         // Validate cart name using cartViewModel
+         let validation = cartViewModel.validateCartName(title)
+         guard validation.isValid else {
+             print("❌ Cannot create cart: \(validation.errorMessage ?? "Unknown error")")
+             // You could set an error state here to show in the UI
+             return false
+         }
+         
+         if let newCart = cartViewModel.createEmptyCart(name: title, budget: budget) {
+             print("✅ Empty cart created: \(newCart.name)")
+             
+             // Hide from list initially
+             hiddenCartIds.insert(newCart.id)
+             pendingCartToShow = newCart
+             
+             // Auto-select the new cart to open detail screen
+             selectedCart = newCart
+             return true
+         }
+         
+         return false
+     }
     func completePendingCartDisplay() {
         guard let cart = pendingCartToShow else { return }
         
@@ -118,13 +127,12 @@ final class HomeViewModel {
         }
     }
     
-    func handleCreateCartConfirmation(title: String, budget: Double) {
-        createEmptyCart(title: title, budget: budget)
+    func handleCreateCartConfirmation(title: String, budget: Double) -> Bool {
+        return createEmptyCart(title: title, budget: budget)
     }
-
-    func handleCreateCartCancellation() {
-        // Nothing to do here
-    }
+//    func handleCreateCartCancellation() {
+//        // Nothing to do here
+//    }
 
     func toggleMenu() {
         showMenu.toggle()
@@ -254,5 +262,9 @@ final class HomeViewModel {
     
     var menuIconOpacity: Double {
         showMenu ? 1 : 0
+    }
+    
+    func validateCartName(_ name: String) -> (isValid: Bool, errorMessage: String?) {
+        return cartViewModel.validateCartName(name)
     }
 }
