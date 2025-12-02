@@ -24,41 +24,48 @@ struct CategoryCircularButton: View {
                 .pickerStyle(.inline)
             } label: {
                 ZStack {
+                    // Main circle that morphs
                     Circle()
                         .fill(selectedCategory == nil
                               ? .gray.opacity(0.2)
                               : selectedCategory!.pastelColor)
                         .frame(width: 34, height: 34)
-                        .overlay(
-                            Circle()
-                                .stroke(
-                                    selectedCategory == nil
-                                     ? Color.gray
-                                     : selectedCategory!.pastelColor.darker(by: 0.2),
-                                    lineWidth: 1.5
-                                )
-                        )
-                        .overlay(
-                            // Outer red stroke for errors
-                            Circle()
-                                .stroke(
-                                    Color(hex: "#FA003F"),
-                                    lineWidth: hasError ? 2.0 : 0
-                                )
-                                .padding(hasError ? -4 : 0) // Push the stroke outside
-                        )
                     
+                    // Outer stroke (non-animating)
+                    Circle()
+                        .stroke(
+                            selectedCategory == nil
+                            ? Color.gray
+                            : selectedCategory!.pastelColor.darker(by: 0.2),
+                            lineWidth: 1.5
+                        )
+                        .frame(width: 34, height: 34)
+//                        .allowsHitTesting(false) // so it doesn't affect tap area
+                    
+                    // Error stroke
+                    if hasError {
+                        Circle()
+                            .stroke(Color(hex: "#FA003F"), lineWidth: 2)
+                            .frame(width: 34 + 8, height: 34 + 8) 
+                    }
+                    
+                    // Content
                     if selectedCategory == nil {
                         Image(systemName: "plus")
                             .font(.system(size: 18, weight: .bold))
-                            .foregroundColor(.gray) // Always gray, no change for error
+                            .foregroundColor(.gray)
                     } else {
                         Text(selectedCategoryEmoji)
                             .font(.system(size: 18))
                     }
                 }
-                .offset(x: -4)
+                .frame(width: 40, height: 40)
+                .contentShape(Circle())
+
             }
+//            .labelStyle(.iconOnly) // optional, just for Menu label styling
+            .offset(x: -4)
+//            .contentShape(Circle())
         }
     }
 }

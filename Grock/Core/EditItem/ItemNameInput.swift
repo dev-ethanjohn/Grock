@@ -70,7 +70,6 @@ struct ItemNameInput: View {
                                     lineWidth: shouldShowErrorStyling ? 2.0 : 0
                                 )
                         )
-
                         .overlay(
                             CategoryCircularButton(
                                 selectedCategory: $selectedCategory,

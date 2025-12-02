@@ -15,7 +15,7 @@ class User {
 }
 
 @Model
-class Vault {
+class Vault: Equatable {
     @Attribute(.unique) var uid: String
     var categories: [Category] = []
     var carts: [Cart] = []
@@ -23,6 +23,11 @@ class Vault {
     
     init(uid: String = UUID().uuidString) {
         self.uid = uid
+    }
+    
+    //
+    static func == (lhs: Vault, rhs: Vault) -> Bool {
+           lhs.uid == rhs.uid
     }
 }
 

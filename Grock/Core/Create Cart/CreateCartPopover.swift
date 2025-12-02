@@ -1,5 +1,6 @@
 import SwiftUI
 
+// MARK: - Custom Popover Modifier
 struct CustomPopoverModifier<PopoverContent: View>: ViewModifier {
     @Binding var isPresented: Bool
     let onDismiss: (() -> Void)?
@@ -27,27 +28,31 @@ struct CustomPopoverModifier<PopoverContent: View>: ViewModifier {
                     .opacity(opacity)
             }
         }
-        .onChange(of: isPresented) { oldValue, newValue in
+        .onChange(of: isPresented) { _, newValue in
             if newValue {
                 presentPopover()
+            } else {
+                // Reset state if dismissed externally
+                scale = 0.3
+                opacity = 0
             }
         }
     }
     
     private func presentPopover() {
-        // Reset to initial state first (without animation)
+        // Reset to initial state
         scale = 0.3
         opacity = 0
         
-        // Then animate to final state
-        withAnimation(.interpolatingSpring(mass: 0.6, stiffness: 170, damping: 12, initialVelocity: 0)) {
+        // Animate popover appearance with smooth spring
+        withAnimation(.interpolatingSpring(mass: 0.6, stiffness: 170, damping: 12)) {
             scale = 1.0
-            opacity = 1
+            opacity = 1.0
         }
     }
     
     private func dismissPopover() {
-        withAnimation(.interpolatingSpring(mass: 0.5, stiffness: 200, damping: 15, initialVelocity: 0)) {
+        withAnimation(.interpolatingSpring(mass: 0.5, stiffness: 200, damping: 15)) {
             scale = 0.3
             opacity = 0
         }
@@ -79,6 +84,7 @@ struct CreateCartPopover: View {
     let onConfirm: (String, Double) -> Void
     let onCancel: () -> Void
     
+    @Binding var isPresented: Bool
     @State private var cartTitle: String = ""
     @State private var budget: String = ""
     @FocusState private var focusedField: Field?
@@ -116,14 +122,25 @@ struct CreateCartPopover: View {
             .shadow(color: .black.opacity(0.2), radius: 8, x: 0, y: 4)
         }
         .onAppear {
-            focusedField = .title
+            // Reset state
             validationError = nil
             hasAttemptedSubmission = false
+            cartTitle = ""
+            budget = ""
+            
+            focusedField = .title
+        }
+        .onChange(of: isPresented) { _, newValue in
+            if !newValue {
+                // Clear focus when dismissed
+                focusedField = nil
+            }
         }
         .animation(.spring(response: 0.4, dampingFraction: 0.7), value: hasAttemptedSubmission)
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: validationError)
     }
-
+    
+    // MARK: - Sections
     private var titleSection: some View {
         VStack(alignment: .leading, spacing: 4) {
             TextField("My Monday Shopping Trip...", text: $cartTitle)
@@ -132,19 +149,14 @@ struct CreateCartPopover: View {
                 .multilineTextAlignment(.leading)
                 .focused($focusedField, equals: .title)
                 .submitLabel(.next)
-                .onSubmit {
-                    focusedField = .budget
-                }
+                .onSubmit { focusedField = .budget }
                 .normalizedText($cartTitle)
-                .onChange(of: cartTitle) { oldValue, newValue in
-                    if hasAttemptedSubmission {
-                        validateCartTitle(newValue)
-                    }
+                .onChange(of: cartTitle) { _, newValue in
+                    if hasAttemptedSubmission { validateCartTitle(newValue) }
                 }
                 .autocorrectionDisabled(true)
                 .textInputAutocapitalization(.never)
                 .offset(x: titleShakeOffset)
-            
             
             Rectangle()
                 .fill(Color.gray.opacity(0.3))
@@ -152,30 +164,21 @@ struct CreateCartPopover: View {
                 .offset(y: 10)
             
             if shouldShowError, let error = validationError {
-                validationError(error)
-                    .offset(y: 10)
+                validationError(error).offset(y: 10)
             }
-         
         }
         .padding(20)
-        .onChange(of: cartTitle) { oldValue, newValue in
-            if !newValue.isEmpty {
-                validationError = nil
-            }
+        .onChange(of: cartTitle) { _, newValue in
+            if !newValue.isEmpty { validationError = nil }
         }
-        .onChange(of: hasAttemptedSubmission) { oldValue, newValue in
-            if newValue && validationError != nil {
-                triggerTitleShake()
-            }
+        .onChange(of: hasAttemptedSubmission) { _, newValue in
+            if newValue && validationError != nil { triggerTitleShake() }
         }
     }
     
     private var budgetSection: some View {
-        VStack(spacing: 0) {
-            budgetRow
-                .padding(.bottom)
-        }
-        .padding(.horizontal, 20)
+        VStack(spacing: 0) { budgetRow.padding(.bottom) }
+            .padding(.horizontal, 20)
     }
     
     private var buttonsSection: some View {
@@ -187,10 +190,12 @@ struct CreateCartPopover: View {
         .padding(.bottom, 20)
     }
     
+    // MARK: - Buttons
     private var cancelButton: some View {
-        Button(action: {
+        Button {
+            focusedField = nil
             onCancel()
-        }) {
+        } label: {
             Text("Cancel")
                 .fuzzyBubblesFont(16, weight: .bold)
                 .foregroundColor(.black)
@@ -199,10 +204,7 @@ struct CreateCartPopover: View {
                 .background(.white)
                 .cornerRadius(10)
         }
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(Color(.systemGray4), lineWidth: 1)
-        )
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color(.systemGray4), lineWidth: 1))
     }
     
     private var confirmButton: some View {
@@ -216,11 +218,9 @@ struct CreateCartPopover: View {
             
             if validateCartTitle(cartTitle) {
                 focusedField = nil
-                onConfirm(cartTitle, budgetValue)
+                DispatchQueue.main.async { onConfirm(cartTitle, budgetValue) }
             } else {
-                let generator = UINotificationFeedbackGenerator()
-                generator.notificationOccurred(.error)
-                
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
                 if cartTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     focusedField = .title
                 }
@@ -228,15 +228,15 @@ struct CreateCartPopover: View {
         }
     }
     
+    // MARK: - Budget row
     private var budgetRow: some View {
         HStack {
             HStack(spacing: 6) {
                 Text("Budget")
-                Text("(Optional) :")
-                    .foregroundStyle(Color(.systemGray))
+                Text("(Optional) :").foregroundStyle(Color(.systemGray))
             }
             .lexendFont(16)
-
+            
             Spacer()
             
             HStack(spacing: 4) {
@@ -254,7 +254,6 @@ struct CreateCartPopover: View {
                             .keyboardType(.decimalPad)
                             .fixedSize(horizontal: true, vertical: false)
                             .autocorrectionDisabled(true)
-                            .offset(x: 0)
                             .textInputAutocapitalization(.never)
                             .numbersOnly($budget, includeDecimal: true, maxDigits: 10)
                             .lexendFont(18, weight: .medium)
@@ -263,21 +262,17 @@ struct CreateCartPopover: View {
                     )
             }
             .contentShape(Rectangle())
-            .onTapGesture {
-                focusedField = .budget
-            }
+            .onTapGesture { focusedField = .budget }
         }
         .padding(.bottom)
     }
     
+    // MARK: - Animations
     private func triggerTitleShake() {
         let shakeSequence = [0, -8, 8, -6, 6, -4, 4, 0]
-        
         for (index, offset) in shakeSequence.enumerated() {
             DispatchQueue.main.asyncAfter(deadline: .now() + Double(index) * 0.05) {
-                withAnimation(.linear(duration: 0.05)) {
-                    self.titleShakeOffset = CGFloat(offset)
-                }
+                withAnimation(.linear(duration: 0.05)) { self.titleShakeOffset = CGFloat(offset) }
             }
         }
     }
@@ -288,24 +283,18 @@ struct CreateCartPopover: View {
             .foregroundColor(Color(hex: "#FA003F"))
             .padding(.bottom, 4)
             .transition(.asymmetric(
-                insertion: .scale(scale: 0.9, anchor: .center)
-                    .combined(with: .opacity)
-                    .animation(.spring(response: 0.3, dampingFraction: 0.55)),
-                removal: .scale(scale: 0.9, anchor: .center)
-                    .combined(with: .opacity)
-                    .animation(.spring(response: 0.3, dampingFraction: 0.75))
+                insertion: .scale(scale: 0.9, anchor: .center).combined(with: .opacity).animation(.spring(response: 0.3, dampingFraction: 0.55)),
+                removal: .scale(scale: 0.9, anchor: .center).combined(with: .opacity).animation(.spring(response: 0.3, dampingFraction: 0.75))
             ))
     }
     
     @discardableResult
     private func validateCartTitle(_ title: String) -> Bool {
-        let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        
-        if trimmedTitle.isEmpty {
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
             validationError = "Cart name cannot be empty"
             return false
         }
-        
         validationError = nil
         return true
     }

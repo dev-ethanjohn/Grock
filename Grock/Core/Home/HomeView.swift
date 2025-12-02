@@ -66,7 +66,8 @@ struct HomeView: View {
                     onCancel: {
                         showCreateCartPopover = false
                         viewModel.cartViewModel.clearDuplicateError() // Clear any previous errors
-                    }
+                    },
+                    isPresented: $showCreateCartPopover,
                 )
             }
 
