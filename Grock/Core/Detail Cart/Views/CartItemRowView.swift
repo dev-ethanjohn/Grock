@@ -20,6 +20,7 @@ struct CartItemRowView: View {
     @State private var isNewlyAdded: Bool = true
     @State private var buttonScale: CGFloat = 0.1
     @State private var buttonVisible: Bool = false
+    @State private var hasInitialized: Bool = false 
     
     private var itemName: String {
         item?.name ?? "Unknown Item"
@@ -83,10 +84,12 @@ struct CartItemRowView: View {
             
             HStack(alignment: .bottom, spacing: 2) {
                 // Checkmark/circle button with smooth scale transition
-                if cart.isShopping {
+                if cart.isShopping || buttonVisible {
                     Button(action: {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                            onToggleFulfillment()
+                        if cart.isShopping {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                                onToggleFulfillment()
+                            }
                         }
                     }) {
                         Image(systemName: cartItem.isFulfilled ? "checkmark.circle.fill" : "circle")
@@ -98,61 +101,27 @@ struct CartItemRowView: View {
                                     .delay(cartItem.isFulfilled ? 0 : 0.1),
                                 value: cartItem.isFulfilled
                             )
-                            .animation(
-                                .spring(response: 0.3, dampingFraction: 0.6),
-                                value: buttonScale
-                            )
                     }
                     .buttonStyle(.plain)
                     .frame(maxHeight: .infinity, alignment: .top)
+                    .frame(width: buttonScale > 0.5 ? nil : 0)
                     .padding(.top, 2.75)
-                    .onChange(of: cart.isShopping) { _, newValue in
-                        // Animate button appearance when shopping mode changes
+                    .onChange(of: cart.isShopping) { oldValue, newValue in
+                        // Only animate when shopping mode actually changes
+                        guard oldValue != newValue else { return }
+                        
                         if newValue {
+                            buttonVisible = true
                             withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
                                 buttonScale = 1.0
-                                buttonVisible = true
                             }
                         } else {
-                            withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
                                 buttonScale = 0.1
                             }
-                            // Slight delay before hiding
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                                 buttonVisible = false
                             }
-                        }
-                    }
-                    .onAppear {
-                        // Animate initial appearance
-                        if cart.isShopping && !buttonVisible {
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                                    buttonScale = 1.0
-                                    buttonVisible = true
-                                }
-                            }
-                        }
-                    }
-                } else if buttonVisible {
-                    // Animate disappearance when switching from shopping to planning
-                    Button(action: {}) {
-                        Image(systemName: "circle")
-                            .font(.system(size: 16))
-                            .foregroundColor(Color(hex: "999"))
-                            .scaleEffect(buttonScale)
-                            .animation(.spring(response: 0.2, dampingFraction: 0.6), value: buttonScale)
-                    }
-                    .buttonStyle(.plain)
-                    .frame(maxHeight: .infinity, alignment: .top)
-                    .padding(.top, 2.75)
-                    .onAppear {
-                        // Animate disappearance
-                        withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {
-                            buttonScale = 0.1
-                        }
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                            buttonVisible = false
                         }
                     }
                 }
@@ -175,6 +144,7 @@ struct CartItemRowView: View {
                     .foregroundColor(Color(hex: "231F30"))
                     .opacity(cartItem.isFulfilled ? 0.5 : 1.0)
             }
+            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: buttonScale)
             .padding(.top, 12)
             .padding(.bottom, isLastItem ? 0 : 12)
             .padding(.leading, 12)
@@ -260,9 +230,12 @@ struct CartItemRowView: View {
             dragPosition = 0
             isDeleting = false
             
-            // Initialize button state
-            buttonVisible = cart.isShopping
-            buttonScale = cart.isShopping ? 1.0 : 0.1
+            // Only initialize once to prevent re-animation on every appearance
+            if !hasInitialized {
+                buttonVisible = cart.isShopping
+                buttonScale = cart.isShopping ? 1.0 : 0.1
+                hasInitialized = true
+            }
             
             if isNewlyAdded {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
