@@ -147,6 +147,7 @@ struct ManageCartSheet: View {
         }
         .navigationTitle("Manage Cart")
         .navigationBarTitleDisplayMode(.inline)
+        .background(.white)
         .ignoresSafeArea(.keyboard)
         .presentationDragIndicator(.visible)
         .onAppear {
