@@ -46,7 +46,7 @@ struct CategoryCircularButton: View {
                     if hasError {
                         Circle()
                             .stroke(Color(hex: "#FA003F"), lineWidth: 2)
-                            .frame(width: 34 + 8, height: 34 + 8) 
+                            .frame(width: 34 + 8, height: 34 + 8)
                     }
                     
                     // Content
@@ -63,6 +63,7 @@ struct CategoryCircularButton: View {
                 .contentShape(Circle())
 
             }
+            
 //            .labelStyle(.iconOnly) // optional, just for Menu label styling
             .offset(x: -4)
 //            .contentShape(Circle())

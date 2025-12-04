@@ -5,7 +5,6 @@ struct UnitButton: View {
     let hasError: Bool
     
     @State private var showAddUnit = false
-
     var shakeOffset: CGFloat = 0
     
     let continuousUnits: [(abbr: String, full: String)] = [
@@ -24,70 +23,36 @@ struct UnitButton: View {
         ("bottle", ""),
         ("box", ""),
         ("wrap", ""),
-        ("bag", ""),
+        ("bag", "")
     ]
     
     var body: some View {
         Menu {
-            Button(action: {
-                showAddUnit = true
-            }) {
+            Button(action: { showAddUnit = true }) {
                 Label("Add New Unit", systemImage: "plus.circle.fill")
             }
             
             Divider()
             
+            // Continuous Units Section
             Section(header: Text("Weight/Volume")) {
                 ForEach(continuousUnits, id: \.abbr) { unitOption in
-                    Button(action: {
-                        unit = unitOption.abbr
-                    }) {
-                        if unitOption.full.isEmpty {
-                            HStack {
-                                Text(unitOption.abbr)
-                                if unit == unitOption.abbr {
-                                    Image(systemName: "checkmark")
-                                        .foregroundColor(.blue)
-                                }
-                            }
-                        } else {
-                            Text("\(unitOption.abbr) - \(unitOption.full)")
-                            if unit == unitOption.abbr {
-                                Image(systemName: "checkmark")
-                                    .foregroundColor(.blue)
-                            }
-                        }
-                    }
+                    unitRow(unitOption: unitOption)
                 }
             }
             
+            // Discrete Units Section
             Section(header: Text("Discrete/Count")) {
                 ForEach(discreteUnits, id: \.abbr) { unitOption in
-                    Button(action: {
-                        unit = unitOption.abbr
-                    }) {
-                        if unitOption.full.isEmpty {
-                            HStack {
-                                Text(unitOption.abbr)
-                                if unit == unitOption.abbr {
-                                    Image(systemName: "checkmark")
-                                        .foregroundColor(.blue)
-                                }
-                            }
-                        } else {
-                            Text("\(unitOption.abbr) - \(unitOption.full)")
-                            if unit == unitOption.abbr {
-                                Image(systemName: "checkmark")
-                                    .foregroundColor(.blue)
-                            }
-                        }
-                    }
+                    unitRow(unitOption: unitOption)
                 }
             }
-
+            
+            // Clear selection
             Button("Clear Selection 😶") {
                 unit = ""
             }
+            
         } label: {
             HStack {
                 Text("Unit")
@@ -113,6 +78,42 @@ struct UnitButton: View {
                     )
             )
         }
-        .offset(x: shakeOffset) // Apply shake here
+        .offset(x: shakeOffset)
     }
+    
+    @ViewBuilder
+    private func unitRow(unitOption: (abbr: String, full: String)) -> some View {
+        Button(action: { unit = unitOption.abbr }) {
+            HStack(spacing: 8) {
+                // Abbreviation + full text
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(unitOption.abbr)
+                        .font(.subheadline)
+                        .foregroundColor(.primary)
+                    if !unitOption.full.isEmpty {
+                        Text(unitOption.full)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
+                Spacer()
+                
+                // Fixed-size checkmark placeholder
+                if unit == unitOption.abbr {
+                    Image(systemName: "checkmark")
+                        .foregroundColor(.blue)
+                        .frame(width: 20, alignment: .center) // fixed width
+                } else {
+                    // Empty frame ensures all rows have same horizontal alignment
+                    Color.clear
+                        .frame(width: 20)
+                }
+            }
+            .padding(.vertical, 4)
+        }
+    }
+
 }
+
+

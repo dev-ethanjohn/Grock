@@ -1,5 +1,6 @@
 import SwiftUI
 
+// MARK: - Form Completion Button
 struct FormCompletionButton: View {
     let title: String
     let isEnabled: Bool
@@ -46,7 +47,13 @@ struct FormCompletionButton: View {
     }
     
     var body: some View {
-        Button(action: action) {
+        Button(action: {
+            // Play haptic feedback using shared manager
+            HapticManager.shared.playButtonTap()
+            
+            // Execute the action
+            action()
+        }) {
             Text(title)
                 .fuzzyBubblesFont(16, weight: .bold)
                 .foregroundStyle(isEnabled ? .white : Color(.systemGray3))
@@ -129,6 +136,7 @@ struct FormCompletionButton: View {
     }
 }
 
+// MARK: - Convenience Constructors
 extension FormCompletionButton {
     static func finishButton(
         isEnabled: Bool,
@@ -210,7 +218,6 @@ extension FormCompletionButton {
         )
     }
     
-    
     static func createCartButton(
         isEnabled: Bool,
         cornerRadius: CGFloat = 10,
@@ -230,7 +237,4 @@ extension FormCompletionButton {
             action: action
         )
     }
-
 }
-
-

@@ -1,5 +1,43 @@
 import SwiftUI
 
+class HapticManager {
+    static let shared = HapticManager()
+    
+    private let lightImpact = UIImpactFeedbackGenerator(style: .light)
+    private let mediumImpact = UIImpactFeedbackGenerator(style: .medium)
+    private let heavyImpact = UIImpactFeedbackGenerator(style: .heavy)
+    
+    private init() {
+        prepareAll()
+    }
+    
+    private func prepareAll() {
+        lightImpact.prepare()
+        mediumImpact.prepare()
+        heavyImpact.prepare()
+    }
+    
+    func playLight() {
+        lightImpact.impactOccurred()
+        lightImpact.prepare() // Prepare for next use
+    }
+    
+    func playMedium() {
+        mediumImpact.impactOccurred()
+        mediumImpact.prepare()
+    }
+    
+    func playHeavy() {
+        heavyImpact.impactOccurred()
+        heavyImpact.prepare()
+    }
+    
+    // Convenience method specifically for buttons
+    func playButtonTap() {
+        playLight()
+    }
+}
+// Then in your view:
 struct OnboardingWelcomeView: View {
     @Bindable var viewModel: OnboardingViewModel
     
@@ -30,6 +68,8 @@ struct OnboardingWelcomeView: View {
             Spacer()
             
             Button("Get Started") {
+                // Use the shared haptic manager
+                HapticManager.shared.playButtonTap()
                 viewModel.navigateToLastStore()
             }
             .fuzzyBubblesFont(16, weight: .bold)

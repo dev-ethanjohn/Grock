@@ -67,7 +67,10 @@ struct VaultView: View {
     @State private var isKeyboardVisible = false
     
     @State private var showDismissConfirmation = false
-//    @State private var showCancelConfirmation = false
+    
+    // ✅ Updated to use @State with @Observable macro
+    @State private var keyboardResponder = KeyboardResponder()
+    @State private var focusedItemId: String?
     
     private var totalVaultItemsCount: Int {
         guard let vault = vaultService.vault else { return 0 }
@@ -120,7 +123,6 @@ struct VaultView: View {
                                 categoryScrollView
                             }
                             .onTapGesture {
-                                // Dismiss keyboard when tapping category section
                                 dismissKeyboard()
                             }
                             .background(
@@ -181,11 +183,27 @@ struct VaultView: View {
                     createCartButtonVisible = false
                 }
             }
+
+            ZStack {
+                if keyboardResponder.isVisible && focusedItemId != nil {
+                    KeyboardDoneButton(
+                        keyboardHeight: keyboardResponder.currentHeight,
+                        onDone: {
+                            UIApplication.shared.endEditing()
+                        }
+                    )
+                    .transition(.identity)
+                    .zIndex(10)
+                }
+            }
+            .frame(maxHeight: .infinity)
+        }
+        .onPreferenceChange(TextFieldFocusPreferenceKey.self) { itemId in
+            focusedItemId = itemId
         }
         .frame(maxHeight: .infinity)
         .ignoresSafeArea(.keyboard)
         .toolbar(.hidden)
-        // Prevent sheet dismissal when keyboard is visible
         .interactiveDismissDisabled(isKeyboardVisible)
         .overlay {
             if showCartConfirmation {

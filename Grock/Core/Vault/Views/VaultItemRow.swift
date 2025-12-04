@@ -1,6 +1,40 @@
 import SwiftUI
-import UIKit
-import SwiftUIIntrospect
+import Combine
+
+@Observable
+class KeyboardResponder {
+    var currentHeight: CGFloat = 0
+    var isVisible: Bool = false
+    
+    private var cancellables = Set<AnyCancellable>()
+    
+    init() {
+        NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)
+            .compactMap { notification -> CGFloat? in
+                (notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect)?.height
+            }
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] height in
+                self?.currentHeight = height
+                self?.isVisible = true
+            }
+            .store(in: &cancellables)
+        
+        NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.isVisible = false
+            }
+            .store(in: &cancellables)
+        
+        NotificationCenter.default.publisher(for: UIResponder.keyboardDidHideNotification)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.currentHeight = 0
+            }
+            .store(in: &cancellables)
+    }
+}
 
 struct VaultItemRow: View {
     let item: Item
@@ -34,7 +68,7 @@ struct VaultItemRow: View {
 
     private var totalOffset: CGFloat {
         if isDeleting {
-            return -UIScreen.main.bounds.width // slide completely off screen
+            return -UIScreen.main.bounds.width
         } else {
             let proposed = dragPosition + dragOffset
             return max(proposed, -80)
@@ -43,11 +77,9 @@ struct VaultItemRow: View {
 
     var body: some View {
         ZStack(alignment: .trailing) {
-            // Delete background
             deleteItemBackRow
                 .offset(x: isDeleting ? totalOffset : 0)
 
-            // Main content
             itemFrontRow
         }
         .contentShape(Rectangle())
@@ -55,7 +87,6 @@ struct VaultItemRow: View {
         .opacity(appearOpacity)
         .offset(y: slideInOffset)
         .onTapGesture {
-            // Prevent tap when keyboard is open
             guard !isFocused else { return }
             
             if isSwiped {
@@ -67,7 +98,6 @@ struct VaultItemRow: View {
                 showEditSheet = true
             }
         }
-        // Disable interaction when keyboard is visible
         .allowsHitTesting(!isFocused)
         .sheet(isPresented: $showEditSheet) {
             EditItemSheet(
@@ -126,13 +156,11 @@ struct VaultItemRow: View {
                     isNewlyAdded = false
                 }
             } else {
-                // Item already exists, show immediately
                 appearScale = 1.0
                 appearOpacity = 1.0
                 slideInOffset = 0
             }
             
-            // Initialize textValue on appear
             if textValue.isEmpty || textValue != formatValue(currentQuantity) {
                 textValue = formatValue(currentQuantity)
             }
@@ -142,6 +170,7 @@ struct VaultItemRow: View {
         }
         .animation(.spring(response: 0.35, dampingFraction: 0.75), value: totalOffset)
         .animation(.spring(response: 0.4, dampingFraction: 0.7), value: isDeleting)
+        .preference(key: TextFieldFocusPreferenceKey.self, value: isFocused ? item.id : nil)
     }
 
     private func triggerDeletion() {
@@ -262,7 +291,7 @@ struct VaultItemRow: View {
         .background(.white)
         .animation(.spring(response: 0.4, dampingFraction: 0.7), value: isActive)
         .offset(x: totalOffset)
-        .gesture(isFocused ? nil : swipeGesture) // Disable swipe when keyboard is open
+        .gesture(isFocused ? nil : swipeGesture)
         .disabled(isDeleting)
     }
     
@@ -325,7 +354,7 @@ struct VaultItemRow: View {
         }
         .buttonStyle(.plain)
         .contentShape(Rectangle())
-        .disabled(currentQuantity <= 0 || isFocused) // Disable when keyboard is open
+        .disabled(currentQuantity <= 0 || isFocused)
         .opacity(currentQuantity <= 0 ? 0.5 : 1)
     }
     
@@ -339,7 +368,23 @@ struct VaultItemRow: View {
                 .animation(.spring(response: 0.3, dampingFraction: 0.7), value: textValue)
                 .fixedSize()
 
-            textFieldWithToolbar
+            TextField("", text: $textValue)
+                .keyboardType(.decimalPad)
+                .font(.system(size: 15, weight: .bold))
+                .foregroundColor(.clear)
+                .multilineTextAlignment(.center)
+                .focused($isFocused)
+                .normalizedNumber($textValue, allowDecimal: true, maxDecimalPlaces: 2)
+                .onChange(of: isFocused) { _, focused in
+                    if !focused {
+                        commitTextField()
+                    }
+                }
+                .onChange(of: textValue) { _, newText in
+                    if let number = Double(newText), number > 100 {
+                        textValue = "100"
+                    }
+                }
         }
         .padding(.horizontal, 6)
         .background(
@@ -349,45 +394,6 @@ struct VaultItemRow: View {
         .frame(minWidth: 40)
         .frame(maxWidth: 80)
         .fixedSize(horizontal: true, vertical: false)
-    }
-    
-    private var textFieldWithToolbar: some View {
-        TextField("", text: $textValue)
-            .keyboardType(.decimalPad)
-            .font(.system(size: 15, weight: .bold))
-            .foregroundColor(.clear)
-            .multilineTextAlignment(.center)
-            .focused($isFocused)
-            .normalizedNumber($textValue, allowDecimal: true, maxDecimalPlaces: 2)
-            .onChange(of: isFocused) { _, focused in
-                if !focused {
-                    commitTextField()
-                }
-            }
-            .onChange(of: textValue) { _, newText in
-                if let number = Double(newText), number > 100 {
-                    textValue = "100"
-                }
-            }
-            .introspect(.textField, on: .iOS(.v16, .v17, .v18)) { textField in
-                let toolbar = TransparentToolbar(
-                    onClose: { [weak textField] in
-                        DispatchQueue.main.async {
-                            textValue = formatValue(currentQuantity)
-                            isFocused = false
-                            textField?.resignFirstResponder()
-                        }
-                    },
-                    onSubmit: { [weak textField] in
-                        DispatchQueue.main.async {
-                            commitTextField()
-                            textField?.resignFirstResponder()
-                        }
-                    }
-                )
-                textField.inputAccessoryView = toolbar
-                textField.reloadInputViews()
-            }
     }
     
     private var plusButton: some View {
@@ -410,7 +416,7 @@ struct VaultItemRow: View {
         .clipShape(Circle())
         .contentShape(Circle())
         .buttonStyle(.plain)
-        .disabled(isFocused) // Disable when keyboard is open
+        .disabled(isFocused)
     }
     
     private var swipeGesture: some Gesture {
@@ -456,76 +462,54 @@ struct VaultItemRow: View {
     }
 }
 
-// MARK: - Transparent UIKit Toolbar
-private class TransparentToolbar: UIView {
-    private let onClose: () -> Void
-    private let onSubmit: () -> Void
+struct TextFieldFocusPreferenceKey: PreferenceKey {
+    static var defaultValue: String? = nil
     
-    init(onClose: @escaping () -> Void, onSubmit: @escaping () -> Void) {
-        self.onClose = onClose
-        self.onSubmit = onSubmit
-        super.init(frame: CGRect(x: 0, y: 0, width: UIScreen.main.bounds.width, height: 60))
-        setupToolbar()
+    static func reduce(value: inout String?, nextValue: () -> String?) {
+        value = nextValue() ?? value
     }
+}
+
+struct KeyboardDoneButton: View {
+    let keyboardHeight: CGFloat
+    let onDone: () -> Void
+    @State private var isVisible = false
     
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-    
-    private func setupToolbar() {
-        backgroundColor = .clear
-        
-        // Add gradient layer
-        let gradientLayer = CAGradientLayer()
-        gradientLayer.frame = bounds
-        gradientLayer.colors = [
-            UIColor.white.withAlphaComponent(0.0).cgColor,
-            UIColor.white.withAlphaComponent(0.6).cgColor,
-            UIColor.white.withAlphaComponent(0.95).cgColor,
-            UIColor.white.withAlphaComponent(1.0).cgColor
-        ]
-        gradientLayer.locations = [0.0, 0.25, 0.55, 1.0]
-        gradientLayer.startPoint = CGPoint(x: 0.5, y: 0.0)
-        gradientLayer.endPoint = CGPoint(x: 0.5, y: 1.0)
-        layer.insertSublayer(gradientLayer, at: 0)
-        
-        var config = UIButton.Configuration.filled()
-        config.baseBackgroundColor = .black
-        config.baseForegroundColor = .white
-        config.contentInsets = NSDirectionalEdgeInsets(top: 6, leading: 20, bottom: 6, trailing: 20)
-        config.cornerStyle = .capsule
-        
-        // Set attributed title with custom font
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: UIFont(name: "FuzzyBubbles-Bold", size: 16) ?? UIFont.boldSystemFont(ofSize: 16),
-            .foregroundColor: UIColor.white
-        ]
-        config.attributedTitle = AttributedString(NSAttributedString(string: "Save", attributes: attributes))
-        
-        let saveButton = UIButton(configuration: config)
-        saveButton.addTarget(self, action: #selector(submitTapped), for: .touchUpInside)
-        
-        let stackView = UIStackView(arrangedSubviews: [UIView(), saveButton])
-        stackView.axis = .horizontal
-        stackView.distribution = .fill
-        stackView.alignment = .center
-        stackView.translatesAutoresizingMaskIntoConstraints = false
-        
-        addSubview(stackView)
-        
-        NSLayoutConstraint.activate([
-            stackView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 16),
-            stackView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -16),
-            stackView.topAnchor.constraint(equalTo: topAnchor),
-            stackView.bottomAnchor.constraint(equalTo: bottomAnchor)
-        ])
-    }
-    
-    @objc private func closeTapped() {
-        onClose()
-    }
-    
-    @objc private func submitTapped() {
-        onSubmit()
+    var body: some View {
+        VStack {
+            Spacer()
+            
+            HStack {
+                Spacer()
+                
+                Text("Done")
+                    .fuzzyBubblesFont(16, weight: .bold)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 8)
+                    .background(
+                        Capsule()
+                            .fill(Color.black)
+                    )
+                    .cornerRadius(25)
+                    .onTapGesture {
+                        onDone()
+                    }
+                    .scaleEffect(isVisible ? 1 : 0)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isVisible)
+                    .padding(.trailing, 20)
+                    .padding(.bottom, keyboardHeight > 0 ? keyboardHeight - 20 : 0)
+            }
+        }
+        .onAppear {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.7).delay(0.05)) {
+                isVisible = true
+            }
+        }
+        .onDisappear {
+            withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {
+                isVisible = false
+            }
+        }
     }
 }
