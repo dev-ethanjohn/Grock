@@ -36,6 +36,26 @@ class KeyboardResponder {
     }
 }
 
+class KeyboardManager {
+    static func dismissWithAnimation() {
+        // Get the current key window using the modern API
+        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let keyWindow = windowScene.windows.first(where: { $0.isKeyWindow }) else {
+            return
+        }
+        
+        // Dismiss keyboard with animation
+        keyWindow.endEditing(true)
+    }
+    
+    static func getKeyWindow() -> UIWindow? {
+        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene else {
+            return nil
+        }
+        return windowScene.windows.first(where: { $0.isKeyWindow })
+    }
+}
+
 struct VaultItemRow: View {
     let item: Item
     let category: GroceryCategory?
@@ -492,10 +512,9 @@ struct KeyboardDoneButton: View {
                             .fill(Color.black)
                     )
                     .cornerRadius(25)
-                    .onTapGesture {
-                        onDone()
-                    }
+                    .onTapGesture(perform: handleDoneTap)
                     .scaleEffect(isVisible ? 1 : 0)
+                    .opacity(isVisible ? 1 : 0)
                     .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isVisible)
                     .padding(.trailing, 20)
                     .padding(.bottom, keyboardHeight > 0 ? keyboardHeight - 20 : 0)
@@ -506,10 +525,25 @@ struct KeyboardDoneButton: View {
                 isVisible = true
             }
         }
-        .onDisappear {
-            withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {
-                isVisible = false
-            }
+    }
+    
+    private func handleDoneTap() {
+        let generator = UIImpactFeedbackGenerator(style: .light)
+        generator.impactOccurred()
+        
+        // Animate button out first
+        withAnimation(.spring(response: 0.15, dampingFraction: 0.7)) {
+            isVisible = false
+        }
+        
+        // Dismiss keyboard with animation
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            KeyboardManager.dismissWithAnimation()
+        }
+        
+        // Call onDone after a delay
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            onDone()
         }
     }
 }
