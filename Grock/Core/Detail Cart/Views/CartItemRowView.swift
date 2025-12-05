@@ -2,7 +2,6 @@ import SwiftUI
 import SwiftData
 
 struct CartItemRowView: View {
-    //    MARK: put in a viewmodel + reaarange
     let cartItem: CartItem
     let item: Item?
     let cart: Cart
@@ -20,7 +19,6 @@ struct CartItemRowView: View {
     @State private var isNewlyAdded: Bool = true
     @State private var buttonScale: CGFloat = 0.1
     @State private var buttonVisible: Bool = false
-    @State private var hasInitialized: Bool = false 
     
     private var itemName: String {
         item?.name ?? "Unknown Item"
@@ -52,7 +50,7 @@ struct CartItemRowView: View {
     var body: some View {
         ZStack(alignment: .trailing) {
             
-//            delete
+            // Delete button
             HStack {
                 Spacer()
                 Button(action: {
@@ -83,48 +81,29 @@ struct CartItemRowView: View {
             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isDeleting)
             
             HStack(alignment: .bottom, spacing: 2) {
-                // Checkmark/circle button with smooth scale transition
-                if cart.isShopping || buttonVisible {
-                    Button(action: {
-                        if cart.isShopping {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                                onToggleFulfillment()
-                            }
-                        }
-                    }) {
-                        Image(systemName: cartItem.isFulfilled ? "checkmark.circle.fill" : "circle")
-                            .font(.system(size: 16))
-                            .foregroundColor(cartItem.isFulfilled ? .green : Color(hex: "999"))
-                            .scaleEffect(buttonScale)
-                            .animation(
-                                .spring(response: 0.3, dampingFraction: 0.6)
-                                    .delay(cartItem.isFulfilled ? 0 : 0.1),
-                                value: cartItem.isFulfilled
-                            )
-                    }
-                    .buttonStyle(.plain)
-                    .frame(maxHeight: .infinity, alignment: .top)
-                    .frame(width: buttonScale > 0.5 ? nil : 0)
-                    .padding(.top, 2.75)
-                    .onChange(of: cart.isShopping) { oldValue, newValue in
-                        // Only animate when shopping mode actually changes
-                        guard oldValue != newValue else { return }
-                        
-                        if newValue {
-                            buttonVisible = true
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                                buttonScale = 1.0
-                            }
-                        } else {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                                buttonScale = 0.1
-                            }
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                buttonVisible = false
-                            }
+                // Checkmark/circle button - always present but conditionally visible
+                Button(action: {
+                    if cart.isShopping {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                            onToggleFulfillment()
                         }
                     }
+                }) {
+                    Image(systemName: cartItem.isFulfilled ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 16))
+                        .foregroundColor(cartItem.isFulfilled ? .green : Color(hex: "999"))
+                        .scaleEffect(buttonScale)
+                        .animation(
+                            .spring(response: 0.3, dampingFraction: 0.6)
+                                .delay(cartItem.isFulfilled ? 0 : 0.1),
+                            value: cartItem.isFulfilled
+                        )
                 }
+                .buttonStyle(.plain)
+                .frame(maxHeight: .infinity, alignment: .top)
+                .frame(width: buttonScale > 0.5 ? nil : 0)
+                .padding(.top, 2.75)
+                .opacity(buttonVisible ? 1 : 0)
                 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("\(quantityString) \(itemName)")
@@ -219,6 +198,24 @@ struct CartItemRowView: View {
                 }
             }
         }
+        .onChange(of: cart.isShopping) { oldValue, newValue in
+            // Only animate when shopping mode actually changes
+            guard oldValue != newValue else { return }
+            
+            if newValue {
+                buttonVisible = true
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                    buttonScale = 1.0
+                }
+            } else {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                    buttonScale = 0.1
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    buttonVisible = false
+                }
+            }
+        }
         .onChange(of: isDeleting) { _, newValue in
             if newValue {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
@@ -226,16 +223,15 @@ struct CartItemRowView: View {
                 }
             }
         }
+        .task(id: cart.isShopping) {
+            // Initialize button state based on shopping mode
+            // task(id:) only runs once per unique id value
+            buttonVisible = cart.isShopping
+            buttonScale = cart.isShopping ? 1.0 : 0.1
+        }
         .onAppear {
             dragPosition = 0
             isDeleting = false
-            
-            // Only initialize once to prevent re-animation on every appearance
-            if !hasInitialized {
-                buttonVisible = cart.isShopping
-                buttonScale = cart.isShopping ? 1.0 : 0.1
-                hasInitialized = true
-            }
             
             if isNewlyAdded {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
