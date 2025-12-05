@@ -84,20 +84,20 @@ struct HomeCartRowView: View {
     }
     
     private var progressSection: some View {
-        VStack(spacing: 8) {
-            HStack(alignment: .center, spacing: 8) {
-                BudgetProgressBar(cart: cart, budgetProgressColor: budgetProgressColor, progressWidth: progressWidth)
-                
-                Text(cart.budget.formattedCurrency)
-                    .lexendFont(14, weight: .bold)
-                    .foregroundColor(Color(hex: "333"))
-            }
-            .frame(height: 20)
-            
-            categoriesView
-        }
-    }
-    
+         VStack(spacing: 8) {
+             HStack(alignment: .center, spacing: 8) {
+                 BudgetProgressBar(cart: cart, budgetProgressColor: budgetProgressColor, progressWidth: progressWidth)
+                 
+                 Text(cart.budget.formattedCurrency)
+                     .lexendFont(14, weight: .bold)
+                     .foregroundColor(Color(hex: "333"))
+             }
+             .frame(height: 20)
+             
+             categoriesView
+         }
+     }
+     
     private var categoriesView: some View {
         HStack {
             if !categories.isEmpty {

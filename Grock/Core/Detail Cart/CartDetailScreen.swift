@@ -6,49 +6,49 @@ struct CartDetailScreen: View {
     @Environment(VaultService.self) private var vaultService
     @Environment(CartViewModel.self) private var cartViewModel
     @Environment(\.dismiss) private var dismiss
-
+    
     // modes
     @State private var showingDeleteAlert = false
     @State private var editingItem: CartItem?
     @State private var showingCompleteAlert = false
-
+    
     @State private var showingStartShoppingAlert = false
     @State private var showingSwitchToPlanningAlert = false
-
+    
     @State private var anticipationOffset: CGFloat = 0
-
+    
     // filter
     @State private var selectedFilter: FilterOption = .all
     @State private var showingFilterSheet = false
-
+    
     @State private var headerHeight: CGFloat = 0
-
+    
     @State private var animatedFulfilledAmount: Double = 0
     @State private var animatedFulfilledPercentage: Double = 0
-
+    
     @State private var itemToEdit: Item? = nil
-
+    
     @State private var showingVaultView = false
-
+    
     @State private var previousHasItems = false
-
+    
     // Celebration state
     @State private var showCelebration = false
-
+    
     @State private var manageCartButtonVisible = false
     @State private var buttonScale: CGFloat = 1.0
     @State private var shouldBounceAfterCelebration = false
-
+    
     // Loading state
     @State private var cartReady = false
-
+    
     // Refresh trigger for synchronization
     @State private var refreshTrigger = UUID()
-
+    
     private var cartInsights: CartInsights {
         vaultService.getCartInsights(cart: cart)
     }
-
+    
     private var itemsByStore: [String: [(cartItem: CartItem, item: Item?)]] {
         let sortedCartItems = cart.cartItems.sorted { $0.itemId < $1.itemId }
         let cartItemsWithDetails = sortedCartItems.map { cartItem in
@@ -59,11 +59,11 @@ struct CartDetailScreen: View {
         }
         return grouped.filter { !$0.key.isEmpty && !$0.value.isEmpty }
     }
-
+    
     // Add refresh-aware computed property
     private var itemsByStoreWithRefresh: [String: [(cartItem: CartItem, item: Item?)]] {
         _ = refreshTrigger // Force recalculation when refreshTrigger changes
-
+        
         let sortedCartItems = cart.cartItems.sorted { $0.itemId < $1.itemId }
         let cartItemsWithDetails = sortedCartItems.map { cartItem in
             (cartItem, vaultService.findItemById(cartItem.itemId))
@@ -73,35 +73,35 @@ struct CartDetailScreen: View {
         }
         return grouped.filter { !$0.key.isEmpty && !$0.value.isEmpty }
     }
-
+    
     private var sortedStores: [String] {
         Array(itemsByStore.keys).sorted()
     }
-
+    
     private var sortedStoresWithRefresh: [String] {
         Array(itemsByStoreWithRefresh.keys).sorted()
     }
-
+    
     private var totalItemCount: Int {
         cart.cartItems.count
     }
-
+    
     private var hasItems: Bool {
         totalItemCount > 0 && !sortedStores.isEmpty
     }
-
+    
     private var shouldAnimateTransition: Bool {
         previousHasItems != hasItems
     }
-
+    
     private func storeItems(for store: String) -> [(cartItem: CartItem, item: Item?)] {
         itemsByStore[store] ?? []
     }
-
+    
     private func storeItemsWithRefresh(for store: String) -> [(cartItem: CartItem, item: Item?)] {
         itemsByStoreWithRefresh[store] ?? []
     }
-
+    
     var body: some View {
         CartDetailContent(
             cart: cart,
@@ -161,7 +161,7 @@ struct CartDetailScreen: View {
             EditItemSheet(
                 item: item,
                 onSave: { updatedItem in
-               
+                    
                     vaultService.updateCartTotals(cart: cart)
                     refreshTrigger = UUID()
                 },
@@ -225,25 +225,25 @@ struct CartDetailScreen: View {
             FilterSheet(selectedFilter: $selectedFilter)
         }
     }
-
+    
     private func checkAndShowCelebration() {
         let hasSeenCelebration = UserDefaults.standard.bool(forKey: "hasSeenFirstShoppingCartCelebration")
-
+        
         print("🎉 Cart Celebration Debug:")
         print(" - hasSeenCelebration: \(hasSeenCelebration)")
         print(" - Total carts: \(cartViewModel.carts.count)")
         print(" - Current cart name: \(cart.name)")
         print(" - Current cart ID: \(cart.id)")
-
+        
         guard !hasSeenCelebration else {
             print("⏭️ Skipping first cart celebration - already seen")
             manageCartButtonVisible = true
             return
         }
-
+        
         let isFirstCart = cartViewModel.carts.count == 1 || cartViewModel.isFirstCart(cart)
         print(" - Is first cart: \(isFirstCart)")
-
+        
         if isFirstCart {
             print("🎉 First cart celebration triggered!")
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
@@ -256,7 +256,7 @@ struct CartDetailScreen: View {
     }
 }
 
-// MARK: - Content
+
 struct CartDetailContent: View {
     let cart: Cart
     let cartInsights: CartInsights
@@ -269,48 +269,51 @@ struct CartDetailContent: View {
     let shouldAnimateTransition: Bool
     let storeItems: (String) -> [(cartItem: CartItem, item: Item?)]
     let storeItemsWithRefresh: (String) -> [(cartItem: CartItem, item: Item?)]
-
+    
     @Binding var showingDeleteAlert: Bool
     @Binding var editingItem: CartItem?
     @Binding var showingCompleteAlert: Bool
-
+    
     @Binding var showingStartShoppingAlert: Bool
     @Binding var showingSwitchToPlanningAlert: Bool
-
+    
     @Binding var anticipationOffset: CGFloat
-
+    
     // filter
     @Binding var selectedFilter: FilterOption
     @Binding var showingFilterSheet: Bool
-
+    
     @Binding var headerHeight: CGFloat
-
+    
     @Binding var animatedFulfilledAmount: Double
     @Binding var animatedFulfilledPercentage: Double
-
+    
     @Binding var itemToEdit: Item?
-
+    
     @Binding var showingVaultView: Bool
-
+    
     @Binding var previousHasItems: Bool
-
+    
     // Celebration state
     @Binding var showCelebration: Bool
-
+    
     @Binding var manageCartButtonVisible: Bool
     @Binding var buttonScale: CGFloat
     @Binding var shouldBounceAfterCelebration: Bool
-
+    
     // Loading state
     @Binding var cartReady: Bool
-
+    
     // Refresh trigger for synchronization
     @Binding var refreshTrigger: UUID
-
+    
+    // NEW: State for budget editing
+    @State private var showEditBudget = false
+    
     @Environment(VaultService.self) private var vaultService
     @Environment(CartViewModel.self) private var cartViewModel
     @Environment(\.dismiss) private var dismiss
-
+    
     var body: some View {
         GeometryReader { geometry in
             ZStack (alignment: .bottom){
@@ -325,7 +328,7 @@ struct CartDetailContent: View {
                                 headerHeight: $headerHeight,
                                 refreshTrigger: $refreshTrigger
                             )
-
+                            
                             ZStack {
                                 if hasItems {
                                     VStack(spacing: 24) {
@@ -351,7 +354,7 @@ struct CartDetailContent: View {
                                             }
                                         )
                                         .transition(.scale)
-
+                                        
                                         FooterView(
                                             cart: cart,
                                             animatedFulfilledAmount: $animatedFulfilledAmount,
@@ -366,23 +369,26 @@ struct CartDetailContent: View {
                                 }
                             }
                             .animation(.spring(response: 0.3, dampingFraction: 0.85), value: hasItems)
-
+                            
                             Spacer(minLength: 0)
                         }
                         .padding(.vertical, 40)
                         .padding(.horizontal)
                         .frame(maxHeight: .infinity, alignment: .top)
-
+                        
                         HeaderView(
                             cart: cart,
                             showingDeleteAlert: $showingDeleteAlert,
                             showingCompleteAlert: $showingCompleteAlert,
                             showingStartShoppingAlert: $showingStartShoppingAlert,
                             headerHeight: $headerHeight,
-                            dismiss: dismiss
+                            dismiss: dismiss,
+                            onBudgetTap: {
+                                showEditBudget = true
+                            }
                         )
                     }
-
+                    
                     if !showCelebration {
                         ZStack {
                             // Button positioned at bottom center
@@ -414,6 +420,21 @@ struct CartDetailContent: View {
                             }
                         }
                 }
+                
+                if showEditBudget {
+                    EditBudgetPopover(
+                        isPresented: $showEditBudget,
+                        cart: cart,
+                        onSave: { newBudget in
+                            vaultService.updateCartTotals(cart: cart)
+                            refreshTrigger = UUID()
+                        },
+                        onDismiss: nil
+                    )
+                    .environment(vaultService)
+                    .zIndex(1000) 
+                }
+                
             }
             .overlay {
                 if showCelebration {
@@ -423,12 +444,12 @@ struct CartDetailContent: View {
                         subtitle: nil
                     )
                     .transition(.scale)
-                    .zIndex(1000)
+                    .zIndex(1001)
                 }
             }
         }
     }
-
+    
     private func handleDeleteItem(_ cartItem: CartItem) {
         withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
             vaultService.removeItemFromCart(cart: cart, itemId: cartItem.itemId)
@@ -438,7 +459,7 @@ struct CartDetailContent: View {
     }
 }
 
-// MARK: - Header View
+
 struct HeaderView: View {
     let cart: Cart
     @Binding var showingDeleteAlert: Bool
@@ -446,9 +467,11 @@ struct HeaderView: View {
     @Binding var showingStartShoppingAlert: Bool
     @Binding var headerHeight: CGFloat
     let dismiss: DismissAction
-
+    
+    var onBudgetTap: (() -> Void)?
+    
     @Environment(VaultService.self) private var vaultService
-
+    
     private var budgetProgressColor: Color {
         let progress = cart.totalSpent / cart.budget
         if progress < 0.7 {
@@ -459,12 +482,12 @@ struct HeaderView: View {
             return .red
         }
     }
-
+    
     private func progressWidth(for totalWidth: CGFloat) -> CGFloat {
         let progress = cart.totalSpent / cart.budget
         return CGFloat(progress) * totalWidth
     }
-
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
@@ -489,7 +512,7 @@ struct HeaderView: View {
                         }
                     }
                     Divider()
-
+                    
                     Button("Delete Cart", systemImage: "trash", role: .destructive) {
                         showingDeleteAlert = true
                     }
@@ -500,18 +523,24 @@ struct HeaderView: View {
                 }
             }
             .padding(.top)
-
+            
             VStack(alignment: .leading, spacing: 8) {
                 Text(cart.name)
                     .lexendFont(22, weight: .bold)
                     .foregroundColor(.black)
-
+                
                 VStack(spacing: 8) {
                     HStack(alignment: .center, spacing: 8) {
-                        BudgetProgressBar(cart: cart, budgetProgressColor: budgetProgressColor, progressWidth: progressWidth(for:))
-                        Text(cart.budget.formattedCurrency)
-                            .lexendFont(14, weight: .bold)
-                            .foregroundColor(Color(hex: "333"))
+                        BudgetProgressBar(cart: cart, budgetProgressColor: budgetProgressColor, progressWidth: progressWidth)
+                        
+                        Button(action: {
+                            onBudgetTap?()
+                        }) {
+                            Text(cart.budget.formattedCurrency)
+                                .lexendFont(14, weight: .bold)
+                                .foregroundColor(Color(hex: "333"))
+                        }
+                        .buttonStyle(.plain)
                     }
                     .frame(height: 22)
                 }
@@ -535,7 +564,6 @@ struct HeaderView: View {
     }
 }
 
-// MARK: - Mode Toggle View
 struct ModeToggleView: View {
     let cart: Cart
     @Binding var anticipationOffset: CGFloat
@@ -543,17 +571,17 @@ struct ModeToggleView: View {
     @Binding var showingSwitchToPlanningAlert: Bool
     @Binding var headerHeight: CGFloat
     @Binding var refreshTrigger: UUID
-
+    
     @Environment(VaultService.self) private var vaultService
-//    @Environment(\.showingFilterSheet) private var showingFilterSheet
-
+    //    @Environment(\.showingFilterSheet) private var showingFilterSheet
+    
     var body: some View {
         HStack(spacing: 0) {
             ZStack {
                 Color(hex: "EEEEEE")
                     .frame(width: 176, height: 26)
                     .cornerRadius(16)
-
+                
                 HStack {
                     if cart.isShopping {
                         Spacer()
@@ -570,7 +598,7 @@ struct ModeToggleView: View {
                 }
                 .frame(width: 176)
                 .animation(.spring(response: 0.3, dampingFraction: 0.7), value: cart.status)
-
+                
                 HStack(spacing: 0) {
                     Button(action: {
                         if cart.status == .shopping {
@@ -578,7 +606,7 @@ struct ModeToggleView: View {
                             withAnimation(.easeInOut(duration: 0.1)) {
                                 anticipationOffset = -16// Move left halfway
                             }
-
+                            
                             // Show confirmation alert
                             showingSwitchToPlanningAlert = true
                         }
@@ -593,14 +621,14 @@ struct ModeToggleView: View {
                     }
                     .disabled(cart.isCompleted)
                     .buttonStyle(.plain)
-
+                    
                     Button(action: {
                         if cart.status == .planning {
                             // Anticipation animation for switching to shopping
                             withAnimation(.easeInOut(duration: 0.1)) {
                                 anticipationOffset = 16 // Move right halfway
                             }
-
+                            
                             // Show confirmation alert
                             showingStartShoppingAlert = true
                         }
@@ -617,29 +645,29 @@ struct ModeToggleView: View {
                 }
             }
             .frame(width: 176, height: 30)
-
+            
             Spacer()
-
+            
             HStack(spacing: 8) {
-
+                
                 Button(action: {
-//                    showingFilterSheet = true
+                    //                    showingFilterSheet = true
                 }) {
                     Image(systemName: "line.3.horizontal.decrease.circle")
                         .resizable()
                         .frame(width: 20, height: 20)
                         .fontWeight(.light)
                         .foregroundColor(.black)
-
+                    
                 }
                 .padding(1.5)
                 .background(.white)
                 .clipShape(Circle())
                 .shadow(color: Color.black.opacity(0.4), radius: 1, x: 0, y: 0.5)
-
+                
                 Text("|")
                     .lexendFont(16, weight: .thin)
-
+                
                 Button(action: {
                     // Future filter functionality
                 }) {
@@ -648,7 +676,7 @@ struct ModeToggleView: View {
                         .frame(width: 20, height: 20)
                         .fontWeight(.light)
                         .foregroundColor(.black)
-
+                    
                 }
                 .padding(1.5)
                 .background(.white)
@@ -692,7 +720,7 @@ struct ItemsListView: View {
     let onToggleFulfillment: (CartItem) -> Void
     let onEditItem: (CartItem) -> Void
     let onDeleteItem: (CartItem) -> Void
-
+    
     var body: some View {
         Group {
             if totalItemCount <= 7 {
@@ -751,7 +779,7 @@ struct EmptyStateView: View {
             Image(systemName: "cart.badge.plus")
                 .font(.system(size: 48))
                 .foregroundColor(.gray.opacity(0.5))
-
+            
             Text("Add items from vault")
                 .lexendFont(18, weight: .medium)
                 .foregroundColor(.gray)
@@ -770,9 +798,9 @@ struct FooterView: View {
     @Binding var animatedFulfilledPercentage: Double
     let shouldAnimateTransition: Bool
     let geometry: GeometryProxy
-
+    
     @Environment(VaultService.self) private var vaultService
-
+    
     var body: some View {
         if cart.isShopping {
             VStack(alignment: .leading, spacing: 4) {
@@ -781,17 +809,17 @@ struct FooterView: View {
                         .fuzzyBubblesFont(15, weight: .bold)
                         .foregroundColor(.gray)
                         .contentTransition(.numericText(value: animatedFulfilledAmount))
-
+                    
                     Text("/")
                         .fuzzyBubblesFont(10, weight: .bold)
                         .foregroundColor(Color(.systemGray3))
-
+                    
                     Text("\(cart.totalItemsCount) items for ₱\(animatedFulfilledAmount, specifier: "%.2f")")
                         .fuzzyBubblesFont(15, weight: .bold)
                         .foregroundColor(.gray)
                         .contentTransition(.numericText(value: animatedFulfilledAmount))
                 }
-
+                
                 Text("\(Int(animatedFulfilledPercentage))% fulfilled")
                     .fuzzyBubblesFont(15, weight: .bold)
                     .foregroundColor(.gray)
@@ -813,7 +841,7 @@ struct FooterView: View {
             .padding(.bottom, geometry.safeAreaInsets.bottom + 20)
         }
     }
-
+    
     private func updateAnimatedValues() {
         withAnimation(.smooth(duration: 0.5)) {
             animatedFulfilledAmount = vaultService.getTotalFulfilledAmount(for: cart)
@@ -831,7 +859,7 @@ struct CartStoresListView: View {
     let onEditItem: (CartItem) -> Void
     let onDeleteItem: (CartItem) -> Void
     let isScrollable: Bool
-
+    
     var body: some View {
         Group {
             if isScrollable {
@@ -845,7 +873,7 @@ struct CartStoresListView: View {
             }
         }
     }
-
+    
     private var storesVStack: some View {
         VStack(spacing: 0) {
             ForEach(Array(sortedStores.enumerated()), id: \.offset) { index, store in
