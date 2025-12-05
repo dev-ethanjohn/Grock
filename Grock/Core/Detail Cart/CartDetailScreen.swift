@@ -316,7 +316,8 @@ struct CartDetailContent: View {
     
     var body: some View {
         GeometryReader { geometry in
-            ZStack (alignment: .bottom){
+            ZStack {
+                // Main content area
                 if cartReady {
                     ZStack(alignment: .top) {
                         VStack(spacing: 12) {
@@ -388,30 +389,6 @@ struct CartDetailContent: View {
                             }
                         )
                     }
-                    
-                    if !showCelebration {
-                        ZStack {
-                            // Button positioned at bottom center
-                            Button(action: {
-                                showingVaultView = true
-                            }) {
-                                Text("Manage Cart")
-                                    .fuzzyBubblesFont(16, weight: .bold)
-                                    .foregroundColor(.white)
-                                    .padding(.horizontal, 24)
-                                    .padding(.vertical, 12)
-                                    .background(Color.black)
-                                    .cornerRadius(25)
-                            }
-                            .transition(.scale)
-                            .scaleEffect(manageCartButtonVisible ? buttonScale : 0)
-                            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: manageCartButtonVisible)
-                            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: buttonScale)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-                        }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .background(.clear)
-                    }
                 } else {
                     ProgressView()
                         .onAppear {
@@ -421,6 +398,7 @@ struct CartDetailContent: View {
                         }
                 }
                 
+                // Edit budget popover (will appear above main content)
                 if showEditBudget {
                     EditBudgetPopover(
                         isPresented: $showEditBudget,
@@ -432,11 +410,10 @@ struct CartDetailContent: View {
                         onDismiss: nil
                     )
                     .environment(vaultService)
-                    .zIndex(1000) 
+                    .zIndex(1000)
                 }
                 
-            }
-            .overlay {
+                // Celebration overlay (on top of everything)
                 if showCelebration {
                     CelebrationView(
                         isPresented: $showCelebration,
@@ -447,7 +424,28 @@ struct CartDetailContent: View {
                     .zIndex(1001)
                 }
             }
+            .overlay(alignment: .bottom) {
+                if !showCelebration && manageCartButtonVisible {
+                    Button(action: {
+                        showingVaultView = true
+                    }) {
+                        Text("Manage Cart")
+                            .fuzzyBubblesFont(16, weight: .bold)
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 24)
+                            .padding(.vertical, 12)
+                            .background(Color.black)
+                            .cornerRadius(25)
+                    }
+                    .transition(.scale)
+                    .scaleEffect(showEditBudget ? 0 : buttonScale)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.6), value: buttonScale)
+                    .animation(.easeInOut(duration: 0.2), value: showEditBudget)
+                    .ignoresSafeArea(.keyboard)
+                }
+            }
         }
+        .ignoresSafeArea(.keyboard)
     }
     
     private func handleDeleteItem(_ cartItem: CartItem) {

@@ -119,22 +119,13 @@ struct EditBudgetPopover: View {
                 }
                 .disabled(!isValidBudget)
                 .animation(.easeInOut(duration: 0.2), value: isValidBudget)
-                
-                // Cancel button
-                Button(action: dismissPopover) {
-                    Text("Cancel")
-                        .lexendFont(14, weight: .medium)
-                        .foregroundColor(.gray)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                }
-                .padding(.top, 4)
             }
-            .padding(20)
+            .padding()
             .frame(width: UIScreen.main.bounds.width * 0.85)
             .background(Color.white)
             .cornerRadius(20)
             .scaleEffect(contentScale)
+            .offset(y: keyboardVisible ? -UIScreen.main.bounds.height * 0.12 : 0) // Changed to negative for upward movement
             .shadow(color: Color.black.opacity(0.15), radius: 20, x: 0, y: 10)
         }
         .onAppear {
@@ -152,10 +143,7 @@ struct EditBudgetPopover: View {
                 contentScale = 1
             }
             
-            // Focus field after a short delay
-//            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                 budgetFieldIsFocused = true
-//            }
         }
         .onDisappear {
             budgetFieldIsFocused = false
@@ -170,6 +158,7 @@ struct EditBudgetPopover: View {
                 keyboardVisible = false
             }
         }
+        .frame(maxHeight: .infinity, alignment: .center)
     }
     
     private var isValidBudget: Bool {
@@ -221,9 +210,10 @@ struct EditBudgetPopover: View {
             contentScale = 0.8
         }
         
-//        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-            isPresented = false
-            onDismiss?()
-//        }
+        isPresented = false
+        onDismiss?()
     }
 }
+
+
+
