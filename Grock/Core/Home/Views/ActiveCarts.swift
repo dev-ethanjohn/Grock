@@ -1,15 +1,10 @@
-//
-//  ActiveCarts.swift
-//  Grock
-//
-//  Created by Ethan John Paguntalan on 11/14/25.
-//
-
 import SwiftUI
+import SwiftData
 
 struct ActiveCarts: View {
     @Environment(VaultService.self) private var vaultService
     @Bindable var viewModel: HomeViewModel
+    let refreshTrigger: UUID
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -34,29 +29,37 @@ struct ActiveCarts: View {
             
             LazyVStack(spacing: 12) {
                 ForEach(Array(viewModel.displayedCarts.enumerated()), id: \.element.id) { index, cart in
-                    cartRowButton(cart: cart)
-                        .transition(.asymmetric(
-                            insertion: .scale(scale: 0.8).combined(with: .opacity),
-                            removal: .scale(scale: 0.9).combined(with: .opacity)
-                        ))
-                        .animation(
-                            .spring(response: 0.5, dampingFraction: 0.7)
-                            .delay(Double(index) * 0.05),
-                            value: viewModel.displayedCarts.count
+                    Button(action: {
+                        viewModel.selectCart(cart)
+                    }) {
+                        HomeCartRowView(
+                            cart: cart,
+                            vaultService: viewModel.getVaultService(for: cart)
                         )
+                    }
+                    .buttonStyle(.plain)
+                    .transition(.asymmetric(
+                        insertion: .scale(scale: 0.8).combined(with: .opacity),
+                        removal: .scale(scale: 0.9).combined(with: .opacity)
+                    ))
+                    .animation(
+                        .spring(response: 0.5, dampingFraction: 0.7)
+                            .delay(Double(index) * 0.05),
+                        value: viewModel.displayedCarts.count
+                    )
                 }
             }
         }
     }
     
+    // MARK: - Empty State
     private var emptyStateView: some View {
         VStack(spacing: 20) {
             Spacer()
             
             Image(systemName: "cart")
                 .font(.system(size: 60))
-                .foregroundColor(.gray)
-                .scaleEffect(viewModel.hasCarts ? 0.8 : 1.0)
+                .foregroundColor(.gray.opacity(0.6))
             
             Text("No carts yet!")
                 .font(.title2)
@@ -70,14 +73,5 @@ struct ActiveCarts: View {
             Spacer()
         }
         .padding(.vertical, 40)
-    }
-    
-    private func cartRowButton(cart: Cart) -> some View {
-        Button(action: {
-            viewModel.selectCart(cart)
-        }) {
-            HomeCartRowView(cart: cart, vaultService: viewModel.getVaultService(for: cart))
-        }
-        .buttonStyle(PlainButtonStyle())
     }
 }

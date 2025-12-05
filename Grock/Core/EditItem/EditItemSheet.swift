@@ -113,22 +113,24 @@ struct EditItemSheet: View {
     private func saveChanges() {
         guard let priceValue = Double(formViewModel.itemPrice),
               let selectedCategory = formViewModel.selectedCategory else { return }
-        
+
         // Validate for duplicates (excluding current item)
-        let validation = vaultService.validateItemName(formViewModel.itemName, store: formViewModel.storeName, excluding: item.id)
+        let validation = vaultService.validateItemName(
+            formViewModel.itemName,
+            store: formViewModel.storeName,
+            excluding: item.id
+        )
         if !validation.isValid {
             duplicateError = validation.errorMessage
             let generator = UINotificationFeedbackGenerator()
             generator.notificationOccurred(.error)
             return
         }
-        
-        // Store the old store name before updating
+
+        // Store old values
         let oldStoreName = item.priceOptions.first?.store ?? ""
-        
-        // Store the old category for comparison
         let oldCategoryName = vaultService.vault?.categories.first(where: { $0.items.contains(where: { $0.id == item.id }) })?.name
-        
+
         // Update the item in the vault
         let success = vaultService.updateItem(
             item: item,
@@ -138,19 +140,31 @@ struct EditItemSheet: View {
             newPrice: priceValue,
             newUnit: formViewModel.unit
         )
-        
+
         if success {
-            // ✅ PRESERVE THE OLD STORE in vault stores
+            // ✅ Preserve old store
             if !oldStoreName.isEmpty {
                 vaultService.ensureStoreExists(oldStoreName)
             }
-            // ✅ ENSURE THE NEW STORE exists in vault stores
+            // ✅ Ensure new store exists
             vaultService.ensureStoreExists(formViewModel.storeName)
-            
+
+            // --- NEW: Update all CartItems referencing this item ---
+            if let vault = vaultService.vault {
+                for cart in vault.carts {
+                    for cartItem in cart.cartItems where cartItem.itemId == item.id {
+                        cartItem.plannedPrice = priceValue
+                        cartItem.plannedUnit = formViewModel.unit
+                        cartItem.plannedStore = formViewModel.storeName
+                    }
+                }
+            }
+
+            // Call save callback
             onSave?(item)
             dismiss()
-            
-            // Notify about category change if needed
+
+            // Notify category change if needed
             if oldCategoryName != selectedCategory.title {
                 NotificationCenter.default.post(
                     name: NSNotification.Name("ItemCategoryChanged"),
@@ -165,6 +179,7 @@ struct EditItemSheet: View {
             duplicateError = "Failed to update item. Please try again."
         }
     }
+
     
     private func triggerRealTimeValidation() {
         validationTask?.cancel()
