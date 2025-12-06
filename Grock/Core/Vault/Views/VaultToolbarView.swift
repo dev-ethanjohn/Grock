@@ -9,9 +9,10 @@ struct VaultToolbarView: View {
     var showClearButton: Bool = false
     
     @State private var addButtonScale: CGFloat = 1.0
+    @Namespace private var buttonNamespace
     
     var body: some View {
-        ZStack {
+        ZStack(alignment: .top) {
             Text("vault")
                 .lexendFont(18, weight: .bold)
                 .opacity(toolbarAppeared ? 1 : 0)
@@ -19,58 +20,86 @@ struct VaultToolbarView: View {
                 .animation(.spring(response: 0.4, dampingFraction: 0.7, blendDuration: 0).delay(0.1), value: toolbarAppeared)
             
             HStack {
-                HStack(spacing: 16) {
                     
                     if showClearButton, let onDismissTapped = onDismissTapped {
                         Button(action: onDismissTapped) {
                             Image(systemName: "xmark")
-                                .font(.system(size: 21, weight: .medium))
+                                .font(.system(size: 16, weight: .bold))
                                 .foregroundColor(.black)
                                 .frame(width: 24, height: 24)
                         }
                         .transition(.scale)
                         .animation(.spring(response: 0.1, dampingFraction: 0.6, blendDuration: 0).delay(0.1), value: toolbarAppeared)
                     }
-                    
-                    /*
-                    Button(action: {}) {
-                        Image("search")
-                            .resizable()
-                            .frame(width: 24, height: 24)
-                    }
-                    .scaleEffect(toolbarAppeared ? 1 : 0)
-                    .animation(.spring(response: 0.4, dampingFraction: 0.7, blendDuration: 0).delay(0.15), value: toolbarAppeared)
-                    */
-                }
                 
                 Spacer()
                 
-                Text("Add")
-                    .fuzzyBubblesFont(13, weight: .bold)
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 4)
-                    .background(Color.black)
-                    .cornerRadius(20)
-                    .scaleEffect(addButtonScale)
-                    .scaleEffect(toolbarAppeared ? 1 : 0)
-                    .onTapGesture {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                            addButtonScale = 0.9
-                        }
-                        
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                            withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) {
-                                addButtonScale = 1.0
-                            }
-                        }
-                        
-                        onAddTapped()
+                if showClearButton {
+                    Button(action: {
+                        onClearTapped?()
+                    }) {
+                        Text("Clear")
+                            .fuzzyBubblesFont(13, weight: .bold)
+                            .foregroundColor(.white)
+                            .fixedSize()
+                            .padding(.horizontal, 12)
+                            .frame(height: 24)
+                            .background(
+                                RoundedRectangle(cornerRadius: 14)
+                                    .fill(Color(hex: "FA003F"))
+                            )
                     }
-                    .animation(.spring(response: 0.4, dampingFraction: 0.7, blendDuration: 0).delay(0.2), value: toolbarAppeared)
+                    .transition(
+                        .scale(scale: 0.5, anchor: .center)
+//                            .combined(with: .opacity)
+                    )
+                    .animation(.spring(response: 0.45, dampingFraction: 0.7), value: showClearButton)
+                }
+                
+                Button(action: {
+                    animateAddButton()
+                    onAddTapped()
+                }) {
+                    ZStack {
+                        if !showClearButton {
+                            Text("Add")
+                                .fuzzyBubblesFont(13, weight: .bold)
+                                .foregroundColor(.white)
+                                .fixedSize()
+                                .matchedGeometryEffect(id: "buttonContent", in: buttonNamespace)
+//                                .transition(.opacity)
+                        } else {
+                            Image(systemName: "plus")
+                                .font(.system(size: 15, weight: .bold))
+                                .foregroundStyle(.white)
+                                .matchedGeometryEffect(id: "buttonContent", in: buttonNamespace)
+//                                .transition(.opacity)
+                        }
+                    }
+                    .padding(.horizontal, showClearButton ? 0 : 12)
+                    .frame(width: showClearButton ? 24 : nil, height: 24)
+                    .background(
+                        RoundedRectangle(cornerRadius: showClearButton ? 14 : 14)
+                            .fill(Color.black)
+                            .matchedGeometryEffect(id: "buttonBackground", in: buttonNamespace)
+                    )
+                    .scaleEffect(addButtonScale)
+                }
+                .animation(.spring(response: 0.4, dampingFraction: 0.65), value: showClearButton)
             }
         }
         .padding()
+    }
+    
+    private func animateAddButton() {
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+            addButtonScale = 0.9
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) {
+                addButtonScale = 1.0
+            }
+        }
     }
 }
 
@@ -138,7 +167,7 @@ struct CustomActionSheet: View {
                         .fill(Color(.separator))
                         .frame(height: 8)
                     
-
+                    
                     Button(action: dismissSheet) {
                         Text("Cancel")
                             .font(.system(size: 18, weight: .semibold))

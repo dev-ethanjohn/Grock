@@ -450,7 +450,7 @@ struct HomeView: View {
             VaultView(onCreateCart: viewModel.onCreateCartFromVault)
                 .environment(vaultService)
                 .environment(cartViewModel)
-                .presentationCornerRadius(24)
+                .presentationCornerRadius(32)
                 .interactiveDismissDisabled(cartViewModel.hasActiveItems)
         }
     }

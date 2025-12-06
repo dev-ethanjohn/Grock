@@ -11,9 +11,7 @@ struct EditItemSheet: View {
     @Environment(VaultService.self) private var vaultService
     @Environment(\.dismiss) private var dismiss
     
-    // Create formViewModel based on context
     @State private var formViewModel: ItemFormViewModel
-    @State private var showUnitPicker = false
     
     @FocusState private var itemNameFieldIsFocused: Bool
     
@@ -22,28 +20,29 @@ struct EditItemSheet: View {
     
     // MARK: - Initializers for different contexts
     
-    // For vault editing (no cart)
-    init(item: Item, onSave: ((Item) -> Void)? = nil) {
-        self.item = item
-        self.cart = nil
-        self.cartItem = nil
-        self.onSave = onSave
-        self.context = .vault
-        // Initialize with requiresPortion = false for vault
-        _formViewModel = State(initialValue: ItemFormViewModel(requiresPortion: false, requiresStore: true))
-    }
-    
-    // For cart editing
-    init(item: Item, cart: Cart, cartItem: CartItem, onSave: ((Item) -> Void)? = nil) {
+    init(
+        item: Item,
+        cart: Cart? = nil,
+        cartItem: CartItem? = nil,
+        onSave: ((Item) -> Void)? = nil,
+        context: EditContext? = nil
+    ) {
         self.item = item
         self.cart = cart
         self.cartItem = cartItem
         self.onSave = onSave
-        self.context = .cart
-        // Initialize with requiresPortion = true for cart
-        _formViewModel = State(initialValue: ItemFormViewModel(requiresPortion: true, requiresStore: true))
+        
+        if cart != nil && cartItem != nil {
+            self.context = .cart
+            _formViewModel = State(initialValue: ItemFormViewModel(requiresPortion: true, requiresStore: true))
+        } else {
+            self.context = context ?? .vault
+            _formViewModel = State(initialValue: ItemFormViewModel(requiresPortion: false, requiresStore: true))
+        }
+        
+        print("🔵 EditItemSheet INIT called - context: \(self.context)")
     }
-    
+      
     var body: some View {
         NavigationView {
             VStack {
@@ -60,30 +59,30 @@ struct EditItemSheet: View {
                         )
                         
                         // Show total calculation ONLY for cart context
-                        if context == .cart, let portion = formViewModel.portion, let priceValue = Double(formViewModel.itemPrice) {
-                            Divider()
-                                .padding(.vertical, 8)
-                            
-                            VStack(alignment: .leading, spacing: 4) {
-                                HStack {
-                                    Text("Cart Quantity")
-                                        .lexendFont(14, weight: .medium)
-                                        .foregroundColor(.black)
-                                    
-                                    Spacer()
-                                    
-                                    let total = priceValue * portion
-                                    Text("Total: \(formatCurrency(total))")
-                                        .lexendFont(16, weight: .bold)
-                                        .foregroundColor(.green)
-                                }
-                                
-                                Text("\(formatCurrency(priceValue)) × \(portion.formatted())")
-                                    .font(.caption)
-                                    .foregroundColor(.gray)
-                            }
-                            .padding(.vertical, 4)
-                        }
+//                        if context == .cart, let portion = formViewModel.portion, let priceValue = Double(formViewModel.itemPrice) {
+//                            Divider()
+//                                .padding(.vertical, 8)
+//                            
+//                            VStack(alignment: .leading, spacing: 4) {
+//                                HStack {
+//                                    Text("Cart Quantity")
+//                                        .lexendFont(14, weight: .medium)
+//                                        .foregroundColor(.black)
+//                                    
+//                                    Spacer()
+//                                    
+//                                    let total = priceValue * portion
+//                                    Text("Total: \(formatCurrency(total))")
+//                                        .lexendFont(16, weight: .bold)
+//                                        .foregroundColor(.green)
+//                                }
+//                                
+//                                Text("\(formatCurrency(priceValue)) × \(portion.formatted())")
+//                                    .font(.caption)
+//                                    .foregroundColor(.gray)
+//                            }
+//                            .padding(.vertical, 4)
+//                        }
                         
                         if context == .cart {
                             HStack(spacing: 0) {
@@ -140,7 +139,11 @@ struct EditItemSheet: View {
                 }
             }
         }
-        .onAppear {
+        .task {
+            print("🟢 EditItemSheet appeared - context: \(context)")
+            print("🟢 Cart: \(cart?.name ?? "nil")")
+            print("🟢 CartItem: \(cartItem?.itemId ?? "nil")")
+            print("🟢 formViewModel.requiresPortion: \(formViewModel.requiresPortion)")
             initializeFormValues()
         }
         .onChange(of: formViewModel.itemName) { oldValue, newValue in
@@ -176,13 +179,23 @@ struct EditItemSheet: View {
     }
     
     private func initializeFormValues() {
+//        print("🟢 initializeFormValues called")
+//        print("🟢 Context: \(context)")
+//        print("🟢 Cart exists: \(cart != nil)")
+//        print("🟢 CartItem exists: \(cartItem != nil)")
+        
         if context == .cart, let cart = cart, let cartItem = cartItem {
+            print("🛒 Loading cart item data")
+            print("🛒 Cart item quantity: \(cartItem.getQuantity(cart: cart))")
             // For cart editing: load cart quantity into portion
             formViewModel.populateFromItem(item, vaultService: vaultService, cart: cart, cartItem: cartItem)
         } else {
+            print("🏦 Loading vault item data")
             // For vault editing: just load item data (portion will be nil)
             formViewModel.populateFromItem(item, vaultService: vaultService)
         }
+        
+        print("🟢 After populate - portion: \(formViewModel.portion ?? -1)")
     }
     
     private func saveChanges() {

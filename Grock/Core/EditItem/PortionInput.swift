@@ -26,7 +26,11 @@ struct PortionInput: View {
                         of: Locale.current.decimalSeparator ?? ".",
                         with: "."
                     )
-                    portion = Double(numberString)
+                    if numberString.isEmpty {
+                        portion = nil
+                    } else {
+                        portion = Double(numberString)
+                    }
                 }
         }
         .padding(12)
@@ -43,5 +47,34 @@ struct PortionInput: View {
         .onTapGesture {
             isFocused = true
         }
+        .onAppear {
+            //Initialize portionString from portion when view appears
+            if let portionValue = portion, portionValue > 0 {
+                portionString = formatPortion(portionValue)
+            } else {
+                portionString = ""
+            }
+            print("🟢 PortionInput appeared - portion: \(portion ?? 0), portionString: '\(portionString)'")
+        }
+        .onChange(of: portion) { oldValue, newValue in
+            // Update portionString when portion changes programmatically
+            if let newValue = newValue, newValue > 0 {
+                portionString = formatPortion(newValue)
+                print("🔄 Portion changed to \(newValue), updating portionString to '\(portionString)'")
+            } else if newValue == nil || newValue == 0 {
+                portionString = ""
+                print("🔄 Portion changed to nil/0, clearing portionString")
+            }
+        }
+    }
+    
+    private func formatPortion(_ value: Double) -> String {
+        let formatted = String(format: "%.2f", value)
+        if formatted.hasSuffix(".00") {
+            return String(format: "%.0f", value)
+        } else if formatted.hasSuffix("0") {
+            return String(format: "%.1f", value)
+        }
+        return formatted
     }
 }

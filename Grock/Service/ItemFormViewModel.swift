@@ -110,28 +110,7 @@ class ItemFormViewModel {
         invalidSubmissionCount = 0
     }
     
-    // Data Methods
-//    func populateFromItem(_ item: Item, vaultService: VaultService) {
-//        let priceOption = item.priceOptions.first
-//        
-//        itemName = item.name
-//        storeName = priceOption?.store ?? ""
-//        itemPrice = String(priceOption?.pricePerUnit.priceValue ?? 0)
-//        unit = priceOption?.pricePerUnit.unit ?? "g"
-//        
-//        // Find the current category
-//        if let categoryName = vaultService.vault?.categories.first(where: {
-//            $0.items.contains(where: { $0.id == item.id })
-//        })?.name,
-//        let groceryCategory = GroceryCategory.allCases.first(where: {
-//            $0.title == categoryName
-//        }) {
-//            selectedCategory = groceryCategory
-//        }
-//    }
-    // In ItemFormViewModel.swift, update the populateFromItem method:
-    // In ItemFormViewModel.swift
-    func populateFromItem(_ item: Item, vaultService: VaultService, isCartContext: Bool = false, cart: Cart? = nil, cartItem: CartItem? = nil) {
+    func populateFromItem(_ item: Item, vaultService: VaultService, cart: Cart? = nil, cartItem: CartItem? = nil) {
         let priceOption = item.priceOptions.first
         
         itemName = item.name
@@ -140,12 +119,19 @@ class ItemFormViewModel {
         unit = priceOption?.pricePerUnit.unit ?? "g"
         
         // Handle portion based on context
-        if isCartContext, let cart = cart, let cartItem = cartItem {
+        if requiresPortion, let cart = cart, let cartItem = cartItem {
             // In cart context: use cart item quantity
-            portion = cartItem.getQuantity(cart: cart)
+            let cartQuantity = cartItem.getQuantity(cart: cart)
+            portion = cartQuantity > 0 ? cartQuantity : 1.0 // Default to 1.0 if 0
+            print("🛒 Loading cart quantity into portion: \(cartQuantity)")
+        } else if requiresPortion {
+            // In cart context but cart/cartItem missing? Default to 1.0
+            portion = 1.0
+            print("⚠️ Cart context but missing cart/cartItem, defaulting portion to 1.0")
         } else {
-            // In vault context: set portion to nil (or don't set it at all)
+            // In vault context: portion should be nil
             portion = nil
+            print("🏦 Vault context, setting portion to nil")
         }
         
         // Find the current category
@@ -157,6 +143,8 @@ class ItemFormViewModel {
         }) {
             selectedCategory = groceryCategory
         }
+        
+        print("✅ populateFromItem - requiresPortion: \(requiresPortion), portion: \(portion ?? -1)")
     }
     func resetForm() {
         itemName = ""

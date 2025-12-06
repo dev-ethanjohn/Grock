@@ -62,8 +62,9 @@ struct VaultItemRow: View {
     @Environment(CartViewModel.self) private var cartViewModel
     @Environment(VaultService.self) private var vaultService
     let onDelete: () -> Void
-
-    @State private var showEditSheet = false
+    
+    
+    @State private var editItem: Item? = nil
     @State private var dragPosition: CGFloat = 0
     @GestureState private var dragOffset: CGFloat = 0
     @State private var isSwiped = false
@@ -85,6 +86,7 @@ struct VaultItemRow: View {
 
     @State private var textValue: String = ""
     @FocusState private var isFocused: Bool
+    
 
     private var totalOffset: CGFloat {
         if isDeleting {
@@ -107,43 +109,43 @@ struct VaultItemRow: View {
         .opacity(appearOpacity)
         .offset(y: slideInOffset)
         .onTapGesture {
-            guard !isFocused else { return }
-            
-            if isSwiped {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                    dragPosition = 0
-                    isSwiped = false
-                }
-            } else {
-                showEditSheet = true
-            }
-        }
+                   guard !isFocused else { return }
+                   
+                   if isSwiped {
+                       withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                           dragPosition = 0
+                           isSwiped = false
+                       }
+                   } else {
+                       editItem = item
+                   }
+               }
         .allowsHitTesting(!isFocused)
-        .sheet(isPresented: $showEditSheet) {
-            EditItemSheet(
-                item: item,  // This uses the vault editing initializer
-                onSave: { updatedItem in
-                    print("✅ Updated item: \(updatedItem.name)")
-                    // Refresh your vault view if needed
-                }
-            )
-            .environment(vaultService)
-            .presentationDetents([.medium, .fraction(0.75)])
-            .presentationCornerRadius(24)
-        }
+        .sheet(item: $editItem) { item in
+                  EditItemSheet(
+                      item: item,
+                      onSave: { updatedItem in
+                          print("✅ Updated item: \(updatedItem.name)")
+                          editItem = nil
+                      }
+                  )
+                  .environment(vaultService)
+                  .presentationDetents([.medium, .fraction(0.75)])
+                  .presentationCornerRadius(24)
+              }
         .contextMenu {
-            Button(role: .destructive) {
-                triggerDeletion()
-            } label: {
-                Label("Remove", systemImage: "trash")
-            }
+                 Button(role: .destructive) {
+                     triggerDeletion()
+                 } label: {
+                     Label("Remove", systemImage: "trash")
+                 }
 
-            Button {
-                showEditSheet = true
-            } label: {
-                Label("Edit", systemImage: "pencil")
-            }
-        }
+                 Button {
+                     editItem = item
+                 } label: {
+                     Label("Edit", systemImage: "pencil")
+                 }
+             }
         .onChange(of: currentQuantity) { _, newValue in
             if !isFocused {
                 textValue = formatValue(newValue)
