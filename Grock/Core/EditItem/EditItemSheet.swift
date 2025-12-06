@@ -3,19 +3,46 @@ import SwiftData
 
 struct EditItemSheet: View {
     let item: Item
+    let cart: Cart?
+    let cartItem: CartItem?
     var onSave: ((Item) -> Void)?
     var context: EditContext = .vault
     
     @Environment(VaultService.self) private var vaultService
     @Environment(\.dismiss) private var dismiss
     
-    @State private var formViewModel = ItemFormViewModel(requiresPortion: false, requiresStore: true)
+    // Create formViewModel based on context
+    @State private var formViewModel: ItemFormViewModel
     @State private var showUnitPicker = false
     
     @FocusState private var itemNameFieldIsFocused: Bool
     
     @State private var duplicateError: String?
     @State private var validationTask: Task<Void, Never>?
+    
+    // MARK: - Initializers for different contexts
+    
+    // For vault editing (no cart)
+    init(item: Item, onSave: ((Item) -> Void)? = nil) {
+        self.item = item
+        self.cart = nil
+        self.cartItem = nil
+        self.onSave = onSave
+        self.context = .vault
+        // Initialize with requiresPortion = false for vault
+        _formViewModel = State(initialValue: ItemFormViewModel(requiresPortion: false, requiresStore: true))
+    }
+    
+    // For cart editing
+    init(item: Item, cart: Cart, cartItem: CartItem, onSave: ((Item) -> Void)? = nil) {
+        self.item = item
+        self.cart = cart
+        self.cartItem = cartItem
+        self.onSave = onSave
+        self.context = .cart
+        // Initialize with requiresPortion = true for cart
+        _formViewModel = State(initialValue: ItemFormViewModel(requiresPortion: true, requiresStore: true))
+    }
     
     var body: some View {
         NavigationView {
@@ -32,6 +59,32 @@ struct EditItemSheet: View {
                             }
                         )
                         
+                        // Show total calculation ONLY for cart context
+                        if context == .cart, let portion = formViewModel.portion, let priceValue = Double(formViewModel.itemPrice) {
+                            Divider()
+                                .padding(.vertical, 8)
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack {
+                                    Text("Cart Quantity")
+                                        .lexendFont(14, weight: .medium)
+                                        .foregroundColor(.black)
+                                    
+                                    Spacer()
+                                    
+                                    let total = priceValue * portion
+                                    Text("Total: \(formatCurrency(total))")
+                                        .lexendFont(16, weight: .bold)
+                                        .foregroundColor(.green)
+                                }
+                                
+                                Text("\(formatCurrency(priceValue)) × \(portion.formatted())")
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                            }
+                            .padding(.vertical, 4)
+                        }
+                        
                         if context == .cart {
                             HStack(spacing: 0) {
                                 Text("Remove from Cart")
@@ -39,6 +92,9 @@ struct EditItemSheet: View {
                                     .foregroundStyle(.red)
                                     .padding(.vertical)
                                     .frame(maxWidth: .infinity, alignment: .center)
+                                    .onTapGesture {
+                                        removeFromCart()
+                                    }
                                 
                                 Text("|")
                                     .lexendFont(16, weight: .thin)
@@ -48,6 +104,9 @@ struct EditItemSheet: View {
                                     .foregroundStyle(.red)
                                     .padding(.vertical)
                                     .frame(maxWidth: .infinity, alignment: .center)
+                                    .onTapGesture {
+                                        removeFromVault()
+                                    }
                             }
                             .foregroundStyle(.black)
                         } else {
@@ -60,6 +119,9 @@ struct EditItemSheet: View {
                             }
                             .foregroundStyle(.red)
                             .padding(.vertical)
+                            .onTapGesture {
+                                removeFromVault()
+                            }
                         }
                         
                         Spacer()
@@ -70,6 +132,13 @@ struct EditItemSheet: View {
             }
             .navigationTitle("Edit Item")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+            }
         }
         .onAppear {
             initializeFormValues()
@@ -107,7 +176,13 @@ struct EditItemSheet: View {
     }
     
     private func initializeFormValues() {
-        formViewModel.populateFromItem(item, vaultService: vaultService)
+        if context == .cart, let cart = cart, let cartItem = cartItem {
+            // For cart editing: load cart quantity into portion
+            formViewModel.populateFromItem(item, vaultService: vaultService, cart: cart, cartItem: cartItem)
+        } else {
+            // For vault editing: just load item data (portion will be nil)
+            formViewModel.populateFromItem(item, vaultService: vaultService)
+        }
     }
     
     private func saveChanges() {
@@ -149,7 +224,7 @@ struct EditItemSheet: View {
             // ✅ Ensure new store exists
             vaultService.ensureStoreExists(formViewModel.storeName)
 
-            // --- NEW: Update all CartItems referencing this item ---
+            // --- Update all CartItems referencing this item ---
             if let vault = vaultService.vault {
                 for cart in vault.carts {
                     for cartItem in cart.cartItems where cartItem.itemId == item.id {
@@ -158,6 +233,19 @@ struct EditItemSheet: View {
                         cartItem.plannedStore = formViewModel.storeName
                     }
                 }
+            }
+            
+            // --- UPDATE CART ITEM QUANTITY IF IN CART CONTEXT ---
+            if context == .cart, let cart = cart, let cartItem = cartItem, let portion = formViewModel.portion {
+                // Update the cart item's quantity with the portion value
+                if cart.status == .planning {
+                    cartItem.quantity = portion
+                } else if cart.status == .shopping {
+                    cartItem.actualQuantity = portion
+                }
+                
+                // Update cart totals
+                vaultService.updateCartTotals(cart: cart)
             }
 
             // Call save callback
@@ -177,6 +265,42 @@ struct EditItemSheet: View {
             }
         } else {
             duplicateError = "Failed to update item. Please try again."
+        }
+    }
+    
+    private func removeFromCart() {
+        guard let cart = cart else { return }
+        
+        // Remove item from cart
+        vaultService.removeItemFromCart(cart: cart, itemId: item.id)
+        dismiss()
+        
+        // Show confirmation
+        let generator = UINotificationFeedbackGenerator()
+        generator.notificationOccurred(.success)
+    }
+    
+    private func removeFromVault() {
+        // Show confirmation alert
+        let alert = UIAlertController(
+            title: "Remove Item",
+            message: "Are you sure you want to remove this item from your vault? This will also remove it from all carts.",
+            preferredStyle: .alert
+        )
+        
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        alert.addAction(UIAlertAction(title: "Remove", style: .destructive) { _ in
+            vaultService.deleteItem(item)
+            dismiss()
+            
+            let generator = UINotificationFeedbackGenerator()
+            generator.notificationOccurred(.success)
+        })
+        
+        // Present the alert
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let rootViewController = windowScene.windows.first?.rootViewController {
+            rootViewController.present(alert, animated: true)
         }
     }
 
@@ -208,4 +332,13 @@ struct EditItemSheet: View {
             }
         }
     }
+    
+    private func formatCurrency(_ value: Double) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.currencyCode = "PHP"
+        formatter.maximumFractionDigits = value == Double(Int(value)) ? 0 : 2
+        return formatter.string(from: NSNumber(value: value)) ?? "\(value)"
+    }
 }
+

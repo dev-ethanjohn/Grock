@@ -12,6 +12,7 @@ struct CartItemRowView: View {
     var isInScrollableView: Bool = false
     
     @Environment(VaultService.self) private var vaultService
+    @Environment(\.modelContext) private var modelContext // Add this
     
     @State private var dragPosition: CGFloat = 0
     @GestureState private var dragOffset: CGFloat = 0
@@ -19,6 +20,12 @@ struct CartItemRowView: View {
     @State private var isNewlyAdded: Bool = true
     @State private var buttonScale: CGFloat = 0.1
     @State private var buttonVisible: Bool = false
+    
+    // Add these @State properties to observe changes
+    @State private var currentQuantity: Double = 0
+    @State private var currentPrice: Double = 0
+    @State private var currentUnit: String = ""
+    @State private var refreshId = UUID()
     
     private var itemName: String {
         item?.name ?? "Unknown Item"
@@ -233,6 +240,9 @@ struct CartItemRowView: View {
             dragPosition = 0
             isDeleting = false
             
+            // Initialize current values
+            updateCurrentValues()
+            
             if isNewlyAdded {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                     withAnimation(.easeIn(duration: 0.2)) {
@@ -244,6 +254,19 @@ struct CartItemRowView: View {
         .onDisappear {
             isNewlyAdded = true
         }
+        .id(refreshId) // Force view refresh when ID changes
+        .onReceive(NotificationCenter.default.publisher(for: .init("CartItemUpdated"))) { _ in
+            // Update values when notification is received
+            updateCurrentValues()
+            refreshId = UUID()
+        }
+    }
+    
+    private func updateCurrentValues() {
+        // Update the @State properties to trigger view refresh
+        currentQuantity = quantity
+        currentPrice = price
+        currentUnit = unit
     }
     
     private var quantityString: String {

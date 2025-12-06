@@ -111,13 +111,42 @@ class ItemFormViewModel {
     }
     
     // Data Methods
-    func populateFromItem(_ item: Item, vaultService: VaultService) {
+//    func populateFromItem(_ item: Item, vaultService: VaultService) {
+//        let priceOption = item.priceOptions.first
+//        
+//        itemName = item.name
+//        storeName = priceOption?.store ?? ""
+//        itemPrice = String(priceOption?.pricePerUnit.priceValue ?? 0)
+//        unit = priceOption?.pricePerUnit.unit ?? "g"
+//        
+//        // Find the current category
+//        if let categoryName = vaultService.vault?.categories.first(where: {
+//            $0.items.contains(where: { $0.id == item.id })
+//        })?.name,
+//        let groceryCategory = GroceryCategory.allCases.first(where: {
+//            $0.title == categoryName
+//        }) {
+//            selectedCategory = groceryCategory
+//        }
+//    }
+    // In ItemFormViewModel.swift, update the populateFromItem method:
+    // In ItemFormViewModel.swift
+    func populateFromItem(_ item: Item, vaultService: VaultService, isCartContext: Bool = false, cart: Cart? = nil, cartItem: CartItem? = nil) {
         let priceOption = item.priceOptions.first
         
         itemName = item.name
         storeName = priceOption?.store ?? ""
         itemPrice = String(priceOption?.pricePerUnit.priceValue ?? 0)
         unit = priceOption?.pricePerUnit.unit ?? "g"
+        
+        // Handle portion based on context
+        if isCartContext, let cart = cart, let cartItem = cartItem {
+            // In cart context: use cart item quantity
+            portion = cartItem.getQuantity(cart: cart)
+        } else {
+            // In vault context: set portion to nil (or don't set it at all)
+            portion = nil
+        }
         
         // Find the current category
         if let categoryName = vaultService.vault?.categories.first(where: {
@@ -129,7 +158,6 @@ class ItemFormViewModel {
             selectedCategory = groceryCategory
         }
     }
-    
     func resetForm() {
         itemName = ""
         storeName = ""

@@ -158,18 +158,22 @@ struct CartDetailScreen: View {
         }
         .navigationBarBackButtonHidden(true)
         .sheet(item: $itemToEdit) { item in
-            EditItemSheet(
-                item: item,
-                onSave: { updatedItem in
-                    
-                    vaultService.updateCartTotals(cart: cart)
-                    refreshTrigger = UUID()
-                },
-                context: .cart
-            )
-            .environment(vaultService)
-            .presentationDetents([.medium, .fraction(0.75)])
-            .presentationCornerRadius(24)
+            // FIXED: Find the cartItem for this item
+            if let cartItem = cart.cartItems.first(where: { $0.itemId == item.id }) {
+                EditItemSheet(
+                    item: item,
+                    cart: cart,
+                    cartItem: cartItem,
+                    onSave: { updatedItem in
+                        print("✅ Updated cart item")
+                        vaultService.updateCartTotals(cart: cart)
+                        refreshTrigger = UUID()
+                    }
+                )
+                .environment(vaultService)
+                .presentationDetents([.medium, .fraction(0.75)])
+                .presentationCornerRadius(24)
+            }
         }
         .sheet(isPresented: $showingVaultView) {
             // This closure runs when sheet is dismissed
@@ -255,7 +259,6 @@ struct CartDetailScreen: View {
         }
     }
 }
-
 
 struct CartDetailContent: View {
     let cart: Cart

@@ -121,9 +121,10 @@ struct VaultItemRow: View {
         .allowsHitTesting(!isFocused)
         .sheet(isPresented: $showEditSheet) {
             EditItemSheet(
-                item: item,
+                item: item,  // This uses the vault editing initializer
                 onSave: { updatedItem in
                     print("✅ Updated item: \(updatedItem.name)")
+                    // Refresh your vault view if needed
                 }
             )
             .environment(vaultService)
