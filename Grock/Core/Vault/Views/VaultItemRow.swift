@@ -61,13 +61,8 @@ struct VaultItemRow: View {
     let category: GroceryCategory?
     @Environment(CartViewModel.self) private var cartViewModel
     @Environment(VaultService.self) private var vaultService
-    let onDelete: () -> Void
-    
     
     @State private var editItem: Item? = nil
-    @State private var dragPosition: CGFloat = 0
-    @GestureState private var dragOffset: CGFloat = 0
-    @State private var isSwiped = false
     @State private var isDeleting: Bool = false
     @State private var isNewlyAdded: Bool = true
     @State private var deletionCompleted = false
@@ -87,84 +82,61 @@ struct VaultItemRow: View {
     @State private var textValue: String = ""
     @FocusState private var isFocused: Bool
     
-
-    private var totalOffset: CGFloat {
-        if isDeleting {
-            return -UIScreen.main.bounds.width
-        } else {
-            let proposed = dragPosition + dragOffset
-            return max(proposed, -80)
-        }
-    }
-
     var body: some View {
-        ZStack(alignment: .trailing) {
-            deleteItemBackRow
-                .offset(x: isDeleting ? totalOffset : 0)
-
-            itemFrontRow
+        HStack(alignment: .bottom, spacing: 4) {
+            itemIndicator
+            itemDetails
+            Spacer()
+            quantityControls
         }
-        .contentShape(Rectangle())
+        .padding(.bottom, 4)
+        .padding(.horizontal)
+        .padding(.vertical, 8)
+        .background(.white)
         .scaleEffect(appearScale)
         .opacity(appearOpacity)
-        .offset(y: slideInOffset)
+        .animation(.spring(response: 0.4, dampingFraction: 0.7), value: isActive)
+        .disabled(isDeleting)
         .onTapGesture {
-                   guard !isFocused else { return }
-                   
-                   if isSwiped {
-                       withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                           dragPosition = 0
-                           isSwiped = false
-                       }
-                   } else {
-                       editItem = item
-                   }
-               }
+            if isFocused {
+                // If text field is focused, tapping elsewhere should dismiss keyboard
+                isFocused = false
+            } else {
+                editItem = item
+            }
+        }
         .allowsHitTesting(!isFocused)
         .sheet(item: $editItem) { item in
-                  EditItemSheet(
-                      item: item,
-                      onSave: { updatedItem in
-                          print("✅ Updated item: \(updatedItem.name)")
-                          editItem = nil
-                      }
-                  )
-                  .environment(vaultService)
-                  .presentationDetents([.medium, .fraction(0.75)])
-                  .presentationCornerRadius(24)
-              }
+            EditItemSheet(
+                item: item,
+                onSave: { updatedItem in
+                    print("✅ Updated item: \(updatedItem.name)")
+                    editItem = nil
+                }
+            )
+            .environment(vaultService)
+            .presentationDetents([.medium, .fraction(0.75)])
+            .presentationCornerRadius(24)
+        }
         .contextMenu {
-                 Button(role: .destructive) {
-                     triggerDeletion()
-                 } label: {
-                     Label("Remove", systemImage: "trash")
-                 }
+            Button(role: .destructive) {
+                triggerDeletion()
+            } label: {
+                Label("Remove", systemImage: "trash")
+            }
 
-                 Button {
-                     editItem = item
-                 } label: {
-                     Label("Edit", systemImage: "pencil")
-                 }
-             }
+            Button {
+                editItem = item
+            } label: {
+                Label("Edit", systemImage: "pencil")
+            }
+        }
         .onChange(of: currentQuantity) { _, newValue in
             if !isFocused {
                 textValue = formatValue(newValue)
             }
         }
-        .onChange(of: isDeleting) { _, newValue in
-            if newValue && !deletionCompleted {
-                deletionCompleted = true
-                
-                cartViewModel.activeCartItems.removeValue(forKey: item.id)
-                
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                    onDelete()
-                }
-            }
-        }
         .onAppear {
-            dragPosition = 0
-            isSwiped = false
             isDeleting = false
             deletionCompleted = false
 
@@ -191,8 +163,6 @@ struct VaultItemRow: View {
         .onDisappear {
             isNewlyAdded = true
         }
-        .animation(.spring(response: 0.35, dampingFraction: 0.75), value: totalOffset)
-        .animation(.spring(response: 0.4, dampingFraction: 0.7), value: isDeleting)
         .preference(key: TextFieldFocusPreferenceKey.self, value: isFocused ? item.id : nil)
     }
 
@@ -274,50 +244,6 @@ struct VaultItemRow: View {
         }
     }
 
-    private var deleteItemBackRow: some View {
-        HStack {
-            Spacer()
-            Button(action: {
-                triggerDeletion()
-            }) {
-                ZStack {
-                    Rectangle()
-                        .fill(Color.red)
-                        .frame(width: 80)
-
-                    VStack {
-                        Image(systemName: "trash")
-                            .font(.subheadline)
-                            .foregroundColor(.white)
-                        Text("Remove")
-                            .font(.footnote)
-                            .foregroundColor(.white)
-                    }
-                }
-                .frame(width: 80)
-            }
-            .buttonStyle(.plain)
-            .opacity(isNewlyAdded ? 0 : 1)
-        }
-    }
-
-    private var itemFrontRow: some View {
-        HStack(alignment: .bottom, spacing: 4) {
-            itemIndicator
-            itemDetails
-            Spacer()
-            quantityControls
-        }
-        .padding(.bottom, 4)
-        .padding(.horizontal)
-        .padding(.vertical, 8)
-        .background(.white)
-        .animation(.spring(response: 0.4, dampingFraction: 0.7), value: isActive)
-        .offset(x: totalOffset)
-        .gesture(isFocused ? nil : swipeGesture)
-        .disabled(isDeleting)
-    }
-    
     private var itemIndicator: some View {
         VStack {
             Circle()
@@ -440,48 +366,6 @@ struct VaultItemRow: View {
         .contentShape(Circle())
         .buttonStyle(.plain)
         .disabled(isFocused)
-    }
-    
-    private var swipeGesture: some Gesture {
-        DragGesture(minimumDistance: 20, coordinateSpace: .local)
-            .updating($dragOffset) { value, state, _ in
-                let horizontalAmount = abs(value.translation.width)
-                let verticalAmount = abs(value.translation.height)
-
-                if horizontalAmount > verticalAmount * 2 {
-                    let translation = value.translation.width
-                    let proposed = dragPosition + translation
-
-                    if translation < 0 {
-                        if proposed < -80 {
-                            let excess = proposed + 80
-                            state = -80 - dragPosition + (excess * 0.3)
-                        } else {
-                            state = translation
-                        }
-                    } else if dragPosition < 0 {
-                        state = translation * 0.5
-                    }
-                }
-            }
-            .onEnded { value in
-                let horizontalAmount = abs(value.translation.width)
-                let verticalAmount = abs(value.translation.height)
-
-                if horizontalAmount > verticalAmount * 2 {
-                    if value.translation.width < -50 {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                            dragPosition = -80
-                            isSwiped = true
-                        }
-                    } else {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                            dragPosition = 0
-                            isSwiped = false
-                        }
-                    }
-                }
-            }
     }
 }
 

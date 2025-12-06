@@ -62,7 +62,6 @@ struct VaultItemsListView: View {
     }
 }
 
-// MARK: - Enhanced StoreSection with Animations
 struct StoreSection: View {
     let storeName: String
     let items: [Item]
@@ -86,18 +85,22 @@ struct StoreSection: View {
                     .clipShape(RoundedRectangle(cornerRadius: 6))
                 Spacer()
             }
-            .padding(.leading)
-            .listRowInsets(EdgeInsets())
+                .padding(.leading)
+                .listRowInsets(EdgeInsets())
         ) {
             ForEach(itemsWithStableIdentifiers, id: \.id) { tuple in
                 VStack(spacing: 0) {
                     VaultItemRow(
                         item: tuple.item,
-                        category: category,
-                        onDelete: {
-                            onDeleteItem?(tuple.item)
-                        }
+                        category: category
                     )
+                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                        Button(role: .destructive) {
+                            onDeleteItem?(tuple.item)
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                    }
                     
                     if tuple.id != itemsWithStableIdentifiers.last?.id {
                         DashedLine()

@@ -20,17 +20,17 @@ struct VaultToolbarView: View {
                 .animation(.spring(response: 0.4, dampingFraction: 0.7, blendDuration: 0).delay(0.1), value: toolbarAppeared)
             
             HStack {
-                    
-                    if showClearButton, let onDismissTapped = onDismissTapped {
-                        Button(action: onDismissTapped) {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 16, weight: .bold))
-                                .foregroundColor(.black)
-                                .frame(width: 24, height: 24)
-                        }
-                        .transition(.scale)
-                        .animation(.spring(response: 0.1, dampingFraction: 0.6, blendDuration: 0).delay(0.1), value: toolbarAppeared)
+                
+                if showClearButton, let onDismissTapped = onDismissTapped {
+                    Button(action: onDismissTapped) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundColor(.black)
+                            .frame(width: 24, height: 24)
                     }
+                    .transition(.scale)
+                    .animation(.spring(response: 0.1, dampingFraction: 0.6, blendDuration: 0).delay(0.1), value: toolbarAppeared)
+                }
                 
                 Spacer()
                 
@@ -51,7 +51,7 @@ struct VaultToolbarView: View {
                     }
                     .transition(
                         .scale(scale: 0.5, anchor: .center)
-//                            .combined(with: .opacity)
+                        .combined(with: .opacity)
                     )
                     .animation(.spring(response: 0.45, dampingFraction: 0.7), value: showClearButton)
                 }
@@ -67,13 +67,13 @@ struct VaultToolbarView: View {
                                 .foregroundColor(.white)
                                 .fixedSize()
                                 .matchedGeometryEffect(id: "buttonContent", in: buttonNamespace)
-//                                .transition(.opacity)
+                                .transition(.opacity)
                         } else {
                             Image(systemName: "plus")
                                 .font(.system(size: 15, weight: .bold))
                                 .foregroundStyle(.white)
                                 .matchedGeometryEffect(id: "buttonContent", in: buttonNamespace)
-//                                .transition(.opacity)
+                                .transition(.opacity)
                         }
                     }
                     .padding(.horizontal, showClearButton ? 0 : 12)
