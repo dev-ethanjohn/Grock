@@ -1,10 +1,3 @@
-//
-//  HomeViewModel.swift
-//  Grock
-//
-//  Created by Ethan John Paguntalan on 11/12/25.
-//
-
 import Foundation
 import SwiftUI
 import SwiftData
@@ -34,7 +27,12 @@ final class HomeViewModel {
     var isDismissed = false
     var headerHeight: CGFloat = 0
     
-    // MARK: - Computed Properties
+    init(modelContext: ModelContext, cartViewModel: CartViewModel, vaultService: VaultService) {
+        self.modelContext = modelContext
+        self.cartViewModel = cartViewModel
+        self.vaultService = vaultService
+    }
+
     var displayedCarts: [Cart] {
         let baseCarts: [Cart]
         switch selectedTab {
@@ -67,13 +65,6 @@ final class HomeViewModel {
     var hasCarts: Bool {
         !displayedCarts.isEmpty
     }
-    
-    // MARK: - Initialization
-    init(modelContext: ModelContext, cartViewModel: CartViewModel, vaultService: VaultService) {
-         self.modelContext = modelContext
-         self.cartViewModel = cartViewModel
-         self.vaultService = vaultService
-     }
     
     // MARK: - Navigation Methods
     func shouldAutoSelectCart() -> Bool {

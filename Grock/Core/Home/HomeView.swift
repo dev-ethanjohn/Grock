@@ -70,17 +70,19 @@ struct HomeView: View {
                     isPresented: $showCreateCartPopover,
                 )
             }
- 
+            // In HomeView.swift
             .fullScreenCover(item: $viewModel.selectedCart) { cart in
                 CartDetailScreen(cart: cart)
                     .onDisappear {
-                        viewModel.loadCarts()
-                        cartRefreshTrigger = UUID()
-                        
-                        if viewModel.pendingCartToShow != nil {
-                            viewModel.completePendingCartDisplay()
-                        }
-                        viewModel.selectedCart = nil
+//                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                            viewModel.loadCarts()
+                            cartRefreshTrigger = UUID()
+                            
+                            if viewModel.pendingCartToShow != nil {
+                                viewModel.completePendingCartDisplay()
+                            }
+                            viewModel.selectedCart = nil
+//                        }
                     }
                     .presentationCornerRadius(24)
             }

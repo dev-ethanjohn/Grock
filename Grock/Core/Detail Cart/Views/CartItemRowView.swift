@@ -135,7 +135,7 @@ struct CartItemRowView: View {
             .padding(.bottom, isLastItem ? 0 : 12)
             .padding(.leading, 12)
             .padding(.trailing, isInScrollableView ? 0 : 12)
-            .background(Color(hex: "FAFAFA").darker(by: 0.03))
+            .background(Color(hex: "F7F2ED"))
             .offset(x: totalOffset)
             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: totalOffset)
             .gesture(

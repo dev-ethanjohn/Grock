@@ -311,6 +311,9 @@ struct CartDetailContent: View {
     @Binding var refreshTrigger: UUID
     
     // NEW: State for budget editing
+    @State private var localBudget: Double = 0
+    @State private var isSavingBudget = false
+    @State private var animatedBudget: Double = 0
     @State private var showEditBudget = false
     
     @Environment(VaultService.self) private var vaultService
@@ -382,6 +385,8 @@ struct CartDetailContent: View {
                         
                         HeaderView(
                             cart: cart,
+                            animatedBudget: animatedBudget,
+                            localBudget: localBudget,
                             showingDeleteAlert: $showingDeleteAlert,
                             showingCompleteAlert: $showingCompleteAlert,
                             showingStartShoppingAlert: $showingStartShoppingAlert,
@@ -401,22 +406,34 @@ struct CartDetailContent: View {
                         }
                 }
                 
-                // Edit budget popover (will appear above main content)
                 if showEditBudget {
                     EditBudgetPopover(
                         isPresented: $showEditBudget,
-                        cart: cart,
+                        currentBudget: localBudget,
                         onSave: { newBudget in
-                            vaultService.updateCartTotals(cart: cart)
-                            refreshTrigger = UUID()
+                            isSavingBudget = true
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                                localBudget = newBudget
+                                
+                                withAnimation(.easeInOut(duration: 0.3)) {
+                                    animatedBudget = newBudget
+                                }
+                                
+                                isSavingBudget = false
+                            }
                         },
-                        onDismiss: nil
+                        onDismiss: {
+                            if !isSavingBudget {
+                                withAnimation(.easeInOut(duration: 0.3)) {
+                                    animatedBudget = localBudget
+                                }
+                            }
+                        }
                     )
                     .environment(vaultService)
                     .zIndex(1000)
                 }
                 
-                // Celebration overlay (on top of everything)
                 if showCelebration {
                     CelebrationView(
                         isPresented: $showCelebration,
@@ -447,6 +464,27 @@ struct CartDetailContent: View {
                     .ignoresSafeArea(.keyboard)
                 }
             }
+            .onAppear {
+                // Initialize both with cart's budget
+                animatedBudget = cart.budget
+                localBudget = cart.budget
+            }
+            .onDisappear {
+                // Save to actual cart ONLY when dismissing CartDetailScreen
+                if localBudget != cart.budget {
+                    cart.budget = localBudget
+                    vaultService.updateCartTotals(cart: cart)
+                    print("💾 Saved budget update: \(cart.name) = \(localBudget)")
+                }
+            }
+            .onChange(of: cart.budget) { oldValue, newValue in
+                if localBudget != newValue {
+                    localBudget = newValue
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        animatedBudget = newValue
+                    }
+                }
+            }
         }
         .ignoresSafeArea(.keyboard)
     }
@@ -463,6 +501,8 @@ struct CartDetailContent: View {
 
 struct HeaderView: View {
     let cart: Cart
+    let animatedBudget: Double
+    let localBudget: Double
     @Binding var showingDeleteAlert: Bool
     @Binding var showingCompleteAlert: Bool
     @Binding var showingStartShoppingAlert: Bool
@@ -473,8 +513,19 @@ struct HeaderView: View {
     
     @Environment(VaultService.self) private var vaultService
     
+    //    private var budgetProgressColor: Color {
+    //        let progress = cart.totalSpent / cart.budget
+    //        if progress < 0.7 {
+    //            return Color(hex: "98F476")
+    //        } else if progress < 0.9 {
+    //            return .orange
+    //        } else {
+    //            return .red
+    //        }
+    //    }
     private var budgetProgressColor: Color {
-        let progress = cart.totalSpent / cart.budget
+        // Use localBudget for progress calculation in CartDetailScreen
+        let progress = cart.totalSpent / localBudget
         if progress < 0.7 {
             return Color(hex: "98F476")
         } else if progress < 0.9 {
@@ -484,9 +535,22 @@ struct HeaderView: View {
         }
     }
     
+    //    private func progressWidth(for totalWidth: CGFloat) -> CGFloat {
+    //        let progress = cart.totalSpent / cart.budget
+    //        return CGFloat(progress) * totalWidth
+    //    }
+    //    private func progressWidth(for totalWidth: CGFloat) -> CGFloat {
+    //        // Use animatedBudget instead of cart.budget
+    //        guard animatedBudget > 0 else { return 0 }
+    //
+    //        let progress = cart.totalSpent / animatedBudget
+    //        return CGFloat(min(progress, 1.0)) * totalWidth
+    //    }
     private func progressWidth(for totalWidth: CGFloat) -> CGFloat {
-        let progress = cart.totalSpent / cart.budget
-        return CGFloat(progress) * totalWidth
+        guard localBudget > 0 else { return 0 }
+        
+        let progress = cart.totalSpent / localBudget
+        return CGFloat(min(progress, 1.0)) * totalWidth
     }
     
     var body: some View {
@@ -531,15 +595,16 @@ struct HeaderView: View {
                     .foregroundColor(.black)
                 
                 VStack(spacing: 8) {
-                    HStack(alignment: .center, spacing: 8) {
-                        BudgetProgressBar(cart: cart, budgetProgressColor: budgetProgressColor, progressWidth: progressWidth)
+                    HStack(alignment: .center, spacing: 16) {
+                        BudgetProgressBar(cart: cart, animatedBudget: animatedBudget, budgetProgressColor: budgetProgressColor, progressWidth: progressWidth)
                         
                         Button(action: {
                             onBudgetTap?()
                         }) {
-                            Text(cart.budget.formattedCurrency)
+                            Text(animatedBudget.formattedCurrency)
                                 .lexendFont(14, weight: .bold)
                                 .foregroundColor(Color(hex: "333"))
+                                .contentTransition(.numericText()) // Add numeric transition
                         }
                         .buttonStyle(.plain)
                     }
@@ -768,7 +833,7 @@ struct ItemsListView: View {
                 }
             }
         }
-        .background(Color(hex: "FAFAFA").darker(by: 0.03))
+        .background(Color(hex: "F7F2ED"))
         .cornerRadius(16)
     }
 }

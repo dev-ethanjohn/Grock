@@ -2,7 +2,8 @@ import SwiftUI
 
 struct EditBudgetPopover: View {
     @Binding var isPresented: Bool
-    let cart: Cart
+    let currentBudget: Double
+//    let cart: Cart
     let onSave: (Double) -> Void
     let onDismiss: (() -> Void)?
     
@@ -20,6 +21,7 @@ struct EditBudgetPopover: View {
     // Form validation
     @State private var isInvalidAmount = false
     @State private var errorMessage: String = ""
+    @State private var budgetShakeOffset: CGFloat = 0
     
     var body: some View {
         ZStack {
@@ -27,127 +29,162 @@ struct EditBudgetPopover: View {
                 .ignoresSafeArea()
                 .onTapGesture { dismissPopover() }
             
-            VStack(spacing: 12) {
-                HStack {
-                    HStack(spacing: 8) {
-                        Text("Edit Budget")
-                            .lexendFont(15, weight: .medium)
-                        Image(systemName: "dollarsign.circle")
-                            .font(.system(size: 16, weight: .medium))
-                    }
-                    
-                    Spacer()
-                    
-                    Button(action: { dismissPopover() }) {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(.black)
-                    }
-                }
-                .padding(.bottom, 4)
+            VStack(spacing: 0) {
                 
-                // Current budget display
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Current Budget")
-                        .lexendFont(12, weight: .medium)
-                        .foregroundColor(.gray)
-                    
-                    Text(cart.budget.formattedCurrency)
-                        .lexendFont(20, weight: .bold)
+                HStack(alignment: .center) {
+                    Text("Edit Budget")
+                        .lexendFont(20, weight: .medium)
                         .foregroundColor(.black)
-                        .strikethrough()
-                        .opacity(0.7)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.bottom, 8)
-                
-                // New budget input
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("New Budget")
-                        .lexendFont(12, weight: .medium)
-                        .foregroundColor(.gray)
                     
-                    HStack(spacing: 8) {
-                        Text("₱")
-                            .lexendFont(18, weight: .medium)
-                            .foregroundColor(.black)
+                    Image("budget")
+                        .resizable()
+                        .frame(width: 24, height: 24)
                         
-                        TextField("Enter amount", text: $budgetString)
-                            .lexendFont(18, weight: .semibold)
+                }
+                .padding(.bottom, 32)
+ 
+                HStack(alignment: .center, spacing: 8) {
+                    VStack(spacing: 6) {
+                        Text("Current Budget")
+                            .lexendFont(12)
+                            .foregroundColor(Color(hex: "777"))
+                        
+//                        Text(cart.budget.formattedCurrency)
+                        Text(currentBudget.formattedCurrency)
+                            .lexendFont(16, weight: .semibold)
                             .foregroundColor(.black)
-                            .keyboardType(.decimalPad)
-                            .focused($budgetFieldIsFocused)
-                            .onChange(of: budgetString) { oldValue, newValue in
-                                validateBudget(newValue)
-                            }
-                            .onSubmit {
-                                if isValidBudget {
-                                    saveBudget()
-                                }
-                            }
+                            .padding(.vertical, 10)
                     }
-                    .padding(.vertical, 12)
-                    .padding(.horizontal, 16)
-                    .background(Color(hex: "F5F5F5"))
-                    .cornerRadius(12)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(isInvalidAmount ? Color.red : Color.clear, lineWidth: 1)
-                    )
+                    .frame(maxWidth: .infinity)
+                    
+                    VStack(spacing: 6) {
+                        Text("New Budget")
+                            .lexendFont(12)
+                            .foregroundColor(Color(hex: "777"))
+                        
+                        HStack(spacing: 4) {
+                            Text("₱")
+                                .lexendFont(16, weight: .semibold)
+                                .foregroundStyle(budgetString.isEmpty ? .gray : .black)
+                            
+                            Text(budgetString.isEmpty ? "0" : budgetString)
+                                .lexendFont(16, weight: .semibold)
+                                .foregroundStyle(budgetString.isEmpty ? .gray : .black)
+                                .multilineTextAlignment(.center)
+                                .overlay(
+                                    TextField("0", text: $budgetString, onCommit: {
+                                        if isValidBudget { saveBudget() }
+                                    })
+                                    .lexendFont(16, weight: .medium)
+                                    .keyboardType(.decimalPad)
+                                    .autocorrectionDisabled(true)
+                                    .textInputAutocapitalization(.never)
+                                    .focused($budgetFieldIsFocused)
+                                    .opacity(budgetFieldIsFocused ? 1 : 0)
+                                    .multilineTextAlignment(.center)
+                                    .onChange(of: budgetString) {_, newValue in
+                                        validateBudget(newValue)
+                                    }
+                                    
+                                )
+                                .fixedSize(horizontal: true, vertical: false)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.vertical, 10)
+                        .background(Color(hex: "F9F9F9"))
+                        .cornerRadius(16)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color(hex: "999"), lineWidth: 0.5)
+                        )
+                        .offset(x: budgetShakeOffset)
+                    }
+                    .frame(maxWidth: .infinity)
                 }
                 
                 if isInvalidAmount {
                     Text(errorMessage)
                         .lexendFont(11, weight: .medium)
-                        .foregroundColor(.red)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .transition(.opacity)
+                        .foregroundColor(Color(hex: "FA003F"))
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.top, 8)
+                        .transition(
+                            .asymmetric(
+                                insertion: .scale(scale: 0.9, anchor: .center)
+                                    .combined(with: .opacity)
+                                    .animation(.spring(response: 0.3, dampingFraction: 0.55)),
+                                removal: .scale(scale: 0.9, anchor: .center)
+                                    .combined(with: .opacity)
+                                    .animation(.spring(response: 0.3, dampingFraction: 0.75))
+                            )
+                        )
                 }
                 
                 Spacer()
-                    .frame(height: 8)
+                    .frame(height: isInvalidAmount ? 20 : 30)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isInvalidAmount)
                 
-                // Save button
-                Button(action: saveBudget) {
-                    Text("Update Budget")
-                        .lexendFont(14, weight: .bold)
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                        .background(isValidBudget ? Color.black : Color.gray)
-                        .cornerRadius(12)
+                VStack(spacing: 6) {
+                    
+                    FormCompletionButton(
+                        title: "Update Budget",
+                        isEnabled: isValidBudget,
+                        cornerRadius: 100,
+                        verticalPadding: 12,
+                        maxRadius: 1000,
+                        bounceScale: (0.98, 1.05, 1.0),
+                        bounceTiming: (0.1, 0.3, 0.3),
+                        maxWidth: true,
+                        action: saveBudget
+                    )
+                    .frame(maxWidth: .infinity)
+                    
+                    Button(action: {
+                        dismissPopover()
+                    }, label: {
+                        Text("Cancel")
+                            .fuzzyBubblesFont(14, weight: .bold)
+                            .foregroundColor(.black)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .cornerRadius(100)
+                            .overlay {
+                                Capsule()
+                                    .stroke(Color(.systemGray4), lineWidth: 1)
+                            }
+                        
+                    })
                 }
-                .disabled(!isValidBudget)
-                .animation(.easeInOut(duration: 0.2), value: isValidBudget)
+                .padding(.top, 4)
+                
             }
             .padding()
-            .frame(width: UIScreen.main.bounds.width * 0.85)
+            .frame(width: UIScreen.main.bounds.width * 0.9)
             .background(Color.white)
-            .cornerRadius(20)
+            .cornerRadius(24)
             .scaleEffect(contentScale)
-            .offset(y: keyboardVisible ? -UIScreen.main.bounds.height * 0.12 : 0) // Changed to negative for upward movement
+            .offset(y: keyboardVisible ? -UIScreen.main.bounds.height * 0.12 : 0)
             .shadow(color: Color.black.opacity(0.15), radius: 20, x: 0, y: 10)
+            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isInvalidAmount)
         }
         .onAppear {
-            // Store original budget
-            originalBudget = cart.budget
-            
-            // Pre-populate with current budget
-            budgetString = String(format: "%.2f", cart.budget)
-            
-            // Animate in
-            withAnimation(.easeOut(duration: 0.2)) {
-                overlayOpacity = 1
-            }
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                contentScale = 1
-            }
-            
-                budgetFieldIsFocused = true
-        }
-        .onDisappear {
-            budgetFieldIsFocused = false
-        }
+                  originalBudget = currentBudget // Use currentBudget
+                  budgetString = String(format: "%.0f", currentBudget) // Use currentBudget
+                  
+                  withAnimation(.easeOut(duration: 0.2)) {
+                      overlayOpacity = 1
+                  }
+                  withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                      contentScale = 1
+                  }
+                  
+                  DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                      budgetFieldIsFocused = true
+                  }
+              }
+              .onDisappear {
+                  budgetFieldIsFocused = false
+              }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
             withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                 keyboardVisible = true
@@ -168,18 +205,22 @@ struct EditBudgetPopover: View {
     
     private func validateBudget(_ text: String) {
         guard let amount = Double(text) else {
+            triggerBudgetShake()
             isInvalidAmount = true
             errorMessage = "Please enter a valid amount"
             return
         }
         
         if amount <= 0 {
+            triggerBudgetShake()
             isInvalidAmount = true
             errorMessage = "Budget must be greater than 0"
         } else if amount == originalBudget {
+            triggerBudgetShake()
             isInvalidAmount = true
             errorMessage = "Enter a different amount"
-        } else if amount > 1000000 { // Arbitrary limit
+        } else if amount > 1000000 {
+            triggerBudgetShake()
             isInvalidAmount = true
             errorMessage = "Budget is too large"
         } else {
@@ -188,22 +229,40 @@ struct EditBudgetPopover: View {
         }
     }
     
+    private func triggerBudgetShake() {
+        let shakeSequence = [0, -8, 8, -6, 6, -4, 4, 0]
+        
+        for (index, offset) in shakeSequence.enumerated() {
+            DispatchQueue.main.asyncAfter(deadline: .now() + Double(index) * 0.05) {
+                withAnimation(.linear(duration: 0.05)) {
+                    self.budgetShakeOffset = CGFloat(offset)
+                }
+            }
+        }
+    }
+    
+//    private func saveBudget() {
+//        guard let newBudget = Double(budgetString), newBudget > 0 else { return }
+//        
+//        cart.budget = newBudget
+//        vaultService.updateCartTotals(cart: cart)
+//        onSave(newBudget)
+//        dismissPopover()
+//    }
+//    private func saveBudget() {
+//        guard let newBudget = Double(budgetString), newBudget > 0 else { return }
+//        
+//        onSave(newBudget) // Let the parent handle the update with delay
+//        dismissPopover()
+//    }
+//
+    
     private func saveBudget() {
         guard let newBudget = Double(budgetString), newBudget > 0 else { return }
         
-        // Update cart budget
-        cart.budget = newBudget
-        
-        // Update totals
-        vaultService.updateCartTotals(cart: cart)
-        
-        // Callback
-        onSave(newBudget)
-        
-        // Dismiss
+        onSave(newBudget) // Let the parent handle the update with delay
         dismissPopover()
     }
-    
     private func dismissPopover() {
         withAnimation(.easeOut(duration: 0.2)) {
             overlayOpacity = 0
@@ -216,4 +275,6 @@ struct EditBudgetPopover: View {
 }
 
 
-
+extension Notification.Name {
+    static let cartBudgetUpdated = Notification.Name("cartBudgetUpdated")
+}

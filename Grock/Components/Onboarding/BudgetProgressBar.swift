@@ -9,6 +9,7 @@ import SwiftUI
 
 struct BudgetProgressBar: View {
     let cart: Cart
+    let animatedBudget: Double
     let budgetProgressColor: Color
     let progressWidth: (CGFloat) -> CGFloat
     
@@ -90,17 +91,17 @@ struct BudgetProgressText: View {
 }
 
 
-#Preview {
-    BudgetProgressBar(
-        cart: Cart(
-            name: "Hello",
-            budget: 100.0,
-            totalSpent: 75.0
-        ),
-        budgetProgressColor: .green,
-        progressWidth: { width in
-            return width * 0.7
-        }
-    )
-    .padding()
-}
+//#Preview {
+//    BudgetProgressBar(
+//        cart: Cart(
+//            name: "Hello",
+//            budget: 100.0,
+//            totalSpent: 75.0
+//        ),
+//        budgetProgressColor: .green,
+//        progressWidth: { width in
+//            return width * 0.7
+//        }
+//    )
+//    .padding()
+//}

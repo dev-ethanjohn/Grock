@@ -5,7 +5,14 @@ struct HomeCartRowView: View {
     let cart: Cart
     let vaultService: VaultService?
     
+    @State private var viewModel: HomeCartRowViewModel
     @State private var appeared = false
+    
+    init(cart: Cart, vaultService: VaultService?) {
+        self.cart = cart
+        self.vaultService = vaultService
+        self._viewModel = State(initialValue: HomeCartRowViewModel(cart: cart))
+    }
     
     private var itemCount: Int {
         cart.cartItems.count
@@ -37,7 +44,7 @@ struct HomeCartRowView: View {
     }
     
     private var budgetProgressColor: Color {
-        let progress = cart.totalSpent / cart.budget
+        let progress = cart.totalSpent / viewModel.animatedBudget
         if progress < 0.7 {
             return Color(hex: "98F476")
         } else if progress < 0.9 {
@@ -67,6 +74,11 @@ struct HomeCartRowView: View {
                 appeared = true
             }
         }
+        .onChange(of: cart.budget) { oldValue, newValue in
+            guard oldValue != newValue else { return }
+            viewModel.updateBudget(newValue, animated: true)
+        }
+
     }
     
     private var headerRow: some View {
@@ -86,11 +98,17 @@ struct HomeCartRowView: View {
     private var progressSection: some View {
          VStack(spacing: 8) {
              HStack(alignment: .center, spacing: 8) {
-                 BudgetProgressBar(cart: cart, budgetProgressColor: budgetProgressColor, progressWidth: progressWidth)
+                 BudgetProgressBar(
+                     cart: cart,
+                     animatedBudget: viewModel.animatedBudget,
+                     budgetProgressColor: budgetProgressColor,
+                     progressWidth: progressWidth
+                 )
                  
-                 Text(cart.budget.formattedCurrency)
+                 Text(viewModel.animatedBudget.formattedCurrency)
                      .lexendFont(14, weight: .bold)
                      .foregroundColor(Color(hex: "333"))
+                     .contentTransition(.numericText())
              }
              .frame(height: 20)
              
@@ -119,9 +137,9 @@ struct HomeCartRowView: View {
 
     private func progressWidth(for totalWidth: CGFloat) -> CGFloat {
         // Handle zero budget case to avoid division by zero
-        guard cart.budget > 0 else { return 0 }
+        guard viewModel.animatedBudget > 0 else { return 0 }
         
-        let progress = cart.totalSpent / cart.budget
+        let progress = cart.totalSpent / viewModel.animatedBudget
         return CGFloat(min(progress, 1.0)) * totalWidth
     }
 }
@@ -139,4 +157,54 @@ struct HomeCartRowView: View {
     HomeCartRowView(cart: mockCart, vaultService: nil)
         .padding()
         .background(Color.gray.opacity(0.1))
+}
+
+
+import SwiftUI
+import Observation
+
+@Observable
+class HomeCartRowViewModel {
+    var animatedBudget: Double = 0
+    private var cartId: String
+    private var lastUpdateTime: Date = Date()
+    private var updateWorkItem: DispatchWorkItem?
+    
+    init(cart: Cart) {
+        self.cartId = cart.id
+        self.animatedBudget = cart.budget
+    }
+    
+    func updateBudget(_ newBudget: Double, animated: Bool = true) {
+        // Cancel any pending updates
+        updateWorkItem?.cancel()
+        
+        if animated {
+            // Schedule with 0.2s delay
+            let workItem = DispatchWorkItem { [weak self] in
+                // Run animation on main thread
+                Task { @MainActor in
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        self?.animatedBudget = newBudget
+                    }
+                }
+            }
+            
+            updateWorkItem = workItem
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2, execute: workItem)
+        } else {
+            // Update immediately without animation
+            animatedBudget = newBudget
+        }
+        
+        lastUpdateTime = Date()
+    }
+    
+    func handleNotification(userInfo: [AnyHashable: Any]) {
+        guard let notificationCartId = userInfo["cartId"] as? String,
+              notificationCartId == cartId,
+              let newBudget = userInfo["newBudget"] as? Double else { return }
+        
+        updateBudget(newBudget, animated: true)
+    }
 }
