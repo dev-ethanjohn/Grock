@@ -754,6 +754,8 @@ struct VaultView: View {
         withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
             selectedCategory = category
         }
+
+        
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
             withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {

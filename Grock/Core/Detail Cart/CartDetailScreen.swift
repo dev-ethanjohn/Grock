@@ -335,7 +335,7 @@ struct CartDetailContent: View {
                                 headerHeight: $headerHeight,
                                 refreshTrigger: $refreshTrigger
                             )
-                            
+
                             ZStack {
                                 if hasItems {
                                     VStack(spacing: 24) {
@@ -382,7 +382,7 @@ struct CartDetailContent: View {
                         .padding(.vertical, 40)
                         .padding(.horizontal)
                         .frame(maxHeight: .infinity, alignment: .top)
-                        
+
                         HeaderView(
                             cart: cart,
                             animatedBudget: animatedBudget,
@@ -415,7 +415,7 @@ struct CartDetailContent: View {
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                                 localBudget = newBudget
                                 
-                                withAnimation(.easeInOut(duration: 0.3)) {
+                                withAnimation(.spring(duration: 0.3)) {
                                     animatedBudget = newBudget
                                 }
                                 
@@ -511,48 +511,28 @@ struct HeaderView: View {
     
     var onBudgetTap: (() -> Void)?
     
+    private var progress: Double {
+         guard localBudget > 0 else { return 0 }
+         return min(cart.totalSpent / localBudget, 1.0)
+     }
+    
     @Environment(VaultService.self) private var vaultService
     
-    //    private var budgetProgressColor: Color {
-    //        let progress = cart.totalSpent / cart.budget
-    //        if progress < 0.7 {
-    //            return Color(hex: "98F476")
-    //        } else if progress < 0.9 {
-    //            return .orange
-    //        } else {
-    //            return .red
-    //        }
-    //    }
     private var budgetProgressColor: Color {
-        // Use localBudget for progress calculation in CartDetailScreen
-        let progress = cart.totalSpent / localBudget
-        if progress < 0.7 {
-            return Color(hex: "98F476")
-        } else if progress < 0.9 {
-            return .orange
-        } else {
-            return .red
-        }
-    }
-    
-    //    private func progressWidth(for totalWidth: CGFloat) -> CGFloat {
-    //        let progress = cart.totalSpent / cart.budget
-    //        return CGFloat(progress) * totalWidth
-    //    }
-    //    private func progressWidth(for totalWidth: CGFloat) -> CGFloat {
-    //        // Use animatedBudget instead of cart.budget
-    //        guard animatedBudget > 0 else { return 0 }
-    //
-    //        let progress = cart.totalSpent / animatedBudget
-    //        return CGFloat(min(progress, 1.0)) * totalWidth
-    //    }
+         let progress = self.progress
+         if progress < 0.7 {
+             return Color(hex: "98F476")
+         } else if progress < 0.9 {
+             return .orange
+         } else {
+             return .red
+         }
+     }
+
     private func progressWidth(for totalWidth: CGFloat) -> CGFloat {
-        guard localBudget > 0 else { return 0 }
-        
-        let progress = cart.totalSpent / localBudget
-        return CGFloat(min(progress, 1.0)) * totalWidth
+        return CGFloat(progress) * totalWidth
     }
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
@@ -604,7 +584,7 @@ struct HeaderView: View {
                             Text(animatedBudget.formattedCurrency)
                                 .lexendFont(14, weight: .bold)
                                 .foregroundColor(Color(hex: "333"))
-                                .contentTransition(.numericText()) // Add numeric transition
+                                .contentTransition(.numericText())
                         }
                         .buttonStyle(.plain)
                     }

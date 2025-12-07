@@ -1,28 +1,77 @@
-//
-//  BudgetProgressBar.swift
-//  Grock
-//
-//  Created by Ethan John Paguntalan on 11/13/25.
-//
-
 import SwiftUI
 
+//struct BudgetProgressBar: View {
+//    let cart: Cart
+//    let animatedBudget: Double
+//    let budgetProgressColor: Color
+//    let progressWidth: (CGFloat) -> CGFloat
+//    
+//    @State private var currentProgressWidth: CGFloat = 0
+//    
+//    var body: some View {
+//        GeometryReader { geometry in
+//            let rawPillWidth = progressWidth(geometry.size.width)
+//            let pillWidth = max(0, min(rawPillWidth, geometry.size.width))
+//            let minWidthForInternalText: CGFloat = 80
+//            
+//            let visualPillWidth = max(20, pillWidth)
+//            
+//            ZStack(alignment: .leading) {
+//                // Background capsule
+//                Capsule()
+//                    .fill(Color.white)
+//                    .frame(height: 20)
+//                    .overlay(
+//                        Capsule()
+//                            .stroke(Color(hex: "cacaca"), lineWidth: 1)
+//                    )
+//
+//                // Progress capsule with minimum width
+//                Capsule()
+//                    .fill(budgetProgressColor)
+//                    .frame(width: currentProgressWidth, height: 22) // Use animated width
+//                    .overlay(
+//                        Capsule()
+//                            .stroke(.black, lineWidth: 1)
+//                    )
+//                    .onAppear {
+//                        currentProgressWidth = visualPillWidth
+//                    }
+//                    .onChange(of: visualPillWidth) { oldValue, newValue in
+//                        withAnimation(.easeInOut(duration: 0.3)) {
+//                            currentProgressWidth = newValue
+//                        }
+//                    }
+//                
+//                // Text overlay
+//                BudgetProgressText(
+//                    cart: cart,
+//                    budgetProgressColor: budgetProgressColor,
+//                    pillWidth: currentProgressWidth, // Use animated width
+//                    minWidthForInternalText: minWidthForInternalText
+//                )
+//            }
+//        }
+//        .frame(height: 22)
+//    }
+//}
 struct BudgetProgressBar: View {
     let cart: Cart
     let animatedBudget: Double
     let budgetProgressColor: Color
     let progressWidth: (CGFloat) -> CGFloat
     
+    @State private var currentProgressWidth: CGFloat = 0
+    
     var body: some View {
         GeometryReader { geometry in
             let rawPillWidth = progressWidth(geometry.size.width)
             let pillWidth = max(0, min(rawPillWidth, geometry.size.width))
             let minWidthForInternalText: CGFloat = 80
-            
             let visualPillWidth = max(20, pillWidth)
             
             ZStack(alignment: .leading) {
-                // Background capsule
+                // Background capsule - static
                 Capsule()
                     .fill(Color.white)
                     .frame(height: 20)
@@ -31,10 +80,10 @@ struct BudgetProgressBar: View {
                             .stroke(Color(hex: "cacaca"), lineWidth: 1)
                     )
 
-                // Progress capsule with minimum width
+                // Progress capsule - animated with .linear for smoother animation
                 Capsule()
                     .fill(budgetProgressColor)
-                    .frame(width: visualPillWidth, height: 22)
+                    .frame(width: currentProgressWidth, height: 22)
                     .overlay(
                         Capsule()
                             .stroke(.black, lineWidth: 1)
@@ -44,35 +93,97 @@ struct BudgetProgressBar: View {
                 BudgetProgressText(
                     cart: cart,
                     budgetProgressColor: budgetProgressColor,
-                    pillWidth: visualPillWidth,
+                    pillWidth: currentProgressWidth,
                     minWidthForInternalText: minWidthForInternalText
                 )
+            }
+            .onAppear {
+                currentProgressWidth = visualPillWidth
+            }
+            .onChange(of: visualPillWidth) { oldValue, newValue in
+                // Use .linear animation for smoother width changes
+                withAnimation(.linear(duration: 0.3)) {
+                    currentProgressWidth = newValue
+                }
             }
         }
         .frame(height: 22)
     }
 }
 
+//struct BudgetProgressText: View {
+//    let cart: Cart
+//    let budgetProgressColor: Color
+//    let pillWidth: CGFloat
+//    let minWidthForInternalText: CGFloat
+//    
+//    private var safePillWidth: CGFloat {
+//        max(0, pillWidth)
+//    }
+//    
+//    var body: some View {
+//        Group {
+//            if safePillWidth >= minWidthForInternalText {
+//                Text(cart.totalSpent.formattedCurrency)
+//                    .lexendFont(14, weight: .bold)
+//                    .foregroundColor(budgetProgressColor.darker(by: 0.5).saturated(by: 0.4))
+//                    .padding(.horizontal, 12)
+//                    .frame(width: safePillWidth, height: 22, alignment: .trailing)
+//            } else {
+//                HStack(spacing: 8) {
+//                    Capsule()
+//                        .fill(budgetProgressColor)
+//                        .frame(width: safePillWidth, height: 22)
+//                        .overlay(
+//                            Capsule()
+//                                .stroke(.black, lineWidth: 1)
+//                        )
+//                    
+//                    Text(cart.totalSpent.formattedCurrency)
+//                        .lexendFont(14, weight: .bold)
+//                        .foregroundColor(Color(hex: "007B02"))
+//                }
+//            }
+//        }
+//    }
+//}
 struct BudgetProgressText: View {
     let cart: Cart
     let budgetProgressColor: Color
     let pillWidth: CGFloat
     let minWidthForInternalText: CGFloat
     
+    // Cache the processed color to avoid recalculating every frame
+    private var textColor: Color {
+        budgetProgressColor.darker(by: 0.5).saturated(by: 0.4)
+    }
+    
     private var safePillWidth: CGFloat {
         max(0, pillWidth)
     }
     
+    // Determine if we should show text inside or outside
+    private var shouldShowTextInside: Bool {
+        safePillWidth >= minWidthForInternalText
+    }
+    
     var body: some View {
-        Group {
-            if safePillWidth >= minWidthForInternalText {
+        // Use a ZStack with conditional opacity instead of switching layouts
+        ZStack {
+            // Text inside (shown when pill is wide enough)
+            if shouldShowTextInside {
                 Text(cart.totalSpent.formattedCurrency)
                     .lexendFont(14, weight: .bold)
-                    .foregroundColor(budgetProgressColor.darker(by: 0.5).saturated(by: 0.4))
+                    .foregroundColor(textColor)
                     .padding(.horizontal, 12)
                     .frame(width: safePillWidth, height: 22, alignment: .trailing)
-            } else {
+                    .transition(.opacity.combined(with: .scale(scale: 0.9)))
+            }
+            
+            // Text outside (shown when pill is too narrow)
+            if !shouldShowTextInside {
                 HStack(spacing: 8) {
+                    // Empty capsule - just for layout consistency
                     Capsule()
                         .fill(budgetProgressColor)
                         .frame(width: safePillWidth, height: 22)
@@ -85,8 +196,10 @@ struct BudgetProgressText: View {
                         .lexendFont(14, weight: .bold)
                         .foregroundColor(Color(hex: "007B02"))
                 }
+                .transition(.opacity.combined(with: .scale(scale: 0.9)))
             }
         }
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: shouldShowTextInside)
     }
 }
 
