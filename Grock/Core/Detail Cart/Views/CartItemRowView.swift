@@ -1,31 +1,20 @@
 import SwiftUI
 import SwiftData
 
-struct CartItemRowView: View {
+struct CartItemRowListView: View {
     let cartItem: CartItem
     let item: Item?
     let cart: Cart
     let onToggleFulfillment: () -> Void
     let onEditItem: () -> Void
-    let onDelete: () -> Void
+    let onDeleteItem: () -> Void
     let isLastItem: Bool
-    var isInScrollableView: Bool = false
     
     @Environment(VaultService.self) private var vaultService
-    @Environment(\.modelContext) private var modelContext // Add this
     
-    @State private var dragPosition: CGFloat = 0
-    @GestureState private var dragOffset: CGFloat = 0
-    @State private var isDeleting: Bool = false
     @State private var isNewlyAdded: Bool = true
     @State private var buttonScale: CGFloat = 0.1
     @State private var buttonVisible: Bool = false
-    
-    // Add these @State properties to observe changes
-    @State private var currentQuantity: Double = 0
-    @State private var currentPrice: Double = 0
-    @State private var currentUnit: String = ""
-    @State private var refreshId = UUID()
     
     private var itemName: String {
         item?.name ?? "Unknown Item"
@@ -50,50 +39,12 @@ struct CartItemRowView: View {
         return cartItem.getTotalPrice(from: vault, cart: cart)
     }
     
-    private var totalOffset: CGFloat {
-        isDeleting ? -400 : (dragPosition + dragOffset)
-    }
-    
     var body: some View {
-        ZStack(alignment: .trailing) {
-            
-            // Delete button
-            HStack {
-                Spacer()
+        HStack(alignment: .top, spacing: cart.isShopping ? 8 : 0) {
+            if cart.isShopping {
                 Button(action: {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                        isDeleting = true
-                    }
-                }) {
-                    ZStack {
-                        Rectangle()
-                            .fill(Color.red)
-                            .frame(width: 80)
-                        
-                        VStack(spacing: 4) {
-                            Image(systemName: "trash")
-                                .font(.title3)
-                                .foregroundColor(.white)
-                            Text("Delete")
-                                .font(.caption)
-                                .foregroundColor(.white)
-                        }
-                    }
-                    .frame(width: 80)
-                }
-                .buttonStyle(.plain)
-                .opacity(isNewlyAdded ? 0 : 1)
-            }
-            .offset(x: isDeleting ? totalOffset : 0)
-            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isDeleting)
-            
-            HStack(alignment: .bottom, spacing: 2) {
-                // Checkmark/circle button - always present but conditionally visible
-                Button(action: {
-                    if cart.isShopping {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                            onToggleFulfillment()
-                        }
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                        onToggleFulfillment()
                     }
                 }) {
                     Image(systemName: cartItem.isFulfilled ? "checkmark.circle.fill" : "circle")
@@ -107,106 +58,43 @@ struct CartItemRowView: View {
                         )
                 }
                 .buttonStyle(.plain)
-                .frame(maxHeight: .infinity, alignment: .top)
-                .frame(width: buttonScale > 0.5 ? nil : 0)
-                .padding(.top, 2.75)
+                .frame(width: 20, height: 20)
+                .padding(.top, 2)
                 .opacity(buttonVisible ? 1 : 0)
+            }
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(quantityString) \(itemName)")
+                    .lexendFont(17, weight: .regular)
+                    .lineLimit(3) 
+                    .fixedSize(horizontal: false, vertical: true)
                 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("\(quantityString) \(itemName)")
-                        .lexendFont(17, weight: .regular)
-                        .lineLimit(1)
-                    
+                HStack(spacing: 4) {
                     Text("\(formatCurrency(price)) / \(unit)")
                         .lexendFont(12)
+                        .lineLimit(1)
+                    
+                    Spacer()
+                    
+                    Text(formatCurrency(totalPrice))
+                        .lexendFont(14, weight: .bold)
+                        .lineLimit(1)
                 }
-                .opacity(cartItem.isFulfilled ? 0.5 : 1.0)
                 .foregroundColor(Color(hex: "231F30"))
-                
-                Spacer()
-                
-                Text(formatCurrency(totalPrice))
-                    .lexendFont(14, weight: .bold)
-                    .foregroundColor(Color(hex: "231F30"))
-                    .opacity(cartItem.isFulfilled ? 0.5 : 1.0)
+                .opacity(cartItem.isFulfilled ? 0.5 : 1.0)
             }
-            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: buttonScale)
-            .padding(.top, 12)
-            .padding(.bottom, isLastItem ? 0 : 12)
-            .padding(.leading, 12)
-            .padding(.trailing, isInScrollableView ? 0 : 12)
-            .background(Color(hex: "F7F2ED"))
-            .offset(x: totalOffset)
-            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: totalOffset)
-            .gesture(
-                DragGesture()
-                    .updating($dragOffset) { value, state, _ in
-                        let translation = value.translation.width
-                        if translation < 0 {
-                            let proposed = dragPosition + translation
-                            if proposed < -80 {
-                                let excess = proposed + 80
-                                state = -80 - dragPosition + (excess * 0.3)
-                            } else {
-                                state = translation
-                            }
-                        } else if dragPosition < 0 {
-                            state = translation * 0.5
-                        }
-                    }
-                    .onEnded { value in
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                            if value.translation.width < -50 {
-                                dragPosition = -80
-                            } else {
-                                dragPosition = 0
-                            }
-                        }
-                    }
-            )
-            .disabled(isDeleting)
+            .opacity(cartItem.isFulfilled ? 0.5 : 1.0)
         }
-        .animation(.spring(response: 0.4, dampingFraction: 0.7), value: cart.isShopping)
+        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: buttonScale)
+        .padding(.vertical, 12)
+        .padding(.leading, cart.isShopping ? 16 : 16)
+        .padding(.trailing, 16)
+        .background(Color(hex: "F7F2ED").darker(by: 0.02))
         .contentShape(Rectangle())
         .onTapGesture {
-            if dragPosition < 0 {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                    dragPosition = 0
-                }
-            } else {
-                onEditItem()
-            }
-        }
-        .contextMenu {
-            Button(role: .destructive) {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                    isDeleting = true
-                }
-            } label: {
-                Label("Delete", systemImage: "trash")
-            }
-            
-            Button {
-                onEditItem()
-            } label: {
-                Label("Edit", systemImage: "pencil")
-            }
-            
-            if cart.isShopping {
-                Button {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                        onToggleFulfillment()
-                    }
-                } label: {
-                    Label(
-                        cartItem.isFulfilled ? "Mark as Unfulfilled" : "Mark as Fulfilled",
-                        systemImage: cartItem.isFulfilled ? "circle" : "checkmark.circle.fill"
-                    )
-                }
-            }
+            onEditItem()
         }
         .onChange(of: cart.isShopping) { oldValue, newValue in
-            // Only animate when shopping mode actually changes
             guard oldValue != newValue else { return }
             
             if newValue {
@@ -223,26 +111,11 @@ struct CartItemRowView: View {
                 }
             }
         }
-        .onChange(of: isDeleting) { _, newValue in
-            if newValue {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    onDelete()
-                }
-            }
-        }
         .task(id: cart.isShopping) {
-            // Initialize button state based on shopping mode
-            // task(id:) only runs once per unique id value
             buttonVisible = cart.isShopping
             buttonScale = cart.isShopping ? 1.0 : 0.1
         }
         .onAppear {
-            dragPosition = 0
-            isDeleting = false
-            
-            // Initialize current values
-            updateCurrentValues()
-            
             if isNewlyAdded {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                     withAnimation(.easeIn(duration: 0.2)) {
@@ -254,19 +127,6 @@ struct CartItemRowView: View {
         .onDisappear {
             isNewlyAdded = true
         }
-        .id(refreshId) // Force view refresh when ID changes
-        .onReceive(NotificationCenter.default.publisher(for: .init("CartItemUpdated"))) { _ in
-            // Update values when notification is received
-            updateCurrentValues()
-            refreshId = UUID()
-        }
-    }
-    
-    private func updateCurrentValues() {
-        // Update the @State properties to trigger view refresh
-        currentQuantity = quantity
-        currentPrice = price
-        currentUnit = unit
     }
     
     private var quantityString: String {

@@ -362,17 +362,18 @@ struct CartDetailContent: View {
                                         )
                                         .transition(.scale)
                                         
-                                        FooterView(
-                                            cart: cart,
-                                            animatedFulfilledAmount: $animatedFulfilledAmount,
-                                            animatedFulfilledPercentage: $animatedFulfilledPercentage,
-                                            shouldAnimateTransition: shouldAnimateTransition,
-                                            geometry: geometry
-                                        )
+//                                        FooterView(
+//                                            cart: cart,
+//                                            animatedFulfilledAmount: $animatedFulfilledAmount,
+//                                            animatedFulfilledPercentage: $animatedFulfilledPercentage,
+//                                            shouldAnimateTransition: shouldAnimateTransition,
+//                                            geometry: geometry
+//                                        )
                                     }
                                 } else {
-                                    EmptyStateView()
+                                    EmptyCartView()
                                         .transition(.scale)
+                                        .offset(y: 80)
                                 }
                             }
                             .animation(.spring(response: 0.3, dampingFraction: 0.85), value: hasItems)
@@ -619,10 +620,9 @@ struct ModeToggleView: View {
     @Binding var refreshTrigger: UUID
     
     @Environment(VaultService.self) private var vaultService
-    //    @Environment(\.showingFilterSheet) private var showingFilterSheet
     
     var body: some View {
-        HStack(spacing: 0) {
+        HStack(alignment: .bottom, spacing: 0) {
             ZStack {
                 Color(hex: "EEEEEE")
                     .frame(width: 176, height: 26)
@@ -648,12 +648,10 @@ struct ModeToggleView: View {
                 HStack(spacing: 0) {
                     Button(action: {
                         if cart.status == .shopping {
-                            // Anticipation animation for switching to planning
                             withAnimation(.easeInOut(duration: 0.1)) {
-                                anticipationOffset = -16// Move left halfway
+                                anticipationOffset = -14
                             }
                             
-                            // Show confirmation alert
                             showingSwitchToPlanningAlert = true
                         }
                     }) {
@@ -670,12 +668,10 @@ struct ModeToggleView: View {
                     
                     Button(action: {
                         if cart.status == .planning {
-                            // Anticipation animation for switching to shopping
                             withAnimation(.easeInOut(duration: 0.1)) {
-                                anticipationOffset = 16 // Move right halfway
+                                anticipationOffset = 14
                             }
                             
-                            // Show confirmation alert
                             showingStartShoppingAlert = true
                         }
                     }) {
@@ -694,28 +690,7 @@ struct ModeToggleView: View {
             
             Spacer()
             
-            HStack(spacing: 8) {
-                
                 Button(action: {
-                    //                    showingFilterSheet = true
-                }) {
-                    Image(systemName: "line.3.horizontal.decrease.circle")
-                        .resizable()
-                        .frame(width: 20, height: 20)
-                        .fontWeight(.light)
-                        .foregroundColor(.black)
-                    
-                }
-                .padding(1.5)
-                .background(.white)
-                .clipShape(Circle())
-                .shadow(color: Color.black.opacity(0.4), radius: 1, x: 0, y: 0.5)
-                
-                Text("|")
-                    .lexendFont(16, weight: .thin)
-                
-                Button(action: {
-                    // Future filter functionality
                 }) {
                     Image(systemName: "circle")
                         .resizable()
@@ -728,7 +703,6 @@ struct ModeToggleView: View {
                 .background(.white)
                 .clipShape(Circle())
                 .shadow(color: Color.black.opacity(0.4), radius: 1, x: 0, y: 0.5)
-            }
         }
         .padding(.top, headerHeight)
         .background(Color.white)
@@ -757,7 +731,6 @@ struct ModeToggleView: View {
     }
 }
 
-// MARK: - Items List View
 struct ItemsListView: View {
     let cart: Cart
     let totalItemCount: Int
@@ -767,136 +740,226 @@ struct ItemsListView: View {
     let onEditItem: (CartItem) -> Void
     let onDeleteItem: (CartItem) -> Void
     
-    var body: some View {
-        Group {
-            if totalItemCount <= 7 {
-                VStack(spacing: 0) {
-                    ForEach(Array(sortedStoresWithRefresh.enumerated()), id: \.offset) { index, store in
-                        let storeItems = storeItemsWithRefresh(store)
-                        if !storeItems.isEmpty {
-                            StoreSectionView(
-                                store: store,
-                                items: storeItems,
-                                cart: cart,
-                                onToggleFulfillment: onToggleFulfillment,
-                                onEditItem: onEditItem,
-                                onDeleteItem: onDeleteItem,
-                                isLastStore: index == sortedStoresWithRefresh.count - 1,
-                                isInScrollableView: false
-                            )
-                            .padding(.top, index == 0 ? 0 : 20)
-                        }
-                    }
-                }
-                .padding(.vertical, 12)
-            } else {
-                VerticalScrollViewWithCustomIndicator(maxHeight: 500, indicatorVerticalPadding: 12) {
-                    VStack(spacing: 0) {
-                        ForEach(Array(sortedStoresWithRefresh.enumerated()), id: \.offset) { index, store in
-                            let storeItems = storeItemsWithRefresh(store)
-                            if !storeItems.isEmpty {
-                                StoreSectionView(
-                                    store: store,
-                                    items: storeItems,
-                                    cart: cart,
-                                    onToggleFulfillment: onToggleFulfillment,
-                                    onEditItem: onEditItem,
-                                    onDeleteItem: onDeleteItem,
-                                    isLastStore: index == sortedStoresWithRefresh.count - 1,
-                                    isInScrollableView: true
-                                )
-                                .padding(.top, index == 0 ? 0 : 20)
-                            }
-                        }
-                    }
-                    .padding(.vertical, 12)
-                }
-            }
-        }
-        .background(Color(hex: "F7F2ED"))
-        .cornerRadius(16)
+    // Calculate available width based on screen width minus total padding
+    private var availableWidth: CGFloat {
+        let screenWidth = UIScreen.main.bounds.width
+        
+        // TOTAL HORIZONTAL PADDING BREAKDOWN:
+        // 1. CartDetailContent: ~17pt (default system padding)
+        // 2. CartItemRowListView:
+        //    - Shopping: 12pt left + 8pt button spacing + 16pt right = 36pt
+        //    - Planning: 12pt left + 16pt right = 28pt
+        // 3. Additional 4pt internal HStack spacing in price details
+        // 4. Small buffer for safety: ~3pt
+        
+        let cartDetailPadding: CGFloat = 17
+        let itemRowPadding: CGFloat = cart.isShopping ? 36 : 28
+        let internalSpacing: CGFloat = 4
+        let safetyBuffer: CGFloat = 3
+        
+        let totalPadding = cartDetailPadding + itemRowPadding + internalSpacing + safetyBuffer
+        
+        // Shopping: 17 + 36 + 4 + 3 = 60pt
+        // Planning: 17 + 28 + 4 + 3 = 52pt
+        
+        let calculatedWidth = screenWidth - totalPadding
+        
+        // Ensure reasonable bounds
+        return max(min(calculatedWidth, 250), 150)
     }
-}
-
-// MARK: - Empty State View
-struct EmptyStateView: View {
-    var body: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "cart.badge.plus")
-                .font(.system(size: 48))
-                .foregroundColor(.gray.opacity(0.5))
-            
-            Text("Add items from vault")
-                .lexendFont(18, weight: .medium)
-                .foregroundColor(.gray)
-                .multilineTextAlignment(.center)
-                .padding(.bottom, 40)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .cornerRadius(16)
+    
+    private func estimateRowHeight(for itemName: String, isFirstInSection: Bool = true) -> CGFloat {
+        let averageCharWidth: CGFloat = 8.0
+        
+        let estimatedTextWidth = CGFloat(itemName.count) * averageCharWidth
+        let numberOfLines = ceil(estimatedTextWidth / availableWidth)
+        
+        let singleLineTextHeight: CGFloat = 22
+        let verticalPadding: CGFloat = 24
+        let internalSpacing: CGFloat = 10
+        
+        // Base height = text + padding + spacing
+        let baseHeight = singleLineTextHeight + verticalPadding + internalSpacing
+        
+        // Each additional line adds the text line height
+        let additionalLineHeight: CGFloat = 24
+        
+        let itemHeight = baseHeight + (max(0, numberOfLines - 1) * additionalLineHeight)
+        
+        // ADD divider height (except for first item in each store)
+        let dividerHeight: CGFloat = isFirstInSection ? 0 : 12.0
+        
+        return itemHeight + dividerHeight
     }
-}
-
-// MARK: - Footer View
-struct FooterView: View {
-    let cart: Cart
-    @Binding var animatedFulfilledAmount: Double
-    @Binding var animatedFulfilledPercentage: Double
-    let shouldAnimateTransition: Bool
-    let geometry: GeometryProxy
-    
-    @Environment(VaultService.self) private var vaultService
-    
-    var body: some View {
-        if cart.isShopping {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 2) {
-                    Text("\(cart.fulfilledItemsCount)")
-                        .fuzzyBubblesFont(15, weight: .bold)
-                        .foregroundColor(.gray)
-                        .contentTransition(.numericText(value: animatedFulfilledAmount))
-                    
-                    Text("/")
-                        .fuzzyBubblesFont(10, weight: .bold)
-                        .foregroundColor(Color(.systemGray3))
-                    
-                    Text("\(cart.totalItemsCount) items for ₱\(animatedFulfilledAmount, specifier: "%.2f")")
-                        .fuzzyBubblesFont(15, weight: .bold)
-                        .foregroundColor(.gray)
-                        .contentTransition(.numericText(value: animatedFulfilledAmount))
+    private var estimatedHeight: CGFloat {
+        let sectionHeaderHeight: CGFloat = 34
+        let sectionSpacing: CGFloat = 8
+        let listPadding: CGFloat = 24
+        
+        var totalHeight: CGFloat = listPadding
+        
+        for store in sortedStoresWithRefresh {
+            let storeItems = storeItemsWithRefresh(store)
+            if !storeItems.isEmpty {
+                totalHeight += sectionHeaderHeight
+                
+                // Track which item is first in this store
+                for (index, (_, item)) in storeItems.enumerated() {
+                    let itemName = item?.name ?? "Unknown"
+                    let isFirstInStore = index == 0
+                    totalHeight += estimateRowHeight(for: itemName, isFirstInSection: isFirstInStore)
                 }
                 
-                Text("\(Int(animatedFulfilledPercentage))% fulfilled")
-                    .fuzzyBubblesFont(15, weight: .bold)
-                    .foregroundColor(.gray)
-                    .contentTransition(.numericText(value: animatedFulfilledPercentage))
+                // ADD spacing between stores (except after last store)
+                if store != sortedStoresWithRefresh.last {
+                    totalHeight += sectionSpacing
+                }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .onAppear {
-                updateAnimatedValues()
-            }
-            .onChange(of: cart.fulfilledItemsCount) { oldValue, newValue in
-                updateAnimatedValues()
-            }
-            .onChange(of: vaultService.getTotalFulfilledAmount(for: cart)) { oldValue, newValue in
-                updateAnimatedValues()
-            }
-            .scaleEffect(shouldAnimateTransition ? 0.8 : 1)
-            .animation(.spring(response: 0.3, dampingFraction: 0.7).delay(0.05), value: shouldAnimateTransition)
-            .padding(.leading)
-            .padding(.bottom, geometry.safeAreaInsets.bottom + 20)
         }
+        
+        return totalHeight
     }
     
-    private func updateAnimatedValues() {
-        withAnimation(.smooth(duration: 0.5)) {
-            animatedFulfilledAmount = vaultService.getTotalFulfilledAmount(for: cart)
-            animatedFulfilledPercentage = vaultService.getCurrentFulfillmentPercentage(for: cart)
+    var body: some View {
+        GeometryReader { geometry in
+            let calculatedHeight = estimatedHeight
+            let maxAllowedHeight = geometry.size.height * 0.8
+            
+            List {
+                ForEach(Array(sortedStoresWithRefresh.enumerated()), id: \.offset) { (index, store) in
+                    let storeItems = storeItemsWithRefresh(store)
+                    if !storeItems.isEmpty {
+                        StoreSectionListView(
+                            store: store,
+                            items: storeItems,
+                            cart: cart,
+                            onToggleFulfillment: onToggleFulfillment,
+                            onEditItem: onEditItem,
+                            onDeleteItem: onDeleteItem,
+                            isLastStore: index == sortedStoresWithRefresh.count - 1
+                        )
+                        .listRowInsets(EdgeInsets())
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color(hex: "F7F2ED"))
+                    }
+                }
+            }
+            .frame(height: min(calculatedHeight, maxAllowedHeight))
+            .listStyle(PlainListStyle())
+            .listSectionSpacing(0)
+            .background(Color(hex: "F7F2ED").darker(by: 0.02))
+            .cornerRadius(16)
         }
     }
 }
 
-// MARK: - Cart Stores List View (original provided)
+// Preference key to pass height up the view hierarchy
+struct ContentHeightPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
+}
+
+struct StoreSectionListView: View {
+    let store: String
+    let items: [(cartItem: CartItem, item: Item?)]
+    let cart: Cart
+    let onToggleFulfillment: (CartItem) -> Void
+    let onEditItem: (CartItem) -> Void
+    let onDeleteItem: (CartItem) -> Void
+    let isLastStore: Bool
+    
+    private var itemsWithStableIdentifiers: [(id: String, cartItem: CartItem, item: Item?)] {
+        items.map { ($0.cartItem.itemId, $0.cartItem, $0.item) }
+    }
+    
+    var body: some View {
+        Section(
+            header: VStack(spacing: 0) {
+                HStack {
+                    HStack(spacing: 2) {
+                        Image("store")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 10, height: 10)
+                            .foregroundColor(.white)
+                        
+                        Text(store)
+                            .lexendFont(11, weight: .bold)
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.black)
+                    .cornerRadius(6)
+                    Spacer()
+                }
+                .padding(.leading)
+            }
+            .listRowInsets(EdgeInsets())
+            .textCase(nil)
+            
+        ) {
+            ForEach(Array(itemsWithStableIdentifiers.enumerated()), id: \.element.id) { index, tuple in
+                VStack(spacing: 0) {
+                    CartItemRowListView(
+                        cartItem: tuple.cartItem,
+                        item: tuple.item,
+                        cart: cart,
+                        onToggleFulfillment: { onToggleFulfillment(tuple.cartItem) },
+                        onEditItem: { onEditItem(tuple.cartItem) },
+                        onDeleteItem: { onDeleteItem(tuple.cartItem) },
+                        isLastItem: index == itemsWithStableIdentifiers.count - 1
+                    )
+                    .listRowInsets(EdgeInsets())
+                    .listRowSeparator(.hidden)
+                    .background(Color(hex: "F7F2ED"))
+                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                        Button(role: .destructive) {
+                            onDeleteItem(tuple.cartItem)
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                        
+                        Button {
+                            onEditItem(tuple.cartItem)
+                        } label: {
+                            Label("Edit", systemImage: "pencil")
+                        }
+                        
+                        if cart.isShopping {
+                            Button {
+                                onToggleFulfillment(tuple.cartItem)
+                            } label: {
+                                Label(
+                                    tuple.cartItem.isFulfilled ? "Mark Unfulfilled" : "Mark Fulfilled",
+                                    systemImage: tuple.cartItem.isFulfilled ? "circle" : "checkmark.circle.fill"
+                                )
+                            }
+                            .tint(tuple.cartItem.isFulfilled ? .orange : .green)
+                        }
+                    }
+                    
+                    // Add the dashed line divider between items (but not after the last item)
+                    if index < itemsWithStableIdentifiers.count - 1 {
+                        DashedLine()
+                            .stroke(style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
+                            .frame(height: 0.5)
+                            .foregroundColor(Color(hex: "999").opacity(0.5))
+                            .padding(.horizontal, 12)
+                    }
+                }
+                .listRowInsets(EdgeInsets())
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color(hex: "F7F2ED"))
+            }
+        }
+        .listSectionSpacing(isLastStore ? 0 : 20)
+    }
+}
+
 struct CartStoresListView: View {
     let cart: Cart
     let sortedStores: [String]
@@ -935,7 +998,7 @@ struct CartStoresListView: View {
                         isLastStore: index == sortedStores.count - 1,
                         isInScrollableView: isScrollable
                     )
-                    .padding(.top, index == 0 ? 0 : 20)
+                    .padding(.top, index == 0 ? 0 : 10)
                 }
             }
         }

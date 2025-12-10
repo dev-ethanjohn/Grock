@@ -2,7 +2,6 @@ import SwiftUI
 import SwiftData
 
 struct StoreSectionView: View {
-    //    MARK: put in a viewmodel + reaarange
     let store: String
     let items: [(cartItem: CartItem, item: Item?)]
     let cart: Cart
@@ -35,15 +34,14 @@ struct StoreSectionView: View {
             
             LazyVStack(spacing: 0) {
                 ForEach(Array(items.enumerated()), id: \.element.cartItem.itemId) { index, tuple in
-                    CartItemRowView(
+                    CartItemRowListView(
                         cartItem: tuple.cartItem,
                         item: tuple.item,
                         cart: cart,
                         onToggleFulfillment: { onToggleFulfillment(tuple.cartItem) },
                         onEditItem: { onEditItem(tuple.cartItem) },
-                        onDelete: { onDeleteItem(tuple.cartItem) },
-                        isLastItem: index == items.count - 1,
-                        isInScrollableView: isInScrollableView
+                        onDeleteItem: { onDeleteItem(tuple.cartItem) },
+                        isLastItem: index == items.count - 1
                     )
                     
                     if index < items.count - 1 {
@@ -57,6 +55,5 @@ struct StoreSectionView: View {
                 }
             }
         }
-        .padding(.bottom, isLastStore ? 0 : 8)
     }
 }
