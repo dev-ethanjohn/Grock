@@ -45,6 +45,9 @@ struct CartDetailScreen: View {
     // Refresh trigger for synchronization
     @State private var refreshTrigger = UUID()
     
+    @State private var showFinishTripButton = false
+    @Namespace private var buttonNamespace
+    
     private var cartInsights: CartInsights {
         vaultService.getCartInsights(cart: cart)
     }
@@ -103,6 +106,39 @@ struct CartDetailScreen: View {
     }
     
     var body: some View {
+        //        CartDetailContent(
+        //            cart: cart,
+        //            cartInsights: cartInsights,
+        //            itemsByStore: itemsByStore,
+        //            itemsByStoreWithRefresh: itemsByStoreWithRefresh,
+        //            sortedStores: sortedStores,
+        //            sortedStoresWithRefresh: sortedStoresWithRefresh,
+        //            totalItemCount: totalItemCount,
+        //            hasItems: hasItems,
+        //            shouldAnimateTransition: shouldAnimateTransition,
+        //            storeItems: storeItems(for:),
+        //            storeItemsWithRefresh: storeItemsWithRefresh(for:),
+        //            showingDeleteAlert: $showingDeleteAlert,
+        //            editingItem: $editingItem,
+        //            showingCompleteAlert: $showingCompleteAlert,
+        //            showingStartShoppingAlert: $showingStartShoppingAlert,
+        //            showingSwitchToPlanningAlert: $showingSwitchToPlanningAlert,
+        //            anticipationOffset: $anticipationOffset,
+        //            selectedFilter: $selectedFilter,
+        //            showingFilterSheet: $showingFilterSheet,
+        //            headerHeight: $headerHeight,
+        //            animatedFulfilledAmount: $animatedFulfilledAmount,
+        //            animatedFulfilledPercentage: $animatedFulfilledPercentage,
+        //            itemToEdit: $itemToEdit,
+        //            showingVaultView: $showingVaultView,
+        //            previousHasItems: $previousHasItems,
+        //            showCelebration: $showCelebration,
+        //            manageCartButtonVisible: $manageCartButtonVisible,
+        //            buttonScale: $buttonScale,
+        //            shouldBounceAfterCelebration: $shouldBounceAfterCelebration,
+        //            cartReady: $cartReady,
+        //            refreshTrigger: $refreshTrigger
+        //        )
         CartDetailContent(
             cart: cart,
             cartInsights: cartInsights,
@@ -134,24 +170,48 @@ struct CartDetailScreen: View {
             buttonScale: $buttonScale,
             shouldBounceAfterCelebration: $shouldBounceAfterCelebration,
             cartReady: $cartReady,
-            refreshTrigger: $refreshTrigger
+            refreshTrigger: $refreshTrigger,
+            // ADD THESE NEW BINDINGS:
+            showFinishTripButton: $showFinishTripButton,
+            buttonNamespace: buttonNamespace
         )
+        //        .onAppear {
+        //            previousHasItems = hasItems
+        //            checkAndShowCelebration()
+        //        }
         .onAppear {
             previousHasItems = hasItems
             checkAndShowCelebration()
+            
+            if cart.isShopping && hasItems {
+                showFinishTripButton = true
+            }
         }
-        .onChange(of: hasItems) { oldValue, newValue in
+        .onChange(of: cart.status) { oldValue, newValue in
+            print("🛒 Cart status changed: \(oldValue) -> \(newValue)")
+            
+            // Only update if the status actually changed
             if oldValue != newValue {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    previousHasItems = newValue
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                    if newValue == .shopping && hasItems {
+                        showFinishTripButton = true
+                    } else if newValue == .planning {
+                        showFinishTripButton = false
+                    }
                 }
             }
         }
-        .onChange(of: cartReady) { oldValue, newValue in
-            if newValue && !showCelebration {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    withAnimation(.spring(response: 3.0, dampingFraction: 0.6)) {
-                        manageCartButtonVisible = true
+        
+        .onChange(of: hasItems) { oldValue, newValue in
+            print("📦 Items changed: \(oldValue) -> \(newValue)")
+            
+            // Only update if items actually changed
+            if oldValue != newValue {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                    if cart.isShopping && newValue {
+                        showFinishTripButton = true
+                    } else if !newValue {
+                        showFinishTripButton = false
                     }
                 }
             }
@@ -256,8 +316,35 @@ struct CartDetailScreen: View {
             UserDefaults.standard.set(true, forKey: "hasSeenFirstShoppingCartCelebration")
         } else {
             print("⏭️ Not the first cart - no celebration")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                withAnimation {
+                    manageCartButtonVisible = true
+                    // REMOVE THIS LINE - DON'T RESET THE BUTTON STATE
+                    // showFinishTripButton = false
+                }
+            }
         }
     }
+    private func toggleButtonState() {
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+            showFinishTripButton.toggle()
+        }
+    }
+    
+    private func morphToFinishTrip() {
+        guard cart.isShopping && hasItems else { return }
+        
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+            showFinishTripButton = true
+        }
+    }
+    
+    private func morphToManageCart() {
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+            showFinishTripButton = false
+        }
+    }
+    
 }
 
 struct CartDetailContent: View {
@@ -320,6 +407,9 @@ struct CartDetailContent: View {
     @Environment(CartViewModel.self) private var cartViewModel
     @Environment(\.dismiss) private var dismiss
     
+    @Binding var showFinishTripButton: Bool
+    var buttonNamespace: Namespace.ID
+    
     var body: some View {
         GeometryReader { geometry in
             ZStack {
@@ -335,7 +425,7 @@ struct CartDetailContent: View {
                                 headerHeight: $headerHeight,
                                 refreshTrigger: $refreshTrigger
                             )
-
+                            
                             ZStack {
                                 if hasItems {
                                     VStack(spacing: 24) {
@@ -362,13 +452,13 @@ struct CartDetailContent: View {
                                         )
                                         .transition(.scale)
                                         
-//                                        FooterView(
-//                                            cart: cart,
-//                                            animatedFulfilledAmount: $animatedFulfilledAmount,
-//                                            animatedFulfilledPercentage: $animatedFulfilledPercentage,
-//                                            shouldAnimateTransition: shouldAnimateTransition,
-//                                            geometry: geometry
-//                                        )
+                                        //                                        FooterView(
+                                        //                                            cart: cart,
+                                        //                                            animatedFulfilledAmount: $animatedFulfilledAmount,
+                                        //                                            animatedFulfilledPercentage: $animatedFulfilledPercentage,
+                                        //                                            shouldAnimateTransition: shouldAnimateTransition,
+                                        //                                            geometry: geometry
+                                        //                                        )
                                     }
                                 } else {
                                     EmptyCartView()
@@ -383,7 +473,7 @@ struct CartDetailContent: View {
                         .padding(.vertical, 40)
                         .padding(.horizontal)
                         .frame(maxHeight: .infinity, alignment: .top)
-
+                        
                         HeaderView(
                             cart: cart,
                             animatedBudget: animatedBudget,
@@ -445,31 +535,57 @@ struct CartDetailContent: View {
                     .zIndex(1001)
                 }
             }
-            .overlay(alignment: .bottom) {
-                if !showCelebration && manageCartButtonVisible {
-                    Button(action: {
-                        showingVaultView = true
-                    }) {
-                        Text("Manage Cart")
-                            .fuzzyBubblesFont(16, weight: .bold)
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 24)
-                            .padding(.vertical, 12)
-                            .background(Color.black)
-                            .cornerRadius(25)
-                    }
-                    .transition(.scale)
-                    .scaleEffect(showEditBudget ? 0 : buttonScale)
-                    .animation(.spring(response: 0.3, dampingFraction: 0.6), value: buttonScale)
-                    .animation(.easeInOut(duration: 0.2), value: showEditBudget)
-                    .ignoresSafeArea(.keyboard)
-                }
-            }
-            .onAppear {
-                // Initialize both with cart's budget
-                animatedBudget = cart.budget
-                localBudget = cart.budget
-            }
+            //            .overlay(alignment: .bottom) {
+            //                if !showCelebration && manageCartButtonVisible {
+            //                    Button(action: {
+            //                        showingVaultView = true
+            //                    }) {
+            //                        Text("Manage Cart")
+            //                            .fuzzyBubblesFont(16, weight: .bold)
+            //                            .foregroundColor(.white)
+            //                            .padding(.horizontal, 24)
+            //                            .padding(.vertical, 12)
+            //                            .background(Color.black)
+            //                            .cornerRadius(25)
+            //                    }
+            //                    .transition(.scale)
+            //                    .scaleEffect(showEditBudget ? 0 : buttonScale)
+            //                    .animation(.spring(response: 0.3, dampingFraction: 0.6), value: buttonScale)
+            //                    .animation(.easeInOut(duration: 0.2), value: showEditBudget)
+            //                    .ignoresSafeArea(.keyboard)
+            //                }
+            //            }
+            //            .overlay(alignment: .bottom) {
+            //                if cartReady && !showCelebration && manageCartButtonVisible {
+            //                    VStack(spacing: 0) {
+            //                        Spacer()
+            //
+            //                        MorphingCartButtonWithGeometry(
+            //                            isExpanded: showFinishTripButton,
+            //                            onManageCart: {
+            //                                showingVaultView = true
+            //                            },
+            //                            onFinishTrip: {
+            //                                // Handle finish trip action
+            //                                print("Finish trip tapped")
+            //                                // You can trigger completion or navigation here
+            //                                showingCompleteAlert = true
+            //                            },
+            //                            namespace: buttonNamespace
+            //                        )
+            //                        .padding(.bottom, 20)
+            //                        .padding(.horizontal, 16)
+            //                    }
+            //                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            //                    .animation(.spring(response: 0.5, dampingFraction: 0.7), value: manageCartButtonVisible)
+            //                    .ignoresSafeArea(.keyboard)
+            //                }
+            //            }
+            //            .onAppear {
+            //                // Initialize both with cart's budget
+            //                animatedBudget = cart.budget
+            //                localBudget = cart.budget
+            //            }
             .onDisappear {
                 // Save to actual cart ONLY when dismissing CartDetailScreen
                 if localBudget != cart.budget {
@@ -483,6 +599,62 @@ struct CartDetailContent: View {
                     localBudget = newValue
                     withAnimation(.easeInOut(duration: 0.3)) {
                         animatedBudget = newValue
+                    }
+                }
+            }
+            .overlay(alignment: .bottom) {
+                if cartReady && !showCelebration && manageCartButtonVisible {
+                    VStack(spacing: 0) {
+                        Spacer()
+                        
+                        CartDetailActionBar(
+                            showFinishTrip: showFinishTripButton,
+                            onManageCart: {
+                                showingVaultView = true
+                            },
+                            onFinishTrip: {
+                                print("Finish trip tapped")
+                                showingCompleteAlert = true
+                            },
+                            namespace: buttonNamespace
+                        )
+                        .padding(.horizontal, 16)
+                    }
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .animation(.spring(response: 0.5, dampingFraction: 0.7), value: manageCartButtonVisible)
+                    .ignoresSafeArea(.keyboard)
+                }
+            }
+            .onAppear {
+                // Initialize both with cart's budget
+                animatedBudget = cart.budget
+                localBudget = cart.budget
+                
+                // Set initial button state
+                if cart.isShopping && hasItems {
+                    showFinishTripButton = true
+                }
+            }
+            .onChange(of: cart.status) { oldValue, newValue in
+                print("🛒 Cart status changed: \(oldValue) -> \(newValue)")
+                
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                    if newValue == .shopping && hasItems {
+                        showFinishTripButton = true
+                    } else {
+                        showFinishTripButton = false
+                    }
+                }
+            }
+            
+            .onChange(of: hasItems) { oldValue, newValue in
+                print("📦 Items changed: \(oldValue) -> \(newValue)")
+                
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                    if cart.isShopping && newValue {
+                        showFinishTripButton = true
+                    } else if !newValue {
+                        showFinishTripButton = false
                     }
                 }
             }
@@ -513,27 +685,27 @@ struct HeaderView: View {
     var onBudgetTap: (() -> Void)?
     
     private var progress: Double {
-         guard localBudget > 0 else { return 0 }
-         return min(cart.totalSpent / localBudget, 1.0)
-     }
+        guard localBudget > 0 else { return 0 }
+        return min(cart.totalSpent / localBudget, 1.0)
+    }
     
     @Environment(VaultService.self) private var vaultService
     
     private var budgetProgressColor: Color {
-         let progress = self.progress
-         if progress < 0.7 {
-             return Color(hex: "98F476")
-         } else if progress < 0.9 {
-             return .orange
-         } else {
-             return .red
-         }
-     }
-
+        let progress = self.progress
+        if progress < 0.7 {
+            return Color(hex: "98F476")
+        } else if progress < 0.9 {
+            return .orange
+        } else {
+            return .red
+        }
+    }
+    
     private func progressWidth(for totalWidth: CGFloat) -> CGFloat {
         return CGFloat(progress) * totalWidth
     }
-
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
@@ -690,19 +862,19 @@ struct ModeToggleView: View {
             
             Spacer()
             
-                Button(action: {
-                }) {
-                    Image(systemName: "circle")
-                        .resizable()
-                        .frame(width: 20, height: 20)
-                        .fontWeight(.light)
-                        .foregroundColor(.black)
-                    
-                }
-                .padding(1.5)
-                .background(.white)
-                .clipShape(Circle())
-                .shadow(color: Color.black.opacity(0.4), radius: 1, x: 0, y: 0.5)
+            Button(action: {
+            }) {
+                Image(systemName: "circle")
+                    .resizable()
+                    .frame(width: 20, height: 20)
+                    .fontWeight(.light)
+                    .foregroundColor(.black)
+                
+            }
+            .padding(1.5)
+            .background(.white)
+            .clipShape(Circle())
+            .shadow(color: Color.black.opacity(0.4), radius: 1, x: 0, y: 0.5)
         }
         .padding(.top, headerHeight)
         .background(Color.white)
@@ -898,8 +1070,8 @@ struct StoreSectionListView: View {
                 }
                 .padding(.leading)
             }
-            .listRowInsets(EdgeInsets())
-            .textCase(nil)
+                .listRowInsets(EdgeInsets())
+                .textCase(nil)
             
         ) {
             ForEach(Array(itemsWithStableIdentifiers.enumerated()), id: \.element.id) { index, tuple in
@@ -960,47 +1132,3 @@ struct StoreSectionListView: View {
     }
 }
 
-struct CartStoresListView: View {
-    let cart: Cart
-    let sortedStores: [String]
-    let storeItemsProvider: (String) -> [(cartItem: CartItem, item: Item?)]
-    let onToggleFulfillment: (CartItem) -> Void
-    let onEditItem: (CartItem) -> Void
-    let onDeleteItem: (CartItem) -> Void
-    let isScrollable: Bool
-    
-    var body: some View {
-        Group {
-            if isScrollable {
-                VerticalScrollViewWithCustomIndicator(maxHeight: 500, indicatorVerticalPadding: 12) {
-                    storesVStack
-                        .padding(.vertical, 12)
-                }
-            } else {
-                storesVStack
-                    .padding(.vertical, 12)
-            }
-        }
-    }
-    
-    private var storesVStack: some View {
-        VStack(spacing: 0) {
-            ForEach(Array(sortedStores.enumerated()), id: \.offset) { index, store in
-                let storeItems = storeItemsProvider(store)
-                if !storeItems.isEmpty {
-                    StoreSectionView(
-                        store: store,
-                        items: storeItems,
-                        cart: cart,
-                        onToggleFulfillment: onToggleFulfillment,
-                        onEditItem: onEditItem,
-                        onDeleteItem: onDeleteItem,
-                        isLastStore: index == sortedStores.count - 1,
-                        isInScrollableView: isScrollable
-                    )
-                    .padding(.top, index == 0 ? 0 : 10)
-                }
-            }
-        }
-    }
-}
