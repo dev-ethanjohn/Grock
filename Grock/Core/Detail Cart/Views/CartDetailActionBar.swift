@@ -1,5 +1,5 @@
 import SwiftUI
-
+//
 struct CartDetailActionBar: View {
     let showFinishTrip: Bool
     let onManageCart: () -> Void
@@ -34,7 +34,7 @@ struct CartDetailActionBar: View {
                 )
                 .transition(
                     .scale(scale: 0.5, anchor: .center)
-//                    .combined(with: .opacity)
+                    //                    .combined(with: .opacity)
                 )
                 .animation(.spring(response: 0.45, dampingFraction: 0.7), value: showFinishTrip)
             }
@@ -62,10 +62,12 @@ struct CartDetailActionBar: View {
                 .padding(.horizontal, showFinishTrip ? 2 : 24)
                 .frame(width: showFinishTrip ? 44 : nil, height: 44)
                 .background(
-                    RoundedRectangle(cornerRadius: showFinishTrip ? 100 : 25)
-                        .fill(showFinishTrip ? Color.black.opacity(0.1) : Color.black)
+                    Capsule()
+                        .fill(Color.black)
+                        .opacity(showFinishTrip ? 0.1 : 1.0)
                         .matchedGeometryEffect(id: "buttonBackground", in: namespace)
                 )
+                
                 .scaleEffect(buttonScale)
             }
             .animation(.spring(response: 0.4, dampingFraction: 0.65), value: showFinishTrip)
@@ -83,5 +85,4 @@ struct CartDetailActionBar: View {
         }
     }
 }
-
 

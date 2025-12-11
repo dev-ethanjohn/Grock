@@ -115,6 +115,7 @@ struct ManageCartSheet: View {
                         duplicateError = nil
                     }
                 )
+                .offset(y: UIScreen.main.bounds.height * -0.04)
                 .transition(.opacity)
                 .zIndex(1)
             }

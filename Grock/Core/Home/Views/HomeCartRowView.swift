@@ -158,19 +158,18 @@ struct HomeCartRowView: View {
      }
 }
 
-#Preview {
-    let mockCart = Cart(
-        name: "Tues Brunch",
-        budget: 2000.0,
-        totalSpent: 654,
-        fulfillmentStatus: 0.8144,
-        createdAt: Date(),
-        status: .planning
-    )
-    
-    HomeCartRowView(cart: mockCart, vaultService: nil)
-        .padding()
-        .background(Color.gray.opacity(0.1))
-}
+//#Preview {
+//    let mockCart = Cart(
+//        name: "Tues Brunch",
+//        budget: 2000.0,
+//        fulfillmentStatus: 0.8144,
+//        createdAt: Date(),
+//        status: .planning
+//    )
+//    
+//    HomeCartRowView(cart: mockCart, vaultService: nil)
+//        .padding()
+//        .background(Color.gray.opacity(0.1))
+//}
 
 

@@ -107,7 +107,6 @@ class Cart {
     @Attribute(.unique) var id: String
     var name: String
     var budget: Double
-    var totalSpent: Double
     var fulfillmentStatus: Double
     var createdAt: Date
     var status: CartStatus
@@ -119,7 +118,6 @@ class Cart {
         id: String = UUID().uuidString,
         name: String,
         budget: Double,
-        totalSpent: Double = 0.0,
         fulfillmentStatus: Double = 0.0,
         createdAt: Date = Date(),
         status: CartStatus = .planning
@@ -127,7 +125,6 @@ class Cart {
         self.id = id
         self.name = name
         self.budget = budget
-        self.totalSpent = totalSpent
         self.fulfillmentStatus = fulfillmentStatus
         self.createdAt = createdAt
         self.status = status
@@ -144,6 +141,26 @@ class Cart {
 
     var totalItemsCount: Int {
         cartItems.count
+    }
+    
+    var totalSpent: Double {
+        cartItems.reduce(0) { $0 + ($1.actualPrice ?? 0) }
+    }
+    
+    // Or if you need to calculate based on different cart status:
+    func getTotalSpent() -> Double {
+        switch status {
+        case .planning:
+            return cartItems.reduce(0) { $0 + ($1.plannedPrice ?? 0) * $1.quantity }
+        case .shopping:
+            return cartItems.reduce(0) {
+                let price = $1.actualPrice ?? $1.plannedPrice ?? 0
+                let quantity = $1.actualQuantity ?? $1.quantity
+                return $0 + (price * quantity)
+            }
+        case .completed:
+            return cartItems.reduce(0) { $0 + ($1.actualPrice ?? 0) * ($1.actualQuantity ?? $1.quantity) }
+        }
     }
 }
 

@@ -105,40 +105,10 @@ struct CartDetailScreen: View {
         itemsByStoreWithRefresh[store] ?? []
     }
     
+    @State private var showingCompletedItemsPopover = false
+    @State private var completedItems: [CartItem] = []
+    
     var body: some View {
-        //        CartDetailContent(
-        //            cart: cart,
-        //            cartInsights: cartInsights,
-        //            itemsByStore: itemsByStore,
-        //            itemsByStoreWithRefresh: itemsByStoreWithRefresh,
-        //            sortedStores: sortedStores,
-        //            sortedStoresWithRefresh: sortedStoresWithRefresh,
-        //            totalItemCount: totalItemCount,
-        //            hasItems: hasItems,
-        //            shouldAnimateTransition: shouldAnimateTransition,
-        //            storeItems: storeItems(for:),
-        //            storeItemsWithRefresh: storeItemsWithRefresh(for:),
-        //            showingDeleteAlert: $showingDeleteAlert,
-        //            editingItem: $editingItem,
-        //            showingCompleteAlert: $showingCompleteAlert,
-        //            showingStartShoppingAlert: $showingStartShoppingAlert,
-        //            showingSwitchToPlanningAlert: $showingSwitchToPlanningAlert,
-        //            anticipationOffset: $anticipationOffset,
-        //            selectedFilter: $selectedFilter,
-        //            showingFilterSheet: $showingFilterSheet,
-        //            headerHeight: $headerHeight,
-        //            animatedFulfilledAmount: $animatedFulfilledAmount,
-        //            animatedFulfilledPercentage: $animatedFulfilledPercentage,
-        //            itemToEdit: $itemToEdit,
-        //            showingVaultView: $showingVaultView,
-        //            previousHasItems: $previousHasItems,
-        //            showCelebration: $showCelebration,
-        //            manageCartButtonVisible: $manageCartButtonVisible,
-        //            buttonScale: $buttonScale,
-        //            shouldBounceAfterCelebration: $shouldBounceAfterCelebration,
-        //            cartReady: $cartReady,
-        //            refreshTrigger: $refreshTrigger
-        //        )
         CartDetailContent(
             cart: cart,
             cartInsights: cartInsights,
@@ -171,14 +141,11 @@ struct CartDetailScreen: View {
             shouldBounceAfterCelebration: $shouldBounceAfterCelebration,
             cartReady: $cartReady,
             refreshTrigger: $refreshTrigger,
-            // ADD THESE NEW BINDINGS:
+            showingCompletedItemsPopover: $showingCompletedItemsPopover,
+            completedItems: $completedItems,
             showFinishTripButton: $showFinishTripButton,
             buttonNamespace: buttonNamespace
         )
-        //        .onAppear {
-        //            previousHasItems = hasItems
-        //            checkAndShowCelebration()
-        //        }
         .onAppear {
             previousHasItems = hasItems
             checkAndShowCelebration()
@@ -201,7 +168,6 @@ struct CartDetailScreen: View {
                 }
             }
         }
-        
         .onChange(of: hasItems) { oldValue, newValue in
             print("📦 Items changed: \(oldValue) -> \(newValue)")
             
@@ -270,8 +236,15 @@ struct CartDetailScreen: View {
         .alert("Complete Shopping", isPresented: $showingCompleteAlert) {
             Button("Cancel", role: .cancel) { }
             Button("Complete") {
-                vaultService.completeShopping(cart: cart)
-                refreshTrigger = UUID()
+                // Get completed items
+                let fulfilledItems = cart.cartItems.filter { $0.isFulfilled }
+                if !fulfilledItems.isEmpty {
+                    completedItems = fulfilledItems
+                    showingCompletedItemsPopover = true
+                } else {
+                    vaultService.completeShopping(cart: cart)
+                    refreshTrigger = UUID()
+                }
             }
         } message: {
             Text("This will preserve your shopping data for review.")
@@ -301,6 +274,7 @@ struct CartDetailScreen: View {
         
         guard !hasSeenCelebration else {
             print("⏭️ Skipping first cart celebration - already seen")
+            // Ensure button is visible even if celebration was already seen
             manageCartButtonVisible = true
             return
         }
@@ -312,6 +286,14 @@ struct CartDetailScreen: View {
             print("🎉 First cart celebration triggered!")
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 showCelebration = true
+                
+                // Schedule to show manage cart button after celebration
+                // CelebrationView typically lasts 2-3 seconds
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                    withAnimation {
+                        manageCartButtonVisible = true
+                    }
+                }
             }
             UserDefaults.standard.set(true, forKey: "hasSeenFirstShoppingCartCelebration")
         } else {
@@ -319,8 +301,6 @@ struct CartDetailScreen: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 withAnimation {
                     manageCartButtonVisible = true
-                    // REMOVE THIS LINE - DON'T RESET THE BUTTON STATE
-                    // showFinishTripButton = false
                 }
             }
         }
@@ -407,8 +387,11 @@ struct CartDetailContent: View {
     @Environment(CartViewModel.self) private var cartViewModel
     @Environment(\.dismiss) private var dismiss
     
+    @Binding var showingCompletedItemsPopover: Bool
+    @Binding var completedItems: [CartItem]
     @Binding var showFinishTripButton: Bool
     var buttonNamespace: Namespace.ID
+
     
     var body: some View {
         GeometryReader { geometry in
@@ -428,7 +411,10 @@ struct CartDetailContent: View {
                             
                             ZStack {
                                 if hasItems {
+//                                    TODO: LIMIT THIS VSTACK'S HEIGHT to its ocntent height
                                     VStack(spacing: 24) {
+                                        
+                                        
                                         ItemsListView(
                                             cart: cart,
                                             totalItemCount: totalItemCount,
@@ -452,14 +438,38 @@ struct CartDetailContent: View {
                                         )
                                         .transition(.scale)
                                         
-                                        //                                        FooterView(
-                                        //                                            cart: cart,
-                                        //                                            animatedFulfilledAmount: $animatedFulfilledAmount,
-                                        //                                            animatedFulfilledPercentage: $animatedFulfilledPercentage,
-                                        //                                            shouldAnimateTransition: shouldAnimateTransition,
-                                        //                                            geometry: geometry
-                                        //                                        )
+                                        if cart.isShopping {
+                                            let fulfilledCount = cart.cartItems.filter { $0.isFulfilled }.count
+                                            let totalCount = cart.cartItems.count
+                                            
+                                            Button(action: {
+                                                // Get completed items first
+                                                let fulfilledItems = cart.cartItems.filter { $0.isFulfilled }
+                                                completedItems = fulfilledItems
+                                                
+                                                // Show the popover
+                                                withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                                                    showingCompletedItemsPopover = true
+                                                }
+                                            }) {
+                                                HStack(spacing: 6) {
+                                                    Image(systemName: "arrow.down.left.and.arrow.up.right")
+                                                        .font(.system(size: 14))
+                                                    
+                                                    Text("\(fulfilledCount)/\(totalCount)")
+                                                        .lexendFont(14, weight: .bold)
+                                                        .foregroundColor(Color(hex: "333"))
+                                                }
+                                                .padding(.horizontal, 12)
+                                                .padding(.vertical, 8)
+                                                .frame(maxWidth: .infinity)
+                                            }
+                                            .buttonStyle(.plain)
+                                            .padding(.horizontal)
+                                            .transition(.scale)
+                                        }
                                     }
+                                    
                                 } else {
                                     EmptyCartView()
                                         .transition(.scale)
@@ -535,57 +545,6 @@ struct CartDetailContent: View {
                     .zIndex(1001)
                 }
             }
-            //            .overlay(alignment: .bottom) {
-            //                if !showCelebration && manageCartButtonVisible {
-            //                    Button(action: {
-            //                        showingVaultView = true
-            //                    }) {
-            //                        Text("Manage Cart")
-            //                            .fuzzyBubblesFont(16, weight: .bold)
-            //                            .foregroundColor(.white)
-            //                            .padding(.horizontal, 24)
-            //                            .padding(.vertical, 12)
-            //                            .background(Color.black)
-            //                            .cornerRadius(25)
-            //                    }
-            //                    .transition(.scale)
-            //                    .scaleEffect(showEditBudget ? 0 : buttonScale)
-            //                    .animation(.spring(response: 0.3, dampingFraction: 0.6), value: buttonScale)
-            //                    .animation(.easeInOut(duration: 0.2), value: showEditBudget)
-            //                    .ignoresSafeArea(.keyboard)
-            //                }
-            //            }
-            //            .overlay(alignment: .bottom) {
-            //                if cartReady && !showCelebration && manageCartButtonVisible {
-            //                    VStack(spacing: 0) {
-            //                        Spacer()
-            //
-            //                        MorphingCartButtonWithGeometry(
-            //                            isExpanded: showFinishTripButton,
-            //                            onManageCart: {
-            //                                showingVaultView = true
-            //                            },
-            //                            onFinishTrip: {
-            //                                // Handle finish trip action
-            //                                print("Finish trip tapped")
-            //                                // You can trigger completion or navigation here
-            //                                showingCompleteAlert = true
-            //                            },
-            //                            namespace: buttonNamespace
-            //                        )
-            //                        .padding(.bottom, 20)
-            //                        .padding(.horizontal, 16)
-            //                    }
-            //                    .transition(.move(edge: .bottom).combined(with: .opacity))
-            //                    .animation(.spring(response: 0.5, dampingFraction: 0.7), value: manageCartButtonVisible)
-            //                    .ignoresSafeArea(.keyboard)
-            //                }
-            //            }
-            //            .onAppear {
-            //                // Initialize both with cart's budget
-            //                animatedBudget = cart.budget
-            //                localBudget = cart.budget
-            //            }
             .onDisappear {
                 // Save to actual cart ONLY when dismissing CartDetailScreen
                 if localBudget != cart.budget {
@@ -623,6 +582,18 @@ struct CartDetailContent: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                     .animation(.spring(response: 0.5, dampingFraction: 0.7), value: manageCartButtonVisible)
                     .ignoresSafeArea(.keyboard)
+                }
+            }
+            .overlay {
+                if showingCompletedItemsPopover {
+                    CompletedItemsPopover(
+                        isPresented: $showingCompletedItemsPopover,
+                        completedItems: completedItems,
+                        cart: cart,
+                        namespace: buttonNamespace
+                    )
+                    .transition(.opacity)
+                    .zIndex(1002)
                 }
             }
             .onAppear {
@@ -686,7 +657,8 @@ struct HeaderView: View {
     
     private var progress: Double {
         guard localBudget > 0 else { return 0 }
-        return min(cart.totalSpent / localBudget, 1.0)
+        let spent = cart.cartItems.reduce(0) { $0 + ($1.actualPrice ?? 0) * ($1.actualQuantity ?? $1.quantity) }
+        return min(spent / localBudget, 1.0)
     }
     
     @Environment(VaultService.self) private var vaultService
@@ -1015,6 +987,8 @@ struct ItemsListView: View {
                         .listRowBackground(Color(hex: "F7F2ED"))
                     }
                 }
+          
+                
             }
             .frame(height: min(calculatedHeight, maxAllowedHeight))
             .listStyle(PlainListStyle())
@@ -1025,7 +999,6 @@ struct ItemsListView: View {
     }
 }
 
-// Preference key to pass height up the view hierarchy
 struct ContentHeightPreferenceKey: PreferenceKey {
     static var defaultValue: CGFloat = 0
     
@@ -1131,4 +1104,296 @@ struct StoreSectionListView: View {
         .listSectionSpacing(isLastStore ? 0 : 20)
     }
 }
+
+
+
+//struct CompletedItemsPopover: View {
+//    @Binding var isPresented: Bool
+//    let completedItems: [CartItem]
+//    let cart: Cart
+//    var namespace: Namespace.ID
+//    
+//    @Environment(VaultService.self) private var vaultService
+//    
+//    // Animation state
+//    @State private var popoverScale: CGFloat = 0.5
+//    @State private var popoverOpacity: Double = 0
+//    @State private var contentOffset: CGFloat = 300
+//    @State private var backgroundOpacity: Double = 0
+//    
+//    private var groupedItems: [String: [(cartItem: CartItem, item: Item?)]] {
+//        let itemsWithDetails = completedItems.map { cartItem in
+//            (cartItem, vaultService.findItemById(cartItem.itemId))
+//        }
+//        let grouped = Dictionary(grouping: itemsWithDetails) { cartItem, item in
+//            cartItem.getStore(cart: cart)
+//        }
+//        return grouped.filter { !$0.key.isEmpty && !$0.value.isEmpty }
+//    }
+//    
+//    private var sortedStores: [String] {
+//        Array(groupedItems.keys).sorted()
+//    }
+//    
+//    // ADD THIS MISSING COMPUTED PROPERTY:
+//    private var totalSpent: Double {
+//        completedItems.reduce(0) { $0 + ($1.actualPrice ?? 0) }
+//    }
+//    
+//    
+//    
+//    var body: some View {
+//        ZStack {
+//            backgroundView
+//            popoverContentView
+//        }
+//        .onAppear {
+//            animateIn()
+//        }
+//    }
+//    
+//    private var backgroundView: some View {
+//        Color.black.opacity(0.4)
+//            .opacity(backgroundOpacity)
+//            .edgesIgnoringSafeArea(.all)
+//            .onTapGesture {
+//                dismissPopover()
+//            }
+//    }
+//    
+//    private var popoverContentView: some View {
+//        VStack(spacing: 0) {
+//            handleBar
+//            headerView
+//            
+//            if completedItems.isEmpty {
+//                emptyStateView
+//            } else {
+//                itemsListView
+//            }
+//            
+//            doneButton
+//        }
+//        .frame(maxWidth: .infinity)
+//        .frame(height: UIScreen.main.bounds.height * 0.8)
+//        .background(Color.white)
+//        .cornerRadius(24, corners: [.topLeft, .topRight])
+//        .frame(maxHeight: .infinity, alignment: .bottom)
+//        .offset(y: contentOffset)
+//        .scaleEffect(popoverScale)
+//        .opacity(popoverOpacity)
+//        .shadow(color: Color.black.opacity(0.2), radius: 20, x: 0, y: -5)
+//        .matchedGeometryEffect(id: "finishTripButton", in: namespace, properties: .frame, isSource: false)
+//    }
+//    
+//    private var handleBar: some View {
+//        Capsule()
+//            .fill(Color.gray.opacity(0.3))
+//            .frame(width: 40, height: 5)
+//            .padding(.top, 8)
+//    }
+//    
+//    private var headerView: some View {
+//        HStack {
+//            Text("Completed Items")
+//                .lexendFont(18, weight: .bold)
+//                .foregroundColor(.black)
+//            
+//            Spacer()
+//            
+//            Button(action: dismissPopover) {
+//                Image(systemName: "xmark")
+//                    .font(.system(size: 16, weight: .medium))
+//                    .foregroundColor(.gray)
+//                    .frame(width: 30, height: 30)
+//                    .background(Color.gray.opacity(0.1))
+//                    .clipShape(Circle())
+//            }
+//        }
+//        .padding(.horizontal, 20)
+//        .padding(.top, 12)
+//        .padding(.bottom, 16)
+//    }
+//    
+//    private var emptyStateView: some View {
+//        VStack(spacing: 16) {
+//            Image(systemName: "checkmark.circle")
+//                .font(.system(size: 48))
+//                .foregroundColor(.gray.opacity(0.5))
+//            
+//            Text("No items completed yet")
+//                .lexendFont(16, weight: .medium)
+//                .foregroundColor(.gray)
+//        }
+//        .frame(maxHeight: .infinity)
+//        .padding(.vertical, 40)
+//    }
+//    
+//    private var itemsListView: some View {
+//        ScrollView {
+//            VStack(spacing: 0) {
+//                ForEach(sortedStores, id: \.self) { store in
+//                    storeSectionView(for: store)
+//                }
+//                
+//                totalSectionView
+//            }
+//            .padding(.bottom, 30)
+//        }
+//    }
+//    
+//    private func storeSectionView(for store: String) -> some View {
+//        Group {
+//            if let storeItems = groupedItems[store] {
+//                VStack(spacing: 0) {
+//                    // Store header
+//                    HStack {
+//                        Text(store)
+//                            .lexendFont(14, weight: .bold)
+//                            .foregroundColor(.black.opacity(0.8))
+//                        
+//                        Spacer()
+//                        
+//                        Text("\(storeItems.count) item\(storeItems.count == 1 ? "" : "s")")
+//                            .lexendFont(12, weight: .medium)
+//                            .foregroundColor(.gray)
+//                    }
+//                    .padding(.horizontal, 20)
+//                    .padding(.vertical, 12)
+//                    .background(Color(hex: "F5F5F5"))
+//                    .cornerRadius(8)
+//                    .padding(.horizontal, 20)
+//                    .padding(.top, store == sortedStores.first ? 0 : 16)
+//                    
+//                    // Items in store
+//                    VStack(spacing: 0) {
+//                        ForEach(Array(storeItems.enumerated()), id: \.offset) { index, itemTuple in
+//                            storeItemRow(itemTuple: itemTuple, isLastItem: index == storeItems.count - 1)
+//                        }
+//                    }
+//                    .background(Color.white)
+//                    .cornerRadius(8)
+//                    .padding(.horizontal, 20)
+//                }
+//            }
+//        }
+//    }
+//    
+//    private func storeItemRow(itemTuple: (cartItem: CartItem, item: Item?), isLastItem: Bool) -> some View {
+//        let (cartItem, item) = itemTuple
+//        
+//        return VStack(spacing: 0) {
+//            HStack(spacing: 12) {
+//                // Checkmark indicator
+//                Image(systemName: "checkmark.circle.fill")
+//                    .font(.system(size: 16))
+//                    .foregroundColor(.green)
+//                    .frame(width: 24)
+//                
+//                // Item name and details
+//                VStack(alignment: .leading, spacing: 2) {
+//                    Text(item?.name ?? "Unknown Item")
+//                        .lexendFont(14, weight: .medium)
+//                        .foregroundColor(.black)
+//                    
+//                    // quantity is NON-OPTIONAL Double, so direct comparison
+//                    if cartItem.quantity > 1 {
+//                        Text("Qty: \(cartItem.quantity, specifier: "%.0f")")
+//                            .lexendFont(12, weight: .regular)
+//                            .foregroundColor(.gray)
+//                    }
+//                }
+//                
+//                Spacer()
+//                
+//                // Price
+//                priceView(for: cartItem)
+//            }
+//            .padding(.horizontal, 20)
+//            .padding(.vertical, 12)
+//            
+//            // Separator
+//            if !isLastItem {
+//                Divider()
+//                    .padding(.leading, 56)
+//                    .padding(.trailing, 20)
+//            }
+//        }
+//    }
+//    
+//    private func priceView(for cartItem: CartItem) -> some View {
+//        Group {
+//            if cartItem.isFulfilled, let actualPrice = cartItem.actualPrice, actualPrice > 0 {
+//                Text(actualPrice.formattedCurrency)
+//                    .lexendFont(14, weight: .bold)
+//                    .foregroundColor(.black)
+//            } else if let plannedPrice = cartItem.plannedPrice, plannedPrice > 0 {
+//                Text(plannedPrice.formattedCurrency)
+//                    .lexendFont(14, weight: .regular)
+//                    .foregroundColor(.gray)
+//            } else {
+//                Text("N/A")
+//                    .lexendFont(14, weight: .regular)
+//                    .foregroundColor(.gray)
+//            }
+//        }
+//    }
+//    
+//    private var totalSectionView: some View {
+//        VStack(spacing: 12) {
+//            Divider()
+//                .padding(.horizontal, 20)
+//            
+//            HStack {
+//                Text("Total Spent")
+//                    .lexendFont(16, weight: .bold)
+//                    .foregroundColor(.black)
+//                
+//                Spacer()
+//                
+//                Text(totalSpent.formattedCurrency)
+//                    .lexendFont(16, weight: .bold)
+//                    .foregroundColor(.green)
+//            }
+//            .padding(.horizontal, 20)
+//        }
+//        .padding(.top, 16)
+//    }
+//    
+//    private var doneButton: some View {
+//        Button(action: dismissPopover) {
+//            Text("Done")
+//                .lexendFont(16, weight: .semibold)
+//                .foregroundColor(.white)
+//                .frame(maxWidth: .infinity)
+//                .frame(height: 50)
+//                .background(Color(hex: "4CAF50"))
+//                .cornerRadius(12)
+//                .padding(.horizontal, 20)
+//                .padding(.bottom, 30)
+//        }
+//    }
+//    
+//    private func animateIn() {
+//        withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+//            backgroundOpacity = 1
+//            popoverOpacity = 1
+//            contentOffset = 0
+//            popoverScale = 1
+//        }
+//    }
+//    
+//    private func dismissPopover() {
+//        withAnimation(.spring(response: 0.4, dampingFraction: 0.9)) {
+//            backgroundOpacity = 0
+//            popoverOpacity = 0
+//            contentOffset = 300
+//            popoverScale = 0.5
+//        }
+//        
+//        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+//            isPresented = false
+//        }
+//    }
+//}
 

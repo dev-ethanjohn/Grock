@@ -661,33 +661,37 @@ extension VaultService {
 // MARK: - Cart Calculations & Insights
 extension VaultService {
    
-    /// Updates total calculations for a cart
     func updateCartTotals(cart: Cart) {
-        guard let vault = vault else { return }
-       
-        var totalSpent: Double = 0.0
-       
-        for cartItem in cart.cartItems {
-            totalSpent += cartItem.getTotalPrice(from: vault, cart: cart)
-        }
-       
-        cart.totalSpent = totalSpent
-       
-        switch cart.status {
-        case .planning:
-            if cart.budget > 0 {
-                cart.fulfillmentStatus = min(totalSpent / cart.budget, 1.0)
-            }
-        case .shopping:
-            let fulfilledCount = cart.cartItems.filter { $0.isFulfilled }.count
-            let totalCount = cart.cartItems.count
-            cart.fulfillmentStatus = totalCount > 0 ? Double(fulfilledCount) / Double(totalCount) : 0.0
-        case .completed:
-            cart.fulfillmentStatus = 1.0
-        }
-       
-        saveContext()
-    }
+         guard let vault = vault else { return }
+        
+         // No longer need to calculate and assign totalSpent
+         // It's computed automatically from cartItems
+        
+         // Instead, we need to update cartItems if needed and save
+         for cartItem in cart.cartItems {
+             // If we need to capture planned data when starting shopping
+             if cart.status == .shopping && !cartItem.isFulfilled {
+                 cartItem.capturePlannedData(from: vault)
+             }
+         }
+        
+         // Update fulfillmentStatus based on cart status
+         switch cart.status {
+         case .planning:
+             if cart.budget > 0 {
+                 // Use the computed totalSpent
+                 cart.fulfillmentStatus = min(cart.totalSpent / cart.budget, 1.0)
+             }
+         case .shopping:
+             let fulfilledCount = cart.cartItems.filter { $0.isFulfilled }.count
+             let totalCount = cart.cartItems.count
+             cart.fulfillmentStatus = totalCount > 0 ? Double(fulfilledCount) / Double(totalCount) : 0.0
+         case .completed:
+             cart.fulfillmentStatus = 1.0
+         }
+        
+         saveContext()
+     }
    
     /// Generates insights for a shopping cart
     func getCartInsights(cart: Cart) -> CartInsights {
