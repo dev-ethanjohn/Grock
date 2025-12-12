@@ -1,6 +1,9 @@
 import SwiftUI
 import SwiftData
 
+import SwiftUI
+import SwiftData
+
 struct CartDetailScreen: View {
     let cart: Cart
     @Environment(VaultService.self) private var vaultService
@@ -47,6 +50,9 @@ struct CartDetailScreen: View {
     
     @State private var showFinishTripButton = false
     @Namespace private var buttonNamespace
+    
+    @State private var bottomSheetDetent: PresentationDetent = .fraction(0.12)
+    @State private var showingCompletedSheet = false
     
     private var cartInsights: CartInsights {
         vaultService.getCartInsights(cart: cart)
@@ -105,11 +111,9 @@ struct CartDetailScreen: View {
         itemsByStoreWithRefresh[store] ?? []
     }
     
-    @State private var showingCompletedItemsPopover = false
-    @State private var completedItems: [CartItem] = []
-    
     var body: some View {
-        CartDetailContent(
+        // Create the view in stages to avoid compiler issues
+        let basicParams = CartDetailContent(
             cart: cart,
             cartInsights: cartInsights,
             itemsByStore: itemsByStore,
@@ -141,126 +145,147 @@ struct CartDetailScreen: View {
             shouldBounceAfterCelebration: $shouldBounceAfterCelebration,
             cartReady: $cartReady,
             refreshTrigger: $refreshTrigger,
-            showingCompletedItemsPopover: $showingCompletedItemsPopover,
-            completedItems: $completedItems,
             showFinishTripButton: $showFinishTripButton,
-            buttonNamespace: buttonNamespace
+            buttonNamespace: buttonNamespace,
+            bottomSheetDetent: $bottomSheetDetent,
+            showingCompletedSheet: $showingCompletedSheet
         )
-        .onAppear {
-            previousHasItems = hasItems
-            checkAndShowCelebration()
-            
-            if cart.isShopping && hasItems {
-                showFinishTripButton = true
+        
+        basicParams
+            .onAppear {
+                previousHasItems = hasItems
+                checkAndShowCelebration()
+                
+                if cart.isShopping && hasItems {
+                    showFinishTripButton = true
+                }
             }
-        }
-        .onChange(of: cart.status) { oldValue, newValue in
-            print("🛒 Cart status changed: \(oldValue) -> \(newValue)")
-            
-            // Only update if the status actually changed
-            if oldValue != newValue {
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-                    if newValue == .shopping && hasItems {
-                        showFinishTripButton = true
-                    } else if newValue == .planning {
-                        showFinishTripButton = false
+            .onChange(of: cart.status) { oldValue, newValue in
+                print("🛒 Cart status changed: \(oldValue) -> \(newValue)")
+                
+                // Only update if the status actually changed
+                if oldValue != newValue {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                        if newValue == .shopping && hasItems {
+                            showFinishTripButton = true
+                        } else if newValue == .planning {
+                            showFinishTripButton = false
+                        }
+                    }
+                }
+                
+                // Show/hide bottom sheet based on shopping mode
+                if newValue == .shopping && hasItems {
+                    let currentFulfilledCount = cart.cartItems.filter { $0.isFulfilled }.count
+                    if currentFulfilledCount > 0 {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                            showingCompletedSheet = true
+                        }
+                    }
+                } else if newValue == .planning {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        showingCompletedSheet = false
                     }
                 }
             }
-        }
-        .onChange(of: hasItems) { oldValue, newValue in
-            print("📦 Items changed: \(oldValue) -> \(newValue)")
-            
-            // Only update if items actually changed
-            if oldValue != newValue {
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-                    if cart.isShopping && newValue {
-                        showFinishTripButton = true
-                    } else if !newValue {
-                        showFinishTripButton = false
+            .onChange(of: hasItems) { oldValue, newValue in
+                print("📦 Items changed: \(oldValue) -> \(newValue)")
+                
+                // Only update if items actually changed
+                if oldValue != newValue {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                        if cart.isShopping && newValue {
+                            showFinishTripButton = true
+                        } else if !newValue {
+                            showFinishTripButton = false
+                        }
                     }
                 }
             }
-        }
-        .navigationBarBackButtonHidden(true)
-        .sheet(item: $itemToEdit) { item in
-            // FIXED: Find the cartItem for this item
-            if let cartItem = cart.cartItems.first(where: { $0.itemId == item.id }) {
-                EditItemSheet(
-                    item: item,
-                    cart: cart,
-                    cartItem: cartItem,
-                    onSave: { updatedItem in
-                        print("✅ Updated cart item")
-                        vaultService.updateCartTotals(cart: cart)
-                        refreshTrigger = UUID()
-                    }
-                )
-                .environment(vaultService)
-                .presentationDetents([.medium, .fraction(0.75)])
+            .navigationBarBackButtonHidden(true)
+            .sheet(item: $itemToEdit) { item in
+                // FIXED: Find the cartItem for this item
+                if let cartItem = cart.cartItems.first(where: { $0.itemId == item.id }) {
+                    EditItemSheet(
+                        item: item,
+                        cart: cart,
+                        cartItem: cartItem,
+                        onSave: { updatedItem in
+                            print("✅ Updated cart item")
+                            vaultService.updateCartTotals(cart: cart)
+                            refreshTrigger = UUID()
+                        }
+                    )
+                    .environment(vaultService)
+                    .presentationDetents([.medium, .fraction(0.75)])
+                    .presentationCornerRadius(24)
+                }
+            }
+            .sheet(isPresented: $showingVaultView) {
+                // This closure runs when sheet is dismissed
+                print("🔄 Manage cart sheet dismissed - refreshing cart data")
+                vaultService.updateCartTotals(cart: cart)
+                refreshTrigger = UUID() // Force refresh
+            } content: {
+                NavigationStack {
+                    ManageCartSheet(cart: cart)
+                        .environment(vaultService)
+                        .environment(cartViewModel)
+                }
                 .presentationCornerRadius(24)
             }
-        }
-        .sheet(isPresented: $showingVaultView) {
-            // This closure runs when sheet is dismissed
-            print("🔄 Manage cart sheet dismissed - refreshing cart data")
-            vaultService.updateCartTotals(cart: cart)
-            refreshTrigger = UUID() // Force refresh
-        } content: {
-            NavigationStack {
-                ManageCartSheet(cart: cart)
-                    .environment(vaultService)
-                    .environment(cartViewModel)
-            }
-            .presentationCornerRadius(24)
-        }
-        .alert("Start Shopping", isPresented: $showingStartShoppingAlert) {
-            Button("Cancel", role: .cancel) { }
-            Button("Start Shopping") {
-                vaultService.startShopping(cart: cart)
-                refreshTrigger = UUID()
-            }
-        } message: {
-            Text("This will freeze your planned prices. You'll be able to update actual prices during shopping.")
-        }
-        .alert("Switch to Planning", isPresented: $showingSwitchToPlanningAlert) {
-            Button("Cancel", role: .cancel) { }
-            Button("Switch to Planning") {
-                cart.status = .planning
-                vaultService.updateCartTotals(cart: cart)
-                refreshTrigger = UUID()
-            }
-        } message: {
-            Text("Switching back to planning mode will unfreeze planned prices and allow you to modify your shopping list.")
-        }
-        .alert("Complete Shopping", isPresented: $showingCompleteAlert) {
-            Button("Cancel", role: .cancel) { }
-            Button("Complete") {
-                // Get completed items
-                let fulfilledItems = cart.cartItems.filter { $0.isFulfilled }
-                if !fulfilledItems.isEmpty {
-                    completedItems = fulfilledItems
-                    showingCompletedItemsPopover = true
-                } else {
-                    vaultService.completeShopping(cart: cart)
+            // ADD THE COMPLETED SHEET HERE
+            .completedSheet(
+                cart: cart,
+                showing: $showingCompletedSheet,
+                detent: $bottomSheetDetent,
+                refreshTrigger: $refreshTrigger,
+                vaultService: vaultService
+            )
+            .alert("Start Shopping", isPresented: $showingStartShoppingAlert) {
+                Button("Cancel", role: .cancel) { }
+                Button("Start Shopping") {
+                    vaultService.startShopping(cart: cart)
                     refreshTrigger = UUID()
                 }
+            } message: {
+                Text("This will freeze your planned prices. You'll be able to update actual prices during shopping.")
             }
-        } message: {
-            Text("This will preserve your shopping data for review.")
-        }
-        .alert("Delete Cart", isPresented: $showingDeleteAlert) {
-            Button("Cancel", role: .cancel) { }
-            Button("Delete", role: .destructive) {
-                vaultService.deleteCart(cart)
-                dismiss()
+            .alert("Switch to Planning", isPresented: $showingSwitchToPlanningAlert) {
+                Button("Cancel", role: .cancel) { }
+                Button("Switch to Planning") {
+                    cart.status = .planning
+                    vaultService.updateCartTotals(cart: cart)
+                    refreshTrigger = UUID()
+                }
+            } message: {
+                Text("Switching back to planning mode will unfreeze planned prices and allow you to modify your shopping list.")
             }
-        } message: {
-            Text("Are you sure you want to delete this cart? This action cannot be undone.")
-        }
-        .sheet(isPresented: $showingFilterSheet) {
-            FilterSheet(selectedFilter: $selectedFilter)
-        }
+            .alert("Complete Shopping", isPresented: $showingCompleteAlert) {
+                Button("Cancel", role: .cancel) { }
+                Button("Complete") {
+                    vaultService.completeShopping(cart: cart)
+                    refreshTrigger = UUID()
+                    // Hide bottom sheet when completing
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        showingCompletedSheet = false
+                    }
+                }
+            } message: {
+                Text("This will preserve your shopping data for review.")
+            }
+            .alert("Delete Cart", isPresented: $showingDeleteAlert) {
+                Button("Cancel", role: .cancel) { }
+                Button("Delete", role: .destructive) {
+                    vaultService.deleteCart(cart)
+                    dismiss()
+                }
+            } message: {
+                Text("Are you sure you want to delete this cart? This action cannot be undone.")
+            }
+            .sheet(isPresented: $showingFilterSheet) {
+                FilterSheet(selectedFilter: $selectedFilter)
+            }
     }
     
     private func checkAndShowCelebration() {
@@ -305,26 +330,91 @@ struct CartDetailScreen: View {
             }
         }
     }
-    private func toggleButtonState() {
-        withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-            showFinishTripButton.toggle()
+}
+
+
+// Add the simplified extension and helper struct
+extension View {
+    func completedSheet(
+        cart: Cart,
+        showing: Binding<Bool>,
+        detent: Binding<PresentationDetent>,
+        refreshTrigger: Binding<UUID>,
+        vaultService: VaultService
+    ) -> some View {
+        self.sheet(isPresented: showing) {
+            CompletedSheetContent(
+                cart: cart,
+                detent: detent,
+                refreshTrigger: refreshTrigger,
+                vaultService: vaultService
+            )
+        }
+    }
+}
+
+struct CompletedSheetContent: View {
+    let cart: Cart
+    @Binding var detent: PresentationDetent
+    @Binding var refreshTrigger: UUID
+    let vaultService: VaultService
+    
+    private var completedItems: [(cartItem: CartItem, item: Item?)] {
+        cart.cartItems.filter { $0.isFulfilled }.map { c in
+            (c, vaultService.findItemById(c.itemId))
         }
     }
     
-    private func morphToFinishTrip() {
-        guard cart.isShopping && hasItems else { return }
-        
-        withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-            showFinishTripButton = true
-        }
+    private var fulfilledCount: Int {
+        cart.cartItems.filter { $0.isFulfilled }.count
     }
     
-    private func morphToManageCart() {
-        withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-            showFinishTripButton = false
+    var body: some View {
+        CompletedItemsSheet(
+            cart: cart,
+            completedItems: completedItems,
+            fulfilledCount: fulfilledCount,
+            onUnfulfillItem: { cartItem in
+                vaultService.toggleItemFulfillment(cart: cart, itemId: cartItem.itemId)
+                refreshTrigger = UUID()
+            }
+        )
+        .conditionalPresentationBackground()
+        .presentationDetents([.fraction(0.12), .large], selection: $detent)
+        .presentationDragIndicator(.visible)
+        .interactiveDismissDisabled(true)
+        .presentationCornerRadius(24)
+        .backgroundInteractionForSmallDetent(detent: $detent)
+    }
+}
+
+extension View {
+    @ViewBuilder
+    func conditionalPresentationBackground() -> some View {
+        if #available(iOS 26, *) {
+            self
+        } else {
+            self.presentationBackground(.white)
         }
     }
+}
+
+
+extension View {
+    func backgroundInteractionForSmallDetent(detent: Binding<PresentationDetent>) -> some View {
+        self.modifier(BackgroundInteractionModifier(detent: detent))
+    }
+}
+
+struct BackgroundInteractionModifier: ViewModifier {
+    @Binding var detent: PresentationDetent
     
+    func body(content: Content) -> some View {
+        content
+            .presentationBackgroundInteraction(
+                detent == .fraction(0.12) ? .enabled(upThrough: .fraction(0.12)) : .disabled
+            )
+    }
 }
 
 struct CartDetailContent: View {
@@ -387,14 +477,23 @@ struct CartDetailContent: View {
     @Environment(CartViewModel.self) private var cartViewModel
     @Environment(\.dismiss) private var dismiss
     
-    @Binding var showingCompletedItemsPopover: Bool
-    @Binding var completedItems: [CartItem]
     @Binding var showFinishTripButton: Bool
     var buttonNamespace: Namespace.ID
-
+    
+    @State private var fulfilledCount: Int = 0
+    
+    private var currentFulfilledCount: Int {
+        cart.cartItems.filter { $0.isFulfilled }.count
+    }
+    
+    @Binding var bottomSheetDetent: PresentationDetent
+    @Binding var showingCompletedSheet: Bool
     
     var body: some View {
         GeometryReader { geometry in
+            let screenHeight = geometry.size.height
+                  let fractionHeight = screenHeight * 0.12
+            
             ZStack {
                 // Main content area
                 if cartReady {
@@ -411,17 +510,25 @@ struct CartDetailContent: View {
                             
                             ZStack {
                                 if hasItems {
-//                                    TODO: LIMIT THIS VSTACK'S HEIGHT to its ocntent height
                                     VStack(spacing: 24) {
-                                        
-                                        
                                         ItemsListView(
                                             cart: cart,
                                             totalItemCount: totalItemCount,
                                             sortedStoresWithRefresh: sortedStoresWithRefresh,
                                             storeItemsWithRefresh: storeItemsWithRefresh,
+                                            fulfilledCount: $fulfilledCount,
                                             onToggleFulfillment: { cartItem in
                                                 if cart.isShopping {
+                                                    // Update fulfilled count immediately for animation
+                                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                                        fulfilledCount = currentFulfilledCount
+                                                    }
+                                                    
+                                                    // Show bottom sheet if not already showing and we have completed items
+                                                    if !showingCompletedSheet && currentFulfilledCount > 0 {
+                                                        showingCompletedSheet = true
+                                                    }
+                                                    
                                                     vaultService.toggleItemFulfillment(cart: cart, itemId: cartItem.itemId)
                                                     refreshTrigger = UUID()
                                                 }
@@ -437,37 +544,6 @@ struct CartDetailContent: View {
                                             }
                                         )
                                         .transition(.scale)
-                                        
-                                        if cart.isShopping {
-                                            let fulfilledCount = cart.cartItems.filter { $0.isFulfilled }.count
-                                            let totalCount = cart.cartItems.count
-                                            
-                                            Button(action: {
-                                                // Get completed items first
-                                                let fulfilledItems = cart.cartItems.filter { $0.isFulfilled }
-                                                completedItems = fulfilledItems
-                                                
-                                                // Show the popover
-                                                withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-                                                    showingCompletedItemsPopover = true
-                                                }
-                                            }) {
-                                                HStack(spacing: 6) {
-                                                    Image(systemName: "arrow.down.left.and.arrow.up.right")
-                                                        .font(.system(size: 14))
-                                                    
-                                                    Text("\(fulfilledCount)/\(totalCount)")
-                                                        .lexendFont(14, weight: .bold)
-                                                        .foregroundColor(Color(hex: "333"))
-                                                }
-                                                .padding(.horizontal, 12)
-                                                .padding(.vertical, 8)
-                                                .frame(maxWidth: .infinity)
-                                            }
-                                            .buttonStyle(.plain)
-                                            .padding(.horizontal)
-                                            .transition(.scale)
-                                        }
                                     }
                                     
                                 } else {
@@ -497,6 +573,33 @@ struct CartDetailContent: View {
                                 showEditBudget = true
                             }
                         )
+                    }
+                    
+                    // Floating Action Bar (position it above everything)
+                    if cartReady && !showCelebration && manageCartButtonVisible {
+                        VStack {
+                            Spacer()
+                            
+                            CartDetailActionBar(
+                                    showFinishTrip: showFinishTripButton,
+                                    onManageCart: {
+                                        showingVaultView = true
+                                    },
+                                    onFinishTrip: {
+                                        print("Finish trip tapped")
+                                        showingCompleteAlert = true
+                                    },
+                                    namespace: buttonNamespace
+                                )
+                            .padding(.horizontal, 16)
+                            .padding(.bottom)
+                            
+                            Spacer()
+                                .frame(height: showingCompletedSheet ? fractionHeight : 0)
+                        }
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                        .animation(.spring(response: 0.5, dampingFraction: 0.7), value: manageCartButtonVisible)
+                        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: showingCompletedSheet)
                     }
                 } else {
                     ProgressView()
@@ -545,92 +648,71 @@ struct CartDetailContent: View {
                     .zIndex(1001)
                 }
             }
-            .onDisappear {
-                // Save to actual cart ONLY when dismissing CartDetailScreen
-                if localBudget != cart.budget {
-                    cart.budget = localBudget
-                    vaultService.updateCartTotals(cart: cart)
-                    print("💾 Saved budget update: \(cart.name) = \(localBudget)")
+        }
+        .ignoresSafeArea(.keyboard)
+        .onDisappear {
+            // Save to actual cart ONLY when dismissing CartDetailScreen
+            if localBudget != cart.budget {
+                cart.budget = localBudget
+                vaultService.updateCartTotals(cart: cart)
+                print("💾 Saved budget update: \(cart.name) = \(localBudget)")
+            }
+        }
+        .onChange(of: cart.budget) { oldValue, newValue in
+            if localBudget != newValue {
+                localBudget = newValue
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    animatedBudget = newValue
                 }
             }
-            .onChange(of: cart.budget) { oldValue, newValue in
-                if localBudget != newValue {
-                    localBudget = newValue
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        animatedBudget = newValue
-                    }
-                }
-            }
-            .overlay(alignment: .bottom) {
-                if cartReady && !showCelebration && manageCartButtonVisible {
-                    VStack(spacing: 0) {
-                        Spacer()
-                        
-                        CartDetailActionBar(
-                            showFinishTrip: showFinishTripButton,
-                            onManageCart: {
-                                showingVaultView = true
-                            },
-                            onFinishTrip: {
-                                print("Finish trip tapped")
-                                showingCompleteAlert = true
-                            },
-                            namespace: buttonNamespace
-                        )
-                        .padding(.horizontal, 16)
-                    }
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                    .animation(.spring(response: 0.5, dampingFraction: 0.7), value: manageCartButtonVisible)
-                    .ignoresSafeArea(.keyboard)
-                }
-            }
-            .overlay {
-                if showingCompletedItemsPopover {
-                    CompletedItemsPopover(
-                        isPresented: $showingCompletedItemsPopover,
-                        completedItems: completedItems,
-                        cart: cart,
-                        namespace: buttonNamespace
-                    )
-                    .transition(.opacity)
-                    .zIndex(1002)
-                }
-            }
-            .onAppear {
-                // Initialize both with cart's budget
-                animatedBudget = cart.budget
-                localBudget = cart.budget
-                
-                // Set initial button state
-                if cart.isShopping && hasItems {
-                    showFinishTripButton = true
-                }
-            }
-            .onChange(of: cart.status) { oldValue, newValue in
-                print("🛒 Cart status changed: \(oldValue) -> \(newValue)")
-                
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-                    if newValue == .shopping && hasItems {
-                        showFinishTripButton = true
-                    } else {
-                        showFinishTripButton = false
-                    }
-                }
+        }
+        .onAppear {
+            // Initialize both with cart's budget
+            animatedBudget = cart.budget
+            localBudget = cart.budget
+            
+            // Set initial button state
+            if cart.isShopping && hasItems {
+                showFinishTripButton = true
             }
             
-            .onChange(of: hasItems) { oldValue, newValue in
-                print("📦 Items changed: \(oldValue) -> \(newValue)")
-                
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-                    if cart.isShopping && newValue {
-                        showFinishTripButton = true
-                    } else if !newValue {
-                        showFinishTripButton = false
+            if cart.isShopping {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        showingCompletedSheet = true
                     }
                 }
             }
         }
-        .ignoresSafeArea(.keyboard)
+        .onChange(of: cart.status) { oldValue, newValue in
+            print("🛒 Cart status changed: \(oldValue) -> \(newValue)")
+            
+            // Show/hide bottom sheet based on shopping mode
+            if newValue == .shopping && hasItems {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    showingCompletedSheet = true
+                }
+            } else if newValue == .planning {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    showingCompletedSheet = false
+                }
+            }
+        }
+        .onChange(of: currentFulfilledCount) { oldValue, newValue in
+            // Show bottom sheet when we get our first completed item
+            if cart.isShopping && !showingCompletedSheet && newValue > 0 {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    showingCompletedSheet = true
+                }
+            }
+            // Hide bottom sheet when all items are unfulfilled
+            else if cart.isShopping && showingCompletedSheet && newValue == 0 {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    showingCompletedSheet = false
+                }
+            }
+        }
+        // REMOVED: .completedSheet modifier from here (it's now in CartDetailScreen)
     }
     
     private func handleDeleteItem(_ cartItem: CartItem) {
@@ -641,7 +723,6 @@ struct CartDetailContent: View {
         }
     }
 }
-
 
 struct HeaderView: View {
     let cart: Cart
@@ -755,131 +836,12 @@ struct HeaderView: View {
     }
 }
 
-struct ModeToggleView: View {
-    let cart: Cart
-    @Binding var anticipationOffset: CGFloat
-    @Binding var showingStartShoppingAlert: Bool
-    @Binding var showingSwitchToPlanningAlert: Bool
-    @Binding var headerHeight: CGFloat
-    @Binding var refreshTrigger: UUID
-    
-    @Environment(VaultService.self) private var vaultService
-    
-    var body: some View {
-        HStack(alignment: .bottom, spacing: 0) {
-            ZStack {
-                Color(hex: "EEEEEE")
-                    .frame(width: 176, height: 26)
-                    .cornerRadius(16)
-                
-                HStack {
-                    if cart.isShopping {
-                        Spacer()
-                    }
-                    Color.white
-                        .frame(width: 88, height: 30)
-                        .cornerRadius(20)
-                        .shadow(color: Color.black.opacity(0.25), radius: 2, x: 0.5, y: 1)
-                        .offset(x: anticipationOffset)
-                        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: anticipationOffset)
-                    if cart.isPlanning {
-                        Spacer()
-                    }
-                }
-                .frame(width: 176)
-                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: cart.status)
-                
-                HStack(spacing: 0) {
-                    Button(action: {
-                        if cart.status == .shopping {
-                            withAnimation(.easeInOut(duration: 0.1)) {
-                                anticipationOffset = -14
-                            }
-                            
-                            showingSwitchToPlanningAlert = true
-                        }
-                    }) {
-                        Text("Planning")
-                            .lexendFont(12, weight: cart.isPlanning ? .bold : .medium)
-                            .foregroundColor(cart.isPlanning ? .black : Color(hex: "999999"))
-                            .frame(width: 88, height: 26)
-                            .offset(x: cart.isPlanning ? anticipationOffset : 0)
-                            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: anticipationOffset)
-                            .animation(.easeInOut(duration: 0.2), value: cart.isPlanning)
-                    }
-                    .disabled(cart.isCompleted)
-                    .buttonStyle(.plain)
-                    
-                    Button(action: {
-                        if cart.status == .planning {
-                            withAnimation(.easeInOut(duration: 0.1)) {
-                                anticipationOffset = 14
-                            }
-                            
-                            showingStartShoppingAlert = true
-                        }
-                    }) {
-                        Text("Shopping")
-                            .lexendFont(12, weight: cart.isShopping ? .bold : .medium)
-                            .foregroundColor(cart.isShopping ? .black : Color(hex: "999999"))
-                            .frame(width: 88, height: 26)
-                            .offset(x: cart.isShopping ? anticipationOffset : 0)
-                            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: anticipationOffset)
-                            .animation(.easeInOut(duration: 0.2), value: cart.isShopping)
-                    }
-                    .disabled(cart.isCompleted)
-                }
-            }
-            .frame(width: 176, height: 30)
-            
-            Spacer()
-            
-            Button(action: {
-            }) {
-                Image(systemName: "circle")
-                    .resizable()
-                    .frame(width: 20, height: 20)
-                    .fontWeight(.light)
-                    .foregroundColor(.black)
-                
-            }
-            .padding(1.5)
-            .background(.white)
-            .clipShape(Circle())
-            .shadow(color: Color.black.opacity(0.4), radius: 1, x: 0, y: 0.5)
-        }
-        .padding(.top, headerHeight)
-        .background(Color.white)
-        .onChange(of: cart.status) { oldValue, newValue in
-            // Reset anticipation offset when status actually changes
-            withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
-                anticipationOffset = 0
-            }
-        }
-        .onChange(of: showingStartShoppingAlert) { oldValue, newValue in
-            if !newValue && cart.status == .planning {
-                // User cancelled the shopping alert, reset anticipation
-                withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
-                    anticipationOffset = 0
-                }
-            }
-        }
-        .onChange(of: showingSwitchToPlanningAlert) { oldValue, newValue in
-            if !newValue && cart.status == .shopping {
-                // User cancelled the planning alert, reset anticipation
-                withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
-                    anticipationOffset = 0
-                }
-            }
-        }
-    }
-}
-
 struct ItemsListView: View {
     let cart: Cart
     let totalItemCount: Int
     let sortedStoresWithRefresh: [String]
     let storeItemsWithRefresh: (String) -> [(cartItem: CartItem, item: Item?)]
+    @Binding var fulfilledCount: Int
     let onToggleFulfillment: (CartItem) -> Void
     let onEditItem: (CartItem) -> Void
     let onDeleteItem: (CartItem) -> Void
@@ -888,14 +850,6 @@ struct ItemsListView: View {
     private var availableWidth: CGFloat {
         let screenWidth = UIScreen.main.bounds.width
         
-        // TOTAL HORIZONTAL PADDING BREAKDOWN:
-        // 1. CartDetailContent: ~17pt (default system padding)
-        // 2. CartItemRowListView:
-        //    - Shopping: 12pt left + 8pt button spacing + 16pt right = 36pt
-        //    - Planning: 12pt left + 16pt right = 28pt
-        // 3. Additional 4pt internal HStack spacing in price details
-        // 4. Small buffer for safety: ~3pt
-        
         let cartDetailPadding: CGFloat = 17
         let itemRowPadding: CGFloat = cart.isShopping ? 36 : 28
         let internalSpacing: CGFloat = 4
@@ -903,12 +857,8 @@ struct ItemsListView: View {
         
         let totalPadding = cartDetailPadding + itemRowPadding + internalSpacing + safetyBuffer
         
-        // Shopping: 17 + 36 + 4 + 3 = 60pt
-        // Planning: 17 + 28 + 4 + 3 = 52pt
-        
         let calculatedWidth = screenWidth - totalPadding
         
-        // Ensure reasonable bounds
         return max(min(calculatedWidth, 250), 150)
     }
     
@@ -922,19 +872,17 @@ struct ItemsListView: View {
         let verticalPadding: CGFloat = 24
         let internalSpacing: CGFloat = 10
         
-        // Base height = text + padding + spacing
         let baseHeight = singleLineTextHeight + verticalPadding + internalSpacing
         
-        // Each additional line adds the text line height
         let additionalLineHeight: CGFloat = 24
         
         let itemHeight = baseHeight + (max(0, numberOfLines - 1) * additionalLineHeight)
         
-        // ADD divider height (except for first item in each store)
         let dividerHeight: CGFloat = isFirstInSection ? 0 : 12.0
         
         return itemHeight + dividerHeight
     }
+    
     private var estimatedHeight: CGFloat {
         let sectionHeaderHeight: CGFloat = 34
         let sectionSpacing: CGFloat = 8
@@ -944,17 +892,17 @@ struct ItemsListView: View {
         
         for store in sortedStoresWithRefresh {
             let storeItems = storeItemsWithRefresh(store)
-            if !storeItems.isEmpty {
+            let unfulfilledStoreItems = storeItems.filter { !$0.cartItem.isFulfilled }
+            
+            if !unfulfilledStoreItems.isEmpty {
                 totalHeight += sectionHeaderHeight
                 
-                // Track which item is first in this store
-                for (index, (_, item)) in storeItems.enumerated() {
+                for (index, (_, item)) in unfulfilledStoreItems.enumerated() {
                     let itemName = item?.name ?? "Unknown"
                     let isFirstInStore = index == 0
                     totalHeight += estimateRowHeight(for: itemName, isFirstInSection: isFirstInStore)
                 }
                 
-                // ADD spacing between stores (except after last store)
                 if store != sortedStoresWithRefresh.last {
                     totalHeight += sectionSpacing
                 }
@@ -964,46 +912,65 @@ struct ItemsListView: View {
         return totalHeight
     }
     
+    private var allItemsCompleted: Bool {
+        cart.isShopping && fulfilledCount > 0 && fulfilledCount == totalItemCount
+    }
+    
     var body: some View {
         GeometryReader { geometry in
             let calculatedHeight = estimatedHeight
             let maxAllowedHeight = geometry.size.height * 0.8
             
-            List {
-                ForEach(Array(sortedStoresWithRefresh.enumerated()), id: \.offset) { (index, store) in
-                    let storeItems = storeItemsWithRefresh(store)
-                    if !storeItems.isEmpty {
-                        StoreSectionListView(
-                            store: store,
-                            items: storeItems,
-                            cart: cart,
-                            onToggleFulfillment: onToggleFulfillment,
-                            onEditItem: onEditItem,
-                            onDeleteItem: onDeleteItem,
-                            isLastStore: index == sortedStoresWithRefresh.count - 1
-                        )
-                        .listRowInsets(EdgeInsets())
-                        .listRowSeparator(.hidden)
-                        .listRowBackground(Color(hex: "F7F2ED"))
+            VStack(spacing: 0) {
+                if allItemsCompleted {
+                    VStack(spacing: 16) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 50))
+                            .foregroundColor(.green)
+                        
+                        Text("Shopping Complete! 🎉")
+                            .lexendFont(18, weight: .bold)
+                            .foregroundColor(Color(hex: "333"))
+                        
+                        Text("All items have been marked as fulfilled")
+                            .lexendFont(14)
+                            .foregroundColor(Color(hex: "666"))
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
                     }
+                    .frame(height: min(200, maxAllowedHeight))
+                    .frame(maxWidth: .infinity)
+                    .background(Color(hex: "F7F2ED").darker(by: 0.02))
+                    .cornerRadius(16)
+                    .transition(.opacity.combined(with: .scale))
+                } else {
+                    List {
+                        ForEach(Array(sortedStoresWithRefresh.enumerated()), id: \.offset) { (index, store) in
+                            let storeItems = storeItemsWithRefresh(store)
+                            if !storeItems.isEmpty {
+                                StoreSectionListView(
+                                    store: store,
+                                    items: storeItems,
+                                    cart: cart,
+                                    onToggleFulfillment: onToggleFulfillment,
+                                    onEditItem: onEditItem,
+                                    onDeleteItem: onDeleteItem,
+                                    isLastStore: index == sortedStoresWithRefresh.count - 1
+                                )
+                                .listRowInsets(EdgeInsets())
+                                .listRowSeparator(.hidden)
+                                .listRowBackground(Color(hex: "F7F2ED"))
+                            }
+                        }
+                    }
+                    .frame(height: min(calculatedHeight, maxAllowedHeight))
+                    .listStyle(PlainListStyle())
+                    .listSectionSpacing(0)
+                    .background(Color(hex: "F7F2ED").darker(by: 0.02))
+                    .cornerRadius(16)
                 }
-          
-                
             }
-            .frame(height: min(calculatedHeight, maxAllowedHeight))
-            .listStyle(PlainListStyle())
-            .listSectionSpacing(0)
-            .background(Color(hex: "F7F2ED").darker(by: 0.02))
-            .cornerRadius(16)
         }
-    }
-}
-
-struct ContentHeightPreferenceKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-    
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
     }
 }
 
@@ -1016,8 +983,12 @@ struct StoreSectionListView: View {
     let onDeleteItem: (CartItem) -> Void
     let isLastStore: Bool
     
+    private var unfulfilledItems: [(cartItem: CartItem, item: Item?)] {
+        items.filter { !$0.cartItem.isFulfilled }
+    }
+    
     private var itemsWithStableIdentifiers: [(id: String, cartItem: CartItem, item: Item?)] {
-        items.map { ($0.cartItem.itemId, $0.cartItem, $0.item) }
+        unfulfilledItems.map { ($0.cartItem.itemId, $0.cartItem, $0.item) }
     }
     
     var body: some View {
@@ -1043,8 +1014,8 @@ struct StoreSectionListView: View {
                 }
                 .padding(.leading)
             }
-                .listRowInsets(EdgeInsets())
-                .textCase(nil)
+            .listRowInsets(EdgeInsets())
+            .textCase(nil)
             
         ) {
             ForEach(Array(itemsWithStableIdentifiers.enumerated()), id: \.element.id) { index, tuple in
@@ -1087,7 +1058,6 @@ struct StoreSectionListView: View {
                         }
                     }
                     
-                    // Add the dashed line divider between items (but not after the last item)
                     if index < itemsWithStableIdentifiers.count - 1 {
                         DashedLine()
                             .stroke(style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
@@ -1105,295 +1075,144 @@ struct StoreSectionListView: View {
     }
 }
 
+struct CompletedItemsSheet: View {
+    let cart: Cart
+    let completedItems: [(cartItem: CartItem, item: Item?)]
+    let fulfilledCount: Int
+    let onUnfulfillItem: (CartItem) -> Void
+    
+    @Environment(VaultService.self) private var vaultService
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            Spacer()
+                .frame(height: 24)
+            
+            VStack(spacing: 8) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Completed")
+                            .lexendFont(18, weight: .bold)
+                            .foregroundColor(Color(hex: "333"))
+                        
+                        Text("\(fulfilledCount) item\(fulfilledCount == 1 ? "" : "s")")
+                            .lexendFont(14)
+                            .foregroundColor(Color(hex: "666"))
+                    }
+                    
+                    Spacer()
+                    
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 24))
+                        .foregroundColor(.green)
+                }
+            }
+            
+            // Completed items list - Scrollable content
+            ScrollView {
+                if completedItems.isEmpty {
+                    VStack(spacing: 12) {
+                        Image(systemName: "checkmark.circle")
+                            .font(.system(size: 40))
+                            .foregroundColor(Color(hex: "999"))
+                        
+                        Text("No completed items yet")
+                            .lexendFont(14)
+                            .foregroundColor(Color(hex: "666"))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 40)
+                } else {
+                    LazyVStack(spacing: 0) {
+                        ForEach(Array(completedItems.enumerated()), id: \.element.cartItem.itemId) { index, tuple in
+                            CompletedItemRow(
+                                cartItem: tuple.cartItem,
+                                item: tuple.item,
+                                cart: cart,
+                                onUnfulfill: { onUnfulfillItem(tuple.cartItem) }
+                            )
+                            
+                            if index < completedItems.count - 1 {
+                                Divider()
+                                    .padding(.horizontal, 20)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .padding()
+    }
+}
 
 
-//struct CompletedItemsPopover: View {
-//    @Binding var isPresented: Bool
-//    let completedItems: [CartItem]
-//    let cart: Cart
-//    var namespace: Namespace.ID
-//    
-//    @Environment(VaultService.self) private var vaultService
-//    
-//    // Animation state
-//    @State private var popoverScale: CGFloat = 0.5
-//    @State private var popoverOpacity: Double = 0
-//    @State private var contentOffset: CGFloat = 300
-//    @State private var backgroundOpacity: Double = 0
-//    
-//    private var groupedItems: [String: [(cartItem: CartItem, item: Item?)]] {
-//        let itemsWithDetails = completedItems.map { cartItem in
-//            (cartItem, vaultService.findItemById(cartItem.itemId))
-//        }
-//        let grouped = Dictionary(grouping: itemsWithDetails) { cartItem, item in
-//            cartItem.getStore(cart: cart)
-//        }
-//        return grouped.filter { !$0.key.isEmpty && !$0.value.isEmpty }
-//    }
-//    
-//    private var sortedStores: [String] {
-//        Array(groupedItems.keys).sorted()
-//    }
-//    
-//    // ADD THIS MISSING COMPUTED PROPERTY:
-//    private var totalSpent: Double {
-//        completedItems.reduce(0) { $0 + ($1.actualPrice ?? 0) }
-//    }
-//    
-//    
-//    
-//    var body: some View {
-//        ZStack {
-//            backgroundView
-//            popoverContentView
-//        }
-//        .onAppear {
-//            animateIn()
-//        }
-//    }
-//    
-//    private var backgroundView: some View {
-//        Color.black.opacity(0.4)
-//            .opacity(backgroundOpacity)
-//            .edgesIgnoringSafeArea(.all)
-//            .onTapGesture {
-//                dismissPopover()
-//            }
-//    }
-//    
-//    private var popoverContentView: some View {
-//        VStack(spacing: 0) {
-//            handleBar
-//            headerView
-//            
-//            if completedItems.isEmpty {
-//                emptyStateView
-//            } else {
-//                itemsListView
-//            }
-//            
-//            doneButton
-//        }
-//        .frame(maxWidth: .infinity)
-//        .frame(height: UIScreen.main.bounds.height * 0.8)
-//        .background(Color.white)
-//        .cornerRadius(24, corners: [.topLeft, .topRight])
-//        .frame(maxHeight: .infinity, alignment: .bottom)
-//        .offset(y: contentOffset)
-//        .scaleEffect(popoverScale)
-//        .opacity(popoverOpacity)
-//        .shadow(color: Color.black.opacity(0.2), radius: 20, x: 0, y: -5)
-//        .matchedGeometryEffect(id: "finishTripButton", in: namespace, properties: .frame, isSource: false)
-//    }
-//    
-//    private var handleBar: some View {
-//        Capsule()
-//            .fill(Color.gray.opacity(0.3))
-//            .frame(width: 40, height: 5)
-//            .padding(.top, 8)
-//    }
-//    
-//    private var headerView: some View {
-//        HStack {
-//            Text("Completed Items")
-//                .lexendFont(18, weight: .bold)
-//                .foregroundColor(.black)
-//            
-//            Spacer()
-//            
-//            Button(action: dismissPopover) {
-//                Image(systemName: "xmark")
-//                    .font(.system(size: 16, weight: .medium))
-//                    .foregroundColor(.gray)
-//                    .frame(width: 30, height: 30)
-//                    .background(Color.gray.opacity(0.1))
-//                    .clipShape(Circle())
-//            }
-//        }
-//        .padding(.horizontal, 20)
-//        .padding(.top, 12)
-//        .padding(.bottom, 16)
-//    }
-//    
-//    private var emptyStateView: some View {
-//        VStack(spacing: 16) {
-//            Image(systemName: "checkmark.circle")
-//                .font(.system(size: 48))
-//                .foregroundColor(.gray.opacity(0.5))
-//            
-//            Text("No items completed yet")
-//                .lexendFont(16, weight: .medium)
-//                .foregroundColor(.gray)
-//        }
-//        .frame(maxHeight: .infinity)
-//        .padding(.vertical, 40)
-//    }
-//    
-//    private var itemsListView: some View {
-//        ScrollView {
-//            VStack(spacing: 0) {
-//                ForEach(sortedStores, id: \.self) { store in
-//                    storeSectionView(for: store)
-//                }
-//                
-//                totalSectionView
-//            }
-//            .padding(.bottom, 30)
-//        }
-//    }
-//    
-//    private func storeSectionView(for store: String) -> some View {
-//        Group {
-//            if let storeItems = groupedItems[store] {
-//                VStack(spacing: 0) {
-//                    // Store header
-//                    HStack {
-//                        Text(store)
-//                            .lexendFont(14, weight: .bold)
-//                            .foregroundColor(.black.opacity(0.8))
-//                        
-//                        Spacer()
-//                        
-//                        Text("\(storeItems.count) item\(storeItems.count == 1 ? "" : "s")")
-//                            .lexendFont(12, weight: .medium)
-//                            .foregroundColor(.gray)
+struct CompletedItemRow: View {
+    let cartItem: CartItem
+    let item: Item?
+    let cart: Cart
+    let onUnfulfill: () -> Void
+    
+    @Environment(VaultService.self) private var vaultService
+    
+    private var displayPrice: Double {
+        if cart.isShopping {
+            return (cartItem.actualPrice ?? cartItem.plannedPrice) ?? 0
+        }
+        return cartItem.plannedPrice ?? 0
+    }
+    
+    private var displayQuantity: Double {
+        if cart.isShopping {
+            return cartItem.actualQuantity ?? cartItem.quantity
+        }
+        return cartItem.quantity
+    }
+    
+    var body: some View {
+        HStack(alignment: .center, spacing: 12) {
+            
+            Button(action: onUnfulfill) {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 22))
+                    .foregroundColor(.green)
+            }
+            .buttonStyle(.plain)
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text(item?.name ?? "Unknown Item")
+                    .lexendFont(15, weight: .medium)
+                    .foregroundColor(Color(hex: "333"))
+                    .strikethrough(true, color: Color(hex: "999"))
+                
+                HStack(spacing: 8) {
+                    Text("\(displayQuantity.formatQuantity()) × \(displayPrice.formattedCurrency)")
+                        .lexendFont(13)
+                        .foregroundColor(Color(hex: "666"))
+                    
+//                    if let storeName = item?.store {
+//                        Text("• \(storeName)")
+//                            .lexendFont(12)
+//                            .foregroundColor(Color(hex: "999"))
 //                    }
-//                    .padding(.horizontal, 20)
-//                    .padding(.vertical, 12)
-//                    .background(Color(hex: "F5F5F5"))
-//                    .cornerRadius(8)
-//                    .padding(.horizontal, 20)
-//                    .padding(.top, store == sortedStores.first ? 0 : 16)
-//                    
-//                    // Items in store
-//                    VStack(spacing: 0) {
-//                        ForEach(Array(storeItems.enumerated()), id: \.offset) { index, itemTuple in
-//                            storeItemRow(itemTuple: itemTuple, isLastItem: index == storeItems.count - 1)
-//                        }
-//                    }
-//                    .background(Color.white)
-//                    .cornerRadius(8)
-//                    .padding(.horizontal, 20)
-//                }
-//            }
-//        }
-//    }
-//    
-//    private func storeItemRow(itemTuple: (cartItem: CartItem, item: Item?), isLastItem: Bool) -> some View {
-//        let (cartItem, item) = itemTuple
-//        
-//        return VStack(spacing: 0) {
-//            HStack(spacing: 12) {
-//                // Checkmark indicator
-//                Image(systemName: "checkmark.circle.fill")
-//                    .font(.system(size: 16))
-//                    .foregroundColor(.green)
-//                    .frame(width: 24)
-//                
-//                // Item name and details
-//                VStack(alignment: .leading, spacing: 2) {
-//                    Text(item?.name ?? "Unknown Item")
-//                        .lexendFont(14, weight: .medium)
-//                        .foregroundColor(.black)
-//                    
-//                    // quantity is NON-OPTIONAL Double, so direct comparison
-//                    if cartItem.quantity > 1 {
-//                        Text("Qty: \(cartItem.quantity, specifier: "%.0f")")
-//                            .lexendFont(12, weight: .regular)
-//                            .foregroundColor(.gray)
-//                    }
-//                }
-//                
-//                Spacer()
-//                
-//                // Price
-//                priceView(for: cartItem)
-//            }
-//            .padding(.horizontal, 20)
-//            .padding(.vertical, 12)
-//            
-//            // Separator
-//            if !isLastItem {
-//                Divider()
-//                    .padding(.leading, 56)
-//                    .padding(.trailing, 20)
-//            }
-//        }
-//    }
-//    
-//    private func priceView(for cartItem: CartItem) -> some View {
-//        Group {
-//            if cartItem.isFulfilled, let actualPrice = cartItem.actualPrice, actualPrice > 0 {
-//                Text(actualPrice.formattedCurrency)
-//                    .lexendFont(14, weight: .bold)
-//                    .foregroundColor(.black)
-//            } else if let plannedPrice = cartItem.plannedPrice, plannedPrice > 0 {
-//                Text(plannedPrice.formattedCurrency)
-//                    .lexendFont(14, weight: .regular)
-//                    .foregroundColor(.gray)
-//            } else {
-//                Text("N/A")
-//                    .lexendFont(14, weight: .regular)
-//                    .foregroundColor(.gray)
-//            }
-//        }
-//    }
-//    
-//    private var totalSectionView: some View {
-//        VStack(spacing: 12) {
-//            Divider()
-//                .padding(.horizontal, 20)
-//            
-//            HStack {
-//                Text("Total Spent")
-//                    .lexendFont(16, weight: .bold)
-//                    .foregroundColor(.black)
-//                
-//                Spacer()
-//                
-//                Text(totalSpent.formattedCurrency)
-//                    .lexendFont(16, weight: .bold)
-//                    .foregroundColor(.green)
-//            }
-//            .padding(.horizontal, 20)
-//        }
-//        .padding(.top, 16)
-//    }
-//    
-//    private var doneButton: some View {
-//        Button(action: dismissPopover) {
-//            Text("Done")
-//                .lexendFont(16, weight: .semibold)
-//                .foregroundColor(.white)
-//                .frame(maxWidth: .infinity)
-//                .frame(height: 50)
-//                .background(Color(hex: "4CAF50"))
-//                .cornerRadius(12)
-//                .padding(.horizontal, 20)
-//                .padding(.bottom, 30)
-//        }
-//    }
-//    
-//    private func animateIn() {
-//        withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-//            backgroundOpacity = 1
-//            popoverOpacity = 1
-//            contentOffset = 0
-//            popoverScale = 1
-//        }
-//    }
-//    
-//    private func dismissPopover() {
-//        withAnimation(.spring(response: 0.4, dampingFraction: 0.9)) {
-//            backgroundOpacity = 0
-//            popoverOpacity = 0
-//            contentOffset = 300
-//            popoverScale = 0.5
-//        }
-//        
-//        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-//            isPresented = false
-//        }
-//    }
-//}
+                    
+                }
+            }
+            
+            Spacer()
+            
+            Text((displayPrice * displayQuantity).formattedCurrency)
+                .lexendFont(15, weight: .bold)
+                .foregroundColor(Color(hex: "333"))
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
+        .background(Color.white.opacity(0.5))
+    }
+}
+extension Double {
+    func formatQuantity() -> String {
+        self == floor(self) ? String(Int(self)) : String(self)
+    }
+}
+
 
