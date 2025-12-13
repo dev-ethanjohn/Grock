@@ -532,19 +532,45 @@ extension VaultService {
 extension VaultService {
    
     /// Adds an item to a shopping cart
+//    func addItemToCart(item: Item, cart: Cart, quantity: Double, selectedStore: String? = nil) {
+//        let store = selectedStore ?? item.priceOptions.first?.store ?? "Unknown Store"
+//       
+//        let cartItem = CartItem(
+//            itemId: item.id,
+//            quantity: quantity,
+//            plannedStore: store
+//        )
+//       
+//        if cart.status == .shopping {
+//            cartItem.capturePlannedData(from: vault!)
+//        }
+//       
+//        cart.cartItems.append(cartItem)
+//        updateCartTotals(cart: cart)
+//        saveContext()
+//        print("➕ Added item to cart: \(item.name) ×\(quantity)")
+//    }
     func addItemToCart(item: Item, cart: Cart, quantity: Double, selectedStore: String? = nil) {
         let store = selectedStore ?? item.priceOptions.first?.store ?? "Unknown Store"
-       
+        
         let cartItem = CartItem(
             itemId: item.id,
             quantity: quantity,
             plannedStore: store
         )
-       
+        
+        // ✅ IMMEDIATELY set planned price during planning mode
+        if cart.status == .planning {
+            if let vault = vault {
+                cartItem.plannedPrice = cartItem.getCurrentPrice(from: vault, store: store)
+                cartItem.plannedUnit = cartItem.getCurrentUnit(from: vault, store: store)
+            }
+        }
+        
         if cart.status == .shopping {
             cartItem.capturePlannedData(from: vault!)
         }
-       
+        
         cart.cartItems.append(cartItem)
         updateCartTotals(cart: cart)
         saveContext()
@@ -662,36 +688,33 @@ extension VaultService {
 extension VaultService {
    
     func updateCartTotals(cart: Cart) {
-         guard let vault = vault else { return }
+        guard let vault = vault else { return }
         
-         // No longer need to calculate and assign totalSpent
-         // It's computed automatically from cartItems
+        // Update cartItems if needed
+        for cartItem in cart.cartItems {
+            // If we need to capture planned data when starting shopping
+            if cart.status == .shopping && !cartItem.isFulfilled && cartItem.plannedPrice == nil {
+                cartItem.capturePlannedData(from: vault)
+            }
+        }
         
-         // Instead, we need to update cartItems if needed and save
-         for cartItem in cart.cartItems {
-             // If we need to capture planned data when starting shopping
-             if cart.status == .shopping && !cartItem.isFulfilled {
-                 cartItem.capturePlannedData(from: vault)
-             }
-         }
+        // Update fulfillmentStatus based on cart status
+        switch cart.status {
+        case .planning:
+            if cart.budget > 0 {
+                // Use the computed totalSpent
+                cart.fulfillmentStatus = min(cart.totalSpent / cart.budget, 1.0)
+            }
+        case .shopping:
+            let fulfilledCount = cart.cartItems.filter { $0.isFulfilled }.count
+            let totalCount = cart.cartItems.count
+            cart.fulfillmentStatus = totalCount > 0 ? Double(fulfilledCount) / Double(totalCount) : 0.0
+        case .completed:
+            cart.fulfillmentStatus = 1.0
+        }
         
-         // Update fulfillmentStatus based on cart status
-         switch cart.status {
-         case .planning:
-             if cart.budget > 0 {
-                 // Use the computed totalSpent
-                 cart.fulfillmentStatus = min(cart.totalSpent / cart.budget, 1.0)
-             }
-         case .shopping:
-             let fulfilledCount = cart.cartItems.filter { $0.isFulfilled }.count
-             let totalCount = cart.cartItems.count
-             cart.fulfillmentStatus = totalCount > 0 ? Double(fulfilledCount) / Double(totalCount) : 0.0
-         case .completed:
-             cart.fulfillmentStatus = 1.0
-         }
-        
-         saveContext()
-     }
+        saveContext()
+    }
    
     /// Generates insights for a shopping cart
     func getCartInsights(cart: Cart) -> CartInsights {

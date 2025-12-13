@@ -712,7 +712,6 @@ struct CartDetailContent: View {
                 }
             }
         }
-        // REMOVED: .completedSheet modifier from here (it's now in CartDetailScreen)
     }
     
     private func handleDeleteItem(_ cartItem: CartItem) {
@@ -738,7 +737,7 @@ struct HeaderView: View {
     
     private var progress: Double {
         guard localBudget > 0 else { return 0 }
-        let spent = cart.cartItems.reduce(0) { $0 + ($1.actualPrice ?? 0) * ($1.actualQuantity ?? $1.quantity) }
+        let spent = cart.totalSpent // Use the computed property
         return min(spent / localBudget, 1.0)
     }
     

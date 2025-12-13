@@ -153,7 +153,6 @@ struct BudgetProgressText: View {
     let pillWidth: CGFloat
     let minWidthForInternalText: CGFloat
     
-    // Cache the processed color to avoid recalculating every frame
     private var textColor: Color {
         budgetProgressColor.darker(by: 0.5).saturated(by: 0.4)
     }
@@ -162,15 +161,12 @@ struct BudgetProgressText: View {
         max(0, pillWidth)
     }
     
-    // Determine if we should show text inside or outside
     private var shouldShowTextInside: Bool {
         safePillWidth >= minWidthForInternalText
     }
     
     var body: some View {
-        // Use a ZStack with conditional opacity instead of switching layouts
         ZStack {
-            // Text inside (shown when pill is wide enough)
             if shouldShowTextInside {
                 Text(cart.totalSpent.formattedCurrency)
                     .lexendFont(14, weight: .bold)
@@ -180,10 +176,8 @@ struct BudgetProgressText: View {
                     .transition(.opacity.combined(with: .scale(scale: 0.9)))
             }
             
-            // Text outside (shown when pill is too narrow)
             if !shouldShowTextInside {
                 HStack(spacing: 8) {
-                    // Empty capsule - just for layout consistency
                     Capsule()
                         .fill(budgetProgressColor)
                         .frame(width: safePillWidth, height: 22)

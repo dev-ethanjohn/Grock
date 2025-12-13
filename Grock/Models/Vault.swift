@@ -143,23 +143,36 @@ class Cart {
         cartItems.count
     }
     
+    // Fixed totalSpent calculation based on cart status
     var totalSpent: Double {
-        cartItems.reduce(0) { $0 + ($1.actualPrice ?? 0) }
-    }
-    
-    // Or if you need to calculate based on different cart status:
-    func getTotalSpent() -> Double {
-        switch status {
-        case .planning:
-            return cartItems.reduce(0) { $0 + ($1.plannedPrice ?? 0) * $1.quantity }
-        case .shopping:
-            return cartItems.reduce(0) {
-                let price = $1.actualPrice ?? $1.plannedPrice ?? 0
-                let quantity = $1.actualQuantity ?? $1.quantity
-                return $0 + (price * quantity)
+        cartItems.reduce(0) { total, cartItem in
+            let price: Double
+            let quantity: Double
+            
+            switch status {
+            case .planning:
+                // Use planned price during planning
+                price = cartItem.plannedPrice ?? 0
+                quantity = cartItem.quantity
+                
+            case .shopping:
+                // Use actual price if set, otherwise planned price
+                if cartItem.isFulfilled {
+                    price = cartItem.actualPrice ?? cartItem.plannedPrice ?? 0
+                    quantity = cartItem.actualQuantity ?? cartItem.quantity
+                } else {
+                    // For unfulfilled items, use planned price
+                    price = cartItem.plannedPrice ?? 0
+                    quantity = cartItem.quantity
+                }
+                
+            case .completed:
+                // Use actual price for completed carts
+                price = cartItem.actualPrice ?? cartItem.plannedPrice ?? 0
+                quantity = cartItem.actualQuantity ?? cartItem.quantity
             }
-        case .completed:
-            return cartItems.reduce(0) { $0 + ($1.actualPrice ?? 0) * ($1.actualQuantity ?? $1.quantity) }
+            
+            return total + (price * quantity)
         }
     }
 }
