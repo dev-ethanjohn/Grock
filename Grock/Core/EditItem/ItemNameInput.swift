@@ -17,10 +17,13 @@ struct ItemNameInput: View {
     @State private var fillAnimation: CGFloat = 0.0
     @State private var fieldScale: CGFloat = 1.0
     @State private var shakeOffset: CGFloat = 0
+    @State private var showCategoryLockedTooltip = false
     
     private var shouldShowErrorStyling: Bool {
         showItemNameError || duplicateError != nil
     }
+    
+    var isCategoryEditable: Bool = true
     
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -41,6 +44,21 @@ struct ItemNameInput: View {
                 }
                 else if showTooltip && selectedCategory == nil && !showCategoryError {
                     CategoryTooltipPopover()
+                        .offset(x: 0, y: -36)
+                        .transition(.asymmetric(
+                            insertion: .scale(scale: 0.85, anchor: .topTrailing)
+                                .combined(with: .opacity)
+                                .animation(.spring(response: 0.3, dampingFraction: 0.5)),
+                            removal: .scale(scale: 0.95, anchor: .topTrailing)
+                                .combined(with: .opacity)
+                                .animation(.spring(response: 0.15, dampingFraction: 0.75))
+                        ))
+                        .zIndex(1)
+                }
+                
+                // Category Locked Tooltip for Shopping Mode
+                else if !isCategoryEditable && showCategoryLockedTooltip {
+                    CategoryLockedTooltip()
                         .offset(x: 0, y: -36)
                         .transition(.asymmetric(
                             insertion: .scale(scale: 0.85, anchor: .topTrailing)
@@ -74,7 +92,22 @@ struct ItemNameInput: View {
                             CategoryCircularButton(
                                 selectedCategory: $selectedCategory,
                                 selectedCategoryEmoji: selectedCategoryEmoji,
-                                hasError: showCategoryError && selectedCategory == nil
+                                hasError: showCategoryError && selectedCategory == nil,
+                                isEditable: isCategoryEditable,
+                                onTap: {
+                                    if !isCategoryEditable {
+                                        showCategoryLockedTooltip = true
+                                        let generator = UINotificationFeedbackGenerator()
+                                        generator.notificationOccurred(.warning)
+                                        
+                                        // Auto-hide tooltip after 2 seconds
+                                        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                                            withAnimation {
+                                                showCategoryLockedTooltip = false
+                                            }
+                                        }
+                                    }
+                                }
                             )
                             .offset(x: shakeOffset),
                             alignment: .trailing
@@ -83,12 +116,24 @@ struct ItemNameInput: View {
             }
             
             if let category = selectedCategory {
-                Text(category.title)
-                    .font(.caption2)
-                    .foregroundColor(category.pastelColor.darker(by: 0.3))
-                    .padding(.horizontal, 16)
-                    .transition(.scale.combined(with: .opacity))
-                    .id(category.id)
+                HStack(spacing: 4) {
+                    Text(category.title)
+                        .font(.caption2)
+                        .foregroundColor(category.pastelColor.darker(by: 0.3))
+                    
+                    if !isCategoryEditable {
+                        Image(systemName: "lock.fill")
+                            .font(.system(size: 8))
+                            .foregroundColor(.gray)
+                        
+                        Text("From Vault")
+                            .font(.caption2)
+                            .foregroundColor(.gray)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .transition(.scale.combined(with: .opacity))
+                .id(category.id)
             }
         }
         .animation(.spring(response: 0.4, dampingFraction: 0.6), value: selectedCategory)
@@ -129,8 +174,8 @@ struct ItemNameInput: View {
             } else {
                 RadialGradient(
                     colors: [
-                        selectedCategory!.pastelColor.opacity(0.4),
-                        selectedCategory!.pastelColor.opacity(0.35)
+                        selectedCategory!.pastelColor.opacity(isCategoryEditable ? 0.4 : 0.2),
+                        selectedCategory!.pastelColor.opacity(isCategoryEditable ? 0.35 : 0.15)
                     ],
                     center: .center,
                     startRadius: 0,
@@ -139,6 +184,7 @@ struct ItemNameInput: View {
             }
         }
         .brightness(shouldShowErrorStyling ? 0 : -0.03)
+        .opacity(isCategoryEditable ? 1.0 : 0.8)
     }
     
     private func handleCategoryChange(oldValue: GroceryCategory?, newValue: GroceryCategory?) {
@@ -168,6 +214,8 @@ struct ItemNameInput: View {
     }
     
     private func startFieldBounce() {
+        guard isCategoryEditable else { return } // Only bounce if editable
+        
         withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {
             fieldScale = 0.985
         }
@@ -183,5 +231,47 @@ struct ItemNameInput: View {
                 fieldScale = 1.0
             }
         }
+    }
+}
+
+// MARK: - Supporting Components
+
+struct CategoryLockedTooltip: View {
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 8) {
+                Image(systemName: "lock.fill")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+                
+                Text("Category locked in shopping mode")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color.white)
+                    .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 2)
+            )
+            
+            Triangle()
+                .fill(Color.white)
+                .frame(width: 12, height: 8)
+                .shadow(color: Color.black.opacity(0.1), radius: 2, x: 0, y: 1)
+                .offset(y: -1)
+        }
+    }
+}
+
+struct Triangle: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: rect.midX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+        path.closeSubpath()
+        return path
     }
 }

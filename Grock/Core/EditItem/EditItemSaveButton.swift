@@ -2,6 +2,8 @@ import SwiftUI
 
 struct EditItemSaveButton: View {
     let isEditFormValid: Bool
+    var buttonTitle: String = "Save"
+    var buttonColor: Color = .black
     let action: () -> Void
     
     @State private var fillAnimation: CGFloat = 0.0
@@ -9,7 +11,7 @@ struct EditItemSaveButton: View {
     
     var body: some View {
         Button(action: action) {
-            Text("Save")
+            Text(buttonTitle)  // Use parameter
                 .fuzzyBubblesFont(16, weight: .bold)
                 .foregroundStyle(.white)
                 .padding(.vertical, 4)
@@ -19,7 +21,7 @@ struct EditItemSaveButton: View {
                         .fill(
                             isEditFormValid
                             ? RadialGradient(
-                                colors: [Color.black, Color.gray.opacity(0.3)],
+                                colors: [buttonColor, buttonColor.opacity(0.7)],  
                                 center: .center,
                                 startRadius: 0,
                                 endRadius: fillAnimation * 150
@@ -34,6 +36,7 @@ struct EditItemSaveButton: View {
                 )
                 .scaleEffect(buttonScale)
         }
+        .disabled(!isEditFormValid)
         .onChange(of: isEditFormValid) { oldValue, newValue in
             if newValue {
                 if !oldValue {
@@ -75,5 +78,3 @@ struct EditItemSaveButton: View {
         }
     }
 }
-
-

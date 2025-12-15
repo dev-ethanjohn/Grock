@@ -1,9 +1,6 @@
 import SwiftUI
 import SwiftData
 
-import SwiftUI
-import SwiftData
-
 struct CartDetailScreen: View {
     let cart: Cart
     @Environment(VaultService.self) private var vaultService
@@ -53,6 +50,10 @@ struct CartDetailScreen: View {
     
     @State private var bottomSheetDetent: PresentationDetent = .fraction(0.08)
     @State private var showingCompletedSheet = false
+    
+    @State private var showingShoppingPopover = false
+    @State private var selectedCartItemForPopover: CartItem?
+    @State private var selectedItemForPopover: Item?
     
     private var cartInsights: CartInsights {
         vaultService.getCartInsights(cart: cart)
@@ -148,10 +149,36 @@ struct CartDetailScreen: View {
             showFinishTripButton: $showFinishTripButton,
             buttonNamespace: buttonNamespace,
             bottomSheetDetent: $bottomSheetDetent,
-            showingCompletedSheet: $showingCompletedSheet
+            showingCompletedSheet: $showingCompletedSheet,
+            showingShoppingPopover: $showingShoppingPopover,
+            selectedItemForPopover: $selectedItemForPopover,
+            selectedCartItemForPopover: $selectedCartItemForPopover
         )
         
-        basicParams
+        ZStack {
+            basicParams
+            
+            if showingShoppingPopover {
+                           ShoppingEditItemPopover(
+                               isPresented: $showingShoppingPopover,
+                               item: selectedItemForPopover!,
+                               cart: cart,
+                               cartItem: selectedCartItemForPopover!,
+                               onSave: {
+                                   vaultService.updateCartTotals(cart: cart)
+                                   refreshTrigger = UUID()
+                               },
+                               onDismiss: {
+                                   showingShoppingPopover = false
+                               }
+                           )
+                           .environment(vaultService)
+                           .transition(.opacity)
+                           .zIndex(100)
+                       }
+            
+        }
+
             .onAppear {
                 previousHasItems = hasItems
                 checkAndShowCelebration()
@@ -204,14 +231,13 @@ struct CartDetailScreen: View {
             }
             .navigationBarBackButtonHidden(true)
             .sheet(item: $itemToEdit) { item in
-                // FIXED: Find the cartItem for this item
+                // Planning mode: Use EditItemSheet
                 if let cartItem = cart.cartItems.first(where: { $0.itemId == item.id }) {
                     EditItemSheet(
                         item: item,
                         cart: cart,
                         cartItem: cartItem,
                         onSave: { updatedItem in
-                            print("✅ Updated cart item")
                             vaultService.updateCartTotals(cart: cart)
                             refreshTrigger = UUID()
                         }
@@ -234,7 +260,7 @@ struct CartDetailScreen: View {
                 }
                 .presentationCornerRadius(24)
             }
-            // ADD THE COMPLETED SHEET HERE
+            // Completed items bottom sheet
             .completedSheet(
                 cart: cart,
                 showing: $showingCompletedSheet,
@@ -254,12 +280,11 @@ struct CartDetailScreen: View {
             .alert("Switch to Planning", isPresented: $showingSwitchToPlanningAlert) {
                 Button("Cancel", role: .cancel) { }
                 Button("Switch to Planning") {
-                    cart.status = .planning
-                    vaultService.updateCartTotals(cart: cart)
+                    vaultService.returnToPlanning(cart: cart)
                     refreshTrigger = UUID()
                 }
             } message: {
-                Text("Switching back to planning mode will unfreeze planned prices and allow you to modify your shopping list.")
+                Text("Switching back to planning will discard all shopping data and reload prices from your vault.")
             }
             .alert("Complete Shopping", isPresented: $showingCompleteAlert) {
                 Button("Cancel", role: .cancel) { }
@@ -286,6 +311,28 @@ struct CartDetailScreen: View {
             .sheet(isPresented: $showingFilterSheet) {
                 FilterSheet(selectedFilter: $selectedFilter)
             }
+    }
+    
+    private func handleEditItem(cartItem: CartItem) {
+        print("🛒 Editing item in shopping mode")
+        
+        // Force dismiss any keyboard first
+        UIApplication.shared.endEditing()
+        
+        if let found = vaultService.findItemById(cartItem.itemId) {
+            if cart.status == .shopping {
+                print("🛍️ Showing shopping popover for: \(found.name)")
+                // Set state in a single transaction to avoid race conditions
+                DispatchQueue.main.async {
+                    selectedItemForPopover = found
+                    selectedCartItemForPopover = cartItem
+                    showingShoppingPopover = true
+                }
+            } else {
+                print("📝 Planning mode - showing sheet")
+                itemToEdit = found
+            }
+        }
     }
     
     private func checkAndShowCelebration() {
@@ -489,6 +536,12 @@ struct CartDetailContent: View {
     @Binding var bottomSheetDetent: PresentationDetent
     @Binding var showingCompletedSheet: Bool
     
+    
+    // Add these bindings
+      @Binding var showingShoppingPopover: Bool
+      @Binding var selectedItemForPopover: Item?
+      @Binding var selectedCartItemForPopover: CartItem?
+    
     var body: some View {
         GeometryReader { geometry in
             let screenHeight = geometry.size.height
@@ -519,12 +572,10 @@ struct CartDetailContent: View {
                                             fulfilledCount: $fulfilledCount,
                                             onToggleFulfillment: { cartItem in
                                                 if cart.isShopping {
-                                                    // Update fulfilled count immediately for animation
                                                     withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                                                         fulfilledCount = currentFulfilledCount
                                                     }
                                                     
-                                                    // Show bottom sheet if not already showing and we have completed items
                                                     if !showingCompletedSheet && currentFulfilledCount > 0 {
                                                         showingCompletedSheet = true
                                                     }
@@ -534,14 +585,12 @@ struct CartDetailContent: View {
                                                 }
                                             },
                                             onEditItem: { cartItem in
-                                                if let found = vaultService.findItemById(cartItem.itemId) {
-                                                    print("🟢 Setting item to edit: \(found.name)")
-                                                    itemToEdit = found
-                                                }
-                                            },
-                                            onDeleteItem: { cartItem in
-                                                handleDeleteItem(cartItem)
-                                            }
+                                                   // This calls CartDetailContent.handleEditItem
+                                                handleEditItem(cartItem: cartItem)
+                                               },
+                                               onDeleteItem: { cartItem in
+                                                   handleDeleteItem(cartItem)
+                                               }
                                         )
                                         .transition(.scale)
                                     }
@@ -609,6 +658,30 @@ struct CartDetailContent: View {
                             }
                         }
                 }
+                
+//                
+//                if showingShoppingPopover {
+//                     ShoppingEditItemPopover(
+//                         isPresented: $showingShoppingPopover,
+//                         item: selectedItemForPopover!,
+//                         cart: cart,
+//                         cartItem: selectedCartItemForPopover!,
+//                         onSave: {
+//                             vaultService.updateCartTotals(cart: cart)
+//                             refreshTrigger = UUID()
+//                         },
+//                         onDismiss: {
+//                             showingShoppingPopover = false
+//                         }
+//                     )
+//                     .environment(vaultService)
+//                     .transition(.opacity)
+//                     .zIndex(1)
+//                 }
+//                 
+                
+                
+                
                 
                 if showEditBudget {
                     EditBudgetPopover(
@@ -710,6 +783,22 @@ struct CartDetailContent: View {
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                     showingCompletedSheet = false
                 }
+            }
+        }
+    }
+    
+    // In CartDetailContent struct, update handleEditItem:
+    private func handleEditItem(cartItem: CartItem) {
+        if let found = vaultService.findItemById(cartItem.itemId) {
+            if cart.status == .shopping {
+                // Shopping mode: Set bindings for popover
+                selectedItemForPopover = found
+                selectedCartItemForPopover = cartItem
+                showingShoppingPopover = true
+            } else {
+                // Planning mode: Set itemToEdit binding directly
+                // This will trigger the .sheet(item: $itemToEdit) in parent
+                itemToEdit = found
             }
         }
     }
@@ -842,7 +931,7 @@ struct ItemsListView: View {
     let storeItemsWithRefresh: (String) -> [(cartItem: CartItem, item: Item?)]
     @Binding var fulfilledCount: Int
     let onToggleFulfillment: (CartItem) -> Void
-    let onEditItem: (CartItem) -> Void
+    let onEditItem: (CartItem) -> Void  // This should be updated
     let onDeleteItem: (CartItem) -> Void
     
     // Calculate available width based on screen width minus total padding

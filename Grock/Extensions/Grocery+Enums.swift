@@ -1,27 +1,6 @@
-//
-//  Grocery+Enums.swift
-//  Grock
-//
-//  Created by Ethan John Paguntalan on 10/17/25.
-//
-
 import Foundation
 import SwiftUI
 
-
-
-enum EditContext {
-    case vault
-    case cart
-}
-
-//enum FilterOption: String, CaseIterable {
-//    case all = "All"
-//    case fulfilled = "Fulfilled"
-//    case unfulfilled = "Unfulfilled"
-//}
-
-//MARK: Categories
 enum GroceryCategory: String, CaseIterable, Identifiable {
     case freshProduce
     case meatsSeafood
@@ -160,12 +139,3 @@ enum GroceryCategory: String, CaseIterable, Identifiable {
         }
     }
 }
-
-
-//MARK: Onboarding
-//enum OnboardingStep {
-//    case welcome
-//    case lastStore
-//    case firstItem
-//    case done
-//}

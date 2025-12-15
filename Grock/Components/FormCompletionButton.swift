@@ -158,7 +158,7 @@ extension FormCompletionButton {
     
     static func doneButton(
         isEnabled: Bool,
-        cornerRadius: CGFloat = 10,
+        cornerRadius: CGFloat = 100,
         verticalPadding: CGFloat = 6,
         maxWidth: Bool = false,
         action: @escaping () -> Void

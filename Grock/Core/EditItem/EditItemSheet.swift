@@ -1,6 +1,145 @@
 import SwiftUI
 import SwiftData
 
+struct EditItemHeaderView: View {
+    let cart: Cart?
+    let formViewModel: ItemFormViewModel
+    
+    var body: some View {
+        if let cart = cart {
+            VStack(alignment: .leading, spacing: 8) {
+                Divider()
+                
+                Text(formViewModel.modeDescription)
+                    .font(.caption)
+                    .foregroundColor(getModeColor(cart: cart))
+                    .padding(.horizontal)
+            }
+            .padding(.vertical, 8)
+        }
+    }
+    
+    private func getModeColor(cart: Cart) -> Color {
+        cart.status == .planning ? .blue : .green
+    }
+}
+
+struct EditItemRemoveOptionsView: View {
+    let context: EditContext
+    let onRemoveFromCart: () -> Void
+    let onRemoveFromVault: () -> Void
+    
+    var body: some View {
+        if context == .cart {
+            HStack(spacing: 0) {
+                removeOption(
+                    text: "Remove from Cart",
+                    action: onRemoveFromCart
+                )
+                
+                Text("|")
+                    .lexendFont(16, weight: .thin)
+                
+                removeOption(
+                    text: "Remove from Vault",
+                    action: onRemoveFromVault
+                )
+            }
+            .foregroundStyle(.black)
+        } else {
+            HStack(spacing: 8) {
+                Text("Remove from Vault")
+                    .lexendFont(14, weight: .medium)
+                
+                Image(systemName: "trash")
+                    .lexendFont(12, weight: .bold)
+            }
+            .foregroundStyle(.red)
+            .padding(.vertical)
+            .onTapGesture {
+                onRemoveFromVault()
+            }
+        }
+    }
+    
+    private func removeOption(text: String, action: @escaping () -> Void) -> some View {
+        Text(text)
+            .lexendFont(14, weight: .medium)
+            .foregroundStyle(.red)
+            .padding(.vertical)
+            .frame(maxWidth: .infinity, alignment: .center)
+            .onTapGesture {
+                action()
+            }
+    }
+}
+
+struct EditItemBottomBarView: View {
+    let context: EditContext
+    let isEditFormValid: Bool
+    let formViewModel: ItemFormViewModel
+    let onSave: () -> Void
+    
+    var body: some View {
+        VStack(spacing: 8) {
+            if context == .cart {
+                Text("Editing this item will update prices from vault and in all active carts")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+            }
+            
+            EditItemSaveButton(
+                isEditFormValid: isEditFormValid,
+                buttonTitle: formViewModel.getSaveButtonTitle(),
+                buttonColor: formViewModel.getSaveButtonColor()
+            ) {
+                print("🔄 EditItemBottomBarView onSave called")
+                onSave()
+            }
+            .padding(.horizontal)
+        }
+        .padding(.bottom, 12)
+    }
+}
+
+class EditItemValidationHandler {
+    @MainActor
+    static func triggerRealTimeValidation(
+        formViewModel: ItemFormViewModel,
+        item: Item,
+        vaultService: VaultService,
+        duplicateError: Binding<String?>,
+        validationTask: inout Task<Void, Never>?
+    ) {
+        validationTask?.cancel()
+        
+        let itemName = formViewModel.itemName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let storeName = formViewModel.storeName.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        guard !itemName.isEmpty && !storeName.isEmpty else {
+            duplicateError.wrappedValue = nil
+            return
+        }
+        
+        validationTask = Task {
+            try? await Task.sleep(nanoseconds: 500_000_000)
+            
+            if !Task.isCancelled {
+                let validation = vaultService.validateItemName(itemName, store: storeName, excluding: item.id)
+                await MainActor.run {
+                    if !validation.isValid {
+                        duplicateError.wrappedValue = validation.errorMessage
+                    } else {
+                        duplicateError.wrappedValue = nil
+                    }
+                }
+            }
+        }
+    }
+}
+
 struct EditItemSheet: View {
     let item: Item
     let cart: Cart?
@@ -12,13 +151,11 @@ struct EditItemSheet: View {
     @Environment(\.dismiss) private var dismiss
     
     @State private var formViewModel: ItemFormViewModel
-    
-    @FocusState private var itemNameFieldIsFocused: Bool
-    
     @State private var duplicateError: String?
     @State private var validationTask: Task<Void, Never>?
+    @FocusState private var itemNameFieldIsFocused: Bool
     
-    // MARK: - Initializers for different contexts
+    // MARK: - Initializers
     
     init(
         item: Item,
@@ -32,96 +169,56 @@ struct EditItemSheet: View {
         self.cartItem = cartItem
         self.onSave = onSave
         
+        // Determine context and create appropriate view model
         if cart != nil && cartItem != nil {
             self.context = .cart
-            _formViewModel = State(initialValue: ItemFormViewModel(requiresPortion: true, requiresStore: true))
+            _formViewModel = State(initialValue: ItemFormViewModel(
+                requiresPortion: true,
+                requiresStore: true,
+                context: .cart
+            ))
         } else {
             self.context = context ?? .vault
-            _formViewModel = State(initialValue: ItemFormViewModel(requiresPortion: false, requiresStore: true))
+            _formViewModel = State(initialValue: ItemFormViewModel(
+                requiresPortion: false,
+                requiresStore: true,
+                context: context ?? .vault
+            ))
         }
         
         print("🔵 EditItemSheet INIT called - context: \(self.context)")
     }
-      
+    
     var body: some View {
         NavigationView {
             VStack {
                 ScrollView {
                     VStack {
+                        // Form Content
                         ItemFormContent(
                             formViewModel: formViewModel,
                             itemNameFieldIsFocused: $itemNameFieldIsFocused,
                             showCategoryTooltip: false,
                             duplicateError: duplicateError,
+                            isCheckingDuplicate: false,
                             onStoreChange: {
                                 triggerRealTimeValidation()
-                            }
+                            },
+                            isCategoryEditable: true
                         )
                         
-                        // Show total calculation ONLY for cart context
-//                        if context == .cart, let portion = formViewModel.portion, let priceValue = Double(formViewModel.itemPrice) {
-//                            Divider()
-//                                .padding(.vertical, 8)
-//                            
-//                            VStack(alignment: .leading, spacing: 4) {
-//                                HStack {
-//                                    Text("Cart Quantity")
-//                                        .lexendFont(14, weight: .medium)
-//                                        .foregroundColor(.black)
-//                                    
-//                                    Spacer()
-//                                    
-//                                    let total = priceValue * portion
-//                                    Text("Total: \(formatCurrency(total))")
-//                                        .lexendFont(16, weight: .bold)
-//                                        .foregroundColor(.green)
-//                                }
-//                                
-//                                Text("\(formatCurrency(priceValue)) × \(portion.formatted())")
-//                                    .font(.caption)
-//                                    .foregroundColor(.gray)
-//                            }
-//                            .padding(.vertical, 4)
-//                        }
+                        // Mode Header
+                        EditItemHeaderView(
+                            cart: cart,
+                            formViewModel: formViewModel
+                        )
                         
-                        if context == .cart {
-                            HStack(spacing: 0) {
-                                Text("Remove from Cart")
-                                    .lexendFont(14, weight: .medium)
-                                    .foregroundStyle(.red)
-                                    .padding(.vertical)
-                                    .frame(maxWidth: .infinity, alignment: .center)
-                                    .onTapGesture {
-                                        removeFromCart()
-                                    }
-                                
-                                Text("|")
-                                    .lexendFont(16, weight: .thin)
-                                
-                                Text("Remove from Vault")
-                                    .lexendFont(14, weight: .medium)
-                                    .foregroundStyle(.red)
-                                    .padding(.vertical)
-                                    .frame(maxWidth: .infinity, alignment: .center)
-                                    .onTapGesture {
-                                        removeFromVault()
-                                    }
-                            }
-                            .foregroundStyle(.black)
-                        } else {
-                            HStack(spacing: 8) {
-                                Text("Remove from Vault")
-                                    .lexendFont(14, weight: .medium)
-                                
-                                Image(systemName: "trash")
-                                    .lexendFont(12, weight: .bold)
-                            }
-                            .foregroundStyle(.red)
-                            .padding(.vertical)
-                            .onTapGesture {
-                                removeFromVault()
-                            }
-                        }
+                        // Remove Options
+                        EditItemRemoveOptionsView(
+                            context: context,
+                            onRemoveFromCart: removeFromCart,
+                            onRemoveFromVault: removeFromVault
+                        )
                         
                         Spacer()
                             .frame(height: 80)
@@ -141,9 +238,6 @@ struct EditItemSheet: View {
         }
         .task {
             print("🟢 EditItemSheet appeared - context: \(context)")
-            print("🟢 Cart: \(cart?.name ?? "nil")")
-            print("🟢 CartItem: \(cartItem?.itemId ?? "nil")")
-            print("🟢 formViewModel.requiresPortion: \(formViewModel.requiresPortion)")
             initializeFormValues()
         }
         .onChange(of: formViewModel.itemName) { oldValue, newValue in
@@ -153,56 +247,97 @@ struct EditItemSheet: View {
             triggerRealTimeValidation()
         }
         .safeAreaInset(edge: .bottom) {
-            HStack {
-                if context == .cart {
-                    Text("Editing this item will update prices from vault and in all active carts")
-                        .font(.caption)
-                        .foregroundColor(.gray)
-                        .padding(.top, 8)
-                        .multilineTextAlignment(.center)
-                }
-                Spacer()
-                EditItemSaveButton(isEditFormValid: formViewModel.isFormValid && duplicateError == nil) {
-                    if formViewModel.attemptSubmission() {
-                        saveChanges()
-                    } else {
-                        let generator = UINotificationFeedbackGenerator()
-                        generator.notificationOccurred(.warning)
-                    }
-                }
-            }
-            .padding(.horizontal)
-            .padding(.bottom, 12)
+            EditItemBottomBarView(
+                context: context,
+                isEditFormValid: formViewModel.isFormValid && duplicateError == nil,
+                formViewModel: formViewModel,
+                onSave: saveChanges
+            )
         }
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: formViewModel.firstMissingField)
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: duplicateError)
     }
     
+    // MARK: - Helper Methods
+    
     private func initializeFormValues() {
-//        print("🟢 initializeFormValues called")
-//        print("🟢 Context: \(context)")
-//        print("🟢 Cart exists: \(cart != nil)")
-//        print("🟢 CartItem exists: \(cartItem != nil)")
+        print("🟢 initializeFormValues called - Context: \(context)")
         
         if context == .cart, let cart = cart, let cartItem = cartItem {
             print("🛒 Loading cart item data")
-            print("🛒 Cart item quantity: \(cartItem.getQuantity(cart: cart))")
-            // For cart editing: load cart quantity into portion
-            formViewModel.populateFromItem(item, vaultService: vaultService, cart: cart, cartItem: cartItem)
+            print("🛒 Cart status: \(cart.status)")
+            print("🛒 CartItem quantity: \(cartItem.quantity)")
+            
+            // Planning mode only (shopping mode uses ShoppingEditItemSheet)
+            if cart.status == .planning {
+                print("📝 Planning mode - loading vault data")
+                
+                formViewModel.itemName = item.name
+                formViewModel.storeName = cartItem.plannedStore
+                
+                if let plannedPrice = cartItem.plannedPrice {
+                    formViewModel.itemPrice = String(plannedPrice)
+                    print("   Using plannedPrice: \(plannedPrice)")
+                } else {
+                    // Fallback to vault price
+                    let priceOption = item.priceOptions.first
+                    formViewModel.itemPrice = String(priceOption?.pricePerUnit.priceValue ?? 0)
+                    print("   Using vault price")
+                }
+                
+                formViewModel.unit = cartItem.plannedUnit ?? "piece"
+                formViewModel.portion = cartItem.quantity
+                
+                // Category from vault
+                if let categoryName = vaultService.getCategory(for: item.id)?.name,
+                   let groceryCategory = GroceryCategory.allCases.first(where: { $0.title == categoryName }) {
+                    formViewModel.selectedCategory = groceryCategory
+                    print("   Category: \(groceryCategory.title)")
+                }
+                
+                formViewModel.modeDescription = "Planning mode - edits update vault"
+            } else {
+                // Should not happen - shopping mode uses different sheet
+                print("⚠️ Warning: EditItemSheet used in non-planning mode")
+            }
+            
         } else {
+            // Vault editing
             print("🏦 Loading vault item data")
-            // For vault editing: just load item data (portion will be nil)
             formViewModel.populateFromItem(item, vaultService: vaultService)
+            formViewModel.modeDescription = "Editing vault item"
         }
         
-        print("🟢 After populate - portion: \(formViewModel.portion ?? -1)")
+        print("🟢 After initialize:")
+        print("   itemName: \(formViewModel.itemName)")
+        print("   itemPrice: \(formViewModel.itemPrice)")
+        print("   unit: \(formViewModel.unit)")
+        print("   portion: \(formViewModel.portion ?? -1)")
+    }
+    
+    private func triggerRealTimeValidation() {
+        EditItemValidationHandler.triggerRealTimeValidation(
+            formViewModel: formViewModel,
+            item: item,
+            vaultService: vaultService,
+            duplicateError: $duplicateError,
+            validationTask: &validationTask
+        )
     }
     
     private func saveChanges() {
-        guard let priceValue = Double(formViewModel.itemPrice),
-              let selectedCategory = formViewModel.selectedCategory else { return }
-
-        // Validate for duplicates (excluding current item)
+        if formViewModel.attemptSubmission() {
+            executeSave()
+        } else {
+            let generator = UINotificationFeedbackGenerator()
+            generator.notificationOccurred(.warning)
+        }
+    }
+    
+    private func executeSave() {
+        guard let priceValue = Double(formViewModel.itemPrice) else { return }
+        
+        // Validate for duplicates
         let validation = vaultService.validateItemName(
             formViewModel.itemName,
             store: formViewModel.storeName,
@@ -214,12 +349,68 @@ struct EditItemSheet: View {
             generator.notificationOccurred(.error)
             return
         }
-
+        
         // Store old values
         let oldStoreName = item.priceOptions.first?.store ?? ""
-        let oldCategoryName = vaultService.vault?.categories.first(where: { $0.items.contains(where: { $0.id == item.id }) })?.name
-
-        // Update the item in the vault
+        let oldCategoryName = vaultService.vault?.categories.first(where: {
+            $0.items.contains(where: { $0.id == item.id })
+        })?.name
+        
+        var success = false
+        
+        if context == .cart, let cart = cart, let cartItem = cartItem {
+            success = saveCartItemChanges(
+                cart: cart,
+                cartItem: cartItem,
+                priceValue: priceValue,
+                oldStoreName: oldStoreName,
+                oldCategoryName: oldCategoryName
+            )
+        } else {
+            success = saveVaultItemChanges(
+                priceValue: priceValue,
+                oldStoreName: oldStoreName,
+                oldCategoryName: oldCategoryName
+            )
+        }
+        
+        handleSaveResult(
+            success: success,
+            oldStoreName: oldStoreName,
+            oldCategoryName: oldCategoryName
+        )
+    }
+    
+    private func saveCartItemChanges(
+        cart: Cart,
+        cartItem: CartItem,
+        priceValue: Double,
+        oldStoreName: String,
+        oldCategoryName: String?
+    ) -> Bool {
+        print("💾 Saving in cart context - Cart status: \(cart.status)")
+        
+        // Only planning mode uses this sheet
+        return savePlanningCartItem(
+            cart: cart,
+            cartItem: cartItem,
+            priceValue: priceValue,
+            oldCategoryName: oldCategoryName
+        )
+    }
+    
+    private func savePlanningCartItem(
+        cart: Cart,
+        cartItem: CartItem,
+        priceValue: Double,
+        oldCategoryName: String?
+    ) -> Bool {
+        print("📝 Planning mode - updating Vault")
+        guard let selectedCategory = formViewModel.selectedCategory else {
+            duplicateError = "Category is required"
+            return false
+        }
+        
         let success = vaultService.updateItem(
             item: item,
             newName: formViewModel.itemName.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -228,7 +419,47 @@ struct EditItemSheet: View {
             newPrice: priceValue,
             newUnit: formViewModel.unit
         )
-
+        
+        if success {
+            updateAllPlanningCartsWithItem(
+                itemId: item.id,
+                price: priceValue,
+                unit: formViewModel.unit,
+                store: formViewModel.storeName
+            )
+            updateCartItemQuantity(cart: cart, cartItem: cartItem, portion: formViewModel.portion)
+            vaultService.updateCartTotals(cart: cart)
+        }
+        
+        return success
+    }
+    
+    private func saveVaultItemChanges(
+        priceValue: Double,
+        oldStoreName: String,
+        oldCategoryName: String?
+    ) -> Bool {
+        print("🏦 Vault editing - updating Vault")
+        guard let selectedCategory = formViewModel.selectedCategory else {
+            duplicateError = "Category is required"
+            return false
+        }
+        
+        return vaultService.updateItem(
+            item: item,
+            newName: formViewModel.itemName.trimmingCharacters(in: .whitespacesAndNewlines),
+            newCategory: selectedCategory,
+            newStore: formViewModel.storeName.trimmingCharacters(in: .whitespacesAndNewlines),
+            newPrice: priceValue,
+            newUnit: formViewModel.unit
+        )
+    }
+    
+    private func handleSaveResult(
+        success: Bool,
+        oldStoreName: String,
+        oldCategoryName: String?
+    ) {
         if success {
             // ✅ Preserve old store
             if !oldStoreName.isEmpty {
@@ -236,37 +467,14 @@ struct EditItemSheet: View {
             }
             // ✅ Ensure new store exists
             vaultService.ensureStoreExists(formViewModel.storeName)
-
-            // --- Update all CartItems referencing this item ---
-            if let vault = vaultService.vault {
-                for cart in vault.carts {
-                    for cartItem in cart.cartItems where cartItem.itemId == item.id {
-                        cartItem.plannedPrice = priceValue
-                        cartItem.plannedUnit = formViewModel.unit
-                        cartItem.plannedStore = formViewModel.storeName
-                    }
-                }
-            }
             
-            // --- UPDATE CART ITEM QUANTITY IF IN CART CONTEXT ---
-            if context == .cart, let cart = cart, let cartItem = cartItem, let portion = formViewModel.portion {
-                // Update the cart item's quantity with the portion value
-                if cart.status == .planning {
-                    cartItem.quantity = portion
-                } else if cart.status == .shopping {
-                    cartItem.actualQuantity = portion
-                }
-                
-                // Update cart totals
-                vaultService.updateCartTotals(cart: cart)
-            }
-
             // Call save callback
             onSave?(item)
             dismiss()
-
+            
             // Notify category change if needed
-            if oldCategoryName != selectedCategory.title {
+            if let selectedCategory = formViewModel.selectedCategory,
+               oldCategoryName != selectedCategory.title {
                 NotificationCenter.default.post(
                     name: NSNotification.Name("ItemCategoryChanged"),
                     object: nil,
@@ -281,20 +489,43 @@ struct EditItemSheet: View {
         }
     }
     
+    private func updateAllPlanningCartsWithItem(
+        itemId: String,
+        price: Double,
+        unit: String,
+        store: String
+    ) {
+        if let vault = vaultService.vault {
+            for cart in vault.carts where cart.status == .planning {
+                for cartItem in cart.cartItems where cartItem.itemId == itemId {
+                    cartItem.plannedPrice = price
+                    cartItem.plannedUnit = unit
+                    cartItem.plannedStore = store
+                }
+            }
+        }
+    }
+    
+    private func updateCartItemQuantity(
+        cart: Cart,
+        cartItem: CartItem,
+        portion: Double?
+    ) {
+        guard let portion = portion else { return }
+        cartItem.quantity = portion
+    }
+    
     private func removeFromCart() {
         guard let cart = cart else { return }
         
-        // Remove item from cart
         vaultService.removeItemFromCart(cart: cart, itemId: item.id)
         dismiss()
         
-        // Show confirmation
         let generator = UINotificationFeedbackGenerator()
         generator.notificationOccurred(.success)
     }
     
     private func removeFromVault() {
-        // Show confirmation alert
         let alert = UIAlertController(
             title: "Remove Item",
             message: "Are you sure you want to remove this item from your vault? This will also remove it from all carts.",
@@ -310,48 +541,9 @@ struct EditItemSheet: View {
             generator.notificationOccurred(.success)
         })
         
-        // Present the alert
         if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
            let rootViewController = windowScene.windows.first?.rootViewController {
             rootViewController.present(alert, animated: true)
         }
     }
-
-    
-    private func triggerRealTimeValidation() {
-        validationTask?.cancel()
-        
-        let itemName = formViewModel.itemName.trimmingCharacters(in: .whitespacesAndNewlines)
-        let storeName = formViewModel.storeName.trimmingCharacters(in: .whitespacesAndNewlines)
-        
-        guard !itemName.isEmpty && !storeName.isEmpty else {
-            duplicateError = nil
-            return
-        }
-        
-        validationTask = Task {
-            // Debounce the validation
-            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
-            
-            if !Task.isCancelled {
-                let validation = vaultService.validateItemName(itemName, store: storeName, excluding: item.id)
-                await MainActor.run {
-                    if !validation.isValid {
-                        duplicateError = validation.errorMessage
-                    } else {
-                        duplicateError = nil
-                    }
-                }
-            }
-        }
-    }
-    
-    private func formatCurrency(_ value: Double) -> String {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .currency
-        formatter.currencyCode = "PHP"
-        formatter.maximumFractionDigits = value == Double(Int(value)) ? 0 : 2
-        return formatter.string(from: NSNumber(value: value)) ?? "\(value)"
-    }
 }
-

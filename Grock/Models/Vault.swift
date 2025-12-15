@@ -151,23 +151,23 @@ class Cart {
             
             switch status {
             case .planning:
-                // Use planned price during planning
                 price = cartItem.plannedPrice ?? 0
                 quantity = cartItem.quantity
                 
             case .shopping:
-                // Use actual price if set, otherwise planned price
                 if cartItem.isFulfilled {
                     price = cartItem.actualPrice ?? cartItem.plannedPrice ?? 0
                     quantity = cartItem.actualQuantity ?? cartItem.quantity
+                } else if cartItem.wasEditedDuringShopping {
+                    // Use edited shopping data for unfulfilled items
+                    price = cartItem.actualPrice ?? cartItem.plannedPrice ?? 0
+                    quantity = cartItem.actualQuantity ?? cartItem.quantity
                 } else {
-                    // For unfulfilled items, use planned price
                     price = cartItem.plannedPrice ?? 0
                     quantity = cartItem.quantity
                 }
                 
             case .completed:
-                // Use actual price for completed carts
                 price = cartItem.actualPrice ?? cartItem.plannedPrice ?? 0
                 quantity = cartItem.actualQuantity ?? cartItem.quantity
             }
@@ -193,6 +193,9 @@ class CartItem {
     var actualPrice: Double?
     var actualQuantity: Double?
     var actualUnit: String?
+    
+    // Add a property to track if item was edited during shopping
+    var wasEditedDuringShopping: Bool = false
     
     init(
         itemId: String,
@@ -223,17 +226,23 @@ class CartItem {
         case .planning:
             return plannedPrice ?? getCurrentPrice(from: vault, store: plannedStore) ?? 0.0
         case .shopping:
+            // CRITICAL: Use actualPrice if set (even if unfulfilled)
+            if let actualPrice = actualPrice {
+                return actualPrice
+            }
             return actualPrice ?? plannedPrice ?? getCurrentPrice(from: vault, store: actualStore ?? plannedStore) ?? 0.0
         case .completed:
             return actualPrice ?? plannedPrice ?? 0.0
         }
     }
+
     
     func getQuantity(cart: Cart) -> Double {
         switch cart.status {
         case .planning:
             return quantity
         case .shopping, .completed:
+            // CRITICAL: Use actualQuantity if set (even if unfulfilled)
             return actualQuantity ?? quantity
         }
     }
@@ -243,12 +252,16 @@ class CartItem {
         case .planning:
             return plannedUnit ?? getCurrentUnit(from: vault, store: plannedStore) ?? ""
         case .shopping:
+            // CRITICAL: Use actualUnit if set (even if unfulfilled)
+            if let actualUnit = actualUnit {
+                return actualUnit
+            }
             return actualUnit ?? plannedUnit ?? getCurrentUnit(from: vault, store: actualStore ?? plannedStore) ?? ""
         case .completed:
             return actualUnit ?? plannedUnit ?? ""
         }
     }
-    
+
     func getStore(cart: Cart) -> String {
         switch cart.status {
         case .planning:
@@ -318,6 +331,67 @@ class CartItem {
         if let unit = unit { actualUnit = unit }
         if let store = store { actualStore = store }
     }
+    
+    // Add validation method
+    func canEditInMode(cartStatus: CartStatus) -> (canEdit: Bool, message: String) {
+        switch cartStatus {
+        case .planning:
+            return (true, "Can edit planned data")
+        case .shopping:
+            if isFulfilled {
+                return (true, "Can edit actual shopping data")
+            } else {
+                return (false, "Mark item as fulfilled to edit actual data")
+            }
+        case .completed:
+            return (false, "Cart is completed")
+        }
+    }
+    
+    // Add a method for shopping mode edits
+     func updateShoppingData(
+         price: Double? = nil,
+         quantity: Double? = nil,
+         unit: String? = nil,
+         store: String? = nil,
+         isFulfilled: Bool = false
+     ) {
+         if isFulfilled {
+             // Update actual data for fulfilled items
+             if let price = price { actualPrice = price }
+             if let quantity = quantity { actualQuantity = quantity }
+             if let unit = unit { actualUnit = unit }
+             if let store = store { actualStore = store }
+         } else {
+             // For unfulfilled items: store edits in actual fields
+             // but don't mark as fulfilled yet
+             if let price = price { actualPrice = price }
+             if let quantity = quantity { actualQuantity = quantity }
+             if let unit = unit { actualUnit = unit }
+             if let store = store { actualStore = store }
+             wasEditedDuringShopping = true
+         }
+     }
+    
+    // Helper to get display data during shopping
+     func getShoppingDisplayPrice(cart: Cart) -> Double {
+         switch cart.status {
+         case .planning:
+             return plannedPrice ?? 0
+         case .shopping:
+             // For shopping: show edited actual price if set, otherwise planned
+             if isFulfilled {
+                 return actualPrice ?? plannedPrice ?? 0
+             } else if wasEditedDuringShopping {
+                 // Show edited price even if not fulfilled
+                 return actualPrice ?? plannedPrice ?? 0
+             } else {
+                 return plannedPrice ?? 0
+             }
+         case .completed:
+             return actualPrice ?? plannedPrice ?? 0
+         }
+     }
 }
 
 // MARK: - Supporting Types for Insights

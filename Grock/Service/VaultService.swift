@@ -284,38 +284,108 @@ extension VaultService {
          return true
      }
    
-    /// Updates item properties from cart context
     func updateItemFromCart(
         itemId: String,
+        cart: Cart,  // REQUIRED: Must know which cart
         newName: String? = nil,
         newCategory: GroceryCategory? = nil,
         newStore: String? = nil,
         newPrice: Double? = nil,
         newUnit: String? = nil
-    ) -> Bool { // Return Bool to indicate success
+    ) -> Bool {
         guard let item = findItemById(itemId) else { return false }
-       
-        // Change 'let' to 'var' to make it mutable
-        var currentGroceryCategory: GroceryCategory = GroceryCategory.allCases.first!
-        if let currentCategory = getCategory(for: itemId),
-           let groceryCategory = GroceryCategory.allCases.first(where: { $0.title == currentCategory.name }) {
-            currentGroceryCategory = groceryCategory
+        
+        switch cart.status {
+        case .planning:
+            // Planning mode: Update Vault
+            var currentGroceryCategory: GroceryCategory = GroceryCategory.allCases.first!
+            if let currentCategory = getCategory(for: itemId),
+               let groceryCategory = GroceryCategory.allCases.first(where: { $0.title == currentCategory.name }) {
+                currentGroceryCategory = groceryCategory
+            }
+            
+            let targetStore = newStore ?? item.priceOptions.first?.store ?? "Unknown Store"
+            let targetPrice = newPrice ?? item.priceOptions.first(where: { $0.store == targetStore })?.pricePerUnit.priceValue ?? 0.0
+            let targetUnit = newUnit ?? item.priceOptions.first(where: { $0.store == targetStore })?.pricePerUnit.unit ?? "piece"
+            
+            let success = updateItem(
+                item: item,
+                newName: newName ?? item.name,
+                newCategory: newCategory ?? currentGroceryCategory,
+                newStore: targetStore,
+                newPrice: targetPrice,
+                newUnit: targetUnit
+            )
+            
+            if success {
+                // Update all planning carts with this item
+                updateAllPlanningCartsWithItem(itemId: itemId, price: targetPrice, unit: targetUnit, store: targetStore)
+            }
+            return success
+            
+        case .shopping:
+            // Shopping mode: Only update cart item's actual data
+            guard let cartItem = cart.cartItems.first(where: { $0.itemId == itemId }),
+                  cartItem.isFulfilled else {
+                print("⚠️ Cannot edit unfulfilled item while shopping")
+                return false
+            }
+            
+            cartItem.updateActualData(
+                price: newPrice,
+                quantity: nil,
+                unit: newUnit,
+                store: newStore
+            )
+            updateCartTotals(cart: cart)
+            saveContext()
+            return true
+            
+        case .completed:
+            print("⚠️ Cannot edit items in completed cart")
+            return false
         }
-       
-        let targetStore = newStore ?? item.priceOptions.first?.store ?? "Unknown Store"
-        let targetPrice = newPrice ?? item.priceOptions.first(where: { $0.store == targetStore })?.pricePerUnit.priceValue ?? 0.0
-        let targetUnit = newUnit ?? item.priceOptions.first(where: { $0.store == targetStore })?.pricePerUnit.unit ?? "piece"
-       
-        return updateItem(
-            item: item,
-            newName: newName ?? item.name,
-            newCategory: newCategory ?? currentGroceryCategory,
-            newStore: targetStore,
-            newPrice: targetPrice,
-            newUnit: targetUnit
-        )
     }
-   
+
+    private func updateAllPlanningCartsWithItem(itemId: String, price: Double, unit: String, store: String) {
+        guard let vault = vault else { return }
+        
+        for cart in vault.carts where cart.status == .planning {
+            for cartItem in cart.cartItems where cartItem.itemId == itemId {
+                cartItem.plannedPrice = price
+                cartItem.plannedUnit = unit
+                cartItem.plannedStore = store
+            }
+        }
+        saveContext()
+    }
+    
+    func returnToPlanning(cart: Cart) {
+        guard cart.status == .shopping else { return }
+        
+        cart.status = .planning
+        
+        for cartItem in cart.cartItems {
+            // Discard all shopping data
+            cartItem.actualPrice = nil
+            cartItem.actualQuantity = nil
+            cartItem.actualUnit = nil
+            cartItem.actualStore = nil
+            cartItem.isFulfilled = false
+            
+            // Reset planned data from current Vault
+            if let vault = vault {
+                cartItem.plannedPrice = cartItem.getCurrentPrice(from: vault, store: cartItem.plannedStore)
+                cartItem.plannedUnit = cartItem.getCurrentUnit(from: vault, store: cartItem.plannedStore)
+            }
+        }
+        
+        updateCartTotals(cart: cart)
+        saveContext()
+        print("🔄 Returned cart '\(cart.name)' to planning mode")
+    }
+    
+    
     /// Deletes an item from the vault
     func deleteItem(_ item: Item) {
         guard let vault = vault else { return }
@@ -497,16 +567,71 @@ extension VaultService {
     /// Completes shopping session for a cart
     func completeShopping(cart: Cart) {
         guard cart.status == .shopping else { return }
-       
+        
+        print("🔄 Completing shopping for cart: \(cart.name)")
+        
         for cartItem in cart.cartItems {
+            // 1. Capture any missing actual data
             cartItem.captureActualData()
+            
+            // 2. Update Vault with actual prices (LEARNING)
+            updateVaultWithActualData(cartItem: cartItem)
+            
+            print("   ✅ Processed: \(findItemById(cartItem.itemId)?.name ?? "Unknown")")
         }
-       
+        
+        // 3. Mark cart as completed
         cart.status = .completed
         updateCartTotals(cart: cart)
         saveContext()
-        print("✅ Completed shopping for: \(cart.name)")
+        
+        print("🎉 Shopping completed! Vault prices updated.")
     }
+    
+    private func updateVaultWithActualData(cartItem: CartItem) {
+        guard let item = findItemById(cartItem.itemId) else {
+            print("❌ Item not found for cartItem: \(cartItem.itemId)")
+            return
+        }
+        
+        // Only update if we have actual data
+        guard let actualPrice = cartItem.actualPrice,
+              let actualUnit = cartItem.actualUnit,
+              let actualStore = cartItem.actualStore else {
+            print("⚠️ No actual data to update vault for item: \(item.name)")
+            return
+        }
+        
+        print("💾 Updating vault for item: \(item.name)")
+        print("   Store: \(actualStore)")
+        print("   Price: \(actualPrice)")
+        print("   Unit: \(actualUnit)")
+        
+        // Update or add price option in the item
+        if let existingPriceOption = item.priceOptions.first(where: { $0.store == actualStore }) {
+            // Update existing price option
+            existingPriceOption.pricePerUnit = PricePerUnit(
+                priceValue: actualPrice,
+                unit: actualUnit
+            )
+            print("   ✅ Updated existing price option")
+        } else {
+            // Add new price option
+            let newPriceOption = PriceOption(
+                store: actualStore,
+                pricePerUnit: PricePerUnit(
+                    priceValue: actualPrice,
+                    unit: actualUnit
+                )
+            )
+            item.priceOptions.append(newPriceOption)
+            print("   ✅ Added new price option")
+        }
+        
+        // Also ensure the store exists in vault stores
+        ensureStoreExists(actualStore)
+    }
+
    
     /// Reopens a completed cart for modifications
     func reopenCart(cart: Cart) {
@@ -530,26 +655,6 @@ extension VaultService {
 
 // MARK: - Cart Item Operations
 extension VaultService {
-   
-    /// Adds an item to a shopping cart
-//    func addItemToCart(item: Item, cart: Cart, quantity: Double, selectedStore: String? = nil) {
-//        let store = selectedStore ?? item.priceOptions.first?.store ?? "Unknown Store"
-//       
-//        let cartItem = CartItem(
-//            itemId: item.id,
-//            quantity: quantity,
-//            plannedStore: store
-//        )
-//       
-//        if cart.status == .shopping {
-//            cartItem.capturePlannedData(from: vault!)
-//        }
-//       
-//        cart.cartItems.append(cartItem)
-//        updateCartTotals(cart: cart)
-//        saveContext()
-//        print("➕ Added item to cart: \(item.name) ×\(quantity)")
-//    }
     func addItemToCart(item: Item, cart: Cart, quantity: Double, selectedStore: String? = nil) {
         let store = selectedStore ?? item.priceOptions.first?.store ?? "Unknown Store"
         

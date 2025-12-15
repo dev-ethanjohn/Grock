@@ -45,7 +45,8 @@ struct ItemFormContent: View {
     var showCategoryTooltip: Bool = false
     var duplicateError: String? = nil
     var isCheckingDuplicate: Bool = false
-    var onStoreChange: (() -> Void)? = nil 
+    var onStoreChange: (() -> Void)? = nil
+    var isCategoryEditable: Bool = true
     
     @State private var showUnitPicker = false
     
@@ -75,10 +76,12 @@ struct ItemFormContent: View {
                     showItemNameError: (formViewModel.attemptedSubmission && formViewModel.firstMissingField == "Item Name") || duplicateError != nil,
                     showCategoryError: formViewModel.attemptedSubmission && formViewModel.firstMissingField == "Category",
                     invalidAttemptCount: formViewModel.invalidSubmissionCount,
-                    isCheckingDuplicate: isCheckingDuplicate, duplicateError: duplicateError,
+                    isCheckingDuplicate: isCheckingDuplicate,
+                    duplicateError: duplicateError,
                     itemNameFieldIsFocused: itemNameFieldIsFocused,
                     itemName: $formViewModel.itemName,
-                    selectedCategory: $formViewModel.selectedCategory
+                    selectedCategory: $formViewModel.selectedCategory,
+                    isCategoryEditable: isCategoryEditable
                 )
                 .offset(x: itemNameShakeOffset)
             }

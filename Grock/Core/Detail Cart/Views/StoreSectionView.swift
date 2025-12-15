@@ -56,6 +56,7 @@ struct StoreSectionListView: View {
                         onDeleteItem: { onDeleteItem(tuple.cartItem) },
                         isLastItem: index == itemsWithStableIdentifiers.count - 1
                     )
+                    .id(tuple.cartItem.itemId + (tuple.cartItem.actualPrice?.description ?? "")) 
                     .listRowInsets(EdgeInsets())
                     .listRowSeparator(.hidden)
                     .background(Color(hex: "F7F2ED"))
