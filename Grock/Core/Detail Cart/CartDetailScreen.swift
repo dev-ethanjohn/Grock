@@ -406,26 +406,31 @@ struct CompletedSheetContent: View {
     @Binding var refreshTrigger: UUID
     let vaultService: VaultService
     
-    private var completedItems: [(cartItem: CartItem, item: Item?)] {
-        cart.cartItems.filter { $0.isFulfilled }.map { c in
-            (c, vaultService.findItemById(c.itemId))
-        }
-    }
-    
-    private var fulfilledCount: Int {
-        cart.cartItems.filter { $0.isFulfilled }.count
-    }
+//    private var completedItems: [(cartItem: CartItem, item: Item?)] {
+//        cart.cartItems.filter { $0.isFulfilled }.map { c in
+//            (c, vaultService.findItemById(c.itemId))
+//        }
+//    }
+//    
+//    private var fulfilledCount: Int {
+//        cart.cartItems.filter { $0.isFulfilled }.count
+//    }
     
     var body: some View {
         CompletedItemsSheet(
-            cart: cart,
-            completedItems: completedItems,
-            fulfilledCount: fulfilledCount,
-            onUnfulfillItem: { cartItem in
-                vaultService.toggleItemFulfillment(cart: cart, itemId: cartItem.itemId)
-                refreshTrigger = UUID()
-            }
-        )
+                  cart: cart,
+                  onUnfulfillItem: { cartItem in
+                      if cartItem.isSkippedDuringShopping {
+                          // Handle unskipping an item
+                          cartItem.isSkippedDuringShopping = false
+                          cartItem.isFulfilled = false
+                      } else {
+                          // Handle unfulfilling a regular completed item
+                          vaultService.toggleItemFulfillment(cart: cart, itemId: cartItem.itemId)
+                      }
+                      refreshTrigger = UUID()
+                  }
+              )
         .conditionalPresentationBackground()
         .presentationDetents([.fraction(0.08), .large], selection: $detent)
         .presentationDragIndicator(.visible)
@@ -507,6 +512,13 @@ struct CartDetailContent: View {
     @Binding var manageCartButtonVisible: Bool
     @Binding var buttonScale: CGFloat
     @Binding var shouldBounceAfterCelebration: Bool
+    
+    private var completedItemsCount: Int {
+        cart.cartItems.filter {
+            $0.isFulfilled || $0.isSkippedDuringShopping
+        }.count
+    }
+    
     
     // Loading state
     @Binding var cartReady: Bool
@@ -803,6 +815,13 @@ struct CartDetailContent: View {
         }
     }
     
+//    private func handleDeleteItem(_ cartItem: CartItem) {
+//        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+//            vaultService.removeItemFromCart(cart: cart, itemId: cartItem.itemId)
+//            vaultService.updateCartTotals(cart: cart)
+//            refreshTrigger = UUID()
+//        }
+//    }
     private func handleDeleteItem(_ cartItem: CartItem) {
         withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
             vaultService.removeItemFromCart(cart: cart, itemId: cartItem.itemId)
@@ -924,145 +943,6 @@ struct HeaderView: View {
     }
 }
 
-//struct ItemsListView: View {
-//    let cart: Cart
-//    let totalItemCount: Int
-//    let sortedStoresWithRefresh: [String]
-//    let storeItemsWithRefresh: (String) -> [(cartItem: CartItem, item: Item?)]
-//    @Binding var fulfilledCount: Int
-//    let onToggleFulfillment: (CartItem) -> Void
-//    let onEditItem: (CartItem) -> Void  // This should be updated
-//    let onDeleteItem: (CartItem) -> Void
-//    
-//    // Calculate available width based on screen width minus total padding
-//    private var availableWidth: CGFloat {
-//        let screenWidth = UIScreen.main.bounds.width
-//        
-//        let cartDetailPadding: CGFloat = 17
-//        let itemRowPadding: CGFloat = cart.isShopping ? 36 : 28
-//        let internalSpacing: CGFloat = 4
-//        let safetyBuffer: CGFloat = 3
-//        
-//        let totalPadding = cartDetailPadding + itemRowPadding + internalSpacing + safetyBuffer
-//        
-//        let calculatedWidth = screenWidth - totalPadding
-//        
-//        return max(min(calculatedWidth, 250), 150)
-//    }
-//    
-//    private func estimateRowHeight(for itemName: String, isFirstInSection: Bool = true) -> CGFloat {
-//        let averageCharWidth: CGFloat = 8.0
-//        
-//        let estimatedTextWidth = CGFloat(itemName.count) * averageCharWidth
-//        let numberOfLines = ceil(estimatedTextWidth / availableWidth)
-//        
-//        let singleLineTextHeight: CGFloat = 22
-//        let verticalPadding: CGFloat = 24
-//        let internalSpacing: CGFloat = 10
-//        
-//        let baseHeight = singleLineTextHeight + verticalPadding + internalSpacing
-//        
-//        let additionalLineHeight: CGFloat = 24
-//        
-//        let itemHeight = baseHeight + (max(0, numberOfLines - 1) * additionalLineHeight)
-//        
-//        let dividerHeight: CGFloat = isFirstInSection ? 0 : 12.0
-//        
-//        return itemHeight + dividerHeight
-//    }
-//    
-//    private var estimatedHeight: CGFloat {
-//        let sectionHeaderHeight: CGFloat = 34
-//        let sectionSpacing: CGFloat = 8
-//        let listPadding: CGFloat = 24
-//        
-//        var totalHeight: CGFloat = listPadding
-//        
-//        for store in sortedStoresWithRefresh {
-//            let storeItems = storeItemsWithRefresh(store)
-//            let unfulfilledStoreItems = storeItems.filter { !$0.cartItem.isFulfilled }
-//            
-//            if !unfulfilledStoreItems.isEmpty {
-//                totalHeight += sectionHeaderHeight
-//                
-//                for (index, (_, item)) in unfulfilledStoreItems.enumerated() {
-//                    let itemName = item?.name ?? "Unknown"
-//                    let isFirstInStore = index == 0
-//                    totalHeight += estimateRowHeight(for: itemName, isFirstInSection: isFirstInStore)
-//                }
-//                
-//                if store != sortedStoresWithRefresh.last {
-//                    totalHeight += sectionSpacing
-//                }
-//            }
-//        }
-//        
-//        return totalHeight
-//    }
-//    
-//    private var allItemsCompleted: Bool {
-//        cart.isShopping && fulfilledCount > 0 && fulfilledCount == totalItemCount
-//    }
-//    
-//    var body: some View {
-//        GeometryReader { geometry in
-//            let calculatedHeight = estimatedHeight
-//            let maxAllowedHeight = geometry.size.height * 0.8
-//            
-//            VStack(spacing: 0) {
-//                if allItemsCompleted {
-//                    VStack(spacing: 16) {
-//                        Image(systemName: "checkmark.circle.fill")
-//                            .font(.system(size: 50))
-//                            .foregroundColor(.green)
-//                        
-//                        Text("Shopping Complete! 🎉")
-//                            .lexendFont(18, weight: .bold)
-//                            .foregroundColor(Color(hex: "333"))
-//                        
-//                        Text("All items have been marked as fulfilled")
-//                            .lexendFont(14)
-//                            .foregroundColor(Color(hex: "666"))
-//                            .multilineTextAlignment(.center)
-//                            .padding(.horizontal)
-//                    }
-//                    .frame(height: min(200, maxAllowedHeight))
-//                    .frame(maxWidth: .infinity)
-//                    .background(Color(hex: "F7F2ED").darker(by: 0.02))
-//                    .cornerRadius(16)
-//                    .transition(.opacity.combined(with: .scale))
-//                } else {
-//                    List {
-//                        ForEach(Array(sortedStoresWithRefresh.enumerated()), id: \.offset) { (index, store) in
-//                            let storeItems = storeItemsWithRefresh(store)
-//                            if !storeItems.isEmpty {
-//                                StoreSectionListView(
-//                                    store: store,
-//                                    items: storeItems,
-//                                    cart: cart,
-//                                    onToggleFulfillment: onToggleFulfillment,
-//                                    onEditItem: onEditItem,
-//                                    onDeleteItem: onDeleteItem,
-//                                    isLastStore: index == sortedStoresWithRefresh.count - 1
-//                                )
-//                                .listRowInsets(EdgeInsets())
-//                                .listRowSeparator(.hidden)
-//                                .listRowBackground(Color(hex: "F7F2ED"))
-//                            }
-//                        }
-//                    }
-//                    .frame(height: min(calculatedHeight, maxAllowedHeight))
-//                    .listStyle(PlainListStyle())
-//                    .listSectionSpacing(0)
-//                    .background(Color(hex: "F7F2ED").darker(by: 0.02))
-//                    .cornerRadius(16)
-//                }
-//            }
-//        }
-//    }
-//}
-
-
 struct ItemsListView: View {
     let cart: Cart
     let totalItemCount: Int
@@ -1118,13 +998,12 @@ struct ItemsListView: View {
         var totalHeight: CGFloat = listPadding
         
         for store in sortedStoresWithRefresh {
-            let storeItems = storeItemsWithRefresh(store)
-            let unfulfilledStoreItems = storeItems.filter { !$0.cartItem.isFulfilled }
+            let displayItems = getDisplayItems(for: store)
             
-            if !unfulfilledStoreItems.isEmpty {
+            if !displayItems.isEmpty {
                 totalHeight += sectionHeaderHeight
                 
-                for (index, (_, item)) in unfulfilledStoreItems.enumerated() {
+                for (index, (_, item)) in displayItems.enumerated() {
                     let itemName = item?.name ?? "Unknown"
                     let isFirstInStore = index == 0
                     totalHeight += estimateRowHeight(for: itemName, isFirstInSection: isFirstInStore)
@@ -1140,13 +1019,49 @@ struct ItemsListView: View {
     }
     
     private var allItemsCompleted: Bool {
-        // Check if we're in shopping mode AND all items are fulfilled
         guard cart.isShopping else { return false }
         
+        // Get all items across all stores
         let allItems = sortedStoresWithRefresh.flatMap { storeItemsWithRefresh($0) }
-        let allUnfulfilledItems = allItems.filter { !$0.cartItem.isFulfilled }
+        
+        // Check if all non-skipped items are fulfilled
+        let allUnfulfilledItems = allItems.filter {
+            !$0.cartItem.isFulfilled &&
+            !$0.cartItem.isSkippedDuringShopping
+        }
         
         return allUnfulfilledItems.isEmpty && totalItemCount > 0
+    }
+    
+    // FIXED: Check if ALL stores have no display items
+    private var hasDisplayItems: Bool {
+        for store in sortedStoresWithRefresh {
+            if !getDisplayItems(for: store).isEmpty {
+                return true
+            }
+        }
+        return false
+    }
+    
+    private func getDisplayItems(for store: String) -> [(cartItem: CartItem, item: Item?)] {
+        let allItems = storeItemsWithRefresh(store)
+        
+        switch cart.status {
+        case .planning:
+            // Planning mode: Show ALL items
+            return allItems
+            
+        case .shopping:
+            // Shopping mode: Only show unfulfilled, non-skipped items
+            return allItems.filter {
+                !$0.cartItem.isFulfilled &&
+                !$0.cartItem.isSkippedDuringShopping
+            }
+            
+        case .completed:
+            // Completed mode: Show all items (for reference)
+            return allItems
+        }
     }
     
     var body: some View {
@@ -1155,13 +1070,13 @@ struct ItemsListView: View {
             let maxAllowedHeight = geometry.size.height * 0.8
             
             VStack(spacing: 0) {
-                if allItemsCompleted {
+                // FIXED: Only show "Shopping Trip Complete" when in shopping mode AND all items are done
+                if cart.isShopping && allItemsCompleted {
                     // Celebration message for completed shopping
                     VStack(spacing: 16) {
                         Image(systemName: "party.popper.fill")
                             .font(.system(size: 50))
                             .foregroundColor(Color(hex: "FF6B6B"))
-//                            .symbolEffect(.bounce, options: .repeat())
                         
                         Text("Shopping Trip Complete! 🎉")
                             .lexendFont(18, weight: .bold)
@@ -1199,17 +1114,21 @@ struct ItemsListView: View {
                             .stroke(Color(hex: "FF6B6B").opacity(0.3), lineWidth: 2)
                     )
                     .transition(.opacity.combined(with: .scale))
+                } else if !hasDisplayItems && cart.isPlanning {
+                    // FIXED: Only show empty state when in planning mode AND truly no items
+                    // Return to the original EmptyCartView
+                    EmptyCartView()
+                        .transition(.scale)
+                        .offset(y: 80)
                 } else {
                     List {
                         ForEach(Array(sortedStoresWithRefresh.enumerated()), id: \.offset) { (index, store) in
-                            let storeItems = storeItemsWithRefresh(store)
-                            // Filter out fulfilled items
-                            let unfulfilledItems = storeItems.filter { !$0.cartItem.isFulfilled }
+                            let displayItems = getDisplayItems(for: store)
                             
-                            if !unfulfilledItems.isEmpty {
+                            if !displayItems.isEmpty {
                                 StoreSectionListView(
                                     store: store,
-                                    items: unfulfilledItems, // Pass only unfulfilled items
+                                    items: displayItems,
                                     cart: cart,
                                     onToggleFulfillment: onToggleFulfillment,
                                     onEditItem: onEditItem,
@@ -1227,6 +1146,7 @@ struct ItemsListView: View {
                     .listSectionSpacing(0)
                     .background(Color(hex: "F7F2ED").darker(by: 0.02))
                     .cornerRadius(16)
+                    .animation(.spring(response: 0.4, dampingFraction: 0.8), value: calculatedHeight)
                 }
             }
         }
@@ -1237,5 +1157,392 @@ struct ItemsListView: View {
                 fulfilledCount = newFulfilledCount
             }
         }
+        .onChange(of: cart.status) { oldStatus, newStatus in
+            print("🔄 Cart status changed in ItemsListView: \(oldStatus) → \(newStatus)")
+            print("   Display items will now: \(newStatus == .planning ? "Show ALL items" : "Show only unfulfilled, non-skipped")")
+        }
     }
 }
+
+//struct ItemsListView: View {
+//    let cart: Cart
+//    let totalItemCount: Int
+//    let sortedStoresWithRefresh: [String]
+//    let storeItemsWithRefresh: (String) -> [(cartItem: CartItem, item: Item?)]
+//    @Binding var fulfilledCount: Int
+//    let onToggleFulfillment: (CartItem) -> Void
+//    let onEditItem: (CartItem) -> Void
+//    let onDeleteItem: (CartItem) -> Void
+//    
+//    // Calculate available width based on screen width minus total padding
+//    private var availableWidth: CGFloat {
+//        let screenWidth = UIScreen.main.bounds.width
+//        
+//        let cartDetailPadding: CGFloat = 17
+//        let itemRowPadding: CGFloat = cart.isShopping ? 36 : 28
+//        let internalSpacing: CGFloat = 4
+//        let safetyBuffer: CGFloat = 3
+//        
+//        let totalPadding = cartDetailPadding + itemRowPadding + internalSpacing + safetyBuffer
+//        
+//        let calculatedWidth = screenWidth - totalPadding
+//        
+//        return max(min(calculatedWidth, 250), 150)
+//    }
+//    
+//    private func estimateRowHeight(for itemName: String, isFirstInSection: Bool = true) -> CGFloat {
+//        let averageCharWidth: CGFloat = 8.0
+//        
+//        let estimatedTextWidth = CGFloat(itemName.count) * averageCharWidth
+//        let numberOfLines = ceil(estimatedTextWidth / availableWidth)
+//        
+//        let singleLineTextHeight: CGFloat = 22
+//        let verticalPadding: CGFloat = 24
+//        let internalSpacing: CGFloat = 10
+//        
+//        let baseHeight = singleLineTextHeight + verticalPadding + internalSpacing
+//        
+//        let additionalLineHeight: CGFloat = 24
+//        
+//        let itemHeight = baseHeight + (max(0, numberOfLines - 1) * additionalLineHeight)
+//        
+//        let dividerHeight: CGFloat = isFirstInSection ? 0 : 12.0
+//        
+//        return itemHeight + dividerHeight
+//    }
+//    
+//    private var estimatedHeight: CGFloat {
+//        let sectionHeaderHeight: CGFloat = 34
+//        let sectionSpacing: CGFloat = 8
+//        let listPadding: CGFloat = 24
+//        
+//        var totalHeight: CGFloat = listPadding
+//        
+//        for store in sortedStoresWithRefresh {
+//            // FIXED: Use getUnfulfilledItems which EXCLUDES skipped items in shopping mode
+//            let unfulfilledItems = getUnfulfilledItems(for: store)
+//            
+//            if !unfulfilledItems.isEmpty {
+//                totalHeight += sectionHeaderHeight
+//                
+//                for (index, (_, item)) in unfulfilledItems.enumerated() {
+//                    let itemName = item?.name ?? "Unknown"
+//                    let isFirstInStore = index == 0
+//                    totalHeight += estimateRowHeight(for: itemName, isFirstInSection: isFirstInStore)
+//                }
+//                
+//                if store != sortedStoresWithRefresh.last {
+//                    totalHeight += sectionSpacing
+//                }
+//            }
+//        }
+//        
+//        return totalHeight
+//    }
+//    
+//    private var allItemsCompleted: Bool {
+//        guard cart.isShopping else { return false }
+//        
+//        // Get all items across all stores
+//        let allItems = sortedStoresWithRefresh.flatMap { storeItemsWithRefresh($0) }
+//        
+//        // Check if all non-skipped items are fulfilled
+//        let allUnfulfilledItems = allItems.filter {
+//            !$0.cartItem.isFulfilled &&
+//            !$0.cartItem.isSkippedDuringShopping
+//        }
+//        
+//        return allUnfulfilledItems.isEmpty && totalItemCount > 0
+//    }
+//    
+//    // Helper function to get unfulfilled items for a store (EXCLUDES skipped during shopping)
+//    private func getUnfulfilledItems(for store: String) -> [(cartItem: CartItem, item: Item?)] {
+//        if cart.isShopping {
+//            // Shopping mode: Exclude skipped items
+//            return storeItemsWithRefresh(store).filter {
+//                !$0.cartItem.isFulfilled &&
+//                !$0.cartItem.isSkippedDuringShopping
+//            }
+//        } else {
+//            // Planning mode: Show all items
+//            return storeItemsWithRefresh(store)
+//        }
+//    }
+//    
+//    var body: some View {
+//        GeometryReader { geometry in
+//            let calculatedHeight = estimatedHeight
+//            let maxAllowedHeight = geometry.size.height * 0.8
+//            
+//            VStack(spacing: 0) {
+//                if allItemsCompleted {
+//                    // Celebration message for completed shopping
+//                    VStack(spacing: 16) {
+//                        Image(systemName: "party.popper.fill")
+//                            .font(.system(size: 50))
+//                            .foregroundColor(Color(hex: "FF6B6B"))
+//                        
+//                        Text("Shopping Trip Complete! 🎉")
+//                            .lexendFont(18, weight: .bold)
+//                            .foregroundColor(Color(hex: "333"))
+//                            .multilineTextAlignment(.center)
+//                        
+//                        Text("Congratulations! You've checked off all items.")
+//                            .lexendFont(14)
+//                            .foregroundColor(Color(hex: "666"))
+//                            .multilineTextAlignment(.center)
+//                            .padding(.horizontal)
+//                        
+//                        Text("Ready to finish your trip?")
+//                            .lexendFont(12)
+//                            .foregroundColor(Color(hex: "999"))
+//                            .multilineTextAlignment(.center)
+//                            .padding(.horizontal)
+//                            .padding(.top, 4)
+//                    }
+//                    .frame(height: min(200, maxAllowedHeight))
+//                    .frame(maxWidth: .infinity)
+//                    .background(
+//                        LinearGradient(
+//                            colors: [
+//                                Color(hex: "F7F2ED").darker(by: 0.02),
+//                                Color(hex: "F7F2ED")
+//                            ],
+//                            startPoint: .top,
+//                            endPoint: .bottom
+//                        )
+//                    )
+//                    .cornerRadius(16)
+//                    .overlay(
+//                        RoundedRectangle(cornerRadius: 16)
+//                            .stroke(Color(hex: "FF6B6B").opacity(0.3), lineWidth: 2)
+//                    )
+//                    .transition(.opacity.combined(with: .scale))
+//                } else {
+//                    List {
+//                        ForEach(Array(sortedStoresWithRefresh.enumerated()), id: \.offset) { (index, store) in
+//                            let unfulfilledItems = getUnfulfilledItems(for: store)
+//                            
+//                            if !unfulfilledItems.isEmpty {
+//                                StoreSectionListView(
+//                                    store: store,
+//                                    items: unfulfilledItems,
+//                                    cart: cart,
+//                                    onToggleFulfillment: onToggleFulfillment,
+//                                    onEditItem: onEditItem,
+//                                    onDeleteItem: onDeleteItem,
+//                                    isLastStore: index == sortedStoresWithRefresh.count - 1
+//                                )
+//                                .listRowInsets(EdgeInsets())
+//                                .listRowSeparator(.hidden)
+//                                .listRowBackground(Color(hex: "F7F2ED"))
+//                            }
+//                        }
+//                    }
+//                    .frame(height: min(calculatedHeight, maxAllowedHeight))
+//                    .listStyle(PlainListStyle())
+//                    .listSectionSpacing(0)
+//                    .background(Color(hex: "F7F2ED").darker(by: 0.02))
+//                    .cornerRadius(16)
+//                    .animation(.spring(response: 0.4, dampingFraction: 0.8), value: calculatedHeight) // Animate height changes
+//                }
+//            }
+//        }
+//        .onChange(of: cart.cartItems) { oldItems, newItems in
+//            // Update the fulfilled count when cart items change
+//            let newFulfilledCount = newItems.filter { $0.isFulfilled }.count
+//            if fulfilledCount != newFulfilledCount {
+//                fulfilledCount = newFulfilledCount
+//            }
+//        }
+//    }
+//}
+
+
+//struct ItemsListView: View {
+//    let cart: Cart
+//    let totalItemCount: Int
+//    let sortedStoresWithRefresh: [String]
+//    let storeItemsWithRefresh: (String) -> [(cartItem: CartItem, item: Item?)]
+//    @Binding var fulfilledCount: Int
+//    let onToggleFulfillment: (CartItem) -> Void
+//    let onEditItem: (CartItem) -> Void
+//    let onDeleteItem: (CartItem) -> Void
+//    
+//    // Calculate available width based on screen width minus total padding
+//    private var availableWidth: CGFloat {
+//        let screenWidth = UIScreen.main.bounds.width
+//        
+//        let cartDetailPadding: CGFloat = 17
+//        let itemRowPadding: CGFloat = cart.isShopping ? 36 : 28
+//        let internalSpacing: CGFloat = 4
+//        let safetyBuffer: CGFloat = 3
+//        
+//        let totalPadding = cartDetailPadding + itemRowPadding + internalSpacing + safetyBuffer
+//        
+//        let calculatedWidth = screenWidth - totalPadding
+//        
+//        return max(min(calculatedWidth, 250), 150)
+//    }
+//    
+//    private func estimateRowHeight(for itemName: String, isFirstInSection: Bool = true) -> CGFloat {
+//        let averageCharWidth: CGFloat = 8.0
+//        
+//        let estimatedTextWidth = CGFloat(itemName.count) * averageCharWidth
+//        let numberOfLines = ceil(estimatedTextWidth / availableWidth)
+//        
+//        let singleLineTextHeight: CGFloat = 22
+//        let verticalPadding: CGFloat = 24
+//        let internalSpacing: CGFloat = 10
+//        
+//        let baseHeight = singleLineTextHeight + verticalPadding + internalSpacing
+//        
+//        let additionalLineHeight: CGFloat = 24
+//        
+//        let itemHeight = baseHeight + (max(0, numberOfLines - 1) * additionalLineHeight)
+//        
+//        let dividerHeight: CGFloat = isFirstInSection ? 0 : 12.0
+//        
+//        return itemHeight + dividerHeight
+//    }
+//    
+//    private var estimatedHeight: CGFloat {
+//        let sectionHeaderHeight: CGFloat = 34
+//        let sectionSpacing: CGFloat = 8
+//        let listPadding: CGFloat = 24
+//        
+//        var totalHeight: CGFloat = listPadding
+//        
+//        for store in sortedStoresWithRefresh {
+//            // FIX: Use getUnfulfilledItems which EXCLUDES skipped items
+//            let unfulfilledItems = getUnfulfilledItems(for: store)
+//            
+//            if !unfulfilledItems.isEmpty {
+//                totalHeight += sectionHeaderHeight
+//                
+//                for (index, (_, item)) in unfulfilledItems.enumerated() {
+//                    let itemName = item?.name ?? "Unknown"
+//                    let isFirstInStore = index == 0
+//                    totalHeight += estimateRowHeight(for: itemName, isFirstInSection: isFirstInStore)
+//                }
+//                
+//                if store != sortedStoresWithRefresh.last {
+//                    totalHeight += sectionSpacing
+//                }
+//            }
+//        }
+//        
+//        return totalHeight
+//    }
+//    
+//    private var allItemsCompleted: Bool {
+//        guard cart.isShopping else { return false }
+//        
+//        // Get all items across all stores
+//        let allItems = sortedStoresWithRefresh.flatMap { storeItemsWithRefresh($0) }
+//        
+//        // Check if all non-skipped items are fulfilled
+//        let allUnfulfilledItems = allItems.filter {
+//            !$0.cartItem.isFulfilled &&
+//            !$0.cartItem.isSkippedDuringShopping
+//        }
+//        
+//        return allUnfulfilledItems.isEmpty && totalItemCount > 0
+//    }
+//    
+//    // Helper function to get unfulfilled items for a store (EXCLUDES skipped)
+//    private func getUnfulfilledItems(for store: String) -> [(cartItem: CartItem, item: Item?)] {
+//        storeItemsWithRefresh(store).filter {
+//            !$0.cartItem.isFulfilled &&
+//            !$0.cartItem.isSkippedDuringShopping
+//        }
+//    }
+//    
+//    var body: some View {
+//        GeometryReader { geometry in
+//            let calculatedHeight = estimatedHeight
+//            let maxAllowedHeight = geometry.size.height * 0.8
+//            
+//            VStack(spacing: 0) {
+//                if allItemsCompleted {
+//                    // Celebration message for completed shopping
+//                    VStack(spacing: 16) {
+//                        Image(systemName: "party.popper.fill")
+//                            .font(.system(size: 50))
+//                            .foregroundColor(Color(hex: "FF6B6B"))
+//                        
+//                        Text("Shopping Trip Complete! 🎉")
+//                            .lexendFont(18, weight: .bold)
+//                            .foregroundColor(Color(hex: "333"))
+//                            .multilineTextAlignment(.center)
+//                        
+//                        Text("Congratulations! You've checked off all items.")
+//                            .lexendFont(14)
+//                            .foregroundColor(Color(hex: "666"))
+//                            .multilineTextAlignment(.center)
+//                            .padding(.horizontal)
+//                        
+//                        Text("Ready to finish your trip?")
+//                            .lexendFont(12)
+//                            .foregroundColor(Color(hex: "999"))
+//                            .multilineTextAlignment(.center)
+//                            .padding(.horizontal)
+//                            .padding(.top, 4)
+//                    }
+//                    .frame(height: min(200, maxAllowedHeight))
+//                    .frame(maxWidth: .infinity)
+//                    .background(
+//                        LinearGradient(
+//                            colors: [
+//                                Color(hex: "F7F2ED").darker(by: 0.02),
+//                                Color(hex: "F7F2ED")
+//                            ],
+//                            startPoint: .top,
+//                            endPoint: .bottom
+//                        )
+//                    )
+//                    .cornerRadius(16)
+//                    .overlay(
+//                        RoundedRectangle(cornerRadius: 16)
+//                            .stroke(Color(hex: "FF6B6B").opacity(0.3), lineWidth: 2)
+//                    )
+//                    .transition(.opacity.combined(with: .scale))
+//                } else {
+//                    List {
+//                        ForEach(Array(sortedStoresWithRefresh.enumerated()), id: \.offset) { (index, store) in
+//                            let unfulfilledItems = getUnfulfilledItems(for: store)
+//                            
+//                            if !unfulfilledItems.isEmpty {
+//                                StoreSectionListView(
+//                                    store: store,
+//                                    items: unfulfilledItems,
+//                                    cart: cart,
+//                                    onToggleFulfillment: onToggleFulfillment,
+//                                    onEditItem: onEditItem,
+//                                    onDeleteItem: onDeleteItem,
+//                                    isLastStore: index == sortedStoresWithRefresh.count - 1
+//                                )
+//                                .listRowInsets(EdgeInsets())
+//                                .listRowSeparator(.hidden)
+//                                .listRowBackground(Color(hex: "F7F2ED"))
+//                            }
+//                        }
+//                    }
+//                    .frame(height: min(calculatedHeight, maxAllowedHeight))
+//                    .listStyle(PlainListStyle())
+//                    .listSectionSpacing(0)
+//                    .background(Color(hex: "F7F2ED").darker(by: 0.02))
+//                    .cornerRadius(16)
+////                    .animation(.spring(response: 0.4, dampingFraction: 0.8), value: calculatedHeight) // Animate height changes
+//                }
+//            }
+//        }
+//        .onChange(of: cart.cartItems) { oldItems, newItems in
+//            // Update the fulfilled count when cart items change
+//            let newFulfilledCount = newItems.filter { $0.isFulfilled }.count
+//            if fulfilledCount != newFulfilledCount {
+//                fulfilledCount = newFulfilledCount
+//            }
+//        }
+//    }
+//}

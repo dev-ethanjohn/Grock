@@ -1,108 +1,6 @@
 import SwiftUI
 import SwiftData
 
-//struct StoreSectionListView: View {
-//    let store: String
-//    let items: [(cartItem: CartItem, item: Item?)]
-//    let cart: Cart
-//    let onToggleFulfillment: (CartItem) -> Void
-//    let onEditItem: (CartItem) -> Void
-//    let onDeleteItem: (CartItem) -> Void
-//    let isLastStore: Bool
-//    
-//    private var unfulfilledItems: [(cartItem: CartItem, item: Item?)] {
-//        items.filter { !$0.cartItem.isFulfilled }
-//    }
-//    
-//    private var itemsWithStableIdentifiers: [(id: String, cartItem: CartItem, item: Item?)] {
-//        unfulfilledItems.map { ($0.cartItem.itemId, $0.cartItem, $0.item) }
-//    }
-//    
-//    var body: some View {
-//        Section(
-//            header: VStack(spacing: 0) {
-//                HStack {
-//                    HStack(spacing: 2) {
-//                        Image("store")
-//                            .resizable()
-//                            .scaledToFit()
-//                            .frame(width: 10, height: 10)
-//                            .foregroundColor(.white)
-//                        
-//                        Text(store)
-//                            .lexendFont(11, weight: .bold)
-//                    }
-//                    .foregroundColor(.white)
-//                    .padding(.horizontal, 8)
-//                    .padding(.vertical, 4)
-//                    .background(Color.black)
-//                    .cornerRadius(6)
-//                    Spacer()
-//                }
-//                .padding(.leading)
-//            }
-//            .listRowInsets(EdgeInsets())
-//            .textCase(nil)
-//            
-//        ) {
-//            ForEach(Array(itemsWithStableIdentifiers.enumerated()), id: \.element.id) { index, tuple in
-//                VStack(spacing: 0) {
-//                    CartItemRowListView(
-//                        cartItem: tuple.cartItem,
-//                        item: tuple.item,
-//                        cart: cart,
-//                        onToggleFulfillment: { onToggleFulfillment(tuple.cartItem) },
-//                        onEditItem: { onEditItem(tuple.cartItem) },
-//                        onDeleteItem: { onDeleteItem(tuple.cartItem) },
-//                        isLastItem: index == itemsWithStableIdentifiers.count - 1
-//                    )
-//                    .id(tuple.cartItem.itemId + (tuple.cartItem.actualPrice?.description ?? "")) 
-//                    .listRowInsets(EdgeInsets())
-//                    .listRowSeparator(.hidden)
-//                    .background(Color(hex: "F7F2ED"))
-//                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-//                        Button(role: .destructive) {
-//                            onDeleteItem(tuple.cartItem)
-//                        } label: {
-//                            Label("Delete", systemImage: "trash")
-//                        }
-//                        
-//                        Button {
-//                            onEditItem(tuple.cartItem)
-//                        } label: {
-//                            Label("Edit", systemImage: "pencil")
-//                        }
-//                        
-//                        if cart.isShopping {
-//                            Button {
-//                                onToggleFulfillment(tuple.cartItem)
-//                            } label: {
-//                                Label(
-//                                    tuple.cartItem.isFulfilled ? "Mark Unfulfilled" : "Mark Fulfilled",
-//                                    systemImage: tuple.cartItem.isFulfilled ? "circle" : "checkmark.circle.fill"
-//                                )
-//                            }
-//                            .tint(tuple.cartItem.isFulfilled ? .orange : .green)
-//                        }
-//                    }
-//                    
-//                    if index < itemsWithStableIdentifiers.count - 1 {
-//                        DashedLine()
-//                            .stroke(style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
-//                            .frame(height: 0.5)
-//                            .foregroundColor(Color(hex: "999").opacity(0.5))
-//                            .padding(.horizontal, 12)
-//                    }
-//                }
-//                .listRowInsets(EdgeInsets())
-//                .listRowSeparator(.hidden)
-//                .listRowBackground(Color(hex: "F7F2ED"))
-//            }
-//        }
-//        .listSectionSpacing(isLastStore ? 0 : 20)
-//    }
-//}
-
 struct StoreSectionListView: View {
     let store: String
     let items: [(cartItem: CartItem, item: Item?)]
@@ -112,17 +10,30 @@ struct StoreSectionListView: View {
     let onDeleteItem: (CartItem) -> Void
     let isLastStore: Bool
     
-    private var unfulfilledItems: [(cartItem: CartItem, item: Item?)] {
-        items.filter { !$0.cartItem.isFulfilled }
+    @Environment(VaultService.self) private var vaultService
+    
+    // FIXED: Only filter items if we're in shopping mode
+    private var displayItems: [(cartItem: CartItem, item: Item?)] {
+        if cart.isShopping {
+            // In shopping mode, we only get unfulfilled, non-skipped items from parent
+            return items
+        } else {
+            // In planning mode, show all items
+            return items
+        }
     }
     
-    private var itemsWithStableIdentifiers: [(id: String, cartItem: CartItem, item: Item?)] {
-        unfulfilledItems.map { ($0.cartItem.itemId, $0.cartItem, $0.item) }
+    private func handleSkipItem(_ cartItem: CartItem) {
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+            cartItem.isSkippedDuringShopping = true
+            cartItem.isFulfilled = false
+            vaultService.updateCartTotals(cart: cart)
+        }
     }
     
     var body: some View {
-        // Only show section if there are unfulfilled items
-        if !unfulfilledItems.isEmpty {
+        // Only show section if there are items to display
+        if !displayItems.isEmpty {
             Section(
                 header: VStack(spacing: 0) {
                     HStack {
@@ -149,7 +60,7 @@ struct StoreSectionListView: View {
                 .textCase(nil)
                 
             ) {
-                ForEach(Array(itemsWithStableIdentifiers.enumerated()), id: \.element.id) { index, tuple in
+                ForEach(Array(displayItems.enumerated()), id: \.element.cartItem.itemId) { index, tuple in
                     VStack(spacing: 0) {
                         CartItemRowListView(
                             cartItem: tuple.cartItem,
@@ -158,17 +69,28 @@ struct StoreSectionListView: View {
                             onToggleFulfillment: { onToggleFulfillment(tuple.cartItem) },
                             onEditItem: { onEditItem(tuple.cartItem) },
                             onDeleteItem: { onDeleteItem(tuple.cartItem) },
-                            isLastItem: index == itemsWithStableIdentifiers.count - 1
+                            isLastItem: index == displayItems.count - 1
                         )
                         .id(tuple.cartItem.itemId + (tuple.cartItem.actualPrice?.description ?? ""))
                         .listRowInsets(EdgeInsets())
                         .listRowSeparator(.hidden)
                         .background(Color(hex: "F7F2ED"))
                         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                            Button(role: .destructive) {
-                                onDeleteItem(tuple.cartItem)
-                            } label: {
-                                Label("Delete", systemImage: "trash")
+                            if cart.isShopping {
+                                // Shopping mode: Skip action
+                                Button(role: .destructive) {
+                                    handleSkipItem(tuple.cartItem)
+                                } label: {
+                                    Label("Skip", systemImage: "minus.circle")
+                                }
+                                .tint(.orange)
+                            } else {
+                                // Planning mode: Delete action
+                                Button(role: .destructive) {
+                                    onDeleteItem(tuple.cartItem)
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
                             }
                             
                             Button {
@@ -190,7 +112,7 @@ struct StoreSectionListView: View {
                             }
                         }
                         
-                        if index < itemsWithStableIdentifiers.count - 1 {
+                        if index < displayItems.count - 1 {
                             DashedLine()
                                 .stroke(style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
                                 .frame(height: 0.5)
@@ -208,6 +130,127 @@ struct StoreSectionListView: View {
     }
 }
 
+//struct StoreSectionListView: View {
+//    let store: String
+//    let items: [(cartItem: CartItem, item: Item?)]
+//    let cart: Cart
+//    let onToggleFulfillment: (CartItem) -> Void
+//    let onEditItem: (CartItem) -> Void
+//    let onDeleteItem: (CartItem) -> Void
+//    let isLastStore: Bool
+//    
+//    @Environment(VaultService.self) private var vaultService
+//    
+//    private var unfulfilledItems: [(cartItem: CartItem, item: Item?)] {
+//        items.filter { !$0.cartItem.isFulfilled && !$0.cartItem.isSkippedDuringShopping }
+//    }
+//    
+//    private func handleSkipItem(_ cartItem: CartItem) {
+//        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+//            cartItem.isSkippedDuringShopping = true
+//            cartItem.isFulfilled = false
+//            vaultService.updateCartTotals(cart: cart)
+//        }
+//    }
+//    
+//    var body: some View {
+//        // Only show section if there are unfulfilled, non-skipped items
+//        if !unfulfilledItems.isEmpty {
+//            Section(
+//                header: VStack(spacing: 0) {
+//                    HStack {
+//                        HStack(spacing: 2) {
+//                            Image("store")
+//                                .resizable()
+//                                .scaledToFit()
+//                                .frame(width: 10, height: 10)
+//                                .foregroundColor(.white)
+//                            
+//                            Text(store)
+//                                .lexendFont(11, weight: .bold)
+//                        }
+//                        .foregroundColor(.white)
+//                        .padding(.horizontal, 8)
+//                        .padding(.vertical, 4)
+//                        .background(Color.black)
+//                        .cornerRadius(6)
+//                        Spacer()
+//                    }
+//                    .padding(.leading)
+//                }
+//                .listRowInsets(EdgeInsets())
+//                .textCase(nil)
+//                
+//            ) {
+//                ForEach(Array(unfulfilledItems.enumerated()), id: \.element.cartItem.itemId) { index, tuple in
+//                    VStack(spacing: 0) {
+//                        CartItemRowListView(
+//                            cartItem: tuple.cartItem,
+//                            item: tuple.item,
+//                            cart: cart,
+//                            onToggleFulfillment: { onToggleFulfillment(tuple.cartItem) },
+//                            onEditItem: { onEditItem(tuple.cartItem) },
+//                            onDeleteItem: { onDeleteItem(tuple.cartItem) },
+//                            isLastItem: index == unfulfilledItems.count - 1
+//                        )
+//                        .id(tuple.cartItem.itemId + (tuple.cartItem.actualPrice?.description ?? ""))
+//                        .listRowInsets(EdgeInsets())
+//                        .listRowSeparator(.hidden)
+//                        .background(Color(hex: "F7F2ED"))
+//                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+//                            if cart.isShopping {
+//                                // Shopping mode: Skip action
+//                                Button(role: .destructive) {
+//                                    handleSkipItem(tuple.cartItem)
+//                                } label: {
+//                                    Label("Skip", systemImage: "minus.circle")
+//                                }
+//                                .tint(.orange)
+//                            } else {
+//                                // Planning mode: Delete action
+//                                Button(role: .destructive) {
+//                                    onDeleteItem(tuple.cartItem)
+//                                } label: {
+//                                    Label("Delete", systemImage: "trash")
+//                                }
+//                            }
+//                            
+//                            Button {
+//                                onEditItem(tuple.cartItem)
+//                            } label: {
+//                                Label("Edit", systemImage: "pencil")
+//                            }
+//                            
+//                            if cart.isShopping {
+//                                Button {
+//                                    onToggleFulfillment(tuple.cartItem)
+//                                } label: {
+//                                    Label(
+//                                        tuple.cartItem.isFulfilled ? "Mark Unfulfilled" : "Mark Fulfilled",
+//                                        systemImage: tuple.cartItem.isFulfilled ? "circle" : "checkmark.circle.fill"
+//                                    )
+//                                }
+//                                .tint(tuple.cartItem.isFulfilled ? .orange : .green)
+//                            }
+//                        }
+//                        
+//                        if index < unfulfilledItems.count - 1 {
+//                            DashedLine()
+//                                .stroke(style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
+//                                .frame(height: 0.5)
+//                                .foregroundColor(Color(hex: "999").opacity(0.5))
+//                                .padding(.horizontal, 12)
+//                        }
+//                    }
+//                    .listRowInsets(EdgeInsets())
+//                    .listRowSeparator(.hidden)
+//                    .listRowBackground(Color(hex: "F7F2ED"))
+//                }
+//            }
+//            .listSectionSpacing(isLastStore ? 0 : 20)
+//        }
+//    }
+//}
 
 struct CompletedItemRow: View {
     let cartItem: CartItem

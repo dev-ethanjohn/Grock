@@ -183,6 +183,9 @@ class CartItem {
     var quantity: Double
     var isFulfilled: Bool
     
+    // Track if item was skipped during shopping
+    var isSkippedDuringShopping: Bool = false
+    
     // PLANNED data (frozen when shopping starts)
     var plannedStore: String
     var plannedPrice: Double?
@@ -197,30 +200,33 @@ class CartItem {
     // Add a property to track if item was edited during shopping
     var wasEditedDuringShopping: Bool = false
     
-    init(
-        itemId: String,
-        quantity: Double,
-        plannedStore: String,
-        isFulfilled: Bool = false,
-        plannedPrice: Double? = nil,
-        plannedUnit: String? = nil,
-        actualStore: String? = nil,
-        actualPrice: Double? = nil,
-        actualQuantity: Double? = nil,
-        actualUnit: String? = nil
-    ) {
-        self.itemId = itemId
-        self.quantity = quantity
-        self.plannedStore = plannedStore
-        self.isFulfilled = isFulfilled
-        self.plannedPrice = plannedPrice
-        self.plannedUnit = plannedUnit
-        self.actualStore = actualStore
-        self.actualPrice = actualPrice
-        self.actualQuantity = actualQuantity
-        self.actualUnit = actualUnit
-    }
     
+       init(
+           itemId: String,
+           quantity: Double,
+           plannedStore: String,
+           isFulfilled: Bool = false,
+           isSkippedDuringShopping: Bool = false,
+           plannedPrice: Double? = nil,
+           plannedUnit: String? = nil,
+           actualStore: String? = nil,
+           actualPrice: Double? = nil,
+           actualQuantity: Double? = nil,
+           actualUnit: String? = nil
+       ) {
+           self.itemId = itemId
+           self.quantity = quantity
+           self.plannedStore = plannedStore
+           self.isFulfilled = isFulfilled
+           self.isSkippedDuringShopping = isSkippedDuringShopping 
+           self.plannedPrice = plannedPrice
+           self.plannedUnit = plannedUnit
+           self.actualStore = actualStore
+           self.actualPrice = actualPrice
+           self.actualQuantity = actualQuantity
+           self.actualUnit = actualUnit
+       }
+       
     func getPrice(from vault: Vault, cart: Cart) -> Double {
         switch cart.status {
         case .planning:

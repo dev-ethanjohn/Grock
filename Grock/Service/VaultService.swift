@@ -363,18 +363,25 @@ extension VaultService {
     func returnToPlanning(cart: Cart) {
         guard cart.status == .shopping else { return }
         
+        print("🔄 Returning cart '\(cart.name)' to planning mode")
+        
         cart.status = .planning
         
         for cartItem in cart.cartItems {
-            // Discard all shopping data
+            // IMPORTANT: Reset ALL shopping-specific flags
+            cartItem.isFulfilled = false
+            cartItem.isSkippedDuringShopping = false
+            cartItem.wasEditedDuringShopping = false
+            
+            // Clear all shopping data
             cartItem.actualPrice = nil
             cartItem.actualQuantity = nil
             cartItem.actualUnit = nil
             cartItem.actualStore = nil
-            cartItem.isFulfilled = false
             
             // Reset planned data from current Vault
             if let vault = vault {
+                // Get current price and unit from vault
                 cartItem.plannedPrice = cartItem.getCurrentPrice(from: vault, store: cartItem.plannedStore)
                 cartItem.plannedUnit = cartItem.getCurrentUnit(from: vault, store: cartItem.plannedStore)
             }
@@ -382,9 +389,9 @@ extension VaultService {
         
         updateCartTotals(cart: cart)
         saveContext()
-        print("🔄 Returned cart '\(cart.name)' to planning mode")
+        
+        print("✅ Cart '\(cart.name)' reset to planning mode - all items restored")
     }
-    
     
     /// Deletes an item from the vault
     func deleteItem(_ item: Item) {
@@ -683,17 +690,56 @@ extension VaultService {
     }
    
     /// Removes an item from a shopping cart
+//    func removeItemFromCart(cart: Cart, itemId: String) {
+//        guard let cartItem = cart.cartItems.first(where: { $0.itemId == itemId }) else {
+//            print("⚠️ Item not found in cart")
+//            return
+//        }
+//        
+//        let itemName = findItemById(itemId)?.name ?? "Unknown Item"
+//        
+//        if cart.status == .shopping {
+//            // Shopping mode: Mark as SKIPPED
+//            cartItem.isSkippedDuringShopping = true
+//            cartItem.isFulfilled = false // ⚠️ IMPORTANT: NOT fulfilled!
+//            
+//            print("⏸️ Skipped \(itemName) during shopping - moved to skipped section")
+//        } else {
+//            // Planning mode: Actually remove the item
+//            if let index = cart.cartItems.firstIndex(where: { $0.itemId == itemId }) {
+//                cart.cartItems.remove(at: index)
+//                print("🗑️ Removed \(itemName) from cart: \(cart.name)")
+//            }
+//        }
+//        
+//        updateCartTotals(cart: cart)
+//        saveContext()
+//    }
+    // In VaultService.swift - update the existing function
     func removeItemFromCart(cart: Cart, itemId: String) {
-        guard let index = cart.cartItems.firstIndex(where: { $0.itemId == itemId }) else {
+        guard let cartItem = cart.cartItems.first(where: { $0.itemId == itemId }) else {
             print("⚠️ Item not found in cart")
             return
         }
-       
+        
         let itemName = findItemById(itemId)?.name ?? "Unknown Item"
-        cart.cartItems.remove(at: index)
+        
+        if cart.status == .shopping {
+            // Shopping mode: Mark as SKIPPED instead of removing
+            cartItem.isSkippedDuringShopping = true
+            cartItem.isFulfilled = false // ⚠️ IMPORTANT: NOT fulfilled!
+            
+            print("⏸️ Skipped \(itemName) during shopping - moved to skipped section")
+        } else {
+            // Planning mode: Actually remove the item
+            if let index = cart.cartItems.firstIndex(where: { $0.itemId == itemId }) {
+                cart.cartItems.remove(at: index)
+                print("🗑️ Removed \(itemName) from cart: \(cart.name)")
+            }
+        }
+        
         updateCartTotals(cart: cart)
         saveContext()
-        print("🗑️ Removed \(itemName) from cart: \(cart.name)")
     }
    
     /// Updates actual shopping data for a cart item
