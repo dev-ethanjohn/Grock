@@ -5,7 +5,7 @@ struct CartItemRowListView: View {
     @Bindable var cartItem: CartItem
     let item: Item?
     let cart: Cart
-    let onToggleFulfillment: () -> Void
+    let onFulfillItem: () -> Void
     let onEditItem: () -> Void
     let onDeleteItem: () -> Void
     let isLastItem: Bool
@@ -58,76 +58,67 @@ struct CartItemRowListView: View {
     }
     
     var body: some View {
-        HStack(alignment: .top, spacing: cart.isShopping ? 8 : 0) {
+        HStack(alignment: .top, spacing: 0) { // Change spacing to 0
             if cart.isShopping {
                 Button(action: {
                     guard !isFulfilling else { return }
                     
-                    isFulfilling = true
+                    // Call the fulfillment handler first
+                    onFulfillItem()
                     
-                    // 1. Animate icon bouncing
-                    withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {
-                        iconScale = 1.3
-                    }
-                    
-                    // 2. Show checkmark with delay
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                            checkmarkScale = 1.0
+                    // Then schedule state changes for the next run loop
+                    DispatchQueue.main.async {
+                        isFulfilling = true
+                        withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {
+                            iconScale = 1.3
                         }
-                    }
-                    
-                    // 3. Fade out the row
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                        withAnimation(.easeOut(duration: 0.3)) {
-                            rowOpacity = 0
+                        
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            isFulfilling = false
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                                iconScale = 1.0
+                            }
                         }
-                    }
-                    
-                    // 4. After animation completes, trigger fulfillment
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                        onToggleFulfillment()
-                        isFulfilling = false
-                        iconScale = 1.0
-                        checkmarkScale = 0.1
-                        rowOpacity = 1.0
                     }
                 }) {
                     ZStack {
-                        // Circle background
-                        if !cartItem.isFulfilled {
-                            Circle()
-                                .strokeBorder(Color(hex: "999"), lineWidth: 1)
-                                .frame(width: 20, height: 20)
-                                .scaleEffect(iconScale)
-                                .animation(.spring(response: 0.3, dampingFraction: 0.6), value: iconScale)
-                        }
+                        // Always show the circle (for both states)
+                        Circle()
+                            .strokeBorder(
+                                cartItem.isFulfilled ? Color.green : Color(hex: "666"),
+                                lineWidth: cartItem.isFulfilled ? 0 : 1.5
+                            )
+                            .frame(width: 18, height: 18)
+                            .scaleEffect(iconScale)
+                            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: iconScale)
                         
                         // Checkmark when fulfilled
                         if cartItem.isFulfilled {
                             Image(systemName: "checkmark.circle.fill")
-                                .font(.system(size: 20))
+                                .font(.system(size: 22))
                                 .foregroundColor(.green)
                                 .scaleEffect(checkmarkScale)
                                 .animation(.spring(response: 0.3, dampingFraction: 0.6), value: checkmarkScale)
                         } else {
-                            // Empty circle
-                            Image(systemName: "circle")
-                                .font(.system(size: 16))
-                                .foregroundColor(Color(hex: "999"))
-                                .scaleEffect(buttonScale)
-                                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: buttonScale)
+                            // Simple circle for unfulfilled
+                            Circle()
+                                .fill(Color.clear)
+                                .frame(width: 18, height: 18)
                         }
                     }
-                    .frame(width: 20, height: 20)
-                    .padding(.top, 2)
+                    .frame(width: 18, height: 18)
+                    .padding(.trailing, 8) // Add padding to the right for spacing
+                    .padding(.vertical, 4) // Add vertical padding to make bottom area tappable
+                    .contentShape(Rectangle()) // Make entire padded area tappable
                     .scaleEffect(buttonScale)
                 }
                 .buttonStyle(.plain)
                 .disabled(isFulfilling || cartItem.isFulfilled)
-                // FIXED: Remove the opacity animation here
+                // Add a tooltip for clarity
+                .help(cartItem.isFulfilled ? "Already purchased" : "Tap to confirm purchase")
             }
             
+            // The rest of your item content
             VStack(alignment: .leading, spacing: 2) {
                 Text("\(quantityString) \(itemName)")
                     .lexendFont(17, weight: .regular)
@@ -173,14 +164,9 @@ struct CartItemRowListView: View {
                 }
             } else {
                 // Planning mode: Scale down from 1.0 to 0.1
-                // FIXED: Actually animate the scale down
                 withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
                     buttonScale = 0.1
                 }
-                
-                // FIXED: Hide the entire icon container after scale animation
-                // The button will disappear when cart.isShopping becomes false
-                // because of the if statement: `if cart.isShopping { ... }`
             }
         }
         .onAppear {

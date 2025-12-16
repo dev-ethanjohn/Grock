@@ -16,16 +16,7 @@ struct CompletedItemsSheet: View {
             (c, vaultService.findItemById(c.itemId))
         }
     }
-    
-//    private var skippedItems: [(cartItem: CartItem, item: Item?)] {
-//        cart.cartItems.filter {
-//            $0.isSkippedDuringShopping
-//        }.map { c in
-//            (c, vaultService.findItemById(c.itemId))
-//        }
-//    }
-    
-    // In CompletedItemsSheet.swift
+
     private var skippedItems: [(cartItem: CartItem, item: Item?)] {
         cart.cartItems.filter {
             $0.isSkippedDuringShopping
@@ -33,7 +24,6 @@ struct CompletedItemsSheet: View {
             (c, vaultService.findItemById(c.itemId))
         }
     }
-    
     
     private var fulfilledCount: Int {
         cart.cartItems.filter {

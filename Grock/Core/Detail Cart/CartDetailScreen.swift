@@ -55,6 +55,8 @@ struct CartDetailScreen: View {
     @State private var selectedCartItemForPopover: CartItem?
     @State private var selectedItemForPopover: Item?
     
+    @State private var showingFulfillPopover = false
+    
     private var cartInsights: CartInsights {
         vaultService.getCartInsights(cart: cart)
     }
@@ -113,7 +115,7 @@ struct CartDetailScreen: View {
     }
     
     var body: some View {
-        // Create the view in stages to avoid compiler issues
+
         let basicParams = CartDetailContent(
             cart: cart,
             cartInsights: cartInsights,
@@ -144,6 +146,7 @@ struct CartDetailScreen: View {
             manageCartButtonVisible: $manageCartButtonVisible,
             buttonScale: $buttonScale,
             shouldBounceAfterCelebration: $shouldBounceAfterCelebration,
+            showingFulfillPopover: $showingFulfillPopover,
             cartReady: $cartReady,
             refreshTrigger: $refreshTrigger,
             showFinishTripButton: $showFinishTripButton,
@@ -154,163 +157,190 @@ struct CartDetailScreen: View {
             selectedItemForPopover: $selectedItemForPopover,
             selectedCartItemForPopover: $selectedCartItemForPopover
         )
-        
         ZStack {
             basicParams
             
             if showingShoppingPopover {
-                           ShoppingEditItemPopover(
-                               isPresented: $showingShoppingPopover,
-                               item: selectedItemForPopover!,
-                               cart: cart,
-                               cartItem: selectedCartItemForPopover!,
-                               onSave: {
-                                   vaultService.updateCartTotals(cart: cart)
-                                   refreshTrigger = UUID()
-                               },
-                               onDismiss: {
-                                   showingShoppingPopover = false
-                               }
-                           )
-                           .environment(vaultService)
-                           .transition(.opacity)
-                           .zIndex(100)
-                       }
-            
-        }
-
-            .onAppear {
-                previousHasItems = hasItems
-                checkAndShowCelebration()
-                
-                if cart.isShopping && hasItems {
-                    showFinishTripButton = true
-                }
-            }
-            .onChange(of: cart.status) { oldValue, newValue in
-                print("🛒 Cart status changed: \(oldValue) -> \(newValue)")
-                
-                // Only update if the status actually changed
-                if oldValue != newValue {
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-                        if newValue == .shopping && hasItems {
-                            showFinishTripButton = true
-                        } else if newValue == .planning {
-                            showFinishTripButton = false
-                        }
+                ShoppingEditItemPopover(
+                    isPresented: $showingShoppingPopover,
+                    item: selectedItemForPopover!,
+                    cart: cart,
+                    cartItem: selectedCartItemForPopover!,
+                    onSave: {
+                        vaultService.updateCartTotals(cart: cart)
+                        refreshTrigger = UUID()
+                    },
+                    onDismiss: {
+                        showingShoppingPopover = false
                     }
-                }
-                
-                // Show/hide bottom sheet based on shopping mode
-                if newValue == .shopping && hasItems {
-                    let currentFulfilledCount = cart.cartItems.filter { $0.isFulfilled }.count
-                    if currentFulfilledCount > 0 {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                )
+                .environment(vaultService)
+                .transition(.opacity)
+                .zIndex(100)
+            }
+            
+            
+            if showingFulfillPopover {
+                FulfillConfirmationPopover(
+                    isPresented: $showingFulfillPopover,
+                    item: selectedItemForPopover!,
+                    cart: cart,
+                    cartItem: selectedCartItemForPopover!,
+                    onFulfill: {
+                        // Update UI after fulfillment
+                        vaultService.updateCartTotals(cart: cart)
+                        refreshTrigger = UUID()
+                        
+                        // Check if we should show the completed sheet
+                        let currentFulfilledCount = cart.cartItems.filter { $0.isFulfilled }.count
+                        if currentFulfilledCount > 0 && !showingCompletedSheet {
                             showingCompletedSheet = true
                         }
+                    },
+                    onDismiss: {
+                        showingFulfillPopover = false
                     }
-                } else if newValue == .planning {
+                )
+                .environment(vaultService)
+                .transition(.opacity)
+                .zIndex(101) // Higher than shopping popover
+            }
+            
+            
+        }
+        
+        .onAppear {
+            previousHasItems = hasItems
+            checkAndShowCelebration()
+            
+            if cart.isShopping && hasItems {
+                showFinishTripButton = true
+            }
+        }
+        .onChange(of: cart.status) { oldValue, newValue in
+            print("🛒 Cart status changed: \(oldValue) -> \(newValue)")
+            
+            // Only update if the status actually changed
+            if oldValue != newValue {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                    if newValue == .shopping && hasItems {
+                        showFinishTripButton = true
+                    } else if newValue == .planning {
+                        showFinishTripButton = false
+                    }
+                }
+            }
+            
+            // Show/hide bottom sheet based on shopping mode
+            if newValue == .shopping && hasItems {
+                let currentFulfilledCount = cart.cartItems.filter { $0.isFulfilled }.count
+                if currentFulfilledCount > 0 {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                        showingCompletedSheet = false
+                        showingCompletedSheet = true
+                    }
+                }
+            } else if newValue == .planning {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    showingCompletedSheet = false
+                }
+            }
+        }
+        .onChange(of: hasItems) { oldValue, newValue in
+            print("📦 Items changed: \(oldValue) -> \(newValue)")
+            
+            // Only update if items actually changed
+            if oldValue != newValue {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                    if cart.isShopping && newValue {
+                        showFinishTripButton = true
+                    } else if !newValue {
+                        showFinishTripButton = false
                     }
                 }
             }
-            .onChange(of: hasItems) { oldValue, newValue in
-                print("📦 Items changed: \(oldValue) -> \(newValue)")
-                
-                // Only update if items actually changed
-                if oldValue != newValue {
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-                        if cart.isShopping && newValue {
-                            showFinishTripButton = true
-                        } else if !newValue {
-                            showFinishTripButton = false
-                        }
+        }
+        .navigationBarBackButtonHidden(true)
+        .sheet(item: $itemToEdit) { item in
+            // Planning mode: Use EditItemSheet
+            if let cartItem = cart.cartItems.first(where: { $0.itemId == item.id }) {
+                EditItemSheet(
+                    item: item,
+                    cart: cart,
+                    cartItem: cartItem,
+                    onSave: { updatedItem in
+                        vaultService.updateCartTotals(cart: cart)
+                        refreshTrigger = UUID()
                     }
-                }
-            }
-            .navigationBarBackButtonHidden(true)
-            .sheet(item: $itemToEdit) { item in
-                // Planning mode: Use EditItemSheet
-                if let cartItem = cart.cartItems.first(where: { $0.itemId == item.id }) {
-                    EditItemSheet(
-                        item: item,
-                        cart: cart,
-                        cartItem: cartItem,
-                        onSave: { updatedItem in
-                            vaultService.updateCartTotals(cart: cart)
-                            refreshTrigger = UUID()
-                        }
-                    )
-                    .environment(vaultService)
-                    .presentationDetents([.medium, .fraction(0.75)])
-                    .presentationCornerRadius(24)
-                }
-            }
-            .sheet(isPresented: $showingVaultView) {
-                // This closure runs when sheet is dismissed
-                print("🔄 Manage cart sheet dismissed - refreshing cart data")
-                vaultService.updateCartTotals(cart: cart)
-                refreshTrigger = UUID() // Force refresh
-            } content: {
-                NavigationStack {
-                    ManageCartSheet(cart: cart)
-                        .environment(vaultService)
-                        .environment(cartViewModel)
-                }
+                )
+                .environment(vaultService)
+                .presentationDetents([.medium, .fraction(0.75)])
                 .presentationCornerRadius(24)
             }
-            // Completed items bottom sheet
-            .completedSheet(
-                cart: cart,
-                showing: $showingCompletedSheet,
-                detent: $bottomSheetDetent,
-                refreshTrigger: $refreshTrigger,
-                vaultService: vaultService
-            )
-            .alert("Start Shopping", isPresented: $showingStartShoppingAlert) {
-                Button("Cancel", role: .cancel) { }
-                Button("Start Shopping") {
-                    vaultService.startShopping(cart: cart)
-                    refreshTrigger = UUID()
+        }
+        .sheet(isPresented: $showingVaultView) {
+            // This closure runs when sheet is dismissed
+            print("🔄 Manage cart sheet dismissed - refreshing cart data")
+            vaultService.updateCartTotals(cart: cart)
+            refreshTrigger = UUID() // Force refresh
+        } content: {
+            NavigationStack {
+                ManageCartSheet(cart: cart)
+                    .environment(vaultService)
+                    .environment(cartViewModel)
+            }
+            .presentationCornerRadius(24)
+        }
+        // Completed items bottom sheet
+        .completedSheet(
+            cart: cart,
+            showing: $showingCompletedSheet,
+            detent: $bottomSheetDetent,
+            refreshTrigger: $refreshTrigger,
+            vaultService: vaultService
+        )
+        .alert("Start Shopping", isPresented: $showingStartShoppingAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Start Shopping") {
+                vaultService.startShopping(cart: cart)
+                refreshTrigger = UUID()
+            }
+        } message: {
+            Text("This will freeze your planned prices. You'll be able to update actual prices during shopping.")
+        }
+        .alert("Switch to Planning", isPresented: $showingSwitchToPlanningAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Switch to Planning") {
+                vaultService.returnToPlanning(cart: cart)
+                refreshTrigger = UUID()
+            }
+        } message: {
+            Text("Switching back to Planning will reset this trip to your original plan.")
+        }
+        .alert("Complete Shopping", isPresented: $showingCompleteAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Complete") {
+                vaultService.completeShopping(cart: cart)
+                refreshTrigger = UUID()
+                // Hide bottom sheet when completing
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    showingCompletedSheet = false
                 }
-            } message: {
-                Text("This will freeze your planned prices. You'll be able to update actual prices during shopping.")
             }
-            .alert("Switch to Planning", isPresented: $showingSwitchToPlanningAlert) {
-                Button("Cancel", role: .cancel) { }
-                Button("Switch to Planning") {
-                    vaultService.returnToPlanning(cart: cart)
-                    refreshTrigger = UUID()
-                }
-            } message: {
-                Text("Switching back to Planning will reset this trip to your original plan.")
+        } message: {
+            Text("This will preserve your shopping data for review.")
+        }
+        .alert("Delete Cart", isPresented: $showingDeleteAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete", role: .destructive) {
+                vaultService.deleteCart(cart)
+                dismiss()
             }
-            .alert("Complete Shopping", isPresented: $showingCompleteAlert) {
-                Button("Cancel", role: .cancel) { }
-                Button("Complete") {
-                    vaultService.completeShopping(cart: cart)
-                    refreshTrigger = UUID()
-                    // Hide bottom sheet when completing
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                        showingCompletedSheet = false
-                    }
-                }
-            } message: {
-                Text("This will preserve your shopping data for review.")
-            }
-            .alert("Delete Cart", isPresented: $showingDeleteAlert) {
-                Button("Cancel", role: .cancel) { }
-                Button("Delete", role: .destructive) {
-                    vaultService.deleteCart(cart)
-                    dismiss()
-                }
-            } message: {
-                Text("Are you sure you want to delete this cart? This action cannot be undone.")
-            }
-            .sheet(isPresented: $showingFilterSheet) {
-                FilterSheet(selectedFilter: $selectedFilter)
-            }
+        } message: {
+            Text("Are you sure you want to delete this cart? This action cannot be undone.")
+        }
+        .sheet(isPresented: $showingFilterSheet) {
+            FilterSheet(selectedFilter: $selectedFilter)
+        }
     }
     
     private func handleEditItem(cartItem: CartItem) {
@@ -406,31 +436,31 @@ struct CompletedSheetContent: View {
     @Binding var refreshTrigger: UUID
     let vaultService: VaultService
     
-//    private var completedItems: [(cartItem: CartItem, item: Item?)] {
-//        cart.cartItems.filter { $0.isFulfilled }.map { c in
-//            (c, vaultService.findItemById(c.itemId))
-//        }
-//    }
-//    
-//    private var fulfilledCount: Int {
-//        cart.cartItems.filter { $0.isFulfilled }.count
-//    }
+    //    private var completedItems: [(cartItem: CartItem, item: Item?)] {
+    //        cart.cartItems.filter { $0.isFulfilled }.map { c in
+    //            (c, vaultService.findItemById(c.itemId))
+    //        }
+    //    }
+    //
+    //    private var fulfilledCount: Int {
+    //        cart.cartItems.filter { $0.isFulfilled }.count
+    //    }
     
     var body: some View {
         CompletedItemsSheet(
-                  cart: cart,
-                  onUnfulfillItem: { cartItem in
-                      if cartItem.isSkippedDuringShopping {
-                          // Handle unskipping an item
-                          cartItem.isSkippedDuringShopping = false
-                          cartItem.isFulfilled = false
-                      } else {
-                          // Handle unfulfilling a regular completed item
-                          vaultService.toggleItemFulfillment(cart: cart, itemId: cartItem.itemId)
-                      }
-                      refreshTrigger = UUID()
-                  }
-              )
+            cart: cart,
+            onUnfulfillItem: { cartItem in
+                if cartItem.isSkippedDuringShopping {
+                    // Handle unskipping an item
+                    cartItem.isSkippedDuringShopping = false
+                    cartItem.isFulfilled = false
+                } else {
+                    // Handle unfulfilling a regular completed item
+                    vaultService.toggleItemFulfillment(cart: cart, itemId: cartItem.itemId)
+                }
+                refreshTrigger = UUID()
+            }
+        )
         .conditionalPresentationBackground()
         .presentationDetents([.fraction(0.08), .large], selection: $detent)
         .presentationDragIndicator(.visible)
@@ -513,6 +543,9 @@ struct CartDetailContent: View {
     @Binding var buttonScale: CGFloat
     @Binding var shouldBounceAfterCelebration: Bool
     
+    //    @Binding var onFulfillItem: (CartItem) -> Void
+    @Binding var showingFulfillPopover: Bool
+    
     private var completedItemsCount: Int {
         cart.cartItems.filter {
             $0.isFulfilled || $0.isSkippedDuringShopping
@@ -550,14 +583,14 @@ struct CartDetailContent: View {
     
     
     // Add these bindings
-      @Binding var showingShoppingPopover: Bool
-      @Binding var selectedItemForPopover: Item?
-      @Binding var selectedCartItemForPopover: CartItem?
+    @Binding var showingShoppingPopover: Bool
+    @Binding var selectedItemForPopover: Item?
+    @Binding var selectedCartItemForPopover: CartItem?
     
     var body: some View {
         GeometryReader { geometry in
             let screenHeight = geometry.size.height
-                  let fractionHeight = screenHeight * 0.08
+            let fractionHeight = screenHeight * 0.08
             
             ZStack {
                 // Main content area
@@ -576,35 +609,24 @@ struct CartDetailContent: View {
                             ZStack {
                                 if hasItems {
                                     VStack(spacing: 24) {
+                                        
                                         ItemsListView(
                                             cart: cart,
                                             totalItemCount: totalItemCount,
                                             sortedStoresWithRefresh: sortedStoresWithRefresh,
                                             storeItemsWithRefresh: storeItemsWithRefresh,
                                             fulfilledCount: $fulfilledCount,
-                                            onToggleFulfillment: { cartItem in
-                                                if cart.isShopping {
-                                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                                        fulfilledCount = currentFulfilledCount
-                                                    }
-                                                    
-                                                    if !showingCompletedSheet && currentFulfilledCount > 0 {
-                                                        showingCompletedSheet = true
-                                                    }
-                                                    
-                                                    vaultService.toggleItemFulfillment(cart: cart, itemId: cartItem.itemId)
-                                                    refreshTrigger = UUID()
-                                                }
+                                            onFulfillItem: { cartItem in
+                                                // Handle fulfillment - show the popover
+                                                handleFulfillItem(cartItem: cartItem)
                                             },
                                             onEditItem: { cartItem in
-                                                   // This calls CartDetailContent.handleEditItem
                                                 handleEditItem(cartItem: cartItem)
-                                               },
-                                               onDeleteItem: { cartItem in
-                                                   handleDeleteItem(cartItem)
-                                               }
-                                        )
-                                        .transition(.scale)
+                                            },
+                                            onDeleteItem: { cartItem in
+                                                handleDeleteItem(cartItem)
+                                            }
+                                        )                                        .transition(.scale)
                                     }
                                     
                                 } else {
@@ -617,7 +639,7 @@ struct CartDetailContent: View {
                             
                             Spacer(minLength: 0)
                         }
-                        .padding(.vertical, 40)
+                        .padding(.vertical, 28)
                         .padding(.horizontal)
                         .frame(maxHeight: .infinity, alignment: .top)
                         
@@ -634,6 +656,7 @@ struct CartDetailContent: View {
                                 showEditBudget = true
                             }
                         )
+                        
                     }
                     
                     // Floating Action Bar (position it above everything)
@@ -642,16 +665,16 @@ struct CartDetailContent: View {
                             Spacer()
                             
                             CartDetailActionBar(
-                                    showFinishTrip: showFinishTripButton,
-                                    onManageCart: {
-                                        showingVaultView = true
-                                    },
-                                    onFinishTrip: {
-                                        print("Finish trip tapped")
-                                        showingCompleteAlert = true
-                                    },
-                                    namespace: buttonNamespace
-                                )
+                                showFinishTrip: showFinishTripButton,
+                                onManageCart: {
+                                    showingVaultView = true
+                                },
+                                onFinishTrip: {
+                                    print("Finish trip tapped")
+                                    showingCompleteAlert = true
+                                },
+                                namespace: buttonNamespace
+                            )
                             .padding(.horizontal, 16)
                             .padding(.bottom)
                             
@@ -671,26 +694,26 @@ struct CartDetailContent: View {
                         }
                 }
                 
-//                
-//                if showingShoppingPopover {
-//                     ShoppingEditItemPopover(
-//                         isPresented: $showingShoppingPopover,
-//                         item: selectedItemForPopover!,
-//                         cart: cart,
-//                         cartItem: selectedCartItemForPopover!,
-//                         onSave: {
-//                             vaultService.updateCartTotals(cart: cart)
-//                             refreshTrigger = UUID()
-//                         },
-//                         onDismiss: {
-//                             showingShoppingPopover = false
-//                         }
-//                     )
-//                     .environment(vaultService)
-//                     .transition(.opacity)
-//                     .zIndex(1)
-//                 }
-//                 
+                //
+                //                if showingShoppingPopover {
+                //                     ShoppingEditItemPopover(
+                //                         isPresented: $showingShoppingPopover,
+                //                         item: selectedItemForPopover!,
+                //                         cart: cart,
+                //                         cartItem: selectedCartItemForPopover!,
+                //                         onSave: {
+                //                             vaultService.updateCartTotals(cart: cart)
+                //                             refreshTrigger = UUID()
+                //                         },
+                //                         onDismiss: {
+                //                             showingShoppingPopover = false
+                //                         }
+                //                     )
+                //                     .environment(vaultService)
+                //                     .transition(.opacity)
+                //                     .zIndex(1)
+                //                 }
+                //
                 
                 
                 
@@ -722,6 +745,34 @@ struct CartDetailContent: View {
                     .environment(vaultService)
                     .zIndex(1000)
                 }
+                
+                
+                if showingFulfillPopover {
+                    FulfillConfirmationPopover(
+                        isPresented: $showingFulfillPopover,
+                        item: selectedItemForPopover!,
+                        cart: cart,
+                        cartItem: selectedCartItemForPopover!,
+                        onFulfill: {
+                            // Update UI after fulfillment
+                            vaultService.updateCartTotals(cart: cart)
+                            refreshTrigger = UUID()
+                            
+                            // Check if we should show the completed sheet
+                            if currentFulfilledCount > 0 && !showingCompletedSheet {
+                                showingCompletedSheet = true
+                            }
+                        },
+                        onDismiss: {
+                            showingFulfillPopover = false
+                        }
+                    )
+                    .environment(vaultService)
+                    .transition(.opacity)
+                    .zIndex(101)
+                }
+                
+                
                 
                 if showCelebration {
                     CelebrationView(
@@ -815,18 +866,22 @@ struct CartDetailContent: View {
         }
     }
     
-//    private func handleDeleteItem(_ cartItem: CartItem) {
-//        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-//            vaultService.removeItemFromCart(cart: cart, itemId: cartItem.itemId)
-//            vaultService.updateCartTotals(cart: cart)
-//            refreshTrigger = UUID()
-//        }
-//    }
     private func handleDeleteItem(_ cartItem: CartItem) {
         withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
             vaultService.removeItemFromCart(cart: cart, itemId: cartItem.itemId)
             vaultService.updateCartTotals(cart: cart)
             refreshTrigger = UUID()
+        }
+    }
+    
+    private func handleFulfillItem(cartItem: CartItem) {
+        if let found = vaultService.findItemById(cartItem.itemId) {
+            // Show the fulfillment confirmation popover
+            selectedItemForPopover = found
+            selectedCartItemForPopover = cartItem
+            
+            // This will trigger the popover at the CartDetailScreen level
+            showingFulfillPopover = true
         }
     }
 }
@@ -903,9 +958,18 @@ struct HeaderView: View {
             .padding(.top)
             
             VStack(alignment: .leading, spacing: 8) {
-                Text(cart.name)
-                    .lexendFont(22, weight: .bold)
-                    .foregroundColor(.black)
+                HStack(alignment: .bottom, spacing: 4) {
+                    Text(cart.name)
+                        .lexendFont(22, weight: .bold)
+                        .foregroundColor(.black)
+                    
+                    Image("edit")
+                        .resizable()
+                        .renderingMode(.template)
+                        .foregroundStyle(Color(.systemGray2))
+                        .frame(width: 16, height: 16)
+                        .padding(.bottom, 3)
+                }
                 
                 VStack(spacing: 8) {
                     HStack(alignment: .center, spacing: 16) {
@@ -949,7 +1013,8 @@ struct ItemsListView: View {
     let sortedStoresWithRefresh: [String]
     let storeItemsWithRefresh: (String) -> [(cartItem: CartItem, item: Item?)]
     @Binding var fulfilledCount: Int
-    let onToggleFulfillment: (CartItem) -> Void
+    //    let onToggleFulfillment: (CartItem) -> Void
+    let onFulfillItem: (CartItem) -> Void
     let onEditItem: (CartItem) -> Void
     let onDeleteItem: (CartItem) -> Void
     
@@ -1130,7 +1195,9 @@ struct ItemsListView: View {
                                     store: store,
                                     items: displayItems,
                                     cart: cart,
-                                    onToggleFulfillment: onToggleFulfillment,
+                                    onFulfillItem: { cartItem in
+                                        onFulfillItem(cartItem)
+                                    },
                                     onEditItem: onEditItem,
                                     onDeleteItem: onDeleteItem,
                                     isLastStore: index == sortedStoresWithRefresh.count - 1
@@ -1173,88 +1240,88 @@ struct ItemsListView: View {
 //    let onToggleFulfillment: (CartItem) -> Void
 //    let onEditItem: (CartItem) -> Void
 //    let onDeleteItem: (CartItem) -> Void
-//    
+//
 //    // Calculate available width based on screen width minus total padding
 //    private var availableWidth: CGFloat {
 //        let screenWidth = UIScreen.main.bounds.width
-//        
+//
 //        let cartDetailPadding: CGFloat = 17
 //        let itemRowPadding: CGFloat = cart.isShopping ? 36 : 28
 //        let internalSpacing: CGFloat = 4
 //        let safetyBuffer: CGFloat = 3
-//        
+//
 //        let totalPadding = cartDetailPadding + itemRowPadding + internalSpacing + safetyBuffer
-//        
+//
 //        let calculatedWidth = screenWidth - totalPadding
-//        
+//
 //        return max(min(calculatedWidth, 250), 150)
 //    }
-//    
+//
 //    private func estimateRowHeight(for itemName: String, isFirstInSection: Bool = true) -> CGFloat {
 //        let averageCharWidth: CGFloat = 8.0
-//        
+//
 //        let estimatedTextWidth = CGFloat(itemName.count) * averageCharWidth
 //        let numberOfLines = ceil(estimatedTextWidth / availableWidth)
-//        
+//
 //        let singleLineTextHeight: CGFloat = 22
 //        let verticalPadding: CGFloat = 24
 //        let internalSpacing: CGFloat = 10
-//        
+//
 //        let baseHeight = singleLineTextHeight + verticalPadding + internalSpacing
-//        
+//
 //        let additionalLineHeight: CGFloat = 24
-//        
+//
 //        let itemHeight = baseHeight + (max(0, numberOfLines - 1) * additionalLineHeight)
-//        
+//
 //        let dividerHeight: CGFloat = isFirstInSection ? 0 : 12.0
-//        
+//
 //        return itemHeight + dividerHeight
 //    }
-//    
+//
 //    private var estimatedHeight: CGFloat {
 //        let sectionHeaderHeight: CGFloat = 34
 //        let sectionSpacing: CGFloat = 8
 //        let listPadding: CGFloat = 24
-//        
+//
 //        var totalHeight: CGFloat = listPadding
-//        
+//
 //        for store in sortedStoresWithRefresh {
 //            // FIXED: Use getUnfulfilledItems which EXCLUDES skipped items in shopping mode
 //            let unfulfilledItems = getUnfulfilledItems(for: store)
-//            
+//
 //            if !unfulfilledItems.isEmpty {
 //                totalHeight += sectionHeaderHeight
-//                
+//
 //                for (index, (_, item)) in unfulfilledItems.enumerated() {
 //                    let itemName = item?.name ?? "Unknown"
 //                    let isFirstInStore = index == 0
 //                    totalHeight += estimateRowHeight(for: itemName, isFirstInSection: isFirstInStore)
 //                }
-//                
+//
 //                if store != sortedStoresWithRefresh.last {
 //                    totalHeight += sectionSpacing
 //                }
 //            }
 //        }
-//        
+//
 //        return totalHeight
 //    }
-//    
+//
 //    private var allItemsCompleted: Bool {
 //        guard cart.isShopping else { return false }
-//        
+//
 //        // Get all items across all stores
 //        let allItems = sortedStoresWithRefresh.flatMap { storeItemsWithRefresh($0) }
-//        
+//
 //        // Check if all non-skipped items are fulfilled
 //        let allUnfulfilledItems = allItems.filter {
 //            !$0.cartItem.isFulfilled &&
 //            !$0.cartItem.isSkippedDuringShopping
 //        }
-//        
+//
 //        return allUnfulfilledItems.isEmpty && totalItemCount > 0
 //    }
-//    
+//
 //    // Helper function to get unfulfilled items for a store (EXCLUDES skipped during shopping)
 //    private func getUnfulfilledItems(for store: String) -> [(cartItem: CartItem, item: Item?)] {
 //        if cart.isShopping {
@@ -1268,12 +1335,12 @@ struct ItemsListView: View {
 //            return storeItemsWithRefresh(store)
 //        }
 //    }
-//    
+//
 //    var body: some View {
 //        GeometryReader { geometry in
 //            let calculatedHeight = estimatedHeight
 //            let maxAllowedHeight = geometry.size.height * 0.8
-//            
+//
 //            VStack(spacing: 0) {
 //                if allItemsCompleted {
 //                    // Celebration message for completed shopping
@@ -1281,18 +1348,18 @@ struct ItemsListView: View {
 //                        Image(systemName: "party.popper.fill")
 //                            .font(.system(size: 50))
 //                            .foregroundColor(Color(hex: "FF6B6B"))
-//                        
+//
 //                        Text("Shopping Trip Complete! 🎉")
 //                            .lexendFont(18, weight: .bold)
 //                            .foregroundColor(Color(hex: "333"))
 //                            .multilineTextAlignment(.center)
-//                        
+//
 //                        Text("Congratulations! You've checked off all items.")
 //                            .lexendFont(14)
 //                            .foregroundColor(Color(hex: "666"))
 //                            .multilineTextAlignment(.center)
 //                            .padding(.horizontal)
-//                        
+//
 //                        Text("Ready to finish your trip?")
 //                            .lexendFont(12)
 //                            .foregroundColor(Color(hex: "999"))
@@ -1322,7 +1389,7 @@ struct ItemsListView: View {
 //                    List {
 //                        ForEach(Array(sortedStoresWithRefresh.enumerated()), id: \.offset) { (index, store) in
 //                            let unfulfilledItems = getUnfulfilledItems(for: store)
-//                            
+//
 //                            if !unfulfilledItems.isEmpty {
 //                                StoreSectionListView(
 //                                    store: store,
@@ -1359,190 +1426,16 @@ struct ItemsListView: View {
 //}
 
 
-//struct ItemsListView: View {
-//    let cart: Cart
-//    let totalItemCount: Int
-//    let sortedStoresWithRefresh: [String]
-//    let storeItemsWithRefresh: (String) -> [(cartItem: CartItem, item: Item?)]
-//    @Binding var fulfilledCount: Int
-//    let onToggleFulfillment: (CartItem) -> Void
-//    let onEditItem: (CartItem) -> Void
-//    let onDeleteItem: (CartItem) -> Void
-//    
-//    // Calculate available width based on screen width minus total padding
-//    private var availableWidth: CGFloat {
-//        let screenWidth = UIScreen.main.bounds.width
-//        
-//        let cartDetailPadding: CGFloat = 17
-//        let itemRowPadding: CGFloat = cart.isShopping ? 36 : 28
-//        let internalSpacing: CGFloat = 4
-//        let safetyBuffer: CGFloat = 3
-//        
-//        let totalPadding = cartDetailPadding + itemRowPadding + internalSpacing + safetyBuffer
-//        
-//        let calculatedWidth = screenWidth - totalPadding
-//        
-//        return max(min(calculatedWidth, 250), 150)
-//    }
-//    
-//    private func estimateRowHeight(for itemName: String, isFirstInSection: Bool = true) -> CGFloat {
-//        let averageCharWidth: CGFloat = 8.0
-//        
-//        let estimatedTextWidth = CGFloat(itemName.count) * averageCharWidth
-//        let numberOfLines = ceil(estimatedTextWidth / availableWidth)
-//        
-//        let singleLineTextHeight: CGFloat = 22
-//        let verticalPadding: CGFloat = 24
-//        let internalSpacing: CGFloat = 10
-//        
-//        let baseHeight = singleLineTextHeight + verticalPadding + internalSpacing
-//        
-//        let additionalLineHeight: CGFloat = 24
-//        
-//        let itemHeight = baseHeight + (max(0, numberOfLines - 1) * additionalLineHeight)
-//        
-//        let dividerHeight: CGFloat = isFirstInSection ? 0 : 12.0
-//        
-//        return itemHeight + dividerHeight
-//    }
-//    
-//    private var estimatedHeight: CGFloat {
-//        let sectionHeaderHeight: CGFloat = 34
-//        let sectionSpacing: CGFloat = 8
-//        let listPadding: CGFloat = 24
-//        
-//        var totalHeight: CGFloat = listPadding
-//        
-//        for store in sortedStoresWithRefresh {
-//            // FIX: Use getUnfulfilledItems which EXCLUDES skipped items
-//            let unfulfilledItems = getUnfulfilledItems(for: store)
-//            
-//            if !unfulfilledItems.isEmpty {
-//                totalHeight += sectionHeaderHeight
-//                
-//                for (index, (_, item)) in unfulfilledItems.enumerated() {
-//                    let itemName = item?.name ?? "Unknown"
-//                    let isFirstInStore = index == 0
-//                    totalHeight += estimateRowHeight(for: itemName, isFirstInSection: isFirstInStore)
-//                }
-//                
-//                if store != sortedStoresWithRefresh.last {
-//                    totalHeight += sectionSpacing
-//                }
-//            }
-//        }
-//        
-//        return totalHeight
-//    }
-//    
-//    private var allItemsCompleted: Bool {
-//        guard cart.isShopping else { return false }
-//        
-//        // Get all items across all stores
-//        let allItems = sortedStoresWithRefresh.flatMap { storeItemsWithRefresh($0) }
-//        
-//        // Check if all non-skipped items are fulfilled
-//        let allUnfulfilledItems = allItems.filter {
-//            !$0.cartItem.isFulfilled &&
-//            !$0.cartItem.isSkippedDuringShopping
-//        }
-//        
-//        return allUnfulfilledItems.isEmpty && totalItemCount > 0
-//    }
-//    
-//    // Helper function to get unfulfilled items for a store (EXCLUDES skipped)
-//    private func getUnfulfilledItems(for store: String) -> [(cartItem: CartItem, item: Item?)] {
-//        storeItemsWithRefresh(store).filter {
-//            !$0.cartItem.isFulfilled &&
-//            !$0.cartItem.isSkippedDuringShopping
-//        }
-//    }
-//    
-//    var body: some View {
-//        GeometryReader { geometry in
-//            let calculatedHeight = estimatedHeight
-//            let maxAllowedHeight = geometry.size.height * 0.8
-//            
-//            VStack(spacing: 0) {
-//                if allItemsCompleted {
-//                    // Celebration message for completed shopping
-//                    VStack(spacing: 16) {
-//                        Image(systemName: "party.popper.fill")
-//                            .font(.system(size: 50))
-//                            .foregroundColor(Color(hex: "FF6B6B"))
-//                        
-//                        Text("Shopping Trip Complete! 🎉")
-//                            .lexendFont(18, weight: .bold)
-//                            .foregroundColor(Color(hex: "333"))
-//                            .multilineTextAlignment(.center)
-//                        
-//                        Text("Congratulations! You've checked off all items.")
-//                            .lexendFont(14)
-//                            .foregroundColor(Color(hex: "666"))
-//                            .multilineTextAlignment(.center)
-//                            .padding(.horizontal)
-//                        
-//                        Text("Ready to finish your trip?")
-//                            .lexendFont(12)
-//                            .foregroundColor(Color(hex: "999"))
-//                            .multilineTextAlignment(.center)
-//                            .padding(.horizontal)
-//                            .padding(.top, 4)
-//                    }
-//                    .frame(height: min(200, maxAllowedHeight))
-//                    .frame(maxWidth: .infinity)
-//                    .background(
-//                        LinearGradient(
-//                            colors: [
-//                                Color(hex: "F7F2ED").darker(by: 0.02),
-//                                Color(hex: "F7F2ED")
-//                            ],
-//                            startPoint: .top,
-//                            endPoint: .bottom
-//                        )
-//                    )
-//                    .cornerRadius(16)
-//                    .overlay(
-//                        RoundedRectangle(cornerRadius: 16)
-//                            .stroke(Color(hex: "FF6B6B").opacity(0.3), lineWidth: 2)
-//                    )
-//                    .transition(.opacity.combined(with: .scale))
-//                } else {
-//                    List {
-//                        ForEach(Array(sortedStoresWithRefresh.enumerated()), id: \.offset) { (index, store) in
-//                            let unfulfilledItems = getUnfulfilledItems(for: store)
-//                            
-//                            if !unfulfilledItems.isEmpty {
-//                                StoreSectionListView(
-//                                    store: store,
-//                                    items: unfulfilledItems,
-//                                    cart: cart,
-//                                    onToggleFulfillment: onToggleFulfillment,
-//                                    onEditItem: onEditItem,
-//                                    onDeleteItem: onDeleteItem,
-//                                    isLastStore: index == sortedStoresWithRefresh.count - 1
-//                                )
-//                                .listRowInsets(EdgeInsets())
-//                                .listRowSeparator(.hidden)
-//                                .listRowBackground(Color(hex: "F7F2ED"))
-//                            }
-//                        }
-//                    }
-//                    .frame(height: min(calculatedHeight, maxAllowedHeight))
-//                    .listStyle(PlainListStyle())
-//                    .listSectionSpacing(0)
-//                    .background(Color(hex: "F7F2ED").darker(by: 0.02))
-//                    .cornerRadius(16)
-////                    .animation(.spring(response: 0.4, dampingFraction: 0.8), value: calculatedHeight) // Animate height changes
-//                }
-//            }
-//        }
-//        .onChange(of: cart.cartItems) { oldItems, newItems in
-//            // Update the fulfilled count when cart items change
-//            let newFulfilledCount = newItems.filter { $0.isFulfilled }.count
-//            if fulfilledCount != newFulfilledCount {
-//                fulfilledCount = newFulfilledCount
-//            }
+
+
+//// MARK: - Usage in CartDetailContent
+//extension CartDetailContent {
+//    private func handleFulfillItem(cartItem: CartItem) {
+//        if let found = vaultService.findItemById(cartItem.itemId) {
+//            // Show the fulfillment confirmation popover
+//            selectedItemForPopover = found
+//            selectedCartItemForPopover = cartItem
+//            showingFulfillPopover = true
 //        }
 //    }
 //}

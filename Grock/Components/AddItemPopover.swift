@@ -115,7 +115,7 @@ struct AddItemPopover: View {
             .padding()
             .frame(maxWidth: .infinity)
             .background(Color.white)
-            .cornerRadius(20)
+            .cornerRadius(24)
             .padding(.horizontal, UIScreen.main.bounds.width * 0.038)
             .scaleEffect(contentScale)
             .offset(y: keyboardVisible ? UIScreen.main.bounds.height * 0.12 : 0)

@@ -5,7 +5,7 @@ struct StoreSectionListView: View {
     let store: String
     let items: [(cartItem: CartItem, item: Item?)]
     let cart: Cart
-    let onToggleFulfillment: (CartItem) -> Void
+    let onFulfillItem: (CartItem) -> Void  // Changed
     let onEditItem: (CartItem) -> Void
     let onDeleteItem: (CartItem) -> Void
     let isLastStore: Bool
@@ -66,7 +66,7 @@ struct StoreSectionListView: View {
                             cartItem: tuple.cartItem,
                             item: tuple.item,
                             cart: cart,
-                            onToggleFulfillment: { onToggleFulfillment(tuple.cartItem) },
+                            onFulfillItem: { onFulfillItem(tuple.cartItem) },
                             onEditItem: { onEditItem(tuple.cartItem) },
                             onDeleteItem: { onDeleteItem(tuple.cartItem) },
                             isLastItem: index == displayItems.count - 1
@@ -99,16 +99,16 @@ struct StoreSectionListView: View {
                                 Label("Edit", systemImage: "pencil")
                             }
                             
-                            if cart.isShopping {
+                            // FIXED: Only show "Mark Unfulfilled" for already fulfilled items
+                            if cart.isShopping && tuple.cartItem.isFulfilled {
                                 Button {
-                                    onToggleFulfillment(tuple.cartItem)
+                                    // Direct toggle for unfulfilling (no popover needed)
+                                    tuple.cartItem.isFulfilled = false
+                                    vaultService.updateCartTotals(cart: cart)
                                 } label: {
-                                    Label(
-                                        tuple.cartItem.isFulfilled ? "Mark Unfulfilled" : "Mark Fulfilled",
-                                        systemImage: tuple.cartItem.isFulfilled ? "circle" : "checkmark.circle.fill"
-                                    )
+                                    Label("Mark Unfulfilled", systemImage: "circle")
                                 }
-                                .tint(tuple.cartItem.isFulfilled ? .orange : .green)
+                                .tint(.orange)
                             }
                         }
                         
