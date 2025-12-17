@@ -1,6 +1,9 @@
 import SwiftUI
 import SwiftData
 
+import SwiftUI
+import SwiftData
+
 struct CartDetailScreen: View {
     let cart: Cart
     @Environment(VaultService.self) private var vaultService
@@ -157,6 +160,7 @@ struct CartDetailScreen: View {
             selectedItemForPopover: $selectedItemForPopover,
             selectedCartItemForPopover: $selectedCartItemForPopover
         )
+        
         ZStack {
             basicParams
             
@@ -178,7 +182,6 @@ struct CartDetailScreen: View {
                 .transition(.opacity)
                 .zIndex(100)
             }
-            
             
             if showingFulfillPopover {
                 FulfillConfirmationPopover(
@@ -205,8 +208,6 @@ struct CartDetailScreen: View {
                 .transition(.opacity)
                 .zIndex(101) // Higher than shopping popover
             }
-            
-            
         }
         
         .onAppear {
@@ -260,44 +261,8 @@ struct CartDetailScreen: View {
             }
         }
         .navigationBarBackButtonHidden(true)
-        .sheet(item: $itemToEdit) { item in
-            // Planning mode: Use EditItemSheet
-            if let cartItem = cart.cartItems.first(where: { $0.itemId == item.id }) {
-                EditItemSheet(
-                    item: item,
-                    cart: cart,
-                    cartItem: cartItem,
-                    onSave: { updatedItem in
-                        vaultService.updateCartTotals(cart: cart)
-                        refreshTrigger = UUID()
-                    }
-                )
-                .environment(vaultService)
-                .presentationDetents([.medium, .fraction(0.75)])
-                .presentationCornerRadius(24)
-            }
-        }
-        .sheet(isPresented: $showingVaultView) {
-            // This closure runs when sheet is dismissed
-            print("🔄 Manage cart sheet dismissed - refreshing cart data")
-            vaultService.updateCartTotals(cart: cart)
-            refreshTrigger = UUID() // Force refresh
-        } content: {
-            NavigationStack {
-                ManageCartSheet(cart: cart)
-                    .environment(vaultService)
-                    .environment(cartViewModel)
-            }
-            .presentationCornerRadius(24)
-        }
-        // Completed items bottom sheet
-        .completedSheet(
-            cart: cart,
-            showing: $showingCompletedSheet,
-            detent: $bottomSheetDetent,
-            refreshTrigger: $refreshTrigger,
-            vaultService: vaultService
-        )
+        
+        // Alerts only - no sheets remain
         .alert("Start Shopping", isPresented: $showingStartShoppingAlert) {
             Button("Cancel", role: .cancel) { }
             Button("Start Shopping") {
@@ -678,8 +643,8 @@ struct CartDetailContent: View {
                             .padding(.horizontal, 16)
                             .padding(.bottom)
                             
-                            Spacer()
-                                .frame(height: showingCompletedSheet ? fractionHeight : 0)
+//                            Spacer()
+//                                .frame(height: showingCompletedSheet ? fractionHeight : 0)
                         }
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                         .animation(.spring(response: 0.5, dampingFraction: 0.7), value: manageCartButtonVisible)
@@ -744,32 +709,6 @@ struct CartDetailContent: View {
                     )
                     .environment(vaultService)
                     .zIndex(1000)
-                }
-                
-                
-                if showingFulfillPopover {
-                    FulfillConfirmationPopover(
-                        isPresented: $showingFulfillPopover,
-                        item: selectedItemForPopover!,
-                        cart: cart,
-                        cartItem: selectedCartItemForPopover!,
-                        onFulfill: {
-                            // Update UI after fulfillment
-                            vaultService.updateCartTotals(cart: cart)
-                            refreshTrigger = UUID()
-                            
-                            // Check if we should show the completed sheet
-                            if currentFulfilledCount > 0 && !showingCompletedSheet {
-                                showingCompletedSheet = true
-                            }
-                        },
-                        onDismiss: {
-                            showingFulfillPopover = false
-                        }
-                    )
-                    .environment(vaultService)
-                    .transition(.opacity)
-                    .zIndex(101)
                 }
                 
                 
@@ -1231,211 +1170,3 @@ struct ItemsListView: View {
     }
 }
 
-//struct ItemsListView: View {
-//    let cart: Cart
-//    let totalItemCount: Int
-//    let sortedStoresWithRefresh: [String]
-//    let storeItemsWithRefresh: (String) -> [(cartItem: CartItem, item: Item?)]
-//    @Binding var fulfilledCount: Int
-//    let onToggleFulfillment: (CartItem) -> Void
-//    let onEditItem: (CartItem) -> Void
-//    let onDeleteItem: (CartItem) -> Void
-//
-//    // Calculate available width based on screen width minus total padding
-//    private var availableWidth: CGFloat {
-//        let screenWidth = UIScreen.main.bounds.width
-//
-//        let cartDetailPadding: CGFloat = 17
-//        let itemRowPadding: CGFloat = cart.isShopping ? 36 : 28
-//        let internalSpacing: CGFloat = 4
-//        let safetyBuffer: CGFloat = 3
-//
-//        let totalPadding = cartDetailPadding + itemRowPadding + internalSpacing + safetyBuffer
-//
-//        let calculatedWidth = screenWidth - totalPadding
-//
-//        return max(min(calculatedWidth, 250), 150)
-//    }
-//
-//    private func estimateRowHeight(for itemName: String, isFirstInSection: Bool = true) -> CGFloat {
-//        let averageCharWidth: CGFloat = 8.0
-//
-//        let estimatedTextWidth = CGFloat(itemName.count) * averageCharWidth
-//        let numberOfLines = ceil(estimatedTextWidth / availableWidth)
-//
-//        let singleLineTextHeight: CGFloat = 22
-//        let verticalPadding: CGFloat = 24
-//        let internalSpacing: CGFloat = 10
-//
-//        let baseHeight = singleLineTextHeight + verticalPadding + internalSpacing
-//
-//        let additionalLineHeight: CGFloat = 24
-//
-//        let itemHeight = baseHeight + (max(0, numberOfLines - 1) * additionalLineHeight)
-//
-//        let dividerHeight: CGFloat = isFirstInSection ? 0 : 12.0
-//
-//        return itemHeight + dividerHeight
-//    }
-//
-//    private var estimatedHeight: CGFloat {
-//        let sectionHeaderHeight: CGFloat = 34
-//        let sectionSpacing: CGFloat = 8
-//        let listPadding: CGFloat = 24
-//
-//        var totalHeight: CGFloat = listPadding
-//
-//        for store in sortedStoresWithRefresh {
-//            // FIXED: Use getUnfulfilledItems which EXCLUDES skipped items in shopping mode
-//            let unfulfilledItems = getUnfulfilledItems(for: store)
-//
-//            if !unfulfilledItems.isEmpty {
-//                totalHeight += sectionHeaderHeight
-//
-//                for (index, (_, item)) in unfulfilledItems.enumerated() {
-//                    let itemName = item?.name ?? "Unknown"
-//                    let isFirstInStore = index == 0
-//                    totalHeight += estimateRowHeight(for: itemName, isFirstInSection: isFirstInStore)
-//                }
-//
-//                if store != sortedStoresWithRefresh.last {
-//                    totalHeight += sectionSpacing
-//                }
-//            }
-//        }
-//
-//        return totalHeight
-//    }
-//
-//    private var allItemsCompleted: Bool {
-//        guard cart.isShopping else { return false }
-//
-//        // Get all items across all stores
-//        let allItems = sortedStoresWithRefresh.flatMap { storeItemsWithRefresh($0) }
-//
-//        // Check if all non-skipped items are fulfilled
-//        let allUnfulfilledItems = allItems.filter {
-//            !$0.cartItem.isFulfilled &&
-//            !$0.cartItem.isSkippedDuringShopping
-//        }
-//
-//        return allUnfulfilledItems.isEmpty && totalItemCount > 0
-//    }
-//
-//    // Helper function to get unfulfilled items for a store (EXCLUDES skipped during shopping)
-//    private func getUnfulfilledItems(for store: String) -> [(cartItem: CartItem, item: Item?)] {
-//        if cart.isShopping {
-//            // Shopping mode: Exclude skipped items
-//            return storeItemsWithRefresh(store).filter {
-//                !$0.cartItem.isFulfilled &&
-//                !$0.cartItem.isSkippedDuringShopping
-//            }
-//        } else {
-//            // Planning mode: Show all items
-//            return storeItemsWithRefresh(store)
-//        }
-//    }
-//
-//    var body: some View {
-//        GeometryReader { geometry in
-//            let calculatedHeight = estimatedHeight
-//            let maxAllowedHeight = geometry.size.height * 0.8
-//
-//            VStack(spacing: 0) {
-//                if allItemsCompleted {
-//                    // Celebration message for completed shopping
-//                    VStack(spacing: 16) {
-//                        Image(systemName: "party.popper.fill")
-//                            .font(.system(size: 50))
-//                            .foregroundColor(Color(hex: "FF6B6B"))
-//
-//                        Text("Shopping Trip Complete! 🎉")
-//                            .lexendFont(18, weight: .bold)
-//                            .foregroundColor(Color(hex: "333"))
-//                            .multilineTextAlignment(.center)
-//
-//                        Text("Congratulations! You've checked off all items.")
-//                            .lexendFont(14)
-//                            .foregroundColor(Color(hex: "666"))
-//                            .multilineTextAlignment(.center)
-//                            .padding(.horizontal)
-//
-//                        Text("Ready to finish your trip?")
-//                            .lexendFont(12)
-//                            .foregroundColor(Color(hex: "999"))
-//                            .multilineTextAlignment(.center)
-//                            .padding(.horizontal)
-//                            .padding(.top, 4)
-//                    }
-//                    .frame(height: min(200, maxAllowedHeight))
-//                    .frame(maxWidth: .infinity)
-//                    .background(
-//                        LinearGradient(
-//                            colors: [
-//                                Color(hex: "F7F2ED").darker(by: 0.02),
-//                                Color(hex: "F7F2ED")
-//                            ],
-//                            startPoint: .top,
-//                            endPoint: .bottom
-//                        )
-//                    )
-//                    .cornerRadius(16)
-//                    .overlay(
-//                        RoundedRectangle(cornerRadius: 16)
-//                            .stroke(Color(hex: "FF6B6B").opacity(0.3), lineWidth: 2)
-//                    )
-//                    .transition(.opacity.combined(with: .scale))
-//                } else {
-//                    List {
-//                        ForEach(Array(sortedStoresWithRefresh.enumerated()), id: \.offset) { (index, store) in
-//                            let unfulfilledItems = getUnfulfilledItems(for: store)
-//
-//                            if !unfulfilledItems.isEmpty {
-//                                StoreSectionListView(
-//                                    store: store,
-//                                    items: unfulfilledItems,
-//                                    cart: cart,
-//                                    onToggleFulfillment: onToggleFulfillment,
-//                                    onEditItem: onEditItem,
-//                                    onDeleteItem: onDeleteItem,
-//                                    isLastStore: index == sortedStoresWithRefresh.count - 1
-//                                )
-//                                .listRowInsets(EdgeInsets())
-//                                .listRowSeparator(.hidden)
-//                                .listRowBackground(Color(hex: "F7F2ED"))
-//                            }
-//                        }
-//                    }
-//                    .frame(height: min(calculatedHeight, maxAllowedHeight))
-//                    .listStyle(PlainListStyle())
-//                    .listSectionSpacing(0)
-//                    .background(Color(hex: "F7F2ED").darker(by: 0.02))
-//                    .cornerRadius(16)
-//                    .animation(.spring(response: 0.4, dampingFraction: 0.8), value: calculatedHeight) // Animate height changes
-//                }
-//            }
-//        }
-//        .onChange(of: cart.cartItems) { oldItems, newItems in
-//            // Update the fulfilled count when cart items change
-//            let newFulfilledCount = newItems.filter { $0.isFulfilled }.count
-//            if fulfilledCount != newFulfilledCount {
-//                fulfilledCount = newFulfilledCount
-//            }
-//        }
-//    }
-//}
-
-
-
-
-//// MARK: - Usage in CartDetailContent
-//extension CartDetailContent {
-//    private func handleFulfillItem(cartItem: CartItem) {
-//        if let found = vaultService.findItemById(cartItem.itemId) {
-//            // Show the fulfillment confirmation popover
-//            selectedItemForPopover = found
-//            selectedCartItemForPopover = cartItem
-//            showingFulfillPopover = true
-//        }
-//    }
-//}

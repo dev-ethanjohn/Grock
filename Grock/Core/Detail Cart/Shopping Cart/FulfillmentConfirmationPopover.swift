@@ -122,7 +122,7 @@ struct FulfillConfirmationPopover: View {
             .padding(24)
             .background(Color.white)
             .cornerRadius(24)
-            .padding(.horizontal, UIScreen.main.bounds.width * 0.06)
+            .padding(.horizontal, UIScreen.main.bounds.width * 0.04)
             .scaleEffect(contentScale)
             .shadow(color: .black.opacity(0.2), radius: 30, y: 15)
             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: keyboardVisible)
@@ -130,7 +130,6 @@ struct FulfillConfirmationPopover: View {
             .frame(maxHeight: .infinity, alignment: .center)
         }
         .onAppear {
-            // Initialize with current values
             price = String(format: "%.2f", currentPrice)
             portion = String(format: currentQuantity.truncatingRemainder(dividingBy: 1) == 0 ? "%.0f" : "%.2f", currentQuantity)
             
