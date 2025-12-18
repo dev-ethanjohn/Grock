@@ -18,12 +18,12 @@ struct UnitButton: View {
     
     let discreteUnits: [(abbr: String, full: String)] = [
         ("pc", "piece"),
-        ("pack", ""),
-        ("can", ""),
-        ("bottle", ""),
-        ("box", ""),
-        ("wrap", ""),
-        ("bag", "")
+        ("pack", "pack"),
+        ("can", "can"),
+        ("bottle", "bottle"),
+        ("box", "box"),
+        ("wrap", "wrap"),
+        ("bag", "bag")
     ]
     
     var body: some View {
@@ -85,27 +85,24 @@ struct UnitButton: View {
     private func unitRow(unitOption: (abbr: String, full: String)) -> some View {
         Button(action: { unit = unitOption.abbr }) {
             HStack(spacing: 8) {
-                // Abbreviation + full text
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(unitOption.abbr)
+                // Display format: "abbr - full" if they're different, or just "full" if they're the same
+                if unitOption.abbr != unitOption.full && !unitOption.full.isEmpty {
+                    Text("\(unitOption.abbr) - \(unitOption.full)")
                         .font(.subheadline)
                         .foregroundColor(.primary)
-                    if !unitOption.full.isEmpty {
-                        Text(unitOption.full)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
+                } else {
+                    Text(unitOption.full.isEmpty ? unitOption.abbr : unitOption.full)
+                        .font(.subheadline)
+                        .foregroundColor(.primary)
                 }
                 
                 Spacer()
                 
-                // Fixed-size checkmark placeholder
                 if unit == unitOption.abbr {
                     Image(systemName: "checkmark")
                         .foregroundColor(.blue)
-                        .frame(width: 20, alignment: .center) // fixed width
+                        .frame(width: 20, alignment: .center)
                 } else {
-                    // Empty frame ensures all rows have same horizontal alignment
                     Color.clear
                         .frame(width: 20)
                 }
@@ -113,7 +110,4 @@ struct UnitButton: View {
             .padding(.vertical, 4)
         }
     }
-
 }
-
-

@@ -648,7 +648,7 @@ struct CartDetailContent: View {
                 // Main content area
                 if cartReady {
                     ZStack(alignment: .top) {
-                        VStack(spacing: 12) {
+                        VStack(spacing: 8) {
                             ModeToggleView(
                                 cart: cart,
                                 anticipationOffset: $anticipationOffset,
