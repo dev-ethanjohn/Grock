@@ -2,15 +2,16 @@ import SwiftUI
 
 struct HeaderView: View {
     let cart: Cart
-    let animatedBudget: Double
-    let localBudget: Double
-    @Binding var showingDeleteAlert: Bool
-    @Binding var showingCompleteAlert: Bool
-    @Binding var showingStartShoppingAlert: Bool
-    @Binding var headerHeight: CGFloat
-    let dismiss: DismissAction
-    
-    var onBudgetTap: (() -> Void)?
+       let animatedBudget: Double
+       let localBudget: Double
+       @Binding var showingDeleteAlert: Bool
+       @Binding var showingCompleteAlert: Bool
+       @Binding var showingStartShoppingAlert: Bool
+       @Binding var headerHeight: CGFloat
+       let dismiss: DismissAction
+       @Binding var showingEditCartName: Bool  // These two parameters
+       @Binding var refreshTrigger: UUID      // are in this order
+       var onBudgetTap: (() -> Void)?
     
     private var progress: Double {
         guard localBudget > 0 else { return 0 }
@@ -52,6 +53,13 @@ struct HeaderView: View {
                 Spacer()
                 
                 Menu {
+                    // ADD THIS: Edit Cart Name button as the first option
+                    Button("Edit Cart Name", systemImage: "pencil") {
+                        showingEditCartName = true
+                    }
+                    
+                    Divider()
+                    
                     if cart.isPlanning {
                         Button("Start Shopping", systemImage: "cart") {
                             showingStartShoppingAlert = true

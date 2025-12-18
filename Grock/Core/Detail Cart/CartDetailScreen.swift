@@ -57,6 +57,9 @@ struct CartDetailScreen: View {
     
     @State private var showingFulfillPopover = false
     
+    // ADD THIS: State for editing cart name
+    @State private var showingEditCartName = false
+    
     private var cartInsights: CartInsights {
         vaultService.getCartInsights(cart: cart)
     }
@@ -136,7 +139,7 @@ struct CartDetailScreen: View {
             showingCompleteAlert: $showingCompleteAlert,
             showingStartShoppingAlert: $showingStartShoppingAlert,
             showingSwitchToPlanningAlert: $showingSwitchToPlanningAlert,
-            anticipationOffset: $anticipationOffset,
+            anticipationOffset: $anticipationOffset,  // MOVE THIS BEFORE showingEditCartName
             selectedFilter: $selectedFilter,
             showingFilterSheet: $showingFilterSheet,
             headerHeight: $headerHeight,
@@ -151,14 +154,15 @@ struct CartDetailScreen: View {
             shouldBounceAfterCelebration: $shouldBounceAfterCelebration,
             showingFulfillPopover: $showingFulfillPopover,
             cartReady: $cartReady,
-            refreshTrigger: $refreshTrigger,
+            refreshTrigger: $refreshTrigger,  // MOVE THIS BEFORE showingEditCartName
             showFinishTripButton: $showFinishTripButton,
             buttonNamespace: buttonNamespace,
             bottomSheetDetent: $bottomSheetDetent,
             showingCompletedSheet: $showingCompletedSheet,
             showingShoppingPopover: $showingShoppingPopover,
             selectedItemForPopover: $selectedItemForPopover,
-            selectedCartItemForPopover: $selectedCartItemForPopover
+            selectedCartItemForPopover: $selectedCartItemForPopover,
+            showingEditCartName: $showingEditCartName  // MOVE THIS TO THE END
         )
         
         ZStack {
@@ -207,6 +211,23 @@ struct CartDetailScreen: View {
                 .environment(vaultService)
                 .transition(.opacity)
                 .zIndex(101)
+            }
+            
+            // ADD THIS: Edit Cart Name Popover
+            if showingEditCartName {
+                EditCartNamePopover(
+                    isPresented: $showingEditCartName,
+                    currentName: cart.name,
+                    onSave: { newName in
+                        cart.name = newName
+                        vaultService.updateCartTotals(cart: cart)
+                        refreshTrigger = UUID()
+                    },
+                    onDismiss: nil
+                )
+                .transition(.opacity)
+                .environment(vaultService)
+                .zIndex(102)
             }
         }
         .sheet(item: $itemToEdit) { item in
@@ -378,7 +399,7 @@ struct CartDetailScreen: View {
         }
     }
 }
-// MARK: - Unified Popover Configuration
+
 enum PopoverMode {
     case edit // For clicking item row - shows "Update" button
     case fulfill // For clicking checkmark - shows "Confirm Purchase" button
@@ -600,12 +621,6 @@ struct CartDetailContent: View {
     
     @Binding var showingFulfillPopover: Bool
     
-    private var completedItemsCount: Int {
-        cart.cartItems.filter {
-            $0.isFulfilled || $0.isSkippedDuringShopping
-        }.count
-    }
-    
     // Loading state
     @Binding var cartReady: Bool
     
@@ -639,11 +654,11 @@ struct CartDetailContent: View {
     @Binding var selectedItemForPopover: Item?
     @Binding var selectedCartItemForPopover: CartItem?
     
+    // ADD THIS: Binding for Edit Cart Name popover
+    @Binding var showingEditCartName: Bool
+    
     var body: some View {
         GeometryReader { geometry in
-//            let screenHeight = geometry.size.height
-//            let fractionHeight = screenHeight * 0.08
-            
             ZStack {
                 // Main content area
                 if cartReady {
@@ -704,6 +719,8 @@ struct CartDetailContent: View {
                             showingStartShoppingAlert: $showingStartShoppingAlert,
                             headerHeight: $headerHeight,
                             dismiss: dismiss,
+                            showingEditCartName: $showingEditCartName,
+                            refreshTrigger: $refreshTrigger,  // MOVE THIS TO THE END
                             onBudgetTap: {
                                 showEditBudget = true
                             }
@@ -849,7 +866,6 @@ struct CartDetailContent: View {
             }
         }
     }
-    
     
      private func handleEditItem(cartItem: CartItem) {
          if let found = vaultService.findItemById(cartItem.itemId) {
