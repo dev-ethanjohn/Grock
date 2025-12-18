@@ -19,7 +19,13 @@
 		4C17E3F82E8A713700D57F3F /* Exceptions for "Grock" folder in "Grock" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				Fonts/Fuzzy_Bubbles/OFL.txt,
 				Fonts/Lexend/OFL.txt,
+				Fonts/Lexend/README.txt,
+				Fonts/Shantell_Sans/OFL.txt,
+				Fonts/Shantell_Sans/README.txt,
+				"Fonts/Shantell_Sans/ShantellSans-Italic-VariableFont_BNCE,INFM,SPAC,wght.ttf",
+				"Fonts/Shantell_Sans/ShantellSans-VariableFont_BNCE,INFM,SPAC,wght.ttf",
 				Info.plist,
 			);
 			target = 4C07F7B72E88245000B46866 /* Grock */;

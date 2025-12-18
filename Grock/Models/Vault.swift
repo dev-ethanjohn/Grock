@@ -109,6 +109,9 @@ class Cart {
     var budget: Double
     var fulfillmentStatus: Double
     var createdAt: Date
+    var updatedAt: Date  // ✅ ADD THIS
+    var startedAt: Date? // ✅ ADD THIS - when shopping started
+    var completedAt: Date?
     var status: CartStatus
     
     @Relationship(deleteRule: .cascade)
@@ -120,6 +123,8 @@ class Cart {
         budget: Double,
         fulfillmentStatus: Double = 0.0,
         createdAt: Date = Date(),
+        startedAt: Date? = nil,  // ✅ ADD THIS
+        completedAt: Date? = nil,
         status: CartStatus = .planning
     ) {
         self.id = id
@@ -127,6 +132,9 @@ class Cart {
         self.budget = budget
         self.fulfillmentStatus = fulfillmentStatus
         self.createdAt = createdAt
+        self.updatedAt = createdAt  // ✅ INITIALIZE updatedAt
+        self.startedAt = startedAt  // ✅ INITIALIZE startedAt
+        self.completedAt = completedAt
         self.status = status
     }
     

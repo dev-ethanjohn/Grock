@@ -42,6 +42,7 @@ struct ManageCartSheet: View {
             // Main content
             VStack(spacing: 0) {
                 customToolbar
+                Text("Hello")
                 
                 // Use currentVault instead of vaultService.vault directly
                 if let vault = currentVault, !vault.categories.isEmpty {
@@ -120,34 +121,34 @@ struct ManageCartSheet: View {
                 .zIndex(1)
             }
         }
-        .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button(action: {}) {
-                    Image("search")
-                        .resizable()
-                        .frame(width: 24, height: 24)
-                }
-            }
-            
-            ToolbarItem(placement: .topBarTrailing) {
-                Button(action: {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        showAddItemPopover = true
-                        duplicateError = nil // Clear previous errors
-                    }
-                }) {
-                    Text("Add")
-                        .fuzzyBubblesFont(13, weight: .bold)
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 4)
-                        .background(Color.black)
-                        .cornerRadius(20)
-                }
-            }
-        }
-        .navigationTitle("Manage Cart")
-        .navigationBarTitleDisplayMode(.inline)
+//        .toolbar {
+//            ToolbarItem(placement: .topBarLeading) {
+//                Button(action: {}) {
+//                    Image("search")
+//                        .resizable()
+//                        .frame(width: 24, height: 24)
+//                }
+//            }
+//            
+//            ToolbarItem(placement: .topBarTrailing) {
+//                Button(action: {
+//                    withAnimation(.easeInOut(duration: 0.2)) {
+//                        showAddItemPopover = true
+//                        duplicateError = nil // Clear previous errors
+//                    }
+//                }) {
+//                    Text("Add")
+//                        .fuzzyBubblesFont(13, weight: .bold)
+//                        .foregroundColor(.white)
+//                        .padding(.horizontal, 10)
+//                        .padding(.vertical, 4)
+//                        .background(Color.black)
+//                        .cornerRadius(20)
+//                }
+//            }
+//        }
+//        .navigationTitle("Manage Cart")
+//        .navigationBarTitleDisplayMode(.inline)
         .background(.white)
         .ignoresSafeArea(.keyboard)
         .presentationDragIndicator(.visible)

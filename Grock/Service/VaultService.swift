@@ -559,42 +559,41 @@ extension VaultService {
    
     /// Starts shopping session for a cart
     func startShopping(cart: Cart) {
-        guard cart.status == .planning else { return }
-       
-        for cartItem in cart.cartItems {
-            cartItem.capturePlannedData(from: vault!)
-        }
-       
-        cart.status = .shopping
-        updateCartTotals(cart: cart)
-        saveContext()
-        print("🛒 Started shopping for: \(cart.name)")
-    }
+           guard cart.status == .planning else { return }
+          
+           for cartItem in cart.cartItems {
+               cartItem.capturePlannedData(from: vault!)
+           }
+          
+           cart.status = .shopping
+           cart.startedAt = Date()  // ✅ Set when shopping starts
+           cart.updatedAt = Date()  // ✅ Update timestamp
+           updateCartTotals(cart: cart)
+           saveContext()
+           print("🛒 Started shopping for: \(cart.name)")
+       }
    
     /// Completes shopping session for a cart
     func completeShopping(cart: Cart) {
-        guard cart.status == .shopping else { return }
-        
-        print("🔄 Completing shopping for cart: \(cart.name)")
-        
-        for cartItem in cart.cartItems {
-            // 1. Capture any missing actual data
-            cartItem.captureActualData()
-            
-            // 2. Update Vault with actual prices (LEARNING)
-            updateVaultWithActualData(cartItem: cartItem)
-            
-            print("   ✅ Processed: \(findItemById(cartItem.itemId)?.name ?? "Unknown")")
-        }
-        
-        // 3. Mark cart as completed
-        cart.status = .completed
-        updateCartTotals(cart: cart)
-        saveContext()
-        
-        print("🎉 Shopping completed! Vault prices updated.")
-    }
-    
+         guard cart.status == .shopping else { return }
+         
+         print("🔄 Completing shopping for cart: \(cart.name)")
+         
+         for cartItem in cart.cartItems {
+             cartItem.captureActualData()
+             updateVaultWithActualData(cartItem: cartItem)
+         }
+         
+         cart.status = .completed
+         cart.completedAt = Date() // ✅ SET WHEN COMPLETED
+         cart.updatedAt = Date()
+         updateCartTotals(cart: cart)
+         saveContext()
+         
+         print("🎉 Shopping completed! Vault prices updated.")
+     }
+     
+     
     private func updateVaultWithActualData(cartItem: CartItem) {
         guard let item = findItemById(cartItem.itemId) else {
             print("❌ Item not found for cartItem: \(cartItem.itemId)")
@@ -642,22 +641,39 @@ extension VaultService {
    
     /// Reopens a completed cart for modifications
     func reopenCart(cart: Cart) {
-        guard cart.status == .completed else { return }
-       
-        cart.status = .shopping
-       
-        for cartItem in cart.cartItems {
-            cartItem.actualPrice = nil
-            cartItem.actualQuantity = nil
-            cartItem.actualUnit = nil
-            cartItem.actualStore = nil
-            cartItem.isFulfilled = false
-        }
-       
-        updateCartTotals(cart: cart)
-        saveContext()
-        print("🔄 Reopened cart: \(cart.name) - Now using current prices")
-    }
+         guard cart.status == .completed else { return }
+        
+         cart.status = .shopping
+         cart.completedAt = nil // ✅ CLEAR WHEN REOPENED
+         cart.updatedAt = Date()
+        
+         for cartItem in cart.cartItems {
+             cartItem.actualPrice = nil
+             cartItem.actualQuantity = nil
+             cartItem.actualUnit = nil
+             cartItem.actualStore = nil
+             cartItem.isFulfilled = false
+         }
+        
+         updateCartTotals(cart: cart)
+         saveContext()
+         print("🔄 Reopened cart: \(cart.name) - Now using current prices")
+     }
+    
+    /// Updates the cart name
+     func updateCartName(cart: Cart, newName: String) {
+         cart.name = newName
+         cart.updatedAt = Date()  // ✅ Update timestamp when edited
+         saveContext()
+     }
+     
+     /// Updates the cart budget
+     func updateCartBudget(cart: Cart, newBudget: Double) {
+         cart.budget = newBudget
+         cart.updatedAt = Date()  // ✅ Update timestamp when edited
+         updateCartTotals(cart: cart)
+         saveContext()
+     }
 }
 
 // MARK: - Cart Item Operations

@@ -258,10 +258,10 @@ struct VaultItemRow: View {
     }
 
     private var itemDetails: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: 1) {
             Text(item.name)
                 .foregroundColor(isActive ? .black : Color(hex: "999"))
-                .lexendFont(17, weight: .regular)
+                .lexendFont(17)
 
             if let priceOption = item.priceOptions.first {
                 HStack(spacing: 0) {
@@ -269,7 +269,7 @@ struct VaultItemRow: View {
                     Text("/\(priceOption.pricePerUnit.unit)")
                     Spacer()
                 }
-                .lexendFont(12, weight: .medium)
+                .lexendFont(12)
                 .foregroundColor(isActive ? .black : Color(hex: "999"))
             }
         }

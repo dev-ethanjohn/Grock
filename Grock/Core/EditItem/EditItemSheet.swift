@@ -1,29 +1,6 @@
 import SwiftUI
 import SwiftData
 
-struct EditItemHeaderView: View {
-    let cart: Cart?
-    let formViewModel: ItemFormViewModel
-    
-    var body: some View {
-        if let cart = cart {
-            VStack(alignment: .leading, spacing: 8) {
-                Divider()
-                
-                Text(formViewModel.modeDescription)
-                    .font(.caption)
-                    .foregroundColor(getModeColor(cart: cart))
-                    .padding(.horizontal)
-            }
-            .padding(.vertical, 8)
-        }
-    }
-    
-    private func getModeColor(cart: Cart) -> Color {
-        cart.status == .planning ? .blue : .green
-    }
-}
-
 struct EditItemRemoveOptionsView: View {
     let context: EditContext
     let onRemoveFromCart: () -> Void
@@ -82,14 +59,6 @@ struct EditItemBottomBarView: View {
     
     var body: some View {
         VStack(spacing: 8) {
-            if context == .cart {
-                Text("Editing this item will update prices from vault and in all active carts")
-                    .font(.caption)
-                    .foregroundColor(.gray)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal)
-            }
-            
             EditItemSaveButton(
                 isEditFormValid: isEditFormValid,
                 buttonTitle: formViewModel.getSaveButtonTitle(),
@@ -169,7 +138,7 @@ struct EditItemSheet: View {
         self.cartItem = cartItem
         self.onSave = onSave
         
-        // Determine context and create appropriate view model
+        // Determine context
         if cart != nil && cartItem != nil {
             self.context = .cart
             _formViewModel = State(initialValue: ItemFormViewModel(
@@ -207,11 +176,6 @@ struct EditItemSheet: View {
                             isCategoryEditable: true
                         )
                         
-                        // Mode Header
-                        EditItemHeaderView(
-                            cart: cart,
-                            formViewModel: formViewModel
-                        )
                         
                         // Remove Options
                         EditItemRemoveOptionsView(
@@ -266,46 +230,41 @@ struct EditItemSheet: View {
         if context == .cart, let cart = cart, let cartItem = cartItem {
             print("🛒 Loading cart item data")
             print("🛒 Cart status: \(cart.status)")
-            print("🛒 CartItem quantity: \(cartItem.quantity)")
             
-            // Planning mode only (shopping mode uses ShoppingEditItemSheet)
-            if cart.status == .planning {
-                print("📝 Planning mode - loading vault data")
-                
-                formViewModel.itemName = item.name
-                formViewModel.storeName = cartItem.plannedStore
-                
-                if let plannedPrice = cartItem.plannedPrice {
-                    formViewModel.itemPrice = String(plannedPrice)
-                    print("   Using plannedPrice: \(plannedPrice)")
-                } else {
-                    // Fallback to vault price
-                    let priceOption = item.priceOptions.first
-                    formViewModel.itemPrice = String(priceOption?.pricePerUnit.priceValue ?? 0)
-                    print("   Using vault price")
-                }
-                
-                formViewModel.unit = cartItem.plannedUnit ?? "piece"
-                formViewModel.portion = cartItem.quantity
-                
-                // Category from vault
-                if let categoryName = vaultService.getCategory(for: item.id)?.name,
-                   let groceryCategory = GroceryCategory.allCases.first(where: { $0.title == categoryName }) {
-                    formViewModel.selectedCategory = groceryCategory
-                    print("   Category: \(groceryCategory.title)")
-                }
-                
-                formViewModel.modeDescription = "Planning mode - edits update vault"
+            // For cart context (planning mode only)
+            formViewModel.itemName = item.name
+            formViewModel.storeName = cartItem.plannedStore
+            
+            // Get price from planned price or vault
+            if let plannedPrice = cartItem.plannedPrice {
+                formViewModel.itemPrice = String(plannedPrice)
+                print("   Using plannedPrice: \(plannedPrice)")
             } else {
-                // Should not happen - shopping mode uses different sheet
-                print("⚠️ Warning: EditItemSheet used in non-planning mode")
+                // Fallback to vault price
+                let priceOption = item.priceOptions.first
+                formViewModel.itemPrice = String(priceOption?.pricePerUnit.priceValue ?? 0)
+                print("   Using vault price")
             }
+            
+            formViewModel.unit = cartItem.plannedUnit ?? "piece"
+            formViewModel.portion = cartItem.quantity
+            
+            // Category from vault
+            if let categoryName = vaultService.getCategory(for: item.id)?.name,
+               let groceryCategory = GroceryCategory.allCases.first(where: { $0.title == categoryName }) {
+                formViewModel.selectedCategory = groceryCategory
+                print("   Category: \(groceryCategory.title)")
+            }
+            
+            // REMOVED: modeDescription assignment
+            // formViewModel.modeDescription = "Editing item"
             
         } else {
             // Vault editing
             print("🏦 Loading vault item data")
             formViewModel.populateFromItem(item, vaultService: vaultService)
-            formViewModel.modeDescription = "Editing vault item"
+            // REMOVED: modeDescription assignment
+            // formViewModel.modeDescription = "Editing vault item"
         }
         
         print("🟢 After initialize:")
@@ -359,6 +318,7 @@ struct EditItemSheet: View {
         var success = false
         
         if context == .cart, let cart = cart, let cartItem = cartItem {
+            // Cart context - planning mode only
             success = saveCartItemChanges(
                 cart: cart,
                 cartItem: cartItem,
@@ -390,8 +350,13 @@ struct EditItemSheet: View {
     ) -> Bool {
         print("💾 Saving in cart context - Cart status: \(cart.status)")
         
-        // Only planning mode uses this sheet
-        return savePlanningCartItem(
+        // Only allow editing in planning mode
+        guard cart.status == .planning else {
+            print("⚠️ ERROR: Can only edit items in planning mode")
+            return false
+        }
+        
+        return saveCartItem(
             cart: cart,
             cartItem: cartItem,
             priceValue: priceValue,
@@ -399,13 +364,13 @@ struct EditItemSheet: View {
         )
     }
     
-    private func savePlanningCartItem(
+    private func saveCartItem(
         cart: Cart,
         cartItem: CartItem,
         priceValue: Double,
         oldCategoryName: String?
     ) -> Bool {
-        print("📝 Planning mode - updating Vault")
+        print("📝 Updating Vault and cart")
         guard let selectedCategory = formViewModel.selectedCategory else {
             duplicateError = "Category is required"
             return false
@@ -421,7 +386,7 @@ struct EditItemSheet: View {
         )
         
         if success {
-            updateAllPlanningCartsWithItem(
+            updateAllCartsWithItem(
                 itemId: item.id,
                 price: priceValue,
                 unit: formViewModel.unit,
@@ -489,7 +454,7 @@ struct EditItemSheet: View {
         }
     }
     
-    private func updateAllPlanningCartsWithItem(
+    private func updateAllCartsWithItem(
         itemId: String,
         price: Double,
         unit: String,

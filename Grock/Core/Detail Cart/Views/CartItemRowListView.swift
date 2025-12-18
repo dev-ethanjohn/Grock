@@ -119,9 +119,9 @@ struct CartItemRowListView: View {
             }
             
             // The rest of your item content
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 0) {
                 Text("\(quantityString) \(itemName)")
-                    .lexendFont(17, weight: .regular)
+                    .lexendFont(16, weight: .regular)
                     .lineLimit(3)
                     .fixedSize(horizontal: false, vertical: true)
                     .strikethrough(cart.isShopping && (cartItem.isFulfilled || cartItem.isSkippedDuringShopping))
