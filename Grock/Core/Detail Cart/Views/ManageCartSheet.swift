@@ -21,12 +21,17 @@ struct ManageCartSheet: View {
     // Add state to track vault changes and force updates
     @State private var vaultUpdateTrigger = 0
     
-    // Add navigation direction for smooth category transitions
-    @State private var navigationDirection: NavigationDirection = .none
+    // Chevron navigation
+    @State private var showLeftChevron = false
+    @State private var showRightChevron = false
+    @State private var fillAnimation: CGFloat = 0.0
     
-    enum NavigationDirection {
-        case left, right, none
-    }
+    // Track keyboard state
+    @FocusState private var isAnyFieldFocused: Bool
+    
+    // Keyboard responder
+    @State private var keyboardResponder = KeyboardResponder()
+    @State private var focusedItemId: String?
     
     private var hasActiveItems: Bool {
         !localActiveItems.isEmpty
@@ -37,40 +42,47 @@ struct ManageCartSheet: View {
         vaultService.vault
     }
     
+    private var totalVaultItemsCount: Int {
+        guard let vault = vaultService.vault else { return 0 }
+        return vault.categories.reduce(0) { $0 + $1.items.count }
+    }
+    
+    //switching category transition
+    @State private var navigationDirection: NavigationDirection = .none
+    
+    enum NavigationDirection {
+        case left, right, none
+    }
+    
     var body: some View {
         NavigationStack {
-            ZStack {
+            ZStack(alignment: .bottom) {
                 // Main content
                 VStack(spacing: 0) {
-                    customToolbar
-                    
                     // Use currentVault instead of vaultService.vault directly
                     if let vault = currentVault, !vault.categories.isEmpty {
-                        VStack(spacing: 0) {
-                            categoryScrollView
-                                .padding(.top, 8)
-                                .padding(.bottom, 10)
+                        ZStack(alignment: .top) {
+                            categoryContentScrollView
+                                .frame(maxHeight: .infinity)
+                                .padding(.top, 56) // Height of category section
+                                .zIndex(0)
+                            
+                            VaultCategorySectionView(selectedCategory: selectedCategory) {
+                                categoryScrollView
+                            }
+                            .onTapGesture {
+                                UIApplication.shared.endEditing()
+                            }
+                            .zIndex(1)
                         }
-                        .background(
-                            Rectangle()
-                                .fill(.white)
-                                .shadow(color: Color.black.opacity(0.16), radius: 6, x: 0, y: 1)
-                                .mask(
-                                    Rectangle()
-                                        .padding(.bottom, -20)
-                                )
-                        )
-                        
-                        categoryContentScrollView
                     } else {
                         emptyVaultView
                     }
                 }
                 
-                VStack {
-                    Spacer()
-                    doneButton
-                        .padding(.bottom, 20)
+                // Bottom action bar with chevrons
+                if currentVault != nil && !showAddItemPopover {
+                    bottomActionBar
                 }
                 
                 if showAddItemPopover {
@@ -119,9 +131,23 @@ struct ManageCartSheet: View {
                     .transition(.opacity)
                     .zIndex(1)
                 }
+                
+                ZStack {
+                    if keyboardResponder.isVisible && focusedItemId != nil {
+                        KeyboardDoneButton(
+                            keyboardHeight: keyboardResponder.currentHeight,
+                            onDone: {
+                                UIApplication.shared.endEditing()
+                            }
+                        )
+                        .transition(.identity)
+                        .zIndex(10)
+                    }
+                }
+                .frame(maxHeight: .infinity)
             }
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
+                ToolbarItem(placement: .navigationBarLeading) {
                     Button(action: {}) {
                         Image("search")
                             .resizable()
@@ -129,8 +155,15 @@ struct ManageCartSheet: View {
                     }
                 }
                 
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: .principal) {
+                    Text("Manage Cart")
+                        .font(.headline)
+                        .foregroundColor(.black)
+                }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: {
+                        UIApplication.shared.endEditing()
                         withAnimation(.easeInOut(duration: 0.2)) {
                             showAddItemPopover = true
                             duplicateError = nil // Clear previous errors
@@ -146,7 +179,6 @@ struct ManageCartSheet: View {
                     }
                 }
             }
-            .navigationTitle("Manage Cart")
             .navigationBarTitleDisplayMode(.inline)
             .background(.white)
             .ignoresSafeArea(.keyboard)
@@ -155,8 +187,8 @@ struct ManageCartSheet: View {
                 if selectedCategory == nil {
                     selectedCategory = firstCategoryWithItems ?? GroceryCategory.allCases.first
                 }
+                updateChevronVisibility()
             }
-            // Add onChange to watch for vault updates and category changes
             .onChange(of: vaultService.vault) { oldValue, newValue in
                 print("🔄 ManageCartSheet: Vault updated, refreshing view")
                 vaultUpdateTrigger += 1
@@ -171,7 +203,6 @@ struct ManageCartSheet: View {
                 // This forces the view to refresh when vault changes
                 print("🔄 ManageCartSheet: Refreshing view due to vault changes")
             }
-            // Listen for category change notifications (from EditItemSheet)
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ItemCategoryChanged"))) { notification in
                 if let newCategory = notification.userInfo?["newCategory"] as? GroceryCategory {
                     print("🔄 ManageCartSheet: Received category change notification - switching to \(newCategory.title)")
@@ -180,34 +211,37 @@ struct ManageCartSheet: View {
                     }
                 }
             }
+            .onChange(of: selectedCategory) { oldValue, newValue in
+                updateChevronVisibility()
+            }
+            .onChange(of: hasActiveItems) { oldValue, newValue in
+                if newValue {
+                    if !oldValue {
+                        withAnimation(.spring(duration: 0.4)) {
+                            fillAnimation = 1.0
+                        }
+                    }
+                } else {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        fillAnimation = 0.0
+                    }
+                }
+            }
+            .onAppear {
+                if hasActiveItems {
+                    fillAnimation = 1.0
+                }
+            }
+            .preference(key: TextFieldFocusPreferenceKey.self, value: focusedItemId)
         }
         .presentationDragIndicator(.visible)
         .presentationCornerRadius(24)
-    }
-    
-    private var customToolbar: some View {
-        HStack {
-            if let category = selectedCategory {
-                Text(category.title)
-                    .lexendFont(13, weight: .bold)
-                    .contentTransition(.identity)
-                    .animation(.spring(duration: 0.3), value: selectedCategory?.id)
-                    .transition(.push(from: .leading))
-            } else {
-                Text("Select Category")
-                    .fuzzyBubblesFont(13, weight: .bold)
-            }
-            Spacer()
-        }
-        .padding(.horizontal)
-        .background(Color.white)
     }
     
     private var categoryScrollView: some View {
         ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: false) {
                 ZStack(alignment: .leading) {
-                    // ✅ ADDED: Responsive black border that follows selected category
                     if let selectedCategory = selectedCategory,
                        let selectedIndex = GroceryCategory.allCases.firstIndex(of: selectedCategory) {
                         RoundedRectangle(cornerRadius: 10)
@@ -218,17 +252,17 @@ struct ManageCartSheet: View {
                     }
                     
                     HStack(spacing: 1) {
-                        ForEach(GroceryCategory.allCases, id: \.self) { category in
+                        ForEach(GroceryCategory.allCases, id: \.self) { category in  // FIXED: Changed GrocceryCategory to GroceryCategory
                             VaultCategoryIcon(
                                 category: category,
                                 isSelected: selectedCategory == category,
-                                itemCount: getItemCount(for: category),
+                                itemCount: getActiveItemCount(for: category),
                                 hasItems: hasItems(in: category),
                                 action: {
                                     // Dismiss keyboard immediately when tapping category
                                     UIApplication.shared.endEditing()
                                     
-                                    // Set navigation direction for smooth transitions
+                                    // Set navigation direction
                                     if let current = selectedCategory,
                                        let currentIndex = GroceryCategory.allCases.firstIndex(of: current),
                                        let newIndex = GroceryCategory.allCases.firstIndex(of: category) {
@@ -236,8 +270,7 @@ struct ManageCartSheet: View {
                                     }
                                     selectCategory(category, proxy: proxy)
                                 }
-                            )
-                            .frame(width: 50, height: 50)
+                            )                            .frame(width: 50, height: 50)
                             .id(category.id)
                         }
                     }
@@ -264,49 +297,158 @@ struct ManageCartSheet: View {
     }
     
     private var categoryContentScrollView: some View {
-        GeometryReader { geometry in
-            ScrollView(.horizontal, showsIndicators: false) {
-                LazyHStack(spacing: 0) {
-                    ForEach(GroceryCategory.allCases, id: \.self) { category in
-                        AddItemsCategoryView(
-                            category: category,
-                            localActiveItems: $localActiveItems
-                        )
-                        .frame(width: geometry.size.width, height: geometry.size.height)
-                        .id(category.id)
-                    }
-                }
-                .scrollTargetLayout()
+        Group {
+            if let selectedCategory = selectedCategory {
+                CategoryItemsListView(
+                    category: selectedCategory,
+                    localActiveItems: $localActiveItems
+                )
+                .id(selectedCategory.id)
+                .padding(.top, 8)
+                .transition(.asymmetric(
+                    insertion: navigationDirection == .right ?
+                        .move(edge: .trailing) :
+                        .move(edge: .leading),
+                    removal: navigationDirection == .right ?
+                        .move(edge: .leading) :
+                        .move(edge: .trailing)
+                ))
             }
-            .scrollPosition(id: $selectedCategory)
-            .scrollTargetBehavior(.paging)
-            // ✅ ADDED: Smooth animation with navigation direction
-            .animation(.spring(response: 0.35, dampingFraction: 0.8), value: selectedCategory)
         }
+        .frame(maxHeight: .infinity)
+        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: selectedCategory)
     }
     
-    private var doneButton: some View {
-        Button(action: {
-            // Update the cart with selected items
-            updateCartWithSelectedItems()
-            dismiss()
-        }) {
-            Text("Save")
-                .fuzzyBubblesFont(16, weight: .bold)
-                .foregroundColor(.white)
-                .padding(.horizontal, 24)
-                .padding(.vertical, 12)
-                .background(hasActiveItems ? Color.black : Color.gray)
-                .cornerRadius(25)
+    private var bottomActionBar: some View {
+        VStack {
+            Spacer()
+            
+            HStack {
+                if showLeftChevron {
+                    Button(action: navigateToPreviousCategory) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundColor(.black)
+                            .frame(width: 44, height: 44)
+                            .background(
+                                Circle()
+                                    .fill(Material.thin)
+                                    .shadow(color: .black.opacity(0.25), radius: 2, x: 0, y: 2)
+                            )
+                    }
+                    .transition(.scale.combined(with: .opacity))
+                    .animation(.spring(response: 0.3, dampingFraction: 0.7), value: showLeftChevron)
+                } else {
+                    Circle()
+                        .fill(Color.clear)
+                        .frame(width: 44, height: 44)
+                }
+                
+                Spacer()
+                
+                Button(action: {
+                    // Update the cart with selected items
+                    updateCartWithSelectedItems()
+                    dismiss()
+                }) {
+                    Text("Save")
+                        .fuzzyBubblesFont(16, weight: .bold)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 12)
+                        .background(
+                            Capsule()
+                                .fill(
+                                    hasActiveItems
+                                    ? RadialGradient(
+                                        colors: [Color.black, Color.gray.opacity(0.3)],
+                                        center: .center,
+                                        startRadius: 0,
+                                        endRadius: fillAnimation * 300
+                                    )
+                                    : RadialGradient(
+                                        colors: [Color.gray.opacity(0.3), Color.gray.opacity(0.3)],
+                                        center: .center,
+                                        startRadius: 0,
+                                        endRadius: 0
+                                    )
+                                )
+                        )
+                        .cornerRadius(25)
+                }
+                .overlay(alignment: .topLeading, content: {
+                    if hasActiveItems {
+                        Text("\(localActiveItems.count)")
+                            .fuzzyBubblesFont(16, weight: .bold)
+                            .contentTransition(.numericText())
+                            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: localActiveItems.count)
+                            .foregroundColor(.black)
+                            .frame(width: 25, height: 25)
+                            .background(Color.white)
+                            .clipShape(Circle())
+                            .overlay(
+                                Circle()
+                                    .stroke(Color.black, lineWidth: 2)
+                            )
+                            .offset(x: -8, y: -4)
+                    }
+                })
+                .buttonStyle(.solid)
+                .disabled(!hasActiveItems)
+                
+                Spacer()
+                
+                if showRightChevron {
+                    Button(action: navigateToNextCategory) {
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundColor(.black)
+                            .frame(width: 44, height: 44)
+                            .background(
+                                Circle()
+                                    .fill(Material.thin)
+                                    .shadow(color: .black.opacity(0.25), radius: 2, x: 0, y: 2)
+                            )
+                    }
+                    .transition(.scale.combined(with: .opacity))
+                    .animation(.spring(response: 0.3, dampingFraction: 0.7), value: showRightChevron)
+                } else {
+                    Circle()
+                        .fill(Color.clear)
+                        .frame(width: 44, height: 44)
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 40)
         }
-        .padding(.bottom, 20)
-        .disabled(!hasActiveItems)
+        .ignoresSafeArea(.all, edges: .bottom)
+    }
+    
+    private var emptyVaultView: some View {
+        VStack(spacing: 20) {
+            Spacer()
+            
+            Image(systemName: "shippingbox")
+                .font(.system(size: 60))
+                .foregroundColor(.gray)
+            
+            Text("Your vault is empty")
+                .font(.title2)
+                .foregroundColor(.gray)
+            
+            Text("No items available to add")
+                .font(.body)
+                .foregroundColor(.gray.opacity(0.8))
+            
+            Spacer()
+        }
+        .padding()
     }
     
     // MARK: - Helper Methods
     
     private func initializeActiveItemsFromCart() {
-        print("🔄 AddItemsToCartSheet: Initializing from cart '\(cart.name)'")
+        print("🔄 ManageCartSheet: Initializing from cart '\(cart.name)'")
         
         // Clear any existing active items
         localActiveItems.removeAll()
@@ -367,7 +509,7 @@ struct ManageCartSheet: View {
     }
     
     private func selectCategory(_ category: GroceryCategory, proxy: ScrollViewProxy) {
-        // Set navigation direction for smooth animation
+        // Set navigation direction
         if let current = selectedCategory,
            let currentIndex = GroceryCategory.allCases.firstIndex(of: current),
            let newIndex = GroceryCategory.allCases.firstIndex(of: category) {
@@ -378,22 +520,69 @@ struct ManageCartSheet: View {
             selectedCategory = category
         }
         
-        print("🎯 Selected category: '\(category.title)'")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                proxy.scrollTo(category.id, anchor: .center)
+            }
+        }
+    }
+    
+    private func updateChevronVisibility() {
+        guard let currentCategory = selectedCategory,
+              let currentIndex = GroceryCategory.allCases.firstIndex(of: currentCategory) else {
+            showLeftChevron = false
+            showRightChevron = false
+            return
+        }
+        
+        showLeftChevron = currentIndex > 0
+        showRightChevron = currentIndex < GroceryCategory.allCases.count - 1
+    }
+    
+    private func navigateToPreviousCategory() {
+        // Dismiss keyboard immediately
+        UIApplication.shared.endEditing()
+        
+        guard let currentCategory = selectedCategory,
+              let currentIndex = GroceryCategory.allCases.firstIndex(of: currentCategory),
+              currentIndex > 0 else { return }
+        
+        let previousCategory = GroceryCategory.allCases[currentIndex - 1]
+        navigationDirection = .left
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+            selectedCategory = previousCategory
+        }
+    }
+    
+    private func navigateToNextCategory() {
+        // Dismiss keyboard immediately
+        UIApplication.shared.endEditing()
+        
+        guard let currentCategory = selectedCategory,
+              let currentIndex = GroceryCategory.allCases.firstIndex(of: currentCategory),
+              currentIndex < GroceryCategory.allCases.count - 1 else { return }
+        
+        let nextCategory = GroceryCategory.allCases[currentIndex + 1]
+        navigationDirection = .right
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+            selectedCategory = nextCategory
+        }
     }
     
     private var firstCategoryWithItems: GroceryCategory? {
         guard let vault = vaultService.vault else { return nil }
         
-        for category in vault.categories {
-            if !category.items.isEmpty {
-                return GroceryCategory.allCases.first { $0.title == category.name }
+        // Always check in GroceryCategory.allCases order, not vault.categories order
+        for groceryCategory in GroceryCategory.allCases {
+            if let vaultCategory = vault.categories.first(where: { $0.name == groceryCategory.title }),
+               !vaultCategory.items.isEmpty {
+                return groceryCategory
             }
         }
-        
         return nil
     }
     
-    private func getItemCount(for category: GroceryCategory) -> Int {
+    private func getActiveItemCount(for category: GroceryCategory) -> Int {
         guard let vault = vaultService.vault else { return 0 }
         guard let foundCategory = vault.categories.first(where: { $0.name == category.title }) else { return 0 }
         
@@ -415,35 +604,15 @@ struct ManageCartSheet: View {
     private func hasItems(in category: GroceryCategory) -> Bool {
         return getTotalItemCount(for: category) > 0
     }
-    
-    private var emptyVaultView: some View {
-        VStack(spacing: 20) {
-            Spacer()
-            
-            Image(systemName: "shippingbox")
-                .font(.system(size: 60))
-                .foregroundColor(.gray)
-            
-            Text("Your vault is empty")
-                .font(.title2)
-                .foregroundColor(.gray)
-            
-            Text("No items available to add")
-                .font(.body)
-                .foregroundColor(.gray.opacity(0.8))
-            
-            Spacer()
-        }
-        .padding()
-    }
 }
 
-// MARK: - Category Items View for Add Items Sheet
-struct AddItemsCategoryView: View {
+// MARK: - Category Items List View
+struct CategoryItemsListView: View {
     let category: GroceryCategory
     @Binding var localActiveItems: [String: Double]
     
     @Environment(VaultService.self) private var vaultService
+    @State private var focusedItemId: String?
     
     // Use computed property that reacts to vault changes
     private var categoryItems: [Item] {
@@ -465,7 +634,7 @@ struct AddItemsCategoryView: View {
             if categoryItems.isEmpty {
                 emptyCategoryView
             } else {
-                AddItemsVaultItemsListView(
+                ManageCartItemsListView(
                     items: categoryItems,
                     availableStores: availableStores,
                     category: category,
@@ -473,12 +642,7 @@ struct AddItemsCategoryView: View {
                 )
             }
         }
-        .onAppear {
-            print("📱 AddItemsCategoryView appeared for: '\(category.title)'")
-            print("   Items count: \(categoryItems.count)")
-        }
-        // Add animation for smooth updates
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: categoryItems.count)
+        .preference(key: TextFieldFocusPreferenceKey.self, value: focusedItemId)
     }
     
     private var emptyCategoryView: some View {
@@ -491,26 +655,43 @@ struct AddItemsCategoryView: View {
     }
 }
 
-// MARK: - VaultItemsListView for Add Items Sheet (using local state)
-struct AddItemsVaultItemsListView: View {
+// MARK: - Items List View for Manage Cart (with native swipe gestures)
+struct ManageCartItemsListView: View {
     let items: [Item]
     let availableStores: [String]
     let category: GroceryCategory?
     @Binding var localActiveItems: [String: Double]
     
+    @State private var focusedItemId: String?
+    
     var body: some View {
         List {
+            // Add top padding for the list items
+            Color.clear
+                .frame(height: 8)
+                .listRowInsets(EdgeInsets())
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
+            
             ForEach(availableStores, id: \.self) { store in
-                AddItemsStoreSection(
+                ManageCartStoreSection(
                     storeName: store,
                     items: itemsForStore(store),
                     category: category,
                     localActiveItems: $localActiveItems
                 )
             }
+            
+            // Add bottom padding
+            Color.clear
+                .frame(height: 100)
+                .listRowInsets(EdgeInsets())
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
         }
         .listStyle(PlainListStyle())
         .listSectionSpacing(16)
+        .preference(key: TextFieldFocusPreferenceKey.self, value: focusedItemId)
     }
     
     private func itemsForStore(_ store: String) -> [Item] {
@@ -520,39 +701,51 @@ struct AddItemsVaultItemsListView: View {
     }
 }
 
-// MARK: - StoreSection for Add Items Sheet (using local state)
-struct AddItemsStoreSection: View {
+// MARK: - Store Section for Manage Cart
+struct ManageCartStoreSection: View {
     let storeName: String
     let items: [Item]
     let category: GroceryCategory?
     @Binding var localActiveItems: [String: Double]
     
+    private var itemsWithStableIdentifiers: [(id: String, item: Item)] {
+        items.map { ($0.id, $0) }
+    }
+    
     var body: some View {
         Section(
-            header:
-                HStack {
-                    Text(storeName)
-                        .fuzzyBubblesFont(11, weight: .bold)
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(category?.pastelColor.saturated(by: 0.3).darker(by: 0.5) ?? Color.primary)
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
-                    Spacer()
-                }
+            header: HStack {
+                Text(storeName)
+                    .fuzzyBubblesFont(11, weight: .bold)
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(category?.pastelColor.saturated(by: 0.3).darker(by: 0.5) ?? Color.primary)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                Spacer()
+            }
                 .padding(.leading)
                 .listRowInsets(EdgeInsets())
-            
         ) {
-            ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+            ForEach(itemsWithStableIdentifiers, id: \.id) { tuple in
                 VStack(spacing: 0) {
-                    AddItemsVaultItemRow(
-                        item: item,
+                    ManageCartItemRow(
+                        item: tuple.item,
                         category: category,
                         localActiveItems: $localActiveItems
                     )
                     
-                    if index < items.count - 1 {
+                    // Native swipe gesture using .swipeActions modifier
+                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                        Button(role: .destructive) {
+                            // Remove from local active items
+                            localActiveItems.removeValue(forKey: tuple.item.id)
+                        } label: {
+                            Label("Remove", systemImage: "trash")
+                        }
+                    }
+                    
+                    if tuple.id != itemsWithStableIdentifiers.last?.id {
                         DashedLine()
                             .stroke(style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
                             .frame(height: 1)
@@ -563,29 +756,34 @@ struct AddItemsStoreSection: View {
                 }
                 .listRowInsets(EdgeInsets())
                 .listRowSeparator(.hidden)
+                .transition(.asymmetric(
+                    insertion: .move(edge: .top)
+                        .combined(with: .opacity)
+                        .combined(with: .scale(scale: 0.95, anchor: .top)),
+                    removal: .move(edge: .leading)
+                        .combined(with: .opacity)
+                ))
+                .animation(.spring(response: 0.4, dampingFraction: 0.75), value: itemsWithStableIdentifiers.map { $0.id })
             }
         }
     }
 }
 
-// MARK: - VaultItemRow for Add Items Sheet (using local state)
-struct AddItemsVaultItemRow: View {
+// MARK: - Item Row for Manage Cart (clean version without custom swipe)
+struct ManageCartItemRow: View {
     let item: Item
     let category: GroceryCategory?
     @Binding var localActiveItems: [String: Double]
     
     @Environment(VaultService.self) private var vaultService
     @State private var showEditSheet = false
-    @State private var offset: CGFloat = 0
-    @State private var isSwiped = false
     @State private var textValue: String = ""
     @FocusState private var isFocused: Bool
     
-    // Track if this is a newly added item for animation
+    // Animation states
     @State private var isNewlyAdded = true
     @State private var appearScale: CGFloat = 0.8
     @State private var appearOpacity: Double = 0
-    @State private var deleteBackgroundOpacity: Double = 0 // Control delete UI visibility
     
     private var currentQuantity: Double {
         localActiveItems[item.id] ?? 0
@@ -596,26 +794,58 @@ struct AddItemsVaultItemRow: View {
     }
     
     var body: some View {
-        ZStack(alignment: .trailing) {
-            // Swipe to delete background - Only show when swiped or explicitly triggered
-            if isSwiped || deleteBackgroundOpacity > 0 {
-                deleteBackground
-                    .opacity(deleteBackgroundOpacity)
+        HStack(alignment: .bottom, spacing: 4) {
+            VStack {
+                Circle()
+                    .fill(isActive ? (category?.pastelColor.saturated(by: 0.3).darker(by: 0.5) ?? Color.primary) : .clear)
+                    .frame(width: 9, height: 9)
+                    .scaleEffect(isActive ? 1 : 0)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.5), value: isActive)
+                    .padding(.top, 8)
+
+                Spacer()
             }
             
-            // Main content
-            mainContent
-        }
-        .contentShape(Rectangle())
-        .onTapGesture {
-            // If swiped open, tap to close
-            if isSwiped {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                    offset = 0
-                    isSwiped = false
-                    deleteBackgroundOpacity = 0
+            VStack(alignment: .leading, spacing: 0) {
+                Text(item.name)
+                    .foregroundColor(isActive ? .black : Color(hex: "999"))
+                    .lexendFont(17)
+                
+                if let priceOption = item.priceOptions.first {
+                    HStack(spacing: 0) {
+                        Text("₱\(priceOption.pricePerUnit.priceValue, specifier: "%g")")
+                        Text("/\(priceOption.pricePerUnit.unit)")
+                        Spacer()
+                    }
+                    .lexendFont(12)
+                    .foregroundColor(isActive ? .black : Color(hex: "999"))
                 }
-            } else {
+            }
+            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isActive)
+            
+            Spacer()
+            
+            HStack(spacing: 8) {
+                if isActive {
+                    minusButton
+                        .transition(.scale.combined(with: .opacity))
+                    quantityTextField
+                        .transition(.scale.combined(with: .opacity))
+                }
+                plusButton
+            }
+            .animation(.spring(response: 0.35, dampingFraction: 0.7), value: isActive)
+            .padding(.top, 6)
+        }
+        .padding(.bottom, 4)
+        .padding(.horizontal)
+        .padding(.vertical, 8)
+        .background(.white)
+        .scaleEffect(appearScale)
+        .opacity(appearOpacity)
+        .animation(.spring(response: 0.4, dampingFraction: 0.7), value: isActive)
+        .onTapGesture {
+            if !isFocused {
                 showEditSheet = true
             }
         }
@@ -632,9 +862,15 @@ struct AddItemsVaultItemRow: View {
         }
         .contextMenu {
             Button(role: .destructive) {
-                deleteItem()
+                localActiveItems.removeValue(forKey: item.id)
             } label: {
-                Label("Delete from Vault", systemImage: "trash")
+                Label("Remove from Cart", systemImage: "trash")
+            }
+            
+            Button {
+                showEditSheet = true
+            } label: {
+                Label("Edit", systemImage: "pencil")
             }
         }
         .onChange(of: currentQuantity) { oldValue, newValue in
@@ -643,202 +879,103 @@ struct AddItemsVaultItemRow: View {
             }
         }
         .onAppear {
-            // Animate new items in
             if isNewlyAdded {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                withAnimation(.spring(response: 0.25, dampingFraction: 0.75)) {
                     appearScale = 1.0
                     appearOpacity = 1.0
                 }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                     isNewlyAdded = false
                 }
+            } else {
+                appearScale = 1.0
+                appearOpacity = 1.0
+            }
+            
+            if textValue.isEmpty || textValue != formatValue(currentQuantity) {
+                textValue = formatValue(currentQuantity)
             }
         }
+        .preference(key: TextFieldFocusPreferenceKey.self, value: isFocused ? item.id : nil)
     }
     
-    private var deleteBackground: some View {
-        HStack {
-            Spacer()
-            Button(action: {
-                deleteItem()
-            }) {
-                ZStack {
-                    Rectangle()
-                        .fill(Color.red)
-                        .frame(width: 80)
-                    
-                    VStack {
-                        Image(systemName: "trash")
-                            .font(.title2)
-                            .foregroundColor(.white)
-                        Text("Delete")
-                            .font(.caption)
-                            .foregroundColor(.white)
-                    }
-                }
-                .frame(width: 80)
-            }
-            .buttonStyle(.plain)
-        }
-    }
-    
-    private var mainContent: some View {
-        HStack(alignment: .top, spacing: 4) {
-            Circle()
-                .fill(isActive ? (category?.pastelColor.saturated(by: 0.3).darker(by: 0.5) ?? Color.primary) : .clear)
-                .frame(width: 9, height: 9)
-                .padding(.top, 8)
-                .scaleEffect(isActive ? 1 : 0)
-                .animation(.spring(response: 0.3, dampingFraction: 0.5), value: isActive)
-            
-            VStack(alignment: .leading, spacing: 0) {
-                
-                Text(item.name)
-                    .foregroundColor(isActive ? .black : Color(hex: "999"))
-                
-                if let priceOption = item.priceOptions.first {
-                    HStack(spacing: 0) {
-                        Text("₱\(priceOption.pricePerUnit.priceValue, specifier: "%g")")
-                        Text("/\(priceOption.pricePerUnit.unit)")
-                            .lexendFont(12, weight: .medium)
-                        Spacer()
-                    }
-                    .lexendFont(12, weight: .medium)
-                    .foregroundColor(isActive ? .black : Color(hex: "999"))
-                }
-            }
-            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isActive)
-            
-            Spacer()
-            
-            HStack(spacing: 8) {
-                Button {
-                    handleMinus()
-                } label: {
-                    Image(systemName: "minus")
-                        .font(.footnote).bold()
-                        .foregroundColor(Color(hex: "1E2A36"))
-                        .frame(width: 24, height: 24)
-                        .background(.white)
-                        .clipShape(Circle())
-                }
-                .buttonStyle(.plain)
-                .contentShape(Rectangle())
-                .disabled(currentQuantity <= 0)
-                .opacity(currentQuantity <= 0 ? 0.5 : 1)
-                .scaleEffect(isActive ? 1 : 0)
-                .frame(width: isActive ? 24 : 0)
-                
-                ZStack {
-                    Text(textValue)
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundColor(Color(hex: "2C3E50"))
-                        .multilineTextAlignment(.center)
-                        .contentTransition(.numericText())
-                        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: textValue)
-                    
-                    TextField("", text: $textValue)
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundColor(.clear)
-                        .multilineTextAlignment(.center)
-                        .keyboardType(.decimalPad)
-                        .focused($isFocused)
-                        .onChange(of: isFocused) { oldValue, newValue in
-                            if !newValue { commitTextField() }
-                        }
-                        .onChange(of: textValue) { oldValue, newValue in
-                            if let number = Double(newValue), number > 100 {
-                                textValue = "100"
-                            }
-                        }
-                }
-                .padding(.horizontal, 6)
-                .background(
-                    RoundedRectangle(cornerRadius: 6)
-                        .stroke(Color(hex: "F2F2F2").darker(by: 0.1), lineWidth: 1)
-                )
-                .frame(minWidth: 40)
-                .frame(maxWidth: 80)
-                .fixedSize(horizontal: true, vertical: false)
-                .scaleEffect(isActive ? 1 : 0)
-                .frame(width: isActive ? nil : 0)
-                .onAppear {
-                    textValue = formatValue(currentQuantity)
-                }
-                .onChange(of: currentQuantity) { oldValue, newValue in
-                    if !isFocused {
-                        textValue = formatValue(newValue)
-                    }
-                }
-                
-                Button(action: {
-                    if isActive {
-                        handlePlus()
-                    } else {
-                        withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-                            localActiveItems[item.id] = 1
-                        }
-                    }
-                }) {
-                    Image(systemName: "plus")
-                        .font(.footnote)
-                        .bold()
-                        .foregroundColor(isActive ? Color(hex: "1E2A36") : Color(hex: "888888"))
-                }
+    private var minusButton: some View {
+        Button {
+            handleMinus()
+        } label: {
+            Image(systemName: "minus")
+                .font(.footnote).bold()
+                .foregroundColor(Color(hex: "1E2A36"))
                 .frame(width: 24, height: 24)
                 .background(.white)
                 .clipShape(Circle())
-                .contentShape(Circle())
-                .buttonStyle(.plain)
-            }
-            .animation(.spring(response: 0.2, dampingFraction: 0.7), value: isActive)
-            .padding(.top, 6)
         }
-        .padding(.bottom, 4)
-        .padding(.horizontal)
-        .padding(.vertical, 8)
-        .background(.white)
-        .animation(.spring(response: 0.4, dampingFraction: 0.7), value: isActive)
-        .offset(x: offset)
-        .scaleEffect(appearScale)
-        .opacity(appearOpacity)
-        .gesture(
-            DragGesture()
-                .onChanged { value in
-                    // Allow swiping for ALL items (active and inactive)
-                    if value.translation.width < 0 {
-                        offset = value.translation.width
-                        // Gradually show delete background as user swipes
-                        let progress = min(abs(value.translation.width) / 80, 1.0)
-                        deleteBackgroundOpacity = progress
-                    }
-                }
-                .onEnded { value in
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                        if value.translation.width < -100 {
-                            offset = -80
-                            isSwiped = true
-                            deleteBackgroundOpacity = 1.0
-                        } else {
-                            offset = 0
-                            isSwiped = false
-                            deleteBackgroundOpacity = 0
-                        }
-                    }
-                }
-        )
+        .buttonStyle(.plain)
+        .contentShape(Rectangle())
+        .disabled(currentQuantity <= 0)
+        .opacity(currentQuantity <= 0 ? 0.5 : 1)
     }
     
-    private func deleteItem() {
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-            // Remove from local active items (if it was active)
-            localActiveItems.removeValue(forKey: item.id)
-            // Delete the item from the vault (permanent deletion)
-            vaultService.deleteItem(item)
-            offset = 0
-            isSwiped = false
-            deleteBackgroundOpacity = 0
+    private var quantityTextField: some View {
+        ZStack {
+            Text(textValue)
+                .font(.system(size: 15, weight: .bold))
+                .foregroundColor(Color(hex: "2C3E50"))
+                .multilineTextAlignment(.center)
+                .contentTransition(.numericText())
+                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: textValue)
+                .fixedSize()
+            
+            TextField("", text: $textValue)
+                .keyboardType(.decimalPad)
+                .font(.system(size: 15, weight: .bold))
+                .foregroundColor(.clear)
+                .multilineTextAlignment(.center)
+                .focused($isFocused)
+                .normalizedNumber($textValue, allowDecimal: true, maxDecimalPlaces: 2)
+                .onChange(of: isFocused) { oldValue, focused in
+                    if !focused {
+                        commitTextField()
+                    }
+                }
+                .onChange(of: textValue) { oldValue, newText in
+                    if let number = Double(newText), number > 100 {
+                        textValue = "100"
+                    }
+                }
         }
+        .padding(.horizontal, 6)
+        .background(
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(Color(hex: "F2F2F2").darker(by: 0.1), lineWidth: 1)
+        )
+        .frame(minWidth: 40)
+        .frame(maxWidth: 80)
+        .fixedSize(horizontal: true, vertical: false)
+    }
+    
+    private var plusButton: some View {
+        Button(action: {
+            if isActive {
+                handlePlus()
+            } else {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                    localActiveItems[item.id] = 1
+                }
+            }
+        }) {
+            Image(systemName: "plus")
+                .font(.footnote)
+                .bold()
+                .foregroundColor(isActive ? Color(hex: "1E2A36") : Color(hex: "888888"))
+        }
+        .frame(width: 24, height: 24)
+        .background(.white)
+        .clipShape(Circle())
+        .contentShape(Circle())
+        .buttonStyle(.plain)
+        .disabled(isFocused)
     }
     
     private func handlePlus() {
@@ -884,9 +1021,14 @@ struct AddItemsVaultItemRow: View {
         } else {
             textValue = formatValue(currentQuantity)
         }
+        isFocused = false
     }
     
     private func formatValue(_ val: Double) -> String {
+        guard !val.isNaN && val.isFinite else {
+            return "0"
+        }
+        
         if val.truncatingRemainder(dividingBy: 1) == 0 {
             return String(format: "%.0f", val)
         } else {
