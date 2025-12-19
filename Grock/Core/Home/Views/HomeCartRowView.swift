@@ -100,7 +100,7 @@ struct HomeCartRowView: View {
     private var headerRow: some View {
         HStack {
             Text(cart.name)
-                .lexendFont(18, weight: .semibold)
+                .shantellSansFont(18)
                 .foregroundColor(.black)
             
             Spacer()

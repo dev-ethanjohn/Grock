@@ -215,7 +215,7 @@ struct CartDetailScreen: View {
             
             // ADD THIS: Edit Cart Name Popover
             if showingEditCartName {
-                EditCartNamePopover(
+                RenameCartNamePopover(
                     isPresented: $showingEditCartName,
                     currentName: cart.name,
                     onSave: { newName in

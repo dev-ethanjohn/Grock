@@ -159,7 +159,7 @@ struct EditItemSheet: View {
     }
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             VStack {
                 ScrollView {
                     VStack {

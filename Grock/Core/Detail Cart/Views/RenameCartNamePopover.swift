@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct EditCartNamePopover: View {
+struct RenameCartNamePopover: View {
     @Binding var isPresented: Bool
     let currentName: String
     let onSave: (String) -> Void
@@ -29,30 +29,33 @@ struct EditCartNamePopover: View {
             VStack(spacing: 0) {
                 // Header
                 HStack(alignment: .center) {
-                    Text("Edit Cart Name")
-                        .lexendFont(20, weight: .medium)
-                        .foregroundColor(.black)
+                    Text("Rename Cart Name")
+                        .fuzzyBubblesFont(16, weight: .bold)
                     
-                    Image(systemName: "pencil.circle.fill")
-                        .font(.system(size: 24))
-                        .foregroundColor(.blue)
+                    Image("edit")
+                        .resizable()
+                        .renderingMode(.template)
+                        .frame(width: 18, height: 18)
+                        .foregroundColor(.black.opacity(0.8))
                 }
-                .padding(.bottom, 32)
+                .foregroundColor(.black.opacity(0.8))
+                .padding(.top, 6)
+                .padding(.bottom)
                 
                 // Single text field with clean UI (no background, no border)
                 HStack(spacing: 0) {
                     ZStack(alignment: .leading) {
-                        // Placeholder showing current name when empty
+                        // Placeholder showing when field is empty
                         if cartName.isEmpty {
-                            Text(currentName)
-                                .lexendFont(20, weight: .semibold)  // Match CreateCartPopover font
+                            Text("Enter new name...")
+                                .shantellSansFont(20)
                                 .foregroundColor(Color(hex: "999"))
                         }
                         
                         TextField("", text: $cartName, onCommit: {
                             if isValidName { saveName() }
                         })
-                        .lexendFont(20, weight: .semibold)  // Match CreateCartPopover font
+                        .shantellSansFont(20)
                         .foregroundColor(.black)
                         .autocorrectionDisabled(true)
                         .textInputAutocapitalization(.words)
@@ -108,6 +111,7 @@ struct EditCartNamePopover: View {
                         )
                 }
                 
+                
                 // Arrow indicator when form is valid
                 if isValidName && !isInvalidName {
                     Image(systemName: "chevron.down.dotted.2")
@@ -129,7 +133,7 @@ struct EditCartNamePopover: View {
                         )
                 }
                 
-                // Action buttons (using your original FormCompletionButton)
+                // Action buttons
                 VStack(spacing: 6) {
                     FormCompletionButton(
                         title: "Update Name",
@@ -169,18 +173,18 @@ struct EditCartNamePopover: View {
             .background(Color.white)
             .cornerRadius(24)
             .scaleEffect(contentScale)
-            .offset(y: keyboardVisible ? UIScreen.main.bounds.height * 0.12 : 0)
+            .offset(y: keyboardVisible ? -UIScreen.main.bounds.height * 0.12 : 0)
             .shadow(color: Color.black.opacity(0.15), radius: 20, x: 0, y: 10)
             .animation(.spring(response: 0.2, dampingFraction: 0.7, blendDuration: 0.1), value: isValidName)
             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: keyboardVisible)
             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isInvalidName)
-            .frame(maxHeight: .infinity, alignment: keyboardVisible ? .top : .center)
+            .frame(maxHeight: .infinity, alignment: keyboardVisible ? .center : .center)
             .padding(.horizontal, UIScreen.main.bounds.width * 0.038)
         }
         .onAppear {
             originalName = currentName
-            // Start with empty field, placeholder shows current name
-            cartName = ""
+            // FIXED: Start with current cart name pre-filled
+            cartName = currentName
             
             nameFieldIsFocused = true
             
@@ -190,6 +194,18 @@ struct EditCartNamePopover: View {
             
             withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                 contentScale = 1
+            }
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                nameFieldIsFocused = true
+                
+                // Select all text for easy editing
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    if let keyWindow = getKeyWindow(),
+                       let textField = keyWindow.findTextField() {
+                        textField.selectAll(nil)
+                    }
+                }
             }
         }
         .onDisappear {
@@ -245,9 +261,34 @@ struct EditCartNamePopover: View {
             contentScale = 0.9
         }
         
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-            isPresented = false
-            onDismiss?()
+        isPresented = false
+        onDismiss?()
+    }
+    
+    private func getKeyWindow() -> UIWindow? {
+        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene else {
+            return nil
         }
+        
+        if let keyWindow = windowScene.keyWindow {
+            return keyWindow
+        }
+        
+        return windowScene.windows.first
+    }
+}
+
+// Helper extension to find and select text in TextField
+extension UIView {
+    func findTextField() -> UITextField? {
+        if let textField = self as? UITextField {
+            return textField
+        }
+        for subview in self.subviews {
+            if let textField = subview.findTextField() {
+                return textField
+            }
+        }
+        return nil
     }
 }

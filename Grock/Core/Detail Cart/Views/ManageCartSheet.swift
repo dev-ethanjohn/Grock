@@ -38,150 +38,151 @@ struct ManageCartSheet: View {
     }
     
     var body: some View {
-        ZStack {
-            // Main content
-            VStack(spacing: 0) {
-                customToolbar
-                Text("Hello")
-                
-                // Use currentVault instead of vaultService.vault directly
-                if let vault = currentVault, !vault.categories.isEmpty {
-                    VStack(spacing: 0) {
-                        categoryScrollView
-                            .padding(.top, 8)
-                            .padding(.bottom, 10)
-                    }
-                    .background(
-                        Rectangle()
-                            .fill(.white)
-                            .shadow(color: Color.black.opacity(0.16), radius: 6, x: 0, y: 1)
-                            .mask(
-                                Rectangle()
-                                    .padding(.bottom, -20)
-                            )
-                    )
-                    .background(.red)
+        NavigationStack {
+            ZStack {
+                // Main content
+                VStack(spacing: 0) {
+                    customToolbar
                     
-                    categoryContentScrollView
-                } else {
-                    emptyVaultView
-                }
-            }
-            
-            VStack {
-                Spacer()
-                doneButton
-                    .padding(.bottom, 20)
-            }
-            
-            if showAddItemPopover {
-                Color.clear
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            showAddItemPopover = false
+                    // Use currentVault instead of vaultService.vault directly
+                    if let vault = currentVault, !vault.categories.isEmpty {
+                        VStack(spacing: 0) {
+                            categoryScrollView
+                                .padding(.top, 8)
+                                .padding(.bottom, 10)
                         }
-                    }
-                
-                AddItemPopover(
-                    isPresented: $showAddItemPopover,
-                    createCartButtonVisible: $createCartButtonVisible,
-                    onSave: { itemName, category, store, unit, price in
-                        let success = vaultService.addItem(
-                            name: itemName,
-                            to: category,
-                            store: store,
-                            price: price,
-                            unit: unit
+                        .background(
+                            Rectangle()
+                                .fill(.white)
+                                .shadow(color: Color.black.opacity(0.16), radius: 6, x: 0, y: 1)
+                                .mask(
+                                    Rectangle()
+                                        .padding(.bottom, -20)
+                                )
                         )
                         
-                        if success {
-                            print("✅ Item added successfully: \(itemName)")
-                            // Force view update after adding item
-                            vaultUpdateTrigger += 1
-                            
-                            // Auto-scroll to the category where the item was added
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                                    selectedCategory = category
-                                }
-                            }
-                        } else {
-                            print("❌ Failed to add item - duplicate name: \(itemName)")
-                            duplicateError = "An item with this name already exists at \(store)"
-                        }
-                    },
-                    onDismiss: {
-                        // Clear any duplicate error when popover is dismissed
-                        duplicateError = nil
+                        categoryContentScrollView
+                    } else {
+                        emptyVaultView
                     }
-                )
-                .offset(y: UIScreen.main.bounds.height * -0.04)
-                .transition(.opacity)
-                .zIndex(1)
+                }
+                
+                VStack {
+                    Spacer()
+                    doneButton
+                        .padding(.bottom, 20)
+                }
+                
+                if showAddItemPopover {
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                showAddItemPopover = false
+                            }
+                        }
+                    
+                    AddItemPopover(
+                        isPresented: $showAddItemPopover,
+                        createCartButtonVisible: $createCartButtonVisible,
+                        onSave: { itemName, category, store, unit, price in
+                            let success = vaultService.addItem(
+                                name: itemName,
+                                to: category,
+                                store: store,
+                                price: price,
+                                unit: unit
+                            )
+                            
+                            if success {
+                                print("✅ Item added successfully: \(itemName)")
+                                // Force view update after adding item
+                                vaultUpdateTrigger += 1
+                                
+                                // Auto-scroll to the category where the item was added
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                                        selectedCategory = category
+                                    }
+                                }
+                            } else {
+                                print("❌ Failed to add item - duplicate name: \(itemName)")
+                                duplicateError = "An item with this name already exists at \(store)"
+                            }
+                        },
+                        onDismiss: {
+                            // Clear any duplicate error when popover is dismissed
+                            duplicateError = nil
+                        }
+                    )
+                    .offset(y: UIScreen.main.bounds.height * -0.04)
+                    .transition(.opacity)
+                    .zIndex(1)
+                }
             }
-        }
-//        .toolbar {
-//            ToolbarItem(placement: .topBarLeading) {
-//                Button(action: {}) {
-//                    Image("search")
-//                        .resizable()
-//                        .frame(width: 24, height: 24)
-//                }
-//            }
-//            
-//            ToolbarItem(placement: .topBarTrailing) {
-//                Button(action: {
-//                    withAnimation(.easeInOut(duration: 0.2)) {
-//                        showAddItemPopover = true
-//                        duplicateError = nil // Clear previous errors
-//                    }
-//                }) {
-//                    Text("Add")
-//                        .fuzzyBubblesFont(13, weight: .bold)
-//                        .foregroundColor(.white)
-//                        .padding(.horizontal, 10)
-//                        .padding(.vertical, 4)
-//                        .background(Color.black)
-//                        .cornerRadius(20)
-//                }
-//            }
-//        }
-//        .navigationTitle("Manage Cart")
-//        .navigationBarTitleDisplayMode(.inline)
-        .background(.white)
-        .ignoresSafeArea(.keyboard)
-        .presentationDragIndicator(.visible)
-        .onAppear {
-            initializeActiveItemsFromCart()
-            if selectedCategory == nil {
-                selectedCategory = firstCategoryWithItems ?? GroceryCategory.allCases.first
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(action: {}) {
+                        Image("search")
+                            .resizable()
+                            .frame(width: 24, height: 24)
+                    }
+                }
+                
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(action: {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            showAddItemPopover = true
+                            duplicateError = nil // Clear previous errors
+                        }
+                    }) {
+                        Text("Add")
+                            .fuzzyBubblesFont(13, weight: .bold)
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4)
+                            .background(Color.black)
+                            .cornerRadius(20)
+                    }
+                }
             }
-        }
-        // Add onChange to watch for vault updates and category changes
-        .onChange(of: vaultService.vault) { oldValue, newValue in
-            print("🔄 ManageCartSheet: Vault updated, refreshing view")
-            vaultUpdateTrigger += 1
-            
-            // Update selected category if the current one no longer has items
-            if let currentCategory = selectedCategory,
-               !hasItems(in: currentCategory) {
-                selectedCategory = firstCategoryWithItems ?? GroceryCategory.allCases.first
+            .navigationTitle("Manage Cart")
+            .navigationBarTitleDisplayMode(.inline)
+            .background(.white)
+            .ignoresSafeArea(.keyboard)
+            .onAppear {
+                initializeActiveItemsFromCart()
+                if selectedCategory == nil {
+                    selectedCategory = firstCategoryWithItems ?? GroceryCategory.allCases.first
+                }
             }
-        }
-        .onChange(of: vaultUpdateTrigger) { oldValue, newValue in
-            // This forces the view to refresh when vault changes
-            print("🔄 ManageCartSheet: Refreshing view due to vault changes")
-        }
-        // Listen for category change notifications (from EditItemSheet)
-        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ItemCategoryChanged"))) { notification in
-            if let newCategory = notification.userInfo?["newCategory"] as? GroceryCategory {
-                print("🔄 ManageCartSheet: Received category change notification - switching to \(newCategory.title)")
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                    selectedCategory = newCategory
+            // Add onChange to watch for vault updates and category changes
+            .onChange(of: vaultService.vault) { oldValue, newValue in
+                print("🔄 ManageCartSheet: Vault updated, refreshing view")
+                vaultUpdateTrigger += 1
+                
+                // Update selected category if the current one no longer has items
+                if let currentCategory = selectedCategory,
+                   !hasItems(in: currentCategory) {
+                    selectedCategory = firstCategoryWithItems ?? GroceryCategory.allCases.first
+                }
+            }
+            .onChange(of: vaultUpdateTrigger) { oldValue, newValue in
+                // This forces the view to refresh when vault changes
+                print("🔄 ManageCartSheet: Refreshing view due to vault changes")
+            }
+            // Listen for category change notifications (from EditItemSheet)
+            .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ItemCategoryChanged"))) { notification in
+                if let newCategory = notification.userInfo?["newCategory"] as? GroceryCategory {
+                    print("🔄 ManageCartSheet: Received category change notification - switching to \(newCategory.title)")
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                        selectedCategory = newCategory
+                    }
                 }
             }
         }
+        .presentationDragIndicator(.visible)
+        .presentationCornerRadius(24)
     }
     
     private var customToolbar: some View {

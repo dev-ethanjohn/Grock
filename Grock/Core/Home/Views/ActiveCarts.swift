@@ -6,7 +6,15 @@ struct ActiveCarts: View {
     @Bindable var viewModel: HomeViewModel
     let refreshTrigger: UUID
     
-    @State private var showEditBudgetForCart: Cart? = nil
+    // Remove these state variables
+    // @State private var showEditBudgetForCart: Cart? = nil
+    // @State private var cartToDelete: Cart? = nil
+    // @State private var showingDeleteAlert = false
+    // @State private var showingEditCartName = false
+    
+    // Add these callbacks
+    let onDeleteCart: (Cart) -> Void
+    let onRenameCart: (Cart) -> Void
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -25,35 +33,61 @@ struct ActiveCarts: View {
     }
     
     private var cartListView: some View {
-          ScrollView {
-              Color.clear
-                  .frame(height: viewModel.headerHeight)
-              
-              LazyVStack(spacing: 12) {
-                  ForEach(Array(viewModel.displayedCarts.enumerated()), id: \.element.id) { index, cart in
-                      Button(action: {
-                          viewModel.selectCart(cart)
-                      }) {
-                          HomeCartRowView(
-                              cart: cart,
-                              vaultService: viewModel.getVaultService(for: cart)
-                          )
-                      }
-                      .buttonStyle(.plain)
-                      .transition(.asymmetric(
-                          insertion: .scale(scale: 0.8).combined(with: .opacity),
-                          removal: .scale(scale: 0.9).combined(with: .opacity)
-                      ))
-                      .animation(
-                          .spring(response: 0.5, dampingFraction: 0.7)
-                              .delay(Double(index) * 0.05),
-                          value: viewModel.displayedCarts.count
-                      )
-                  }
-              }
-          }
-      }
-      
+        List {
+            // Add header space
+            Color.clear
+                .frame(height: viewModel.headerHeight)
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets())
+            
+            ForEach(Array(viewModel.displayedCarts.enumerated()), id: \.element.id) { index, cart in
+                Button(action: {
+                    viewModel.selectCart(cart)
+                }) {
+                    HomeCartRowView(
+                        cart: cart,
+                        vaultService: viewModel.getVaultService(for: cart)
+                    )
+                }
+                .buttonStyle(.plain)
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
+                .transition(.asymmetric(
+                    insertion: .scale(scale: 0.8).combined(with: .opacity),
+                    removal: .scale(scale: 0.9).combined(with: .opacity)
+                ))
+                .animation(
+                    .spring(response: 0.5, dampingFraction: 0.7)
+                        .delay(Double(index) * 0.05),
+                    value: viewModel.displayedCarts.count
+                )
+                .contextMenu {
+                    Button {
+                        onRenameCart(cart) // Use callback
+                    } label: {
+                        Label("Rename Cart", systemImage: "pencil")
+                    }
+                    
+                    Button(role: .destructive) {
+                        onDeleteCart(cart) // Use callback
+                    } label: {
+                        Label("Delete Cart", systemImage: "trash")
+                    }
+                }
+                .onLongPressGesture {
+                    // Optional: Provide haptic feedback on long press
+                    let generator = UIImpactFeedbackGenerator(style: .medium)
+                    generator.impactOccurred()
+                }
+            }
+        }
+        .listStyle(PlainListStyle())
+        .scrollContentBackground(.hidden)
+        .scrollIndicators(.hidden)
+    }
+    
     private var emptyStateView: some View {
         VStack(spacing: 20) {
             Spacer()

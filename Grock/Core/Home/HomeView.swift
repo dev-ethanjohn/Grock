@@ -1,43 +1,48 @@
 import SwiftData
 import SwiftUI
- 
+
 struct HomeView: View {
     @Environment(VaultService.self) private var vaultService
     @Environment(CartViewModel.self) private var cartViewModel
     @State private var viewModel: HomeViewModel
- 
+    
     @State private var tabs: [CartTabsModel] = [
         .init(id: CartTabsModel.Tab.active),
         .init(id: CartTabsModel.Tab.completed),
         .init(id: CartTabsModel.Tab.statistics),
     ]
- 
+    
     @State private var showCreateCartPopover = false
- 
+    
     @State private var activeTab: CartTabsModel.Tab = .active
     @State private var tabBarScrollState: CartTabsModel.Tab?
     @State private var progress: CGFloat = .zero
     @State private var isDragging: Bool = false
     @State private var delayTask: DispatchWorkItem?
- 
+    
     //create post trasnsition/animation interaction
     @State private var showCreatePost: Bool = false
     @State private var isAnimating = false
     @State private var isScalingDown = false
- 
+    
     @State private var vaultButtonScale: CGFloat = 1.0
     
     @State private var cartRefreshTrigger = UUID()
- 
+    
+    // ADD THESE STATE VARIABLES for rename cart
+    @State private var cartToRename: Cart? = nil
+    @State private var cartToDelete: Cart? = nil
+    @State private var showingDeleteAlert = false
+    
     init(viewModel: HomeViewModel) {
         self._viewModel = State(initialValue: viewModel)
     }
- 
+    
     var body: some View {
         NavigationStack {
             ZStack(alignment: .top) {
-                Color.white.ignoresSafeArea()
- 
+                Color(hex: "#f7f7f7").ignoresSafeArea()
+                
                 MenuView()
                     .opacity(viewModel.showMenu ? 1 : 0)
                     .offset(x: viewModel.showMenu ? 0 : -300)
@@ -45,10 +50,33 @@ struct HomeView: View {
                         .degrees(viewModel.showMenu ? 0 : 30),
                         axis: (x: 0, y: 1, z: 0)
                     )
- 
+                
                 mainContent
- 
+                
                 menuIcon
+                
+                // Rename cart popover overlay (using if conditional)
+                if let cartToRename = cartToRename {
+                    RenameCartNamePopover(
+                        isPresented: Binding(
+                            get: { self.cartToRename != nil },
+                            set: { if !$0 { self.cartToRename = nil } }
+                        ),
+                        currentName: cartToRename.name,
+                        onSave: { newName in
+                            cartToRename.name = newName
+                            vaultService.updateCartTotals(cart: cartToRename)
+                            // Refresh the UI
+                            cartRefreshTrigger = UUID()
+                            self.cartToRename = nil
+                        },
+                        onDismiss: {
+                            self.cartToRename = nil
+                        }
+                    )
+                    .environment(vaultService)
+                    .zIndex(1000) // Ensure it's on top
+                }
             }
             .clipShape(RoundedRectangle(cornerRadius: 24))
             .ignoresSafeArea()
@@ -70,19 +98,35 @@ struct HomeView: View {
                     isPresented: $showCreateCartPopover,
                 )
             }
+            // Add delete alert
+            .alert("Delete Cart", isPresented: $showingDeleteAlert) {
+                Button("Cancel", role: .cancel) {
+                    cartToDelete = nil
+                }
+                Button("Delete", role: .destructive) {
+                    if let cart = cartToDelete {
+                        deleteCart(cart)
+                        cartToDelete = nil
+                    }
+                }
+            } message: {
+                if let cart = cartToDelete {
+                    Text("Are you sure you want to delete \"\(cart.name)\"? This action cannot be undone.")
+                } else {
+                    Text("Are you sure you want to delete this cart? This action cannot be undone.")
+                }
+            }
             // In HomeView.swift
             .fullScreenCover(item: $viewModel.selectedCart) { cart in
                 CartDetailScreen(cart: cart)
                     .onDisappear {
-//                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                            viewModel.loadCarts()
-                            cartRefreshTrigger = UUID()
-                            
-                            if viewModel.pendingCartToShow != nil {
-                                viewModel.completePendingCartDisplay()
-                            }
-                            viewModel.selectedCart = nil
-//                        }
+                        viewModel.loadCarts()
+                        cartRefreshTrigger = UUID()
+                        
+                        if viewModel.pendingCartToShow != nil {
+                            viewModel.completePendingCartDisplay()
+                        }
+                        viewModel.selectedCart = nil
                     }
                     .presentationCornerRadius(24)
             }
@@ -108,17 +152,17 @@ struct HomeView: View {
             }
         }
     }
- 
+    
     private var mainContent: some View {
         ZStack(alignment: .topLeading) {
-            Color.white.ignoresSafeArea()
- 
+            Color(hex: "#f7f7f7").ignoresSafeArea()
+            
             tabsOnly()
- 
+            
             headerView
- 
+            
             homeMenu
- 
+            
             VStack {
                 Spacer()
                 createCartButton
@@ -141,28 +185,39 @@ struct HomeView: View {
         .shadow(color: Color.black.opacity(0.12), radius: 10, x: -2, y: -5)
         .shadow(color: Color.black.opacity(0.12), radius: 10, x: 2, y: 0)
     }
- 
+    
     @ViewBuilder
     private func tabsOnly() -> some View {
         GeometryReader {
             let size = $0.size
- 
+            
             TabView(selection: $activeTab) {
-                ActiveCarts(viewModel: viewModel, refreshTrigger: cartRefreshTrigger)
-                    .tag(CartTabsModel.Tab.active)
-                    .frame(width: size.width, height: size.height)
-                    .rect { tabProgress(.active, rect: $0, size: size) }
- 
+                // Update ActiveCarts to pass callbacks
+                ActiveCarts(
+                    viewModel: viewModel,
+                    refreshTrigger: cartRefreshTrigger,
+                    onDeleteCart: { cart in
+                        cartToDelete = cart
+                        showingDeleteAlert = true
+                    },
+                    onRenameCart: { cart in
+                        cartToRename = cart
+                    }
+                )
+                .tag(CartTabsModel.Tab.active)
+                .frame(width: size.width, height: size.height)
+                .rect { tabProgress(.active, rect: $0, size: size) }
+                
                 Text("Completed")
                     .tag(CartTabsModel.Tab.completed)
                     .frame(width: size.width, height: size.height)
                     .rect { tabProgress(.completed, rect: $0, size: size) }
- 
+                
                 Text("Statistics")
                     .tag(CartTabsModel.Tab.statistics)
                     .frame(width: size.width, height: size.height)
                     .rect { tabProgress(.statistics, rect: $0, size: size) }
- 
+                
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
             .allowsHitTesting(!isDragging)
@@ -174,7 +229,7 @@ struct HomeView: View {
             }
         }
     }
- 
+    
     @ViewBuilder
     func exploreTabBar() -> some View {
         HStack(spacing: 20) {
@@ -191,7 +246,7 @@ struct HomeView: View {
                         return tabBarScrollState
                     },
                     set: { _ in
- 
+                        
                     }
                 ),
                 anchor: .center
@@ -201,7 +256,7 @@ struct HomeView: View {
                     Rectangle()
                         .fill(.clear)
                         .frame(height: 0.5)
- 
+                    
                     let inputRange = tabs.indices.compactMap {
                         return CGFloat($0)
                     }
@@ -215,7 +270,7 @@ struct HomeView: View {
                         inputRange: inputRange,
                         outputRange: outputPositionRange
                     )
- 
+                    
                     Capsule()
                         .fill(Color.black)
                         .frame(width: indicatorWidth, height: 2)
@@ -225,15 +280,15 @@ struct HomeView: View {
             .scrollIndicators(.hidden)
         }
     }
- 
+    
     private func tabsCart() -> some View {
         ForEach($tabs) { $tab in
             Button(action: {
                 delayTask?.cancel()
                 delayTask = nil
- 
+                
                 isDragging = true
- 
+                
                 withAnimation(.easeInOut(duration: 0.3)) {
                     activeTab = tab.id
                     tabBarScrollState = tab.id
@@ -241,9 +296,9 @@ struct HomeView: View {
                         tabs.firstIndex(where: { $0.id == tab.id }) ?? 0
                     )
                 }
- 
+                
                 delayTask = .init { isDragging = false }
- 
+                
                 if let delayTask {
                     DispatchQueue.main.asyncAfter(
                         deadline: .now() + 0.3,
@@ -272,7 +327,7 @@ struct HomeView: View {
             }
         }
     }
- 
+    
     func tabProgress(_ tab: CartTabsModel.Tab, rect: CGRect, size: CGSize) {
         if let index = tabs.firstIndex(where: { $0.id == activeTab }),
             activeTab == tab, !isDragging
@@ -281,7 +336,7 @@ struct HomeView: View {
             progress = -offsetX / size.width
         }
     }
- 
+    
     private var menuIcon: some View {
         MenuIcon {
             withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
@@ -296,7 +351,7 @@ struct HomeView: View {
         )
         .opacity(viewModel.menuIconOpacity)
     }
- 
+    
     private var headerView: some View {
         VStack(spacing: 0) {
             HStack {
@@ -305,7 +360,7 @@ struct HomeView: View {
             }
             .padding(.trailing)
             .padding(.top, 60)
- 
+            
             VStack(spacing: 12) {
                 greetingText
                 exploreTabBar()
@@ -327,7 +382,7 @@ struct HomeView: View {
             }
         )
     }
- 
+    
     private var homeMenu: some View {
         HStack {
             MenuIcon {
@@ -335,7 +390,7 @@ struct HomeView: View {
                     viewModel.toggleMenu()
                 }
             }
- 
+            
             Menu {
                 Button(role: .destructive, action: viewModel.resetApp) {
                     Label(
@@ -355,36 +410,36 @@ struct HomeView: View {
         .offset(x: viewModel.showMenu ? 40 : 0, y: viewModel.showMenu ? 40 : 0)
         .opacity(viewModel.showMenu ? 0 : 1)
     }
- 
+    
     private var headerBackground: some View {
         ZStack {
             LinearGradient(
                 gradient: Gradient(stops: [
-                    .init(color: Color.white.opacity(0.85), location: 0),
-                    .init(color: Color.white.opacity(0.95), location: 0.1),
-                    .init(color: Color.white.opacity(1.0), location: 0.2),
+                    .init(color: Color(hex: "f7f7f7").opacity(0.85), location: 0),
+                    .init(color: Color(hex: "f7f7f7").opacity(0.95), location: 0.1),
+                    .init(color: Color(hex: "f7f7f7").opacity(1.0), location: 0.2),
                 ]),
                 startPoint: .bottom,
                 endPoint: .top
             )
             HStack {
                 Rectangle()
-                    .fill(Color.white)
+                    .fill(Color(hex: "f7f7f7"))
                     .frame(width: 14)
                 Spacer()
                 Rectangle()
-                    .fill(Color.white)
+                    .fill(Color(hex: "f7f7f7"))
                     .frame(width: 14)
             }
         }
     }
- 
+    
     private var greetingText: some View {
         Text("Hi Ethan,")
             .lexendFont(36, weight: .bold)
             .frame(maxWidth: .infinity, alignment: .leading)
     }
- 
+    
     private var createCartButton: some View {
         Button(action: {
             showCreateCartPopover = true
@@ -400,7 +455,7 @@ struct HomeView: View {
         .padding(.bottom)
         .padding(.bottom, 20)
     }
- 
+    
     private var trailingToolbarButton: some View {
         Button(action: {
             withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
@@ -431,7 +486,7 @@ struct HomeView: View {
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
-                }
+            }
             )
             .clipShape(Capsule())
             .shadow(
@@ -446,7 +501,7 @@ struct HomeView: View {
             VaultCoordinatedButtonStyle(showVault: viewModel.showVault)
         )
     }
- 
+    
     private var vaultSheet: some View {
         NavigationStack {
             VaultView(onCreateCart: viewModel.onCreateCartFromVault)
@@ -456,8 +511,7 @@ struct HomeView: View {
                 .interactiveDismissDisabled(cartViewModel.hasActiveItems)
         }
     }
- 
- 
+    
     private func tabButton(title: String, tabIndex: Int) -> some View {
         Button(action: { viewModel.selectedTab = tabIndex }) {
             Text(title)
@@ -471,11 +525,19 @@ struct HomeView: View {
                 .clipShape(Capsule())
         }
     }
+    
+    private func deleteCart(_ cart: Cart) {
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+            vaultService.deleteCart(cart)
+            // Refresh the UI
+            cartRefreshTrigger = UUID()
+        }
+    }
 }
- 
+
 struct VaultCoordinatedButtonStyle: ButtonStyle {
     let showVault: Bool
- 
+    
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .scaleEffect(
@@ -492,3 +554,20 @@ struct VaultCoordinatedButtonStyle: ButtonStyle {
             .brightness(configuration.isPressed ? -0.2 : 0)
     }
 }
+
+// Helper View extension for getting CGRect (if not already defined)
+extension View {
+    func rect(coordinateSpace: CoordinateSpace = .global, completion: @escaping (CGRect) -> ()) -> some View {
+        self
+            .overlay {
+                GeometryReader { proxy in
+                    let rect = proxy.frame(in: coordinateSpace)
+                    
+                    Color.clear
+                        .preference(key: RectKey.self, value: rect)
+                        .onPreferenceChange(RectKey.self, perform: completion)
+                }
+            }
+    }
+}
+
