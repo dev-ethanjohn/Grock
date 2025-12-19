@@ -7,7 +7,7 @@ struct HomeCartRowView: View {
     
     @State private var viewModel: HomeCartRowViewModel
     @State private var appeared = false
-    @State private var currentProgress: Double = 0 
+    @State private var currentProgress: Double = 0
 
     init(cart: Cart, vaultService: VaultService?) {
         self.cart = cart
@@ -15,7 +15,6 @@ struct HomeCartRowView: View {
         self._viewModel = State(initialValue: HomeCartRowViewModel(cart: cart))
         self._currentProgress = State(initialValue: cart.totalSpent / cart.budget)
     }
-    
     
     private var itemCount: Int {
         cart.cartItems.count
@@ -112,25 +111,17 @@ struct HomeCartRowView: View {
     }
     
     private var progressSection: some View {
-             VStack(spacing: 8) {
-                 HStack(alignment: .center, spacing: 8) {
-                     BudgetProgressBar(
-                         cart: cart,
-                         animatedBudget: viewModel.animatedBudget,
-                         budgetProgressColor: budgetProgressColor,
-                         progressWidth: progressWidth
-                     )
-                     
-                     Text(viewModel.animatedBudget.formattedCurrency)
-                         .lexendFont(14, weight: .bold)
-                         .foregroundColor(Color(hex: "333"))
-                         .contentTransition(.numericText())
-                 }
-                 .frame(height: 20)
-                 
-                 categoriesView
-             }
-         }
+        VStack(spacing: 8) {
+            // Using the original FluidBudgetPillView with budget shown inside it
+            FluidBudgetPillView(
+                cart: cart,
+                animatedBudget: viewModel.animatedBudget,
+                onBudgetTap: nil // No tap action needed for home screen
+            )
+            
+            categoriesView
+        }
+    }
      
     private var categoriesView: some View {
         HStack {
@@ -150,12 +141,6 @@ struct HomeCartRowView: View {
             Spacer()
         }
     }
-     private func progressWidth(for totalWidth: CGFloat) -> CGFloat {
-         guard viewModel.animatedBudget > 0 else { return 0 }
-         
-         // Use the cached currentProgress for smoother animation
-         return CGFloat(min(currentProgress, 1.0)) * totalWidth
-     }
 }
 
 //#Preview {

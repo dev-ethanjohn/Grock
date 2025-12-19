@@ -92,19 +92,11 @@ struct HeaderView: View {
                     .foregroundColor(.black)
                 
                 VStack(spacing: 8) {
-                    HStack(alignment: .center, spacing: 16) {
-                        BudgetProgressBar(cart: cart, animatedBudget: animatedBudget, budgetProgressColor: budgetProgressColor, progressWidth: progressWidth)
-                        
-                        Button(action: {
-                            onBudgetTap?()
-                        }) {
-                            Text(animatedBudget.formattedCurrency)
-                                .lexendFont(14, weight: .bold)
-                                .foregroundColor(Color(hex: "333"))
-                                .contentTransition(.numericText())
-                        }
-                        .buttonStyle(.plain)
-                    }
+                        FluidBudgetPillView(
+                            cart: cart,
+                            animatedBudget: animatedBudget,
+                            onBudgetTap: onBudgetTap
+                        )
                     .frame(height: 22)
                 }
             }
