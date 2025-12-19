@@ -75,17 +75,20 @@ struct CartDetailScreen: View {
         return grouped.filter { !$0.key.isEmpty && !$0.value.isEmpty }
     }
     
-    // Add refresh-aware computed property
     private var itemsByStoreWithRefresh: [String: [(cartItem: CartItem, item: Item?)]] {
-        _ = refreshTrigger // Force recalculation when refreshTrigger changes
+        _ = refreshTrigger
         
-        let sortedCartItems = cart.cartItems.sorted { $0.itemId < $1.itemId }
+        // Sort by addedAt (newest first, at TOP)
+        let sortedCartItems = cart.cartItems.sorted { $0.addedAt > $1.addedAt }
+        
         let cartItemsWithDetails = sortedCartItems.map { cartItem in
             (cartItem, vaultService.findItemById(cartItem.itemId))
         }
+        
         let grouped = Dictionary(grouping: cartItemsWithDetails) { cartItem, item in
             cartItem.getStore(cart: cart)
         }
+        
         return grouped.filter { !$0.key.isEmpty && !$0.value.isEmpty }
     }
     
@@ -1070,7 +1073,7 @@ struct ItemsListView: View {
                             endPoint: .bottom
                         )
                     )
-                    .cornerRadius(16)
+                    .cornerRadius(24)
                     .overlay(
                         RoundedRectangle(cornerRadius: 16)
                             .stroke(Color(hex: "FF6B6B").opacity(0.3), lineWidth: 2)

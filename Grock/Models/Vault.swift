@@ -187,6 +187,7 @@ class Cart {
 
 @Model
 class CartItem {
+    @Attribute var addedAt: Date = Date()
     var itemId: String
     var quantity: Double
     var isFulfilled: Bool
@@ -208,33 +209,33 @@ class CartItem {
     // Add a property to track if item was edited during shopping
     var wasEditedDuringShopping: Bool = false
     
-    
-       init(
-           itemId: String,
-           quantity: Double,
-           plannedStore: String,
-           isFulfilled: Bool = false,
-           isSkippedDuringShopping: Bool = false,
-           plannedPrice: Double? = nil,
-           plannedUnit: String? = nil,
-           actualStore: String? = nil,
-           actualPrice: Double? = nil,
-           actualQuantity: Double? = nil,
-           actualUnit: String? = nil
-       ) {
-           self.itemId = itemId
-           self.quantity = quantity
-           self.plannedStore = plannedStore
-           self.isFulfilled = isFulfilled
-           self.isSkippedDuringShopping = isSkippedDuringShopping 
-           self.plannedPrice = plannedPrice
-           self.plannedUnit = plannedUnit
-           self.actualStore = actualStore
-           self.actualPrice = actualPrice
-           self.actualQuantity = actualQuantity
-           self.actualUnit = actualUnit
-       }
-       
+    init(
+        itemId: String,
+        quantity: Double,
+        plannedStore: String,
+        isFulfilled: Bool = false,
+        isSkippedDuringShopping: Bool = false,
+        plannedPrice: Double? = nil,
+        plannedUnit: String? = nil,
+        actualStore: String? = nil,
+        actualPrice: Double? = nil,
+        actualQuantity: Double? = nil,
+        actualUnit: String? = nil
+    ) {
+        self.itemId = itemId
+        self.quantity = quantity
+        self.plannedStore = plannedStore
+        self.isFulfilled = isFulfilled
+        self.isSkippedDuringShopping = isSkippedDuringShopping
+        self.plannedPrice = plannedPrice
+        self.plannedUnit = plannedUnit
+        self.actualStore = actualStore
+        self.actualPrice = actualPrice
+        self.actualQuantity = actualQuantity
+        self.actualUnit = actualUnit
+        // addedAt is automatically Date() by the @Attribute default
+    }
+
     func getPrice(from vault: Vault, cart: Cart) -> Double {
         switch cart.status {
         case .planning:
