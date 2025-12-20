@@ -498,7 +498,8 @@ struct ManageCartSheet: View {
                     // Add new item only if quantity > 0
                     if quantity > 0 {
                         print("   ➕ Adding: \(item.name) × \(quantity)")
-                        vaultService.addItemToCart(item: item, cart: cart, quantity: quantity)
+                        // CHANGED: Use addVaultItemToCart instead of addItemToCart
+                        vaultService.addVaultItemToCart(item: item, cart: cart, quantity: quantity)
                     }
                 }
             }

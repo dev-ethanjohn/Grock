@@ -1,10 +1,11 @@
 import SwiftUI
 
-// MARK: - Cart Level Add Item Sheet
+import SwiftUI
+
 struct AddNewItemToCartSheet: View {
     @Binding var isPresented: Bool
     let cart: Cart
-    var onItemAdded: (() -> Void)? // Changed: Just a simple callback
+    var onItemAdded: (() -> Void)?
     
     @Environment(VaultService.self) private var vaultService
     @Environment(CartViewModel.self) private var cartViewModel
@@ -13,7 +14,6 @@ struct AddNewItemToCartSheet: View {
     @State private var formViewModel = ItemFormViewModel(requiresPortion: false, requiresStore: true)
     @FocusState private var itemNameFieldIsFocused: Bool
     
-    // Vault browsing state
     @State private var selectedCategory: GroceryCategory?
     @State private var showAddItemPopoverInVault = false
     
@@ -27,25 +27,12 @@ struct AddNewItemToCartSheet: View {
             Group {
                 if currentPage == .addNew {
                     AddNewItemView(
+                        cart: cart,
                         formViewModel: $formViewModel,
                         itemNameFieldIsFocused: $itemNameFieldIsFocused,
                         onAddToCart: {
-                            if formViewModel.attemptSubmission(),
-                               let category = formViewModel.selectedCategory,
-                               let priceValue = Double(formViewModel.itemPrice) {
-                                
-                                // Final duplicate check before saving
-                                let validation = vaultService.validateItemName(formViewModel.itemName, store: formViewModel.storeName)
-                                if validation.isValid {
-                                    addNewItemToCart(
-                                        name: formViewModel.itemName,
-                                        category: category,
-                                        store: formViewModel.storeName,
-                                        unit: formViewModel.unit,
-                                        price: priceValue
-                                    )
-                                }
-                            }
+                            // FIXED: Handle add to cart and dismiss
+                            handleAddToCart()
                         },
                         onBrowseVault: {
                             withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
@@ -62,8 +49,8 @@ struct AddNewItemToCartSheet: View {
                         cart: cart,
                         selectedCategory: $selectedCategory,
                         onItemSelected: { item in
-                            // Add the selected vault item to cart
-                            addExistingItemToCart(item)
+                            // FIXED: Handle vault item selection
+                            handleVaultItemSelection(item)
                         },
                         onBack: {
                             withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
@@ -92,7 +79,6 @@ struct AddNewItemToCartSheet: View {
                 
                 if currentPage == .browseVault {
                     ToolbarItem(placement: .principal) {
-                        // Page dots indicator
                         HStack(spacing: 8) {
                             Circle()
                                 .fill(currentPage == .addNew ? Color.black : Color.gray.opacity(0.3))
@@ -114,18 +100,34 @@ struct AddNewItemToCartSheet: View {
                 isPresented: $showAddItemPopoverInVault,
                 createCartButtonVisible: .constant(false),
                 onSave: { itemName, category, store, unit, price in
-                    // Add to vault AND to cart
-                    let success = addNewItemToVaultAndCart(
-                        name: itemName,
-                        category: category,
-                        store: store,
-                        unit: unit,
-                        price: price
-                    )
-                    
-                    if success {
-                        showAddItemPopoverInVault = false
+                    // FIXED: Handle save from popover and dismiss
+                    if cart.isShopping {
+                        vaultService.addShoppingItemToCart(
+                            name: itemName,
+                            store: store,
+                            price: price,
+                            unit: unit,
+                            cart: cart,
+                            quantity: 1
+                        )
+                        // IMPORTANT: Call onItemAdded and dismiss
+                        onItemAdded?()
                         resetAndClose()
+                    } else {
+                        let success = addNewItemToVaultAndCart(
+                            name: itemName,
+                            category: category,
+                            store: store,
+                            unit: unit,
+                            price: price
+                        )
+                        
+                        if success {
+                            // IMPORTANT: Call onItemAdded and dismiss
+                            onItemAdded?()
+                            showAddItemPopoverInVault = false
+                            resetAndClose()
+                        }
                     }
                 }
             )
@@ -134,37 +136,72 @@ struct AddNewItemToCartSheet: View {
     
     // MARK: - Helper Methods
     
-    private func addNewItemToCart(name: String, category: GroceryCategory, store: String, unit: String, price: Double) {
-        // First, check if item already exists
-        let existingItems = vaultService.findItemsByName(name)
-        let matchingItem = existingItems.first { item in
-            item.priceOptions.contains { $0.store == store }
+    private func handleAddToCart() {
+        guard formViewModel.attemptSubmission(),
+              let category = formViewModel.selectedCategory,
+              let priceValue = Double(formViewModel.itemPrice) else {
+            return
         }
         
-        if let existingItem = matchingItem {
-            // Use existing item
-            vaultService.addItemToCart(
-                item: existingItem,
+        if cart.isShopping {
+            // Shopping mode: Add shopping-only item
+            vaultService.addShoppingItemToCart(
+                name: formViewModel.itemName,
+                store: formViewModel.storeName,
+                price: priceValue,
+                unit: formViewModel.unit,
                 cart: cart,
-                quantity: 1,
-                selectedStore: store
+                quantity: 1
             )
-            onItemAdded?()
-            resetAndClose()
+            print("🛍️ Added shopping-only item: \(formViewModel.itemName)")
         } else {
-            // Create new item and add to cart
+            // Planning mode: Add to vault first
             let success = addNewItemToVaultAndCart(
-                name: name,
+                name: formViewModel.itemName,
                 category: category,
-                store: store,
-                unit: unit,
-                price: price
+                store: formViewModel.storeName,
+                unit: formViewModel.unit,
+                price: priceValue
             )
             
             if success {
-                resetAndClose()
+                print("📋 Added vault item: \(formViewModel.itemName)")
             }
         }
+        
+        // IMPORTANT: Call the callback AND dismiss
+        onItemAdded?()
+        resetAndClose()
+    }
+    
+    private func handleVaultItemSelection(_ item: Item) {
+        guard let priceOption = item.priceOptions.first else { return }
+        
+        if cart.isShopping {
+            // Shopping mode: Use shopping item method
+            vaultService.addShoppingItemToCart(
+                name: item.name,
+                store: priceOption.store,
+                price: priceOption.pricePerUnit.priceValue,
+                unit: priceOption.pricePerUnit.unit,
+                cart: cart,
+                quantity: 1
+            )
+            print("🛍️ Selected vault item for shopping: \(item.name)")
+        } else {
+            // Planning mode: Use vault item method
+            vaultService.addVaultItemToCart(
+                item: item,
+                cart: cart,
+                quantity: 1,
+                selectedStore: priceOption.store
+            )
+            print("📋 Selected vault item for planning: \(item.name)")
+        }
+        
+        // IMPORTANT: Call the callback AND dismiss
+        onItemAdded?()
+        resetAndClose()
     }
     
     private func addNewItemToVaultAndCart(name: String, category: GroceryCategory, store: String, unit: String, price: Double) -> Bool {
@@ -183,44 +220,29 @@ struct AddNewItemToCartSheet: View {
             if let newItem = newItems.first(where: { item in
                 item.priceOptions.contains { $0.store == store }
             }) {
-                // Add to cart
-                vaultService.addItemToCart(
+                // Add to cart using vault item
+                vaultService.addVaultItemToCart(
                     item: newItem,
                     cart: cart,
                     quantity: 1,
                     selectedStore: store
                 )
-                onItemAdded?()
                 return true
             }
         }
         return false
     }
     
-    private func addExistingItemToCart(_ item: Item) {
-        // Use the first price option (or let user choose if you want)
-        guard let priceOption = item.priceOptions.first else { return }
-        
-        vaultService.addItemToCart(
-            item: item,
-            cart: cart,
-            quantity: 1,
-            selectedStore: priceOption.store
-        )
-        
-        onItemAdded?()
-        resetAndClose()
-    }
-    
     private func resetAndClose() {
         formViewModel.resetForm()
         currentPage = .addNew
-        isPresented = false
+        isPresented = false // FIXED: This dismisses the sheet
     }
 }
 
 // MARK: - Add New Item View (Page 1)
 struct AddNewItemView: View {
+    let cart: Cart
     @Binding var formViewModel: ItemFormViewModel
     @FocusState.Binding var itemNameFieldIsFocused: Bool
     let onAddToCart: () -> Void
@@ -233,6 +255,23 @@ struct AddNewItemView: View {
     
     var body: some View {
         VStack(spacing: 0) {
+            // Context header
+            VStack(alignment: .leading, spacing: 8) {
+                Text(cart.isShopping ? "🛍️ Add to Shopping Trip" : "📋 Add to Plan")
+                    .lexendFont(18, weight: .bold)
+                    .foregroundColor(cart.isShopping ? .orange : .blue)
+                
+                Text(cart.isShopping ?
+                     "This item will only exist in this shopping trip." :
+                     "This item will be saved to your Vault for future use.")
+                    .lexendFont(12)
+                    .foregroundColor(.gray)
+                    .padding(.bottom, 4)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal)
+            .padding(.top)
+            
             // Main form content
             ScrollView {
                 VStack(spacing: 20) {
@@ -248,7 +287,6 @@ struct AddNewItemView: View {
                     )
                     .padding(.top)
                     
-                    // Spacer to push everything up
                     Spacer(minLength: 100)
                 }
                 .padding(.horizontal)
@@ -257,14 +295,23 @@ struct AddNewItemView: View {
             
             // Action bar at bottom
             VStack(spacing: 16) {
-                // Add to Cart button
-                FormCompletionButton.doneButton(
-                    isEnabled: formViewModel.isFormValid && duplicateError == nil,
-                    verticalPadding: 16,
-                    maxWidth: true
-                ) {
-                    onAddToCart()
+                // Add to Cart button - FIXED: Added explicit action
+                Button(action: {
+                    if formViewModel.isFormValid && duplicateError == nil {
+                        onAddToCart()
+                    }
+                }) {
+                    Text("Add to Cart")
+                        .lexendFont(16, weight: .bold)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(formViewModel.isFormValid && duplicateError == nil ? Color.black : Color.gray)
+                        )
                 }
+                .disabled(!formViewModel.isFormValid || duplicateError != nil)
                 .padding(.horizontal)
                 
                 // Browse Vault option
@@ -301,7 +348,6 @@ struct AddNewItemView: View {
             )
         }
         .onAppear {
-            // Focus the item name field when this view appears
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                 itemNameFieldIsFocused = true
             }

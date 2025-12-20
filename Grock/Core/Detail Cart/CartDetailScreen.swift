@@ -21,10 +21,6 @@ struct CartDetailScreen: View {
     @State private var animatedFulfilledPercentage: Double = 0
     @State private var itemToEdit: Item? = nil
     
-    // Changed: We need TWO different sheet states
-//    @State private var showingManageCartSheet = false  // For planning mode
-//    @State private var showingAddItemSheet = false     // For shopping mode
-    
     @State private var previousHasItems = false
     @State private var showCelebration = false
     @State private var manageCartButtonVisible = false
@@ -48,28 +44,79 @@ struct CartDetailScreen: View {
         vaultService.getCartInsights(cart: cart)
     }
     
-    private var itemsByStore: [String: [(cartItem: CartItem, item: Item?)]] {
-        let sortedCartItems = cart.cartItems.sorted { $0.itemId < $1.itemId }
-        let cartItemsWithDetails = sortedCartItems.map { cartItem in
-            (cartItem, vaultService.findItemById(cartItem.itemId))
-        }
-        let grouped = Dictionary(grouping: cartItemsWithDetails) { cartItem, item in
-            cartItem.getStore(cart: cart)
-        }
-        return grouped.filter { !$0.key.isEmpty && !$0.value.isEmpty }
-    }
+//    private var itemsByStore: [String: [(cartItem: CartItem, item: Item?)]] {
+//        let sortedCartItems = cart.cartItems.sorted { $0.itemId < $1.itemId }
+//        let cartItemsWithDetails = sortedCartItems.map { cartItem in
+//            (cartItem, vaultService.findItemById(cartItem.itemId))
+//        }
+//        let grouped = Dictionary(grouping: cartItemsWithDetails) { cartItem, item in
+//            cartItem.getStore(cart: cart)
+//        }
+//        return grouped.filter { !$0.key.isEmpty && !$0.value.isEmpty }
+//    }
+ 
     
-    private var itemsByStoreWithRefresh: [String: [(cartItem: CartItem, item: Item?)]] {
-        _ = refreshTrigger
-        let sortedCartItems = cart.cartItems.sorted { $0.addedAt > $1.addedAt }
-        let cartItemsWithDetails = sortedCartItems.map { cartItem in
-            (cartItem, vaultService.findItemById(cartItem.itemId))
+//    private var itemsByStoreWithRefresh: [String: [(cartItem: CartItem, item: Item?)]] {
+//        _ = refreshTrigger
+//        let sortedCartItems = cart.cartItems.sorted { $0.addedAt > $1.addedAt }
+//        let cartItemsWithDetails = sortedCartItems.map { cartItem in
+//            (cartItem, vaultService.findItemById(cartItem.itemId))
+//        }
+//        let grouped = Dictionary(grouping: cartItemsWithDetails) { cartItem, item in
+//            cartItem.getStore(cart: cart)
+//        }
+//        return grouped.filter { !$0.key.isEmpty && !$0.value.isEmpty }
+//    }
+    
+    private func groupCartItemsByStore(_ cartItems: [CartItem]) -> [String: [(cartItem: CartItem, item: Item?)]] {
+        let cartItemsWithDetails = cartItems.map { cartItem -> (CartItem, Item?) in
+            // Check if it's a shopping-only item first
+            if cartItem.isShoppingOnlyItem {
+                // Create a temporary Item object for shopping-only items
+                let tempItem = Item(
+                    id: cartItem.itemId,
+                    name: cartItem.shoppingOnlyName ?? "Unknown Item",
+                    priceOptions: cartItem.shoppingOnlyPrice.map { price in
+                        [PriceOption(
+                            store: cartItem.shoppingOnlyStore ?? "Unknown Store",
+                            pricePerUnit: PricePerUnit(
+                                priceValue: price,
+                                unit: cartItem.shoppingOnlyUnit ?? ""
+                            )
+                        )]
+                    } ?? [],
+                    isTemporaryShoppingItem: true,
+                    shoppingPrice: cartItem.shoppingOnlyPrice,
+                    shoppingUnit: cartItem.shoppingOnlyUnit
+                )
+                return (cartItem, tempItem)
+            } else {
+                // Regular vault item
+                return (cartItem, vaultService.findItemById(cartItem.itemId))
+            }
         }
-        let grouped = Dictionary(grouping: cartItemsWithDetails) { cartItem, item in
-            cartItem.getStore(cart: cart)
+        
+        let grouped = Dictionary(grouping: cartItemsWithDetails) { element -> String in
+            let (cartItem, _) = element
+            return cartItem.getStore(cart: cart)
         }
+        
         return grouped.filter { !$0.key.isEmpty && !$0.value.isEmpty }
     }
+
+    private var itemsByStore: [String: [(cartItem: CartItem, item: Item?)]] {
+        groupCartItemsByStore(cart.cartItems.sorted { $0.itemId < $1.itemId })
+    }
+
+//    private var itemsByStoreWithRefresh: [String: [(cartItem: CartItem, item: Item?)]] {
+//        _ = refreshTrigger
+//        return groupCartItemsByStore(cart.cartItems.sorted { $0.addedAt > $1.addedAt })
+//    }
+    private var itemsByStoreWithRefresh: [String: [(cartItem: CartItem, item: Item?)]] {
+        return groupCartItemsByStore(cart.cartItems.sorted { $0.addedAt > $1.addedAt })
+    }
+
+
     
     private var sortedStores: [String] {
         Array(itemsByStore.keys).sorted()
@@ -441,19 +488,7 @@ extension UnifiedItemPopover {
     }
 }
 
-// MARK: - Supporting Views (need to be defined or imported)
 
-// Note: The following supporting views need to be available:
-// - ItemDescriptionText (from your ShoppingEditItemPopover)
-// - PriceField (from your ShoppingEditItemPopover)
-// - PortionField (from your ShoppingEditItemPopover)
-// - ErrorMessageDisplay (from your ShoppingEditItemPopover)
-// - FormCompletionButton (already defined elsewhere)
-// - FuzzyBubblesFont, LexendFont modifiers (should be available)
-
-// MARK: - The rest of the file remains the same...
-
-// Add the simplified extension and helper struct
 extension View {
     func completedSheet(
         cart: Cart,
@@ -966,18 +1001,33 @@ struct ItemsListView: View {
         
         switch cart.status {
         case .planning:
-            // Planning mode: Show ALL items
-            return allItems
+            // Planning mode: Show ONLY vault items (non-shopping-only)
+            let planningItems = allItems.filter { cartItem, _ in
+                !cartItem.isShoppingOnlyItem
+            }
+            print("📋 Planning mode: Showing \(planningItems.count) vault items (filtered out shopping-only)")
+            return planningItems
             
         case .shopping:
-            // Shopping mode: Only show unfulfilled, non-skipped items
-            return allItems.filter {
-                !$0.cartItem.isFulfilled &&
-                !$0.cartItem.isSkippedDuringShopping
+            // Shopping mode: Show items that should be visible during shopping
+            let shoppingItems = allItems.filter { cartItem, _ in
+                if cartItem.isShoppingOnlyItem {
+                    // Always show shopping-only items in shopping mode
+                    return true
+                } else {
+                    // For vault items: show unfulfilled, non-skipped
+                    return !cartItem.isFulfilled && !cartItem.isSkippedDuringShopping
+                }
             }
+            print("🛍️ Shopping mode: Showing \(shoppingItems.count) items")
+            print("   Breakdown:")
+            print("   - Shopping-only: \(shoppingItems.filter { $0.cartItem.isShoppingOnlyItem }.count)")
+            print("   - Vault items: \(shoppingItems.filter { !$0.cartItem.isShoppingOnlyItem }.count)")
+            return shoppingItems
             
         case .completed:
-            // Completed mode: Show all items (for reference)
+            // Completed mode: Show all items
+            print("✅ Completed mode: Showing all \(allItems.count) items")
             return allItems
         }
     }
@@ -1086,40 +1136,53 @@ struct ItemsListView: View {
 
 extension View {
     func cartSheets(
-        cart: Cart,
-        showingCartSheet: Binding<Bool>,
-        showingFilterSheet: Binding<Bool>,
-        selectedFilter: Binding<FilterOption>,
-        vaultService: VaultService,
-        cartViewModel: CartViewModel,
-        refreshTrigger: Binding<UUID>
-    ) -> some View {
-        self
-            .sheet(isPresented: showingCartSheet) {
-                if cart.isPlanning {
-                    ManageCartSheet(cart: cart)
-                        .environment(vaultService)
-                        .environment(cartViewModel)
-                        .onDisappear {
-                            vaultService.updateCartTotals(cart: cart)
-                            refreshTrigger.wrappedValue = UUID()
-                        }
-                } else {
-                    AddNewItemToCartSheet(
-                        isPresented: showingCartSheet,  // Pass the same binding
-                        cart: cart,
-                        onItemAdded: {
-                            vaultService.updateCartTotals(cart: cart)
-                            refreshTrigger.wrappedValue = UUID()
-                        }
-                    )
-                    .environment(vaultService)
-                    .environment(cartViewModel)
-                }
-            }
-            .sheet(isPresented: showingFilterSheet) {
-                FilterSheet(selectedFilter: selectedFilter)
-            }
+          cart: Cart,
+          showingCartSheet: Binding<Bool>,
+          showingFilterSheet: Binding<Bool>,
+          selectedFilter: Binding<FilterOption>,
+          vaultService: VaultService,
+          cartViewModel: CartViewModel,
+          refreshTrigger: Binding<UUID>
+      ) -> some View {
+          self
+              .sheet(isPresented: showingCartSheet) {
+                  if cart.isPlanning {
+                      ManageCartSheet(cart: cart)
+                          .environment(vaultService)
+                          .environment(cartViewModel)
+                          .onDisappear {
+                              vaultService.updateCartTotals(cart: cart)
+                              refreshTrigger.wrappedValue = UUID()
+                          }
+                  } else {
+                      AddNewItemToCartSheet(
+                          isPresented: showingCartSheet,
+                          cart: cart,
+                          onItemAdded: {
+                              print("🎯 onItemAdded callback triggered")
+                              
+                              // Force multiple updates
+                              vaultService.updateCartTotals(cart: cart)
+                              
+                              // Update refresh trigger multiple times to ensure update
+                              refreshTrigger.wrappedValue = UUID()
+                              DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                  refreshTrigger.wrappedValue = UUID()
+                              }
+                          }
+                      )
+                      .environment(vaultService)
+                      .environment(cartViewModel)
+                      .onDisappear {
+                          print("🔄 Sheet dismissed, forcing refresh")
+                          vaultService.updateCartTotals(cart: cart)
+                          refreshTrigger.wrappedValue = UUID()
+                      }
+                  }
+              }
+              .sheet(isPresented: showingFilterSheet) {
+                  FilterSheet(selectedFilter: selectedFilter)
+              }
     }
 
     

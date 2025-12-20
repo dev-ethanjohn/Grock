@@ -365,8 +365,24 @@ extension VaultService {
         
         print("🔄 Returning cart '\(cart.name)' to planning mode")
         
-        cart.status = .planning
+        cleanupShoppingOnlyItems(cart: cart)
         
+        // First, count shopping-only items for debugging
+        let shoppingOnlyCountBefore = cart.cartItems.filter { $0.isShoppingOnlyItem }.count
+        print("   Shopping-only items before reset: \(shoppingOnlyCountBefore)")
+        
+        // Create a new array with ONLY non-shopping-only items (vault items)
+        let vaultItemsOnly = cart.cartItems.filter { !$0.isShoppingOnlyItem }
+        
+        // Remove ALL items from cart
+        cart.cartItems.removeAll()
+        
+        // Add back ONLY the vault items
+        cart.cartItems.append(contentsOf: vaultItemsOnly)
+        
+        print("   Kept \(cart.cartItems.count) vault items, removed \(shoppingOnlyCountBefore) shopping-only items")
+        
+        // Now reset all vault items to planning state
         for cartItem in cart.cartItems {
             // IMPORTANT: Reset ALL shopping-specific flags
             cartItem.isFulfilled = false
@@ -387,10 +403,15 @@ extension VaultService {
             }
         }
         
+        // Update cart status
+        cart.status = .planning
+        cart.startedAt = nil // Clear shopping start time
+        cart.updatedAt = Date()
+        
         updateCartTotals(cart: cart)
         saveContext()
         
-        print("✅ Cart '\(cart.name)' reset to planning mode - all items restored")
+        print("✅ Cart '\(cart.name)' reset to planning mode - only vault items retained")
     }
     
     /// Deletes an item from the vault
@@ -412,10 +433,34 @@ extension VaultService {
         return vault.categories.flatMap { $0.items }
     }
    
-    /// Finds an item by its ID
+    /// Finds an item by its ID (now handles shopping-only items too)
     func findItemById(_ itemId: String) -> Item? {
         guard let vault = vault else { return nil }
-       
+        
+        // First check if it's a shopping-only CartItem in any cart
+        for cart in vault.carts {
+            if let cartItem = cart.cartItems.first(where: { $0.itemId == itemId && $0.isShoppingOnlyItem }) {
+                // Create a temporary Item for shopping-only items
+                return Item(
+                    id: itemId,
+                    name: cartItem.shoppingOnlyName ?? "Unknown",
+                    priceOptions: cartItem.shoppingOnlyPrice.map { price in
+                        [PriceOption(
+                            store: cartItem.shoppingOnlyStore ?? "Unknown Store",
+                            pricePerUnit: PricePerUnit(
+                                priceValue: price,
+                                unit: cartItem.shoppingOnlyUnit ?? ""
+                            )
+                        )]
+                    } ?? [],
+                    isTemporaryShoppingItem: true,
+                    shoppingPrice: cartItem.shoppingOnlyPrice,
+                    shoppingUnit: cartItem.shoppingOnlyUnit
+                )
+            }
+        }
+        
+        // Otherwise, search in vault
         for category in vault.categories {
             if let item = category.items.first(where: { $0.id == itemId }) {
                 return item
@@ -536,7 +581,7 @@ extension VaultService {
        
         for (itemId, quantity) in activeItems {
             if let item = findItemById(itemId) {
-                addItemToCart(item: item, cart: newCart, quantity: quantity)
+                addVaultItemToCart(item: item, cart: newCart, quantity: quantity)
             }
         }
        
@@ -560,6 +605,8 @@ extension VaultService {
     /// Starts shopping session for a cart
     func startShopping(cart: Cart) {
            guard cart.status == .planning else { return }
+        
+        cleanupShoppingOnlyItems(cart: cart)
           
            for cartItem in cart.cartItems {
                cartItem.capturePlannedData(from: vault!)
@@ -593,8 +640,15 @@ extension VaultService {
          print("🎉 Shopping completed! Vault prices updated.")
      }
      
+  
      
     private func updateVaultWithActualData(cartItem: CartItem) {
+        // Skip shopping-only items (they shouldn't be saved to vault)
+        if cartItem.isShoppingOnlyItem {
+            print("🛍️ Skipping vault update for shopping-only item: \(cartItem.shoppingOnlyName ?? "Unknown")")
+            return
+        }
+        
         guard let item = findItemById(cartItem.itemId) else {
             print("❌ Item not found for cartItem: \(cartItem.itemId)")
             return
@@ -678,7 +732,9 @@ extension VaultService {
 
 // MARK: - Cart Item Operations
 extension VaultService {
-    func addItemToCart(item: Item, cart: Cart, quantity: Double, selectedStore: String? = nil) {
+    
+    // MARK: - Vault-Based Operations (Planning Mode)
+    func addVaultItemToCart(item: Item, cart: Cart, quantity: Double, selectedStore: String? = nil) {
         let store = selectedStore ?? item.priceOptions.first?.store ?? "Unknown Store"
         
         let cartItem = CartItem(
@@ -687,7 +743,7 @@ extension VaultService {
             plannedStore: store
         )
         
-        // ✅ IMMEDIATELY set planned price during planning mode
+        // Set planned price during planning mode
         if cart.status == .planning {
             if let vault = vault {
                 cartItem.plannedPrice = cartItem.getCurrentPrice(from: vault, store: store)
@@ -702,36 +758,41 @@ extension VaultService {
         cart.cartItems.append(cartItem)
         updateCartTotals(cart: cart)
         saveContext()
-        print("➕ Added item to cart: \(item.name) ×\(quantity)")
+        print("📋 Added Vault item to cart: \(item.name) ×\(quantity)")
+    }
+    
+    // MARK: - Shopping-Only Operations (No Vault)
+    func addShoppingItemToCart(
+        name: String,
+        store: String,
+        price: Double,
+        unit: String,
+        cart: Cart,
+        quantity: Double = 1
+    ) {
+        print("🛍️ Adding shopping-only item: \(name)")
+        
+        // Create a shopping-only CartItem (not linked to vault)
+        let cartItem = CartItem.createShoppingOnlyItem(
+            name: name,
+            store: store,
+            price: price,
+            unit: unit,
+            quantity: quantity
+        )
+        
+        cart.cartItems.append(cartItem)
+        updateCartTotals(cart: cart)
+        
+        // IMPORTANT: Save changes immediately
+        saveContext()
+        
+        print("✅ Added Shopping-only item to cart: \(name) ×\(quantity)")
+        print("   Cart now has \(cart.cartItems.count) items")
+        print("   Shopping-only items: \(cart.cartItems.filter { $0.isShoppingOnlyItem }.count)")
     }
    
     /// Removes an item from a shopping cart
-//    func removeItemFromCart(cart: Cart, itemId: String) {
-//        guard let cartItem = cart.cartItems.first(where: { $0.itemId == itemId }) else {
-//            print("⚠️ Item not found in cart")
-//            return
-//        }
-//        
-//        let itemName = findItemById(itemId)?.name ?? "Unknown Item"
-//        
-//        if cart.status == .shopping {
-//            // Shopping mode: Mark as SKIPPED
-//            cartItem.isSkippedDuringShopping = true
-//            cartItem.isFulfilled = false // ⚠️ IMPORTANT: NOT fulfilled!
-//            
-//            print("⏸️ Skipped \(itemName) during shopping - moved to skipped section")
-//        } else {
-//            // Planning mode: Actually remove the item
-//            if let index = cart.cartItems.firstIndex(where: { $0.itemId == itemId }) {
-//                cart.cartItems.remove(at: index)
-//                print("🗑️ Removed \(itemName) from cart: \(cart.name)")
-//            }
-//        }
-//        
-//        updateCartTotals(cart: cart)
-//        saveContext()
-//    }
-    // In VaultService.swift - update the existing function
     func removeItemFromCart(cart: Cart, itemId: String) {
         guard let cartItem = cart.cartItems.first(where: { $0.itemId == itemId }) else {
             print("⚠️ Item not found in cart")
@@ -1008,5 +1069,34 @@ extension VaultService {
         }
        
         return (true, nil)
+    }
+}
+
+// MARK: - Cart Cleanup Operations
+extension VaultService {
+    
+    /// Cleans up shopping-only items from a cart
+    func cleanupShoppingOnlyItems(cart: Cart) {
+        let shoppingOnlyItems = cart.cartItems.filter { $0.isShoppingOnlyItem }
+        
+        if !shoppingOnlyItems.isEmpty {
+            print("🧹 Cleaning up \(shoppingOnlyItems.count) shopping-only items")
+            
+            // Remove shopping-only items
+            cart.cartItems.removeAll { $0.isShoppingOnlyItem }
+            
+            updateCartTotals(cart: cart)
+            saveContext()
+            
+            print("✅ Removed shopping-only items")
+        }
+    }
+    
+    /// Optional: Clean up completed carts
+    func cleanupCompletedCart(cart: Cart) {
+        guard cart.status == .completed else { return }
+        
+        // You could add other cleanup logic here
+        print("🧹 Cleaning up completed cart: \(cart.name)")
     }
 }

@@ -25,9 +25,8 @@ class Vault: Equatable {
         self.uid = uid
     }
     
-    //
     static func == (lhs: Vault, rhs: Vault) -> Bool {
-           lhs.uid == rhs.uid
+        lhs.uid == rhs.uid
     }
 }
 
@@ -63,15 +62,31 @@ class Item: Identifiable {
     @Attribute(.unique) var id: String
     var name: String
     var priceOptions: [PriceOption] = []
-    var createdAt: Date  // ✅ ADD THIS
+    var createdAt: Date
     
-    init(id: String = UUID().uuidString, name: String) {
+    // MARK: - New properties for shopping context
+    var isTemporaryShoppingItem: Bool = false
+    var shoppingPrice: Double?
+    var shoppingUnit: String?
+    
+    init(
+        id: String = UUID().uuidString,
+        name: String,
+        priceOptions: [PriceOption] = [],
+        createdAt: Date = Date(),
+        isTemporaryShoppingItem: Bool = false,
+        shoppingPrice: Double? = nil,
+        shoppingUnit: String? = nil
+    ) {
         self.id = id
         self.name = name
-        self.createdAt = Date()  // ✅ ADD THIS
+        self.priceOptions = priceOptions
+        self.createdAt = createdAt
+        self.isTemporaryShoppingItem = isTemporaryShoppingItem
+        self.shoppingPrice = shoppingPrice
+        self.shoppingUnit = shoppingUnit
     }
 }
-
 
 @Model
 class PriceOption {
@@ -101,7 +116,6 @@ enum CartStatus: Int, Codable {
     case completed = 2
 }
 
-
 @Model
 class Cart {
     @Attribute(.unique) var id: String
@@ -109,8 +123,8 @@ class Cart {
     var budget: Double
     var fulfillmentStatus: Double
     var createdAt: Date
-    var updatedAt: Date  // ✅ ADD THIS
-    var startedAt: Date? // ✅ ADD THIS - when shopping started
+    var updatedAt: Date
+    var startedAt: Date?
     var completedAt: Date?
     var status: CartStatus
     
@@ -123,7 +137,7 @@ class Cart {
         budget: Double,
         fulfillmentStatus: Double = 0.0,
         createdAt: Date = Date(),
-        startedAt: Date? = nil,  // ✅ ADD THIS
+        startedAt: Date? = nil,
         completedAt: Date? = nil,
         status: CartStatus = .planning
     ) {
@@ -132,8 +146,8 @@ class Cart {
         self.budget = budget
         self.fulfillmentStatus = fulfillmentStatus
         self.createdAt = createdAt
-        self.updatedAt = createdAt  // ✅ INITIALIZE updatedAt
-        self.startedAt = startedAt  // ✅ INITIALIZE startedAt
+        self.updatedAt = createdAt
+        self.startedAt = startedAt
         self.completedAt = completedAt
         self.status = status
     }
@@ -151,7 +165,6 @@ class Cart {
         cartItems.count
     }
     
-    // Fixed totalSpent calculation based on cart status
     var totalSpent: Double {
         cartItems.reduce(0) { total, cartItem in
             let price: Double
@@ -167,7 +180,6 @@ class Cart {
                     price = cartItem.actualPrice ?? cartItem.plannedPrice ?? 0
                     quantity = cartItem.actualQuantity ?? cartItem.quantity
                 } else if cartItem.wasEditedDuringShopping {
-                    // Use edited shopping data for unfulfilled items
                     price = cartItem.actualPrice ?? cartItem.plannedPrice ?? 0
                     quantity = cartItem.actualQuantity ?? cartItem.quantity
                 } else {
@@ -192,22 +204,24 @@ class CartItem {
     var quantity: Double
     var isFulfilled: Bool
     
-    // Track if item was skipped during shopping
     var isSkippedDuringShopping: Bool = false
-    
-    // PLANNED data (frozen when shopping starts)
     var plannedStore: String
     var plannedPrice: Double?
     var plannedUnit: String?
     
-    // ACTUAL data (editable during shopping)
     var actualStore: String?
     var actualPrice: Double?
     var actualQuantity: Double?
     var actualUnit: String?
     
-    // Add a property to track if item was edited during shopping
     var wasEditedDuringShopping: Bool = false
+    
+    // MARK: - Shopping-only item properties
+    var isShoppingOnlyItem: Bool = false
+    var shoppingOnlyName: String?
+    var shoppingOnlyStore: String?
+    var shoppingOnlyPrice: Double?
+    var shoppingOnlyUnit: String?
     
     init(
         itemId: String,
@@ -220,7 +234,12 @@ class CartItem {
         actualStore: String? = nil,
         actualPrice: Double? = nil,
         actualQuantity: Double? = nil,
-        actualUnit: String? = nil
+        actualUnit: String? = nil,
+        isShoppingOnlyItem: Bool = false,
+        shoppingOnlyName: String? = nil,
+        shoppingOnlyStore: String? = nil,
+        shoppingOnlyPrice: Double? = nil,
+        shoppingOnlyUnit: String? = nil
     ) {
         self.itemId = itemId
         self.quantity = quantity
@@ -233,89 +252,42 @@ class CartItem {
         self.actualPrice = actualPrice
         self.actualQuantity = actualQuantity
         self.actualUnit = actualUnit
-        // addedAt is automatically Date() by the @Attribute default
-    }
-
-    func getPrice(from vault: Vault, cart: Cart) -> Double {
-        switch cart.status {
-        case .planning:
-            return plannedPrice ?? getCurrentPrice(from: vault, store: plannedStore) ?? 0.0
-        case .shopping:
-            // CRITICAL: Use actualPrice if set (even if unfulfilled)
-            if let actualPrice = actualPrice {
-                return actualPrice
-            }
-            return actualPrice ?? plannedPrice ?? getCurrentPrice(from: vault, store: actualStore ?? plannedStore) ?? 0.0
-        case .completed:
-            return actualPrice ?? plannedPrice ?? 0.0
-        }
-    }
-
-    
-    func getQuantity(cart: Cart) -> Double {
-        switch cart.status {
-        case .planning:
-            return quantity
-        case .shopping, .completed:
-            // CRITICAL: Use actualQuantity if set (even if unfulfilled)
-            return actualQuantity ?? quantity
-        }
+        self.isShoppingOnlyItem = isShoppingOnlyItem
+        self.shoppingOnlyName = shoppingOnlyName
+        self.shoppingOnlyStore = shoppingOnlyStore
+        self.shoppingOnlyPrice = shoppingOnlyPrice
+        self.shoppingOnlyUnit = shoppingOnlyUnit
     }
     
-    func getUnit(from vault: Vault, cart: Cart) -> String {
-        switch cart.status {
-        case .planning:
-            return plannedUnit ?? getCurrentUnit(from: vault, store: plannedStore) ?? ""
-        case .shopping:
-            // CRITICAL: Use actualUnit if set (even if unfulfilled)
-            if let actualUnit = actualUnit {
-                return actualUnit
-            }
-            return actualUnit ?? plannedUnit ?? getCurrentUnit(from: vault, store: actualStore ?? plannedStore) ?? ""
-        case .completed:
-            return actualUnit ?? plannedUnit ?? ""
-        }
-    }
-
-    func getStore(cart: Cart) -> String {
-        switch cart.status {
-        case .planning:
-            return plannedStore
-        case .shopping, .completed:
-            return actualStore ?? plannedStore
-        }
-    }
-    
-    func getTotalPrice(from vault: Vault, cart: Cart) -> Double {
-        return getPrice(from: vault, cart: cart) * getQuantity(cart: cart)
-    }
-    
-    func capturePlannedData(from vault: Vault) {
-        if plannedPrice == nil {
-            plannedPrice = getCurrentPrice(from: vault, store: plannedStore)
-        }
-        if plannedUnit == nil {
-            plannedUnit = getCurrentUnit(from: vault, store: plannedStore)
-        }
+    static func createShoppingOnlyItem(
+        name: String,
+        store: String,
+        price: Double,
+        unit: String,
+        quantity: Double = 1
+    ) -> CartItem {
+        print("🔧 Creating shopping-only item: \(name)")
+        
+        return CartItem(
+            itemId: UUID().uuidString,
+            quantity: quantity,
+            plannedStore: store,
+            isFulfilled: false, // CHANGE TO FALSE - so it appears in shopping list
+            // Shopping-only flags
+            actualStore: store,
+            actualPrice: price,
+            actualQuantity: quantity,
+            actualUnit: unit,
+            isShoppingOnlyItem: true,
+            shoppingOnlyName: name,
+            shoppingOnlyStore: store,
+            shoppingOnlyPrice: price,
+            shoppingOnlyUnit: unit
+        )
     }
     
-    func captureActualData() {
-        // If user didn't set actual data during shopping, use planned as actual
-        if actualStore == nil {
-            actualStore = plannedStore
-        }
-        if actualPrice == nil {
-            actualPrice = plannedPrice
-        }
-        if actualQuantity == nil {
-            actualQuantity = quantity
-        }
-        if actualUnit == nil {
-            actualUnit = plannedUnit
-        }
-    }
+    // MARK: - Helper Methods
     
-    // Helper methods
     func getCurrentPrice(from vault: Vault, store: String) -> Double? {
         guard let item = getItem(from: vault),
               let priceOption = item.priceOptions.first(where: { $0.store == store })
@@ -331,6 +303,25 @@ class CartItem {
     }
     
     func getItem(from vault: Vault) -> Item? {
+        if isShoppingOnlyItem, let name = shoppingOnlyName {
+            return Item(
+                id: itemId,
+                name: name,
+                priceOptions: shoppingOnlyPrice.map { price in
+                    [PriceOption(
+                        store: shoppingOnlyStore ?? "Unknown Store",
+                        pricePerUnit: PricePerUnit(
+                            priceValue: price,
+                            unit: shoppingOnlyUnit ?? ""
+                        )
+                    )]
+                } ?? [],
+                isTemporaryShoppingItem: true,
+                shoppingPrice: shoppingOnlyPrice,
+                shoppingUnit: shoppingOnlyUnit
+            )
+        }
+        
         for category in vault.categories {
             if let item = category.items.first(where: { $0.id == itemId }) {
                 return item
@@ -339,7 +330,92 @@ class CartItem {
         return nil
     }
     
-    // MARK: - Shopping Mode Updates
+    func capturePlannedData(from vault: Vault) {
+        if plannedPrice == nil {
+            plannedPrice = getCurrentPrice(from: vault, store: plannedStore)
+        }
+        if plannedUnit == nil {
+            plannedUnit = getCurrentUnit(from: vault, store: plannedStore)
+        }
+    }
+    
+    func captureActualData() {
+        if actualStore == nil {
+            actualStore = plannedStore
+        }
+        if actualPrice == nil {
+            actualPrice = plannedPrice
+        }
+        if actualQuantity == nil {
+            actualQuantity = quantity
+        }
+        if actualUnit == nil {
+            actualUnit = plannedUnit
+        }
+    }
+    
+    func getPrice(from vault: Vault, cart: Cart) -> Double {
+        if isShoppingOnlyItem {
+            return shoppingOnlyPrice ?? 0.0
+        }
+        
+        switch cart.status {
+        case .planning:
+            return plannedPrice ?? getCurrentPrice(from: vault, store: plannedStore) ?? 0.0
+        case .shopping:
+            if let actualPrice = actualPrice {
+                return actualPrice
+            }
+            return actualPrice ?? plannedPrice ?? getCurrentPrice(from: vault, store: actualStore ?? plannedStore) ?? 0.0
+        case .completed:
+            return actualPrice ?? plannedPrice ?? 0.0
+        }
+    }
+    
+    func getStore(cart: Cart) -> String {
+        if isShoppingOnlyItem {
+            return shoppingOnlyStore ?? "Unknown Store"
+        }
+        
+        switch cart.status {
+        case .planning:
+            return plannedStore
+        case .shopping, .completed:
+            return actualStore ?? plannedStore
+        }
+    }
+    
+    func getUnit(from vault: Vault, cart: Cart) -> String {
+        if isShoppingOnlyItem {
+            return shoppingOnlyUnit ?? ""
+        }
+        
+        switch cart.status {
+        case .planning:
+            return plannedUnit ?? getCurrentUnit(from: vault, store: plannedStore) ?? ""
+        case .shopping:
+            if let actualUnit = actualUnit {
+                return actualUnit
+            }
+            return actualUnit ?? plannedUnit ?? getCurrentUnit(from: vault, store: actualStore ?? plannedStore) ?? ""
+        case .completed:
+            return actualUnit ?? plannedUnit ?? ""
+        }
+    }
+    
+    func getQuantity(cart: Cart) -> Double {
+        switch cart.status {
+        case .planning:
+            return quantity
+        case .shopping, .completed:
+            return actualQuantity ?? quantity
+        }
+    }
+    
+    func getTotalPrice(from vault: Vault, cart: Cart) -> Double {
+        return getPrice(from: vault, cart: cart) * getQuantity(cart: cart)
+    }
+    
     func updateActualData(price: Double? = nil, quantity: Double? = nil, unit: String? = nil, store: String? = nil) {
         if let price = price { actualPrice = price }
         if let quantity = quantity { actualQuantity = quantity }
@@ -347,7 +423,6 @@ class CartItem {
         if let store = store { actualStore = store }
     }
     
-    // Add validation method
     func canEditInMode(cartStatus: CartStatus) -> (canEdit: Bool, message: String) {
         switch cartStatus {
         case .planning:
@@ -363,50 +438,43 @@ class CartItem {
         }
     }
     
-    // Add a method for shopping mode edits
-     func updateShoppingData(
-         price: Double? = nil,
-         quantity: Double? = nil,
-         unit: String? = nil,
-         store: String? = nil,
-         isFulfilled: Bool = false
-     ) {
-         if isFulfilled {
-             // Update actual data for fulfilled items
-             if let price = price { actualPrice = price }
-             if let quantity = quantity { actualQuantity = quantity }
-             if let unit = unit { actualUnit = unit }
-             if let store = store { actualStore = store }
-         } else {
-             // For unfulfilled items: store edits in actual fields
-             // but don't mark as fulfilled yet
-             if let price = price { actualPrice = price }
-             if let quantity = quantity { actualQuantity = quantity }
-             if let unit = unit { actualUnit = unit }
-             if let store = store { actualStore = store }
-             wasEditedDuringShopping = true
-         }
-     }
+    func updateShoppingData(
+        price: Double? = nil,
+        quantity: Double? = nil,
+        unit: String? = nil,
+        store: String? = nil,
+        isFulfilled: Bool = false
+    ) {
+        if isFulfilled {
+            if let price = price { actualPrice = price }
+            if let quantity = quantity { actualQuantity = quantity }
+            if let unit = unit { actualUnit = unit }
+            if let store = store { actualStore = store }
+        } else {
+            if let price = price { actualPrice = price }
+            if let quantity = quantity { actualQuantity = quantity }
+            if let unit = unit { actualUnit = unit }
+            if let store = store { actualStore = store }
+            wasEditedDuringShopping = true
+        }
+    }
     
-    // Helper to get display data during shopping
-     func getShoppingDisplayPrice(cart: Cart) -> Double {
-         switch cart.status {
-         case .planning:
-             return plannedPrice ?? 0
-         case .shopping:
-             // For shopping: show edited actual price if set, otherwise planned
-             if isFulfilled {
-                 return actualPrice ?? plannedPrice ?? 0
-             } else if wasEditedDuringShopping {
-                 // Show edited price even if not fulfilled
-                 return actualPrice ?? plannedPrice ?? 0
-             } else {
-                 return plannedPrice ?? 0
-             }
-         case .completed:
-             return actualPrice ?? plannedPrice ?? 0
-         }
-     }
+    func getShoppingDisplayPrice(cart: Cart) -> Double {
+        switch cart.status {
+        case .planning:
+            return plannedPrice ?? 0
+        case .shopping:
+            if isFulfilled {
+                return actualPrice ?? plannedPrice ?? 0
+            } else if wasEditedDuringShopping {
+                return actualPrice ?? plannedPrice ?? 0
+            } else {
+                return plannedPrice ?? 0
+            }
+        case .completed:
+            return actualPrice ?? plannedPrice ?? 0
+        }
+    }
 }
 
 // MARK: - Supporting Types for Insights
