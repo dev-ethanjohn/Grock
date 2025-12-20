@@ -7,59 +7,42 @@ struct CartDetailScreen: View {
     @Environment(CartViewModel.self) private var cartViewModel
     @Environment(\.dismiss) private var dismiss
     
-    // modes
+    // All @State properties (from the simpler version)
     @State private var showingDeleteAlert = false
     @State private var editingItem: CartItem?
     @State private var showingCompleteAlert = false
-    
     @State private var showingStartShoppingAlert = false
     @State private var showingSwitchToPlanningAlert = false
-    
     @State private var anticipationOffset: CGFloat = 0
-    
-    // filter
     @State private var selectedFilter: FilterOption = .all
     @State private var showingFilterSheet = false
-    
     @State private var headerHeight: CGFloat = 0
-    
     @State private var animatedFulfilledAmount: Double = 0
     @State private var animatedFulfilledPercentage: Double = 0
-    
     @State private var itemToEdit: Item? = nil
     
-    @State private var showingVaultView = false
+    // Changed: We need TWO different sheet states
+    @State private var showingManageCartSheet = false  // For planning mode
+    @State private var showingAddItemSheet = false     // For shopping mode
     
     @State private var previousHasItems = false
-    
-    // Celebration state
     @State private var showCelebration = false
-    
     @State private var manageCartButtonVisible = false
     @State private var buttonScale: CGFloat = 1.0
     @State private var shouldBounceAfterCelebration = false
-    
-    // Loading state
     @State private var cartReady = false
-    
-    // Refresh trigger for synchronization
     @State private var refreshTrigger = UUID()
-    
     @State private var showFinishTripButton = false
     @Namespace private var buttonNamespace
-    
     @State private var bottomSheetDetent: PresentationDetent = .fraction(0.08)
     @State private var showingCompletedSheet = false
-    
     @State private var showingShoppingPopover = false
     @State private var selectedCartItemForPopover: CartItem?
     @State private var selectedItemForPopover: Item?
-    
     @State private var showingFulfillPopover = false
-    
-    // ADD THIS: State for editing cart name
     @State private var showingEditCartName = false
     
+    // Computed properties
     private var cartInsights: CartInsights {
         vaultService.getCartInsights(cart: cart)
     }
@@ -77,18 +60,13 @@ struct CartDetailScreen: View {
     
     private var itemsByStoreWithRefresh: [String: [(cartItem: CartItem, item: Item?)]] {
         _ = refreshTrigger
-        
-        // Sort by addedAt (newest first, at TOP)
         let sortedCartItems = cart.cartItems.sorted { $0.addedAt > $1.addedAt }
-        
         let cartItemsWithDetails = sortedCartItems.map { cartItem in
             (cartItem, vaultService.findItemById(cartItem.itemId))
         }
-        
         let grouped = Dictionary(grouping: cartItemsWithDetails) { cartItem, item in
             cartItem.getStore(cart: cart)
         }
-        
         return grouped.filter { !$0.key.isEmpty && !$0.value.isEmpty }
     }
     
@@ -124,55 +102,72 @@ struct CartDetailScreen: View {
         cart.cartItems.filter { $0.isFulfilled }.count
     }
     
+    @ViewBuilder
+      private var mainContent: some View {
+          // Create a computed property with all the bindings
+          let content = createCartDetailContent()
+          content
+      }
+      
+      private func createCartDetailContent() -> CartDetailContent {
+          // Determine which sheet to show based on cart status
+          let vaultViewBinding = cart.isPlanning ? $showingManageCartSheet : $showingAddItemSheet
+          
+          return CartDetailContent(
+              cart: cart,
+              cartInsights: cartInsights,
+              itemsByStore: itemsByStore,
+              itemsByStoreWithRefresh: itemsByStoreWithRefresh,
+              sortedStores: sortedStores,
+              sortedStoresWithRefresh: sortedStoresWithRefresh,
+              totalItemCount: totalItemCount,
+              hasItems: hasItems,
+              shouldAnimateTransition: shouldAnimateTransition,
+              storeItems: storeItems(for:),
+              storeItemsWithRefresh: storeItemsWithRefresh(for:),
+              showingDeleteAlert: $showingDeleteAlert,
+              editingItem: $editingItem,
+              showingCompleteAlert: $showingCompleteAlert,
+              showingStartShoppingAlert: $showingStartShoppingAlert,
+              showingSwitchToPlanningAlert: $showingSwitchToPlanningAlert,
+              anticipationOffset: $anticipationOffset,
+              selectedFilter: $selectedFilter,
+              showingFilterSheet: $showingFilterSheet,
+              headerHeight: $headerHeight,
+              animatedFulfilledAmount: $animatedFulfilledAmount,
+              animatedFulfilledPercentage: $animatedFulfilledPercentage,
+              itemToEdit: $itemToEdit,
+              showingVaultView: vaultViewBinding,
+              previousHasItems: $previousHasItems,
+              showCelebration: $showCelebration,
+              manageCartButtonVisible: $manageCartButtonVisible,
+              buttonScale: $buttonScale,
+              shouldBounceAfterCelebration: $shouldBounceAfterCelebration,
+              showingFulfillPopover: $showingFulfillPopover,
+              cartReady: $cartReady,
+              refreshTrigger: $refreshTrigger,
+              showFinishTripButton: $showFinishTripButton,
+              buttonNamespace: buttonNamespace,
+              bottomSheetDetent: $bottomSheetDetent,
+              showingCompletedSheet: $showingCompletedSheet,
+              showingShoppingPopover: $showingShoppingPopover,
+              selectedItemForPopover: $selectedItemForPopover,
+              selectedCartItemForPopover: $selectedCartItemForPopover,
+              showingEditCartName: $showingEditCartName,
+              showingAddItemSheet: $showingAddItemSheet,
+              showingManageCartSheet: $showingManageCartSheet
+          )
+      }
+      
+    
     var body: some View {
-        let basicParams = CartDetailContent(
-            cart: cart,
-            cartInsights: cartInsights,
-            itemsByStore: itemsByStore,
-            itemsByStoreWithRefresh: itemsByStoreWithRefresh,
-            sortedStores: sortedStores,
-            sortedStoresWithRefresh: sortedStoresWithRefresh,
-            totalItemCount: totalItemCount,
-            hasItems: hasItems,
-            shouldAnimateTransition: shouldAnimateTransition,
-            storeItems: storeItems(for:),
-            storeItemsWithRefresh: storeItemsWithRefresh(for:),
-            showingDeleteAlert: $showingDeleteAlert,
-            editingItem: $editingItem,
-            showingCompleteAlert: $showingCompleteAlert,
-            showingStartShoppingAlert: $showingStartShoppingAlert,
-            showingSwitchToPlanningAlert: $showingSwitchToPlanningAlert,
-            anticipationOffset: $anticipationOffset,  // MOVE THIS BEFORE showingEditCartName
-            selectedFilter: $selectedFilter,
-            showingFilterSheet: $showingFilterSheet,
-            headerHeight: $headerHeight,
-            animatedFulfilledAmount: $animatedFulfilledAmount,
-            animatedFulfilledPercentage: $animatedFulfilledPercentage,
-            itemToEdit: $itemToEdit,
-            showingVaultView: $showingVaultView,
-            previousHasItems: $previousHasItems,
-            showCelebration: $showCelebration,
-            manageCartButtonVisible: $manageCartButtonVisible,
-            buttonScale: $buttonScale,
-            shouldBounceAfterCelebration: $shouldBounceAfterCelebration,
-            showingFulfillPopover: $showingFulfillPopover,
-            cartReady: $cartReady,
-            refreshTrigger: $refreshTrigger,  // MOVE THIS BEFORE showingEditCartName
-            showFinishTripButton: $showFinishTripButton,
-            buttonNamespace: buttonNamespace,
-            bottomSheetDetent: $bottomSheetDetent,
-            showingCompletedSheet: $showingCompletedSheet,
-            showingShoppingPopover: $showingShoppingPopover,
-            selectedItemForPopover: $selectedItemForPopover,
-            selectedCartItemForPopover: $selectedCartItemForPopover,
-            showingEditCartName: $showingEditCartName  // MOVE THIS TO THE END
-        )
-        
         ZStack {
-            basicParams
+            mainContent
             
-            // For edit popover:
-            if showingShoppingPopover, let item = selectedItemForPopover, let cartItem = selectedCartItemForPopover {
+            // Popovers (unchanged)
+            if showingShoppingPopover,
+               let item = selectedItemForPopover,
+               let cartItem = selectedCartItemForPopover {
                 UnifiedItemPopover.edit(
                     isPresented: $showingShoppingPopover,
                     item: item,
@@ -191,8 +186,9 @@ struct CartDetailScreen: View {
                 .zIndex(100)
             }
             
-            // For fulfill popover:
-            if showingFulfillPopover, let item = selectedItemForPopover, let cartItem = selectedCartItemForPopover {
+            if showingFulfillPopover,
+               let item = selectedItemForPopover,
+               let cartItem = selectedCartItemForPopover {
                 UnifiedItemPopover.fulfill(
                     isPresented: $showingFulfillPopover,
                     item: item,
@@ -202,7 +198,6 @@ struct CartDetailScreen: View {
                         vaultService.updateCartTotals(cart: cart)
                         refreshTrigger = UUID()
                         
-                        // Check if we should show the completed sheet
                         if currentFulfilledCount > 0 && !showingCompletedSheet {
                             showingCompletedSheet = true
                         }
@@ -216,7 +211,6 @@ struct CartDetailScreen: View {
                 .zIndex(101)
             }
             
-            // ADD THIS: Edit Cart Name Popover
             if showingEditCartName {
                 RenameCartNamePopover(
                     isPresented: $showingEditCartName,
@@ -233,131 +227,45 @@ struct CartDetailScreen: View {
                 .zIndex(102)
             }
         }
-        .sheet(item: $itemToEdit) { item in
-                 EditItemSheet(
-                     item: item,
-                     cart: cart,
-                     cartItem: cart.cartItems.first { $0.itemId == item.id },
-                     onSave: { updatedItem in
-                         print("💾 EditItemSheet saved")
-                         vaultService.updateCartTotals(cart: cart)
-                         refreshTrigger = UUID()
-                     },
-                     context: .cart
-                 )
-                 .presentationDetents([.medium, .large])
-                 .presentationCornerRadius(24)
-                 .environment(vaultService)
-             }
-        .sheet(isPresented: $showingVaultView) {
-                 ManageCartSheet(cart: cart)
-                     .environment(vaultService)
-                     .environment(cartViewModel)
-                     .presentationDetents([.large])
-                     .presentationDragIndicator(.visible)
-                     .presentationCornerRadius(24)
-                     .onDisappear {
-                         refreshTrigger = UUID()
-                     }
-             }
-        
-        .onAppear {
-            previousHasItems = hasItems
-            checkAndShowCelebration()
-            
-            if cart.isShopping && hasItems {
-                showFinishTripButton = true
-            }
-        }
-        .onChange(of: cart.status) { oldValue, newValue in
-            print("🛒 Cart status changed: \(oldValue) -> \(newValue)")
-            
-            // Only update if the status actually changed
-            if oldValue != newValue {
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-                    if newValue == .shopping && hasItems {
-                        showFinishTripButton = true
-                    } else if newValue == .planning {
-                        showFinishTripButton = false
-                    }
-                }
-            }
-            
-            // Show/hide bottom sheet based on shopping mode
-            if newValue == .shopping && hasItems {
-                let currentFulfilledCount = cart.cartItems.filter { $0.isFulfilled }.count
-                if currentFulfilledCount > 0 {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                        showingCompletedSheet = true
-                    }
-                }
-            } else if newValue == .planning {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                    showingCompletedSheet = false
-                }
-            }
-        }
-        .onChange(of: hasItems) { oldValue, newValue in
-            print("📦 Items changed: \(oldValue) -> \(newValue)")
-            
-            // Only update if items actually changed
-            if oldValue != newValue {
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-                    if cart.isShopping && newValue {
-                        showFinishTripButton = true
-                    } else if !newValue {
-                        showFinishTripButton = false
-                    }
-                }
-            }
-        }
-        .navigationBarBackButtonHidden(true)
-        
-        // Alerts only - no sheets remain
-        .alert("Start Shopping", isPresented: $showingStartShoppingAlert) {
-            Button("Cancel", role: .cancel) { }
-            Button("Start Shopping") {
-                vaultService.startShopping(cart: cart)
-                refreshTrigger = UUID()
-            }
-        } message: {
-            Text("This will freeze your planned prices. You'll be able to update actual prices during shopping.")
-        }
-        .alert("Switch to Planning", isPresented: $showingSwitchToPlanningAlert) {
-            Button("Cancel", role: .cancel) { }
-            Button("Switch to Planning") {
-                vaultService.returnToPlanning(cart: cart)
-                refreshTrigger = UUID()
-            }
-        } message: {
-            Text("Switching back to Planning will reset this trip to your original plan.")
-        }
-        .alert("Complete Shopping", isPresented: $showingCompleteAlert) {
-            Button("Cancel", role: .cancel) { }
-            Button("Complete") {
-                vaultService.completeShopping(cart: cart)
-                refreshTrigger = UUID()
-                // Hide bottom sheet when completing
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                    showingCompletedSheet = false
-                }
-            }
-        } message: {
-            Text("This will preserve your shopping data for review.")
-        }
-        .alert("Delete Cart", isPresented: $showingDeleteAlert) {
-            Button("Cancel", role: .cancel) { }
-            Button("Delete", role: .destructive) {
-                vaultService.deleteCart(cart)
-                dismiss()
-            }
-        } message: {
-            Text("Are you sure you want to delete this cart? This action cannot be undone.")
-        }
-        .sheet(isPresented: $showingFilterSheet) {
-            FilterSheet(selectedFilter: $selectedFilter)
-        }
+        .editItemSheet(
+                  itemToEdit: $itemToEdit,
+                  cart: cart,
+                  vaultService: vaultService,
+                  refreshTrigger: $refreshTrigger
+              )
+              .cartSheets(
+                  cart: cart,
+                  showingManageCartSheet: $showingManageCartSheet,
+                  showingAddItemSheet: $showingAddItemSheet,
+                  showingFilterSheet: $showingFilterSheet,
+                  selectedFilter: $selectedFilter,
+                  vaultService: vaultService,
+                  cartViewModel: cartViewModel,
+                  refreshTrigger: $refreshTrigger
+              )
+              .cartAlerts(
+                  showingStartShoppingAlert: $showingStartShoppingAlert,
+                  showingSwitchToPlanningAlert: $showingSwitchToPlanningAlert,
+                  showingCompleteAlert: $showingCompleteAlert,
+                  showingDeleteAlert: $showingDeleteAlert,
+                  vaultService: vaultService,
+                  cart: cart,
+                  dismiss: dismiss,
+                  refreshTrigger: $refreshTrigger,
+                  showingCompletedSheet: $showingCompletedSheet
+              )
+              .cartLifecycle(
+                  cart: cart,
+                  hasItems: hasItems,
+                  showFinishTripButton: $showFinishTripButton,
+                  previousHasItems: $previousHasItems,
+                  cartStatusChanged: handleCartStatusChange,
+                  itemsChanged: handleItemsChange,
+                  checkAndShowCelebration: checkAndShowCelebration
+              )
     }
+    
+    // MARK: - Helper Methods
     
     private func checkAndShowCelebration() {
         let hasSeenCelebration = UserDefaults.standard.bool(forKey: "hasSeenFirstShoppingCartCelebration")
@@ -370,7 +278,6 @@ struct CartDetailScreen: View {
         
         guard !hasSeenCelebration else {
             print("⏭️ Skipping first cart celebration - already seen")
-            // Ensure button is visible even if celebration was already seen
             manageCartButtonVisible = true
             return
         }
@@ -383,8 +290,6 @@ struct CartDetailScreen: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 showCelebration = true
                 
-                // Schedule to show manage cart button after celebration
-                // CelebrationView typically lasts 2-3 seconds
                 DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
                     withAnimation {
                         manageCartButtonVisible = true
@@ -397,6 +302,47 @@ struct CartDetailScreen: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 withAnimation {
                     manageCartButtonVisible = true
+                }
+            }
+        }
+    }
+    
+    private func handleCartStatusChange(oldValue: CartStatus, newValue: CartStatus) {
+        print("🛒 Cart status changed: \(oldValue) -> \(newValue)")
+        
+        if oldValue != newValue {
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                if newValue == .shopping && hasItems {
+                    showFinishTripButton = true
+                } else if newValue == .planning {
+                    showFinishTripButton = false
+                }
+            }
+        }
+        
+        if newValue == .shopping && hasItems {
+            let currentFulfilledCount = cart.cartItems.filter { $0.isFulfilled }.count
+            if currentFulfilledCount > 0 {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    showingCompletedSheet = true
+                }
+            }
+        } else if newValue == .planning {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                showingCompletedSheet = false
+            }
+        }
+    }
+    
+    private func handleItemsChange(oldValue: Bool, newValue: Bool) {
+        print("📦 Items changed: \(oldValue) -> \(newValue)")
+        
+        if oldValue != newValue {
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                if cart.isShopping && newValue {
+                    showFinishTripButton = true
+                } else if !newValue {
+                    showFinishTripButton = false
                 }
             }
         }
@@ -660,6 +606,9 @@ struct CartDetailContent: View {
     // ADD THIS: Binding for Edit Cart Name popover
     @Binding var showingEditCartName: Bool
     
+    @Binding var showingAddItemSheet: Bool
+    @Binding var showingManageCartSheet: Bool
+    
     var body: some View {
         GeometryReader { geometry in
             ZStack {
@@ -733,30 +682,30 @@ struct CartDetailContent: View {
                     
                     // Floating Action Bar (position it above everything)
                     if cartReady && !showCelebration && manageCartButtonVisible {
-                        VStack {
-                            Spacer()
-                            
-                            CartDetailActionBar(
-                                showFinishTrip: showFinishTripButton,
-                                onManageCart: {
-                                    print("Test button tapped")
-                                    showingVaultView = true
-                                },
-                                onFinishTrip: {
-                                    print("Finish trip tapped")
-                                    showingCompleteAlert = true
-                                },
-                                namespace: buttonNamespace
-                            )
-                            .padding(.horizontal, 16)
-                            
-//                            Spacer()
-//                                .frame(height: showingCompletedSheet ? fractionHeight : 0)
-                        }
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
-                        .animation(.spring(response: 0.5, dampingFraction: 0.7), value: manageCartButtonVisible)
-                        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: showingCompletedSheet)
-                    }
+                                      VStack {
+                                          Spacer()
+                                          
+                                          CartDetailActionBar(
+                                              showFinishTrip: showFinishTripButton,
+                                              onManageCart: {
+                                                  // IMPORTANT: Show different sheets based on cart status
+                                                  if cart.isPlanning {
+                                                      showingManageCartSheet = true
+                                                  } else {
+                                                      showingAddItemSheet = true
+                                                  }
+                                              },
+                                              onFinishTrip: {
+                                                  showingCompleteAlert = true
+                                              },
+                                              namespace: buttonNamespace
+                                          )
+                                          .padding(.horizontal, 16)
+                                      }
+                                      .transition(.move(edge: .bottom).combined(with: .opacity))
+                                      .animation(.spring(response: 0.5, dampingFraction: 0.7), value: manageCartButtonVisible)
+                                      .animation(.spring(response: 0.3, dampingFraction: 0.7), value: showingCompletedSheet)
+                                  }
                 } else {
                     ProgressView()
                         .onAppear {
@@ -1135,3 +1084,148 @@ struct ItemsListView: View {
 
 
 
+
+
+extension View {
+    func cartSheets(
+        cart: Cart,
+        showingManageCartSheet: Binding<Bool>,
+        showingAddItemSheet: Binding<Bool>,
+        showingFilterSheet: Binding<Bool>,
+        selectedFilter: Binding<FilterOption>,
+        vaultService: VaultService,
+        cartViewModel: CartViewModel,
+        refreshTrigger: Binding<UUID>
+    ) -> some View {
+        self
+            .sheet(isPresented: showingManageCartSheet) {
+                       ManageCartSheet(cart: cart)  // Remove the onDismiss parameter
+                           .environment(vaultService)
+                           .environment(cartViewModel)
+                           .onDisappear {
+                               vaultService.updateCartTotals(cart: cart)
+                               refreshTrigger.wrappedValue = UUID()
+                           }
+                   }
+            .sheet(isPresented: showingAddItemSheet) {
+                AddNewItemToCartSheet(
+                    isPresented: showingAddItemSheet,
+                    cart: cart,
+                    onItemAdded: {
+                        vaultService.updateCartTotals(cart: cart)
+                        refreshTrigger.wrappedValue = UUID()
+                    }
+                )
+                .environment(vaultService)
+                .environment(cartViewModel)
+            }
+            .sheet(isPresented: showingFilterSheet) {
+                FilterSheet(selectedFilter: selectedFilter)
+            }
+    }
+    
+    func cartAlerts(
+        showingStartShoppingAlert: Binding<Bool>,
+        showingSwitchToPlanningAlert: Binding<Bool>,
+        showingCompleteAlert: Binding<Bool>,
+        showingDeleteAlert: Binding<Bool>,
+        vaultService: VaultService,
+        cart: Cart,
+        dismiss: DismissAction,
+        refreshTrigger: Binding<UUID>,
+        showingCompletedSheet: Binding<Bool>
+    ) -> some View {
+        self
+            .alert("Start Shopping", isPresented: showingStartShoppingAlert) {
+                Button("Cancel", role: .cancel) { }
+                Button("Start Shopping") {
+                    vaultService.startShopping(cart: cart)
+                    refreshTrigger.wrappedValue = UUID()
+                }
+            } message: {
+                Text("This will freeze your planned prices. You'll be able to update actual prices during shopping.")
+            }
+            .alert("Switch to Planning", isPresented: showingSwitchToPlanningAlert) {
+                Button("Cancel", role: .cancel) { }
+                Button("Switch to Planning") {
+                    vaultService.returnToPlanning(cart: cart)
+                    refreshTrigger.wrappedValue = UUID()
+                }
+            } message: {
+                Text("Switching back to Planning will reset this trip to your original plan.")
+            }
+            .alert("Complete Shopping", isPresented: showingCompleteAlert) {
+                Button("Cancel", role: .cancel) { }
+                Button("Complete") {
+                    vaultService.completeShopping(cart: cart)
+                    refreshTrigger.wrappedValue = UUID()
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        showingCompletedSheet.wrappedValue = false
+                    }
+                }
+            } message: {
+                Text("This will preserve your shopping data for review.")
+            }
+            .alert("Delete Cart", isPresented: showingDeleteAlert) {
+                Button("Cancel", role: .cancel) { }
+                Button("Delete", role: .destructive) {
+                    vaultService.deleteCart(cart)
+                    dismiss()
+                }
+            } message: {
+                Text("Are you sure you want to delete this cart? This action cannot be undone.")
+            }
+    }
+    
+    func cartLifecycle(
+        cart: Cart,
+        hasItems: Bool,
+        showFinishTripButton: Binding<Bool>,
+        previousHasItems: Binding<Bool>,
+        cartStatusChanged: @escaping (CartStatus, CartStatus) -> Void,
+        itemsChanged: @escaping (Bool, Bool) -> Void,
+        checkAndShowCelebration: @escaping () -> Void
+    ) -> some View {
+        self
+            .onAppear {
+                previousHasItems.wrappedValue = hasItems
+                checkAndShowCelebration()
+                
+                if cart.isShopping && hasItems {
+                    showFinishTripButton.wrappedValue = true
+                }
+            }
+            .onChange(of: cart.status) { oldValue, newValue in
+                cartStatusChanged(oldValue, newValue)
+            }
+            .onChange(of: hasItems) { oldValue, newValue in
+                itemsChanged(oldValue, newValue)
+            }
+            .navigationBarBackButtonHidden(true)
+    }
+    
+    func editItemSheet(
+        itemToEdit: Binding<Item?>,
+        cart: Cart,
+        vaultService: VaultService,
+        refreshTrigger: Binding<UUID>
+    ) -> some View {
+        self
+            .sheet(item: itemToEdit) { item in
+                EditItemSheet(
+                    item: item,
+                    cart: cart,
+                    cartItem: cart.cartItems.first { $0.itemId == item.id },
+                    onSave: { updatedItem in
+                        print("💾 EditItemSheet saved")
+                        vaultService.updateCartTotals(cart: cart)
+                        refreshTrigger.wrappedValue = UUID()
+                    },
+                    context: .cart
+                )
+                .presentationDetents([.medium, .large])
+                .presentationCornerRadius(24)
+                .environment(vaultService)
+            }
+    }
+}

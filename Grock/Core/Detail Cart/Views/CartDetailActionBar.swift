@@ -52,7 +52,7 @@ struct CartDetailActionBar: View {
                             .matchedGeometryEffect(id: "buttonContent", in: namespace)
                             .transition(.opacity)
                     } else {
-                        Image(systemName: "shippingbox")
+                        Image(systemName: "plus")
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundStyle(.black)
                             .matchedGeometryEffect(id: "buttonContent", in: namespace)
