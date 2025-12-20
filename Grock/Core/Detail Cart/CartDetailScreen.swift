@@ -44,30 +44,6 @@ struct CartDetailScreen: View {
         vaultService.getCartInsights(cart: cart)
     }
     
-//    private var itemsByStore: [String: [(cartItem: CartItem, item: Item?)]] {
-//        let sortedCartItems = cart.cartItems.sorted { $0.itemId < $1.itemId }
-//        let cartItemsWithDetails = sortedCartItems.map { cartItem in
-//            (cartItem, vaultService.findItemById(cartItem.itemId))
-//        }
-//        let grouped = Dictionary(grouping: cartItemsWithDetails) { cartItem, item in
-//            cartItem.getStore(cart: cart)
-//        }
-//        return grouped.filter { !$0.key.isEmpty && !$0.value.isEmpty }
-//    }
- 
-    
-//    private var itemsByStoreWithRefresh: [String: [(cartItem: CartItem, item: Item?)]] {
-//        _ = refreshTrigger
-//        let sortedCartItems = cart.cartItems.sorted { $0.addedAt > $1.addedAt }
-//        let cartItemsWithDetails = sortedCartItems.map { cartItem in
-//            (cartItem, vaultService.findItemById(cartItem.itemId))
-//        }
-//        let grouped = Dictionary(grouping: cartItemsWithDetails) { cartItem, item in
-//            cartItem.getStore(cart: cart)
-//        }
-//        return grouped.filter { !$0.key.isEmpty && !$0.value.isEmpty }
-//    }
-    
     private func groupCartItemsByStore(_ cartItems: [CartItem]) -> [String: [(cartItem: CartItem, item: Item?)]] {
         let cartItemsWithDetails = cartItems.map { cartItem -> (CartItem, Item?) in
             // Check if it's a shopping-only item first
@@ -103,27 +79,14 @@ struct CartDetailScreen: View {
         
         return grouped.filter { !$0.key.isEmpty && !$0.value.isEmpty }
     }
-
+    
     private var itemsByStore: [String: [(cartItem: CartItem, item: Item?)]] {
-        groupCartItemsByStore(cart.cartItems.sorted { $0.itemId < $1.itemId })
-    }
-
-//    private var itemsByStoreWithRefresh: [String: [(cartItem: CartItem, item: Item?)]] {
-//        _ = refreshTrigger
-//        return groupCartItemsByStore(cart.cartItems.sorted { $0.addedAt > $1.addedAt })
-//    }
-    private var itemsByStoreWithRefresh: [String: [(cartItem: CartItem, item: Item?)]] {
+        _ = refreshTrigger // This ensures refresh when needed
         return groupCartItemsByStore(cart.cartItems.sorted { $0.addedAt > $1.addedAt })
     }
-
-
     
     private var sortedStores: [String] {
         Array(itemsByStore.keys).sorted()
-    }
-    
-    private var sortedStoresWithRefresh: [String] {
-        Array(itemsByStoreWithRefresh.keys).sorted()
     }
     
     private var totalItemCount: Int {
@@ -142,34 +105,30 @@ struct CartDetailScreen: View {
         itemsByStore[store] ?? []
     }
     
-    private func storeItemsWithRefresh(for store: String) -> [(cartItem: CartItem, item: Item?)] {
-        itemsByStoreWithRefresh[store] ?? []
-    }
-    
     private var currentFulfilledCount: Int {
         cart.cartItems.filter { $0.isFulfilled }.count
     }
     
     @ViewBuilder
-      private var mainContent: some View {
-          // Create a computed property with all the bindings
-          let content = createCartDetailContent()
-          content
-      }
-      
+    private var mainContent: some View {
+        // Create a computed property with all the bindings
+        let content = createCartDetailContent()
+        content
+    }
+    
     private func createCartDetailContent() -> CartDetailContent {
         return CartDetailContent(
             cart: cart,
             cartInsights: cartInsights,
             itemsByStore: itemsByStore,
-            itemsByStoreWithRefresh: itemsByStoreWithRefresh,
+            // REMOVED: itemsByStoreWithRefresh parameter
             sortedStores: sortedStores,
-            sortedStoresWithRefresh: sortedStoresWithRefresh,
+            // REMOVED: sortedStoresWithRefresh parameter
             totalItemCount: totalItemCount,
             hasItems: hasItems,
             shouldAnimateTransition: shouldAnimateTransition,
             storeItems: storeItems(for:),
-            storeItemsWithRefresh: storeItemsWithRefresh(for:),
+            // REMOVED: storeItemsWithRefresh parameter
             showingDeleteAlert: $showingDeleteAlert,
             editingItem: $editingItem,
             showingCompleteAlert: $showingCompleteAlert,
@@ -182,7 +141,6 @@ struct CartDetailScreen: View {
             animatedFulfilledAmount: $animatedFulfilledAmount,
             animatedFulfilledPercentage: $animatedFulfilledPercentage,
             itemToEdit: $itemToEdit,
-            // CHANGED: Remove showingVaultView binding, add showingCartSheet
             showingCartSheet: $showingCartSheet,
             previousHasItems: $previousHasItems,
             showCelebration: $showCelebration,
@@ -200,10 +158,8 @@ struct CartDetailScreen: View {
             selectedItemForPopover: $selectedItemForPopover,
             selectedCartItemForPopover: $selectedCartItemForPopover,
             showingEditCartName: $showingEditCartName
-            // REMOVED: showingAddItemSheet and showingManageCartSheet
         )
     }
-      
     
     var body: some View {
         ZStack {
@@ -273,21 +229,11 @@ struct CartDetailScreen: View {
             }
         }
         .editItemSheet(
-                  itemToEdit: $itemToEdit,
-                  cart: cart,
-                  vaultService: vaultService,
-                  refreshTrigger: $refreshTrigger
-              )
-//              .cartSheets(
-//                  cart: cart,
-////                  showingManageCartSheet: $showingManageCartSheet,
-//                  showingCartSheet: $showingCartSheet,
-//                  showingFilterSheet: $showingFilterSheet,
-//                  selectedFilter: $selectedFilter,
-//                  vaultService: vaultService,
-//                  cartViewModel: cartViewModel,
-//                  refreshTrigger: $refreshTrigger
-//              )
+            itemToEdit: $itemToEdit,
+            cart: cart,
+            vaultService: vaultService,
+            refreshTrigger: $refreshTrigger
+        )
         .cartSheets(
             cart: cart,
             showingCartSheet: $showingCartSheet,  // Pass the new single binding
@@ -297,62 +243,56 @@ struct CartDetailScreen: View {
             cartViewModel: cartViewModel,
             refreshTrigger: $refreshTrigger
         )
-              .cartAlerts(
-                  showingStartShoppingAlert: $showingStartShoppingAlert,
-                  showingSwitchToPlanningAlert: $showingSwitchToPlanningAlert,
-                  showingCompleteAlert: $showingCompleteAlert,
-                  showingDeleteAlert: $showingDeleteAlert,
-                  vaultService: vaultService,
-                  cart: cart,
-                  dismiss: dismiss,
-                  refreshTrigger: $refreshTrigger,
-                  showingCompletedSheet: $showingCompletedSheet
-              )
-              .cartLifecycle(
-                  cart: cart,
-                  hasItems: hasItems,
-                  showFinishTripButton: $showFinishTripButton,
-                  previousHasItems: $previousHasItems,
-                  cartStatusChanged: handleCartStatusChange,
-                  itemsChanged: handleItemsChange,
-                  checkAndShowCelebration: checkAndShowCelebration
-              )
+        .cartAlerts(
+            showingStartShoppingAlert: $showingStartShoppingAlert,
+            showingSwitchToPlanningAlert: $showingSwitchToPlanningAlert,
+            showingCompleteAlert: $showingCompleteAlert,
+            showingDeleteAlert: $showingDeleteAlert,
+            vaultService: vaultService,
+            cart: cart,
+            dismiss: dismiss,
+            refreshTrigger: $refreshTrigger,
+            showingCompletedSheet: $showingCompletedSheet
+        )
+        .cartLifecycle(
+            cart: cart,
+            hasItems: hasItems,
+            showFinishTripButton: $showFinishTripButton,
+            previousHasItems: $previousHasItems,
+            cartStatusChanged: handleCartStatusChange,
+            itemsChanged: handleItemsChange,
+            checkAndShowCelebration: checkAndShowCelebration
+        )
     }
     
     // MARK: - Helper Methods
     
     private func checkAndShowCelebration() {
         let hasSeenCelebration = UserDefaults.standard.bool(forKey: "hasSeenFirstShoppingCartCelebration")
-        
-        print("🎉 Cart Celebration Debug:")
-        print(" - hasSeenCelebration: \(hasSeenCelebration)")
-        print(" - Total carts: \(cartViewModel.carts.count)")
-        print(" - Current cart name: \(cart.name)")
-        print(" - Current cart ID: \(cart.id)")
-        
-        guard !hasSeenCelebration else {
-            print("⏭️ Skipping first cart celebration - already seen")
-            manageCartButtonVisible = true
-            return
-        }
-        
         let isFirstCart = cartViewModel.carts.count == 1 || cartViewModel.isFirstCart(cart)
-        print(" - Is first cart: \(isFirstCart)")
         
-        if isFirstCart {
+        #if DEBUG
+        print("🎉 Cart Celebration Debug:")
+        print("   - hasSeenCelebration: \(hasSeenCelebration)")
+        print("   - Total carts: \(cartViewModel.carts.count)")
+        print("   - Current cart: \(cart.name) (ID: \(cart.id))")
+        print("   - Is first cart: \(isFirstCart)")
+        #endif
+        
+        if !hasSeenCelebration && isFirstCart {
+            #if DEBUG
             print("🎉 First cart celebration triggered!")
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                showCelebration = true
-                
-                DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-                    withAnimation {
-                        manageCartButtonVisible = true
-                    }
+            #endif
+            
+            showCelebration = true
+            UserDefaults.standard.set(true, forKey: "hasSeenFirstShoppingCartCelebration")
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                withAnimation {
+                    manageCartButtonVisible = true
                 }
             }
-            UserDefaults.standard.set(true, forKey: "hasSeenFirstShoppingCartCelebration")
         } else {
-            print("⏭️ Not the first cart - no celebration")
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 withAnimation {
                     manageCartButtonVisible = true
@@ -362,7 +302,9 @@ struct CartDetailScreen: View {
     }
     
     private func handleCartStatusChange(oldValue: CartStatus, newValue: CartStatus) {
+        #if DEBUG
         print("🛒 Cart status changed: \(oldValue) -> \(newValue)")
+        #endif
         
         if oldValue != newValue {
             withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
@@ -374,22 +316,19 @@ struct CartDetailScreen: View {
             }
         }
         
-        if newValue == .shopping && hasItems {
-            let currentFulfilledCount = cart.cartItems.filter { $0.isFulfilled }.count
-            if currentFulfilledCount > 0 {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                    showingCompletedSheet = true
-                }
-            }
-        } else if newValue == .planning {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                showingCompletedSheet = false
-            }
+        // Combine conditions to avoid duplicate animations
+        let currentFulfilledCount = cart.cartItems.filter { $0.isFulfilled }.count
+        let shouldShowCompletedSheet = newValue == .shopping && hasItems && currentFulfilledCount > 0
+        
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+            showingCompletedSheet = shouldShowCompletedSheet
         }
     }
     
     private func handleItemsChange(oldValue: Bool, newValue: Bool) {
+        #if DEBUG
         print("📦 Items changed: \(oldValue) -> \(newValue)")
+        #endif
         
         if oldValue != newValue {
             withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
@@ -570,14 +509,14 @@ struct CartDetailContent: View {
     let cart: Cart
     let cartInsights: CartInsights
     let itemsByStore: [String: [(cartItem: CartItem, item: Item?)]]
-    let itemsByStoreWithRefresh: [String: [(cartItem: CartItem, item: Item?)]]
+    // REMOVED: let itemsByStoreWithRefresh: [String: [(cartItem: CartItem, item: Item?)]]
     let sortedStores: [String]
-    let sortedStoresWithRefresh: [String]
+    // REMOVED: let sortedStoresWithRefresh: [String]
     let totalItemCount: Int
     let hasItems: Bool
     let shouldAnimateTransition: Bool
     let storeItems: (String) -> [(cartItem: CartItem, item: Item?)]
-    let storeItemsWithRefresh: (String) -> [(cartItem: CartItem, item: Item?)]
+    // REMOVED: let storeItemsWithRefresh: (String) -> [(cartItem: CartItem, item: Item?)]
     
     @Binding var showingDeleteAlert: Bool
     @Binding var editingItem: CartItem?
@@ -599,7 +538,6 @@ struct CartDetailContent: View {
     
     @Binding var itemToEdit: Item?
     
-//    @Binding var showingVaultView: Bool
     @Binding var showingCartSheet: Bool
     
     @Binding var previousHasItems: Bool
@@ -649,10 +587,6 @@ struct CartDetailContent: View {
     // ADD THIS: Binding for Edit Cart Name popover
     @Binding var showingEditCartName: Bool
     
-//    @Binding var showingAddItemSheet: Bool
-//    @Binding var showingManageCartSheet: Bool
-//    @Binding var showingCartSheet: Bool
-    
     var body: some View {
         GeometryReader { geometry in
             ZStack {
@@ -672,12 +606,13 @@ struct CartDetailContent: View {
                             ZStack {
                                 if hasItems {
                                     VStack(spacing: 24) {
-                                        
                                         ItemsListView(
                                             cart: cart,
                                             totalItemCount: totalItemCount,
-                                            sortedStoresWithRefresh: sortedStoresWithRefresh,
-                                            storeItemsWithRefresh: storeItemsWithRefresh,
+                                            // CHANGED: Use sortedStores instead of sortedStoresWithRefresh
+                                            sortedStoresWithRefresh: sortedStores,
+                                            // CHANGED: Use storeItems instead of storeItemsWithRefresh
+                                            storeItemsWithRefresh: storeItems,
                                             fulfilledCount: $fulfilledCount,
                                             onFulfillItem: { cartItem in
                                                 // Handle fulfillment - show the popover
@@ -689,7 +624,8 @@ struct CartDetailContent: View {
                                             onDeleteItem: { cartItem in
                                                 handleDeleteItem(cartItem)
                                             }
-                                        )                                        .transition(.scale)
+                                        )
+                                        .transition(.scale)
                                     }
                                     
                                 } else {
@@ -716,7 +652,7 @@ struct CartDetailContent: View {
                             headerHeight: $headerHeight,
                             dismiss: dismiss,
                             showingEditCartName: $showingEditCartName,
-                            refreshTrigger: $refreshTrigger,  // MOVE THIS TO THE END
+                            refreshTrigger: $refreshTrigger,
                             onBudgetTap: {
                                 showEditBudget = true
                             }
@@ -726,25 +662,25 @@ struct CartDetailContent: View {
                     
                     // Floating Action Bar (position it above everything)
                     if cartReady && !showCelebration && manageCartButtonVisible {
-                                      VStack {
-                                          Spacer()
-                                          
-                                          CartDetailActionBar(
-                                              showFinishTrip: showFinishTripButton,
-                                              onManageCart: {
-                                                  showingCartSheet = true
-                                              },
-                                              onFinishTrip: {
-                                                  showingCompleteAlert = true
-                                              },
-                                              namespace: buttonNamespace
-                                          )
-                                          .padding(.horizontal, 16)
-                                      }
-                                      .transition(.move(edge: .bottom).combined(with: .opacity))
-                                      .animation(.spring(response: 0.5, dampingFraction: 0.7), value: manageCartButtonVisible)
-                                      .animation(.spring(response: 0.3, dampingFraction: 0.7), value: showingCompletedSheet)
-                                  }
+                        VStack {
+                            Spacer()
+                            
+                            CartDetailActionBar(
+                                showFinishTrip: showFinishTripButton,
+                                onManageCart: {
+                                    showingCartSheet = true
+                                },
+                                onFinishTrip: {
+                                    showingCompleteAlert = true
+                                },
+                                namespace: buttonNamespace
+                            )
+                            .padding(.horizontal, 16)
+                        }
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                        .animation(.spring(response: 0.5, dampingFraction: 0.7), value: manageCartButtonVisible)
+                        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: showingCompletedSheet)
+                    }
                 } else {
                     ProgressView()
                         .onAppear {
@@ -799,7 +735,9 @@ struct CartDetailContent: View {
             if localBudget != cart.budget {
                 cart.budget = localBudget
                 vaultService.updateCartTotals(cart: cart)
+                #if DEBUG
                 print("💾 Saved budget update: \(cart.name) = \(localBudget)")
+                #endif
             }
         }
         .onChange(of: cart.budget) { oldValue, newValue in
@@ -829,7 +767,9 @@ struct CartDetailContent: View {
             }
         }
         .onChange(of: cart.status) { oldValue, newValue in
+            #if DEBUG
             print("🛒 Cart status changed: \(oldValue) -> \(newValue)")
+            #endif
             
             // Show/hide bottom sheet based on shopping mode
             if newValue == .shopping && hasItems {
@@ -858,20 +798,19 @@ struct CartDetailContent: View {
         }
     }
     
-     private func handleEditItem(cartItem: CartItem) {
-         if let found = vaultService.findItemById(cartItem.itemId) {
-             if cart.status == .shopping {
-                 // Shopping mode: Use UnifiedItemPopover
-                 selectedItemForPopover = found
-                 selectedCartItemForPopover = cartItem
-                 showingShoppingPopover = true
-             } else {
-                 // Planning mode: Use EditItemSheet
-                 itemToEdit = found
-             }
-         }
-     }
-     
+    private func handleEditItem(cartItem: CartItem) {
+        if let found = vaultService.findItemById(cartItem.itemId) {
+            if cart.status == .shopping {
+                // Shopping mode: Use UnifiedItemPopover
+                selectedItemForPopover = found
+                selectedCartItemForPopover = cartItem
+                showingShoppingPopover = true
+            } else {
+                // Planning mode: Use EditItemSheet
+                itemToEdit = found
+            }
+        }
+    }
     
     private func handleDeleteItem(_ cartItem: CartItem) {
         withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {

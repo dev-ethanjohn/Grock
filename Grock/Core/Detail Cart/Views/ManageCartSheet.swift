@@ -94,6 +94,7 @@ struct ManageCartSheet: View {
                             }
                         }
                     
+
                     AddItemPopover(
                         isPresented: $showAddItemPopover,
                         createCartButtonVisible: $createCartButtonVisible,
@@ -106,24 +107,8 @@ struct ManageCartSheet: View {
                                 unit: unit
                             )
                             
-                            if success {
-                                print("✅ Item added successfully: \(itemName)")
-                                // Force view update after adding item
-                                vaultUpdateTrigger += 1
-                                
-                                // Auto-scroll to the category where the item was added
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                                        selectedCategory = category
-                                    }
-                                }
-                            } else {
-                                print("❌ Failed to add item - duplicate name: \(itemName)")
-                                duplicateError = "An item with this name already exists at \(store)"
-                            }
                         },
                         onDismiss: {
-                            // Clear any duplicate error when popover is dismissed
                             duplicateError = nil
                         }
                     )
@@ -607,7 +592,6 @@ struct ManageCartSheet: View {
     }
 }
 
-// MARK: - Category Items List View
 struct CategoryItemsListView: View {
     let category: GroceryCategory
     @Binding var localActiveItems: [String: Double]
@@ -615,19 +599,15 @@ struct CategoryItemsListView: View {
     @Environment(VaultService.self) private var vaultService
     @State private var focusedItemId: String?
     
-    // Use computed property that reacts to vault changes
+    // Store availableStores as @State
+    @State private var currentStores: [String] = []
+    
     private var categoryItems: [Item] {
         guard let vault = vaultService.vault,
               let foundCategory = vault.categories.first(where: { $0.name == category.title })
         else { return [] }
-        return foundCategory.items.sorted { $0.createdAt > $1.createdAt } // Sort by newest first
-    }
-    
-    private var availableStores: [String] {
-        let allStores = categoryItems.flatMap { item in
-            item.priceOptions.map { $0.store }
-        }
-        return Array(Set(allStores)).sorted()
+        
+        return foundCategory.items.sorted { $0.createdAt > $1.createdAt }
     }
     
     var body: some View {
@@ -637,13 +617,35 @@ struct CategoryItemsListView: View {
             } else {
                 ManageCartItemsListView(
                     items: categoryItems,
-                    availableStores: availableStores,
+                    availableStores: currentStores,
                     category: category,
                     localActiveItems: $localActiveItems
                 )
             }
         }
         .preference(key: TextFieldFocusPreferenceKey.self, value: focusedItemId)
+        .onAppear {
+            updateStores()
+        }
+        .onChange(of: vaultService.vault) { oldValue, newValue in
+            updateStores()
+        }
+        // Also watch for when items count changes
+        .onChange(of: categoryItems.count) { oldCount, newCount in
+            updateStores()
+        }
+    }
+    
+    private func updateStores() {
+        let allStores = categoryItems.flatMap { item in
+            item.priceOptions.map { $0.store }
+        }
+        let newStores = Array(Set(allStores)).sorted()
+        
+        if newStores != currentStores {
+            print("🔄 Stores updated: \(newStores)")
+            currentStores = newStores
+        }
     }
     
     private var emptyCategoryView: some View {
@@ -656,6 +658,7 @@ struct CategoryItemsListView: View {
     }
 }
 
+
 // MARK: - Items List View for Manage Cart (with native swipe gestures)
 struct ManageCartItemsListView: View {
     let items: [Item]
@@ -664,6 +667,8 @@ struct ManageCartItemsListView: View {
     @Binding var localActiveItems: [String: Double]
     
     @State private var focusedItemId: String?
+    
+    @State private var previousStores: [String] = []
     
     var body: some View {
         List {
@@ -681,6 +686,10 @@ struct ManageCartItemsListView: View {
                     category: category,
                     localActiveItems: $localActiveItems
                 )
+                .animation(
+                                 previousStores.contains(store) ? nil : .spring(response: 0.3, dampingFraction: 0.7),
+                                 value: store
+                             )
             }
             
             // Add bottom padding
@@ -693,6 +702,13 @@ struct ManageCartItemsListView: View {
         .listStyle(PlainListStyle())
         .listSectionSpacing(16)
         .preference(key: TextFieldFocusPreferenceKey.self, value: focusedItemId)
+        .onAppear {
+                   previousStores = availableStores
+               }
+               .onChange(of: availableStores) { oldStores, newStores in
+                   // Update previous stores
+                   previousStores = oldStores
+               }
     }
     
     private func itemsForStore(_ store: String) -> [Item] {

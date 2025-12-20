@@ -1,7 +1,5 @@
 import SwiftUI
 
-import SwiftUI
-
 struct AddNewItemToCartSheet: View {
     @Binding var isPresented: Bool
     let cart: Cart
