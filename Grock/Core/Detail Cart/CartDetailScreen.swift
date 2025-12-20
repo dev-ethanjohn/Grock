@@ -22,8 +22,8 @@ struct CartDetailScreen: View {
     @State private var itemToEdit: Item? = nil
     
     // Changed: We need TWO different sheet states
-    @State private var showingManageCartSheet = false  // For planning mode
-    @State private var showingAddItemSheet = false     // For shopping mode
+//    @State private var showingManageCartSheet = false  // For planning mode
+//    @State private var showingAddItemSheet = false     // For shopping mode
     
     @State private var previousHasItems = false
     @State private var showCelebration = false
@@ -41,6 +41,7 @@ struct CartDetailScreen: View {
     @State private var selectedItemForPopover: Item?
     @State private var showingFulfillPopover = false
     @State private var showingEditCartName = false
+    @State private var showingCartSheet = false
     
     // Computed properties
     private var cartInsights: CartInsights {
@@ -109,55 +110,52 @@ struct CartDetailScreen: View {
           content
       }
       
-      private func createCartDetailContent() -> CartDetailContent {
-          // Determine which sheet to show based on cart status
-          let vaultViewBinding = cart.isPlanning ? $showingManageCartSheet : $showingAddItemSheet
-          
-          return CartDetailContent(
-              cart: cart,
-              cartInsights: cartInsights,
-              itemsByStore: itemsByStore,
-              itemsByStoreWithRefresh: itemsByStoreWithRefresh,
-              sortedStores: sortedStores,
-              sortedStoresWithRefresh: sortedStoresWithRefresh,
-              totalItemCount: totalItemCount,
-              hasItems: hasItems,
-              shouldAnimateTransition: shouldAnimateTransition,
-              storeItems: storeItems(for:),
-              storeItemsWithRefresh: storeItemsWithRefresh(for:),
-              showingDeleteAlert: $showingDeleteAlert,
-              editingItem: $editingItem,
-              showingCompleteAlert: $showingCompleteAlert,
-              showingStartShoppingAlert: $showingStartShoppingAlert,
-              showingSwitchToPlanningAlert: $showingSwitchToPlanningAlert,
-              anticipationOffset: $anticipationOffset,
-              selectedFilter: $selectedFilter,
-              showingFilterSheet: $showingFilterSheet,
-              headerHeight: $headerHeight,
-              animatedFulfilledAmount: $animatedFulfilledAmount,
-              animatedFulfilledPercentage: $animatedFulfilledPercentage,
-              itemToEdit: $itemToEdit,
-              showingVaultView: vaultViewBinding,
-              previousHasItems: $previousHasItems,
-              showCelebration: $showCelebration,
-              manageCartButtonVisible: $manageCartButtonVisible,
-              buttonScale: $buttonScale,
-              shouldBounceAfterCelebration: $shouldBounceAfterCelebration,
-              showingFulfillPopover: $showingFulfillPopover,
-              cartReady: $cartReady,
-              refreshTrigger: $refreshTrigger,
-              showFinishTripButton: $showFinishTripButton,
-              buttonNamespace: buttonNamespace,
-              bottomSheetDetent: $bottomSheetDetent,
-              showingCompletedSheet: $showingCompletedSheet,
-              showingShoppingPopover: $showingShoppingPopover,
-              selectedItemForPopover: $selectedItemForPopover,
-              selectedCartItemForPopover: $selectedCartItemForPopover,
-              showingEditCartName: $showingEditCartName,
-              showingAddItemSheet: $showingAddItemSheet,
-              showingManageCartSheet: $showingManageCartSheet
-          )
-      }
+    private func createCartDetailContent() -> CartDetailContent {
+        return CartDetailContent(
+            cart: cart,
+            cartInsights: cartInsights,
+            itemsByStore: itemsByStore,
+            itemsByStoreWithRefresh: itemsByStoreWithRefresh,
+            sortedStores: sortedStores,
+            sortedStoresWithRefresh: sortedStoresWithRefresh,
+            totalItemCount: totalItemCount,
+            hasItems: hasItems,
+            shouldAnimateTransition: shouldAnimateTransition,
+            storeItems: storeItems(for:),
+            storeItemsWithRefresh: storeItemsWithRefresh(for:),
+            showingDeleteAlert: $showingDeleteAlert,
+            editingItem: $editingItem,
+            showingCompleteAlert: $showingCompleteAlert,
+            showingStartShoppingAlert: $showingStartShoppingAlert,
+            showingSwitchToPlanningAlert: $showingSwitchToPlanningAlert,
+            anticipationOffset: $anticipationOffset,
+            selectedFilter: $selectedFilter,
+            showingFilterSheet: $showingFilterSheet,
+            headerHeight: $headerHeight,
+            animatedFulfilledAmount: $animatedFulfilledAmount,
+            animatedFulfilledPercentage: $animatedFulfilledPercentage,
+            itemToEdit: $itemToEdit,
+            // CHANGED: Remove showingVaultView binding, add showingCartSheet
+            showingCartSheet: $showingCartSheet,
+            previousHasItems: $previousHasItems,
+            showCelebration: $showCelebration,
+            manageCartButtonVisible: $manageCartButtonVisible,
+            buttonScale: $buttonScale,
+            shouldBounceAfterCelebration: $shouldBounceAfterCelebration,
+            showingFulfillPopover: $showingFulfillPopover,
+            cartReady: $cartReady,
+            refreshTrigger: $refreshTrigger,
+            showFinishTripButton: $showFinishTripButton,
+            buttonNamespace: buttonNamespace,
+            bottomSheetDetent: $bottomSheetDetent,
+            showingCompletedSheet: $showingCompletedSheet,
+            showingShoppingPopover: $showingShoppingPopover,
+            selectedItemForPopover: $selectedItemForPopover,
+            selectedCartItemForPopover: $selectedCartItemForPopover,
+            showingEditCartName: $showingEditCartName
+            // REMOVED: showingAddItemSheet and showingManageCartSheet
+        )
+    }
       
     
     var body: some View {
@@ -233,16 +231,25 @@ struct CartDetailScreen: View {
                   vaultService: vaultService,
                   refreshTrigger: $refreshTrigger
               )
-              .cartSheets(
-                  cart: cart,
-                  showingManageCartSheet: $showingManageCartSheet,
-                  showingAddItemSheet: $showingAddItemSheet,
-                  showingFilterSheet: $showingFilterSheet,
-                  selectedFilter: $selectedFilter,
-                  vaultService: vaultService,
-                  cartViewModel: cartViewModel,
-                  refreshTrigger: $refreshTrigger
-              )
+//              .cartSheets(
+//                  cart: cart,
+////                  showingManageCartSheet: $showingManageCartSheet,
+//                  showingCartSheet: $showingCartSheet,
+//                  showingFilterSheet: $showingFilterSheet,
+//                  selectedFilter: $selectedFilter,
+//                  vaultService: vaultService,
+//                  cartViewModel: cartViewModel,
+//                  refreshTrigger: $refreshTrigger
+//              )
+        .cartSheets(
+            cart: cart,
+            showingCartSheet: $showingCartSheet,  // Pass the new single binding
+            showingFilterSheet: $showingFilterSheet,
+            selectedFilter: $selectedFilter,
+            vaultService: vaultService,
+            cartViewModel: cartViewModel,
+            refreshTrigger: $refreshTrigger
+        )
               .cartAlerts(
                   showingStartShoppingAlert: $showingStartShoppingAlert,
                   showingSwitchToPlanningAlert: $showingSwitchToPlanningAlert,
@@ -557,7 +564,8 @@ struct CartDetailContent: View {
     
     @Binding var itemToEdit: Item?
     
-    @Binding var showingVaultView: Bool
+//    @Binding var showingVaultView: Bool
+    @Binding var showingCartSheet: Bool
     
     @Binding var previousHasItems: Bool
     
@@ -606,8 +614,9 @@ struct CartDetailContent: View {
     // ADD THIS: Binding for Edit Cart Name popover
     @Binding var showingEditCartName: Bool
     
-    @Binding var showingAddItemSheet: Bool
-    @Binding var showingManageCartSheet: Bool
+//    @Binding var showingAddItemSheet: Bool
+//    @Binding var showingManageCartSheet: Bool
+//    @Binding var showingCartSheet: Bool
     
     var body: some View {
         GeometryReader { geometry in
@@ -688,12 +697,7 @@ struct CartDetailContent: View {
                                           CartDetailActionBar(
                                               showFinishTrip: showFinishTripButton,
                                               onManageCart: {
-                                                  // IMPORTANT: Show different sheets based on cart status
-                                                  if cart.isPlanning {
-                                                      showingManageCartSheet = true
-                                                  } else {
-                                                      showingAddItemSheet = true
-                                                  }
+                                                  showingCartSheet = true
                                               },
                                               onFinishTrip: {
                                                   showingCompleteAlert = true
@@ -1080,17 +1084,10 @@ struct ItemsListView: View {
     }
 }
 
-
-
-
-
-
-
 extension View {
     func cartSheets(
         cart: Cart,
-        showingManageCartSheet: Binding<Bool>,
-        showingAddItemSheet: Binding<Bool>,
+        showingCartSheet: Binding<Bool>,
         showingFilterSheet: Binding<Bool>,
         selectedFilter: Binding<FilterOption>,
         vaultService: VaultService,
@@ -1098,31 +1095,33 @@ extension View {
         refreshTrigger: Binding<UUID>
     ) -> some View {
         self
-            .sheet(isPresented: showingManageCartSheet) {
-                       ManageCartSheet(cart: cart)  // Remove the onDismiss parameter
-                           .environment(vaultService)
-                           .environment(cartViewModel)
-                           .onDisappear {
-                               vaultService.updateCartTotals(cart: cart)
-                               refreshTrigger.wrappedValue = UUID()
-                           }
-                   }
-            .sheet(isPresented: showingAddItemSheet) {
-                AddNewItemToCartSheet(
-                    isPresented: showingAddItemSheet,
-                    cart: cart,
-                    onItemAdded: {
-                        vaultService.updateCartTotals(cart: cart)
-                        refreshTrigger.wrappedValue = UUID()
-                    }
-                )
-                .environment(vaultService)
-                .environment(cartViewModel)
+            .sheet(isPresented: showingCartSheet) {
+                if cart.isPlanning {
+                    ManageCartSheet(cart: cart)
+                        .environment(vaultService)
+                        .environment(cartViewModel)
+                        .onDisappear {
+                            vaultService.updateCartTotals(cart: cart)
+                            refreshTrigger.wrappedValue = UUID()
+                        }
+                } else {
+                    AddNewItemToCartSheet(
+                        isPresented: showingCartSheet,  // Pass the same binding
+                        cart: cart,
+                        onItemAdded: {
+                            vaultService.updateCartTotals(cart: cart)
+                            refreshTrigger.wrappedValue = UUID()
+                        }
+                    )
+                    .environment(vaultService)
+                    .environment(cartViewModel)
+                }
             }
             .sheet(isPresented: showingFilterSheet) {
                 FilterSheet(selectedFilter: selectedFilter)
             }
     }
+
     
     func cartAlerts(
         showingStartShoppingAlert: Binding<Bool>,
