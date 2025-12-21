@@ -290,6 +290,45 @@ struct UnifiedItemPopover: View {
     }
     
     // MARK: - Helper Methods
+//    private func saveChanges() {
+//        guard let priceValue = Double(price),
+//              let portionValue = Double(portion) else {
+//            errorMessage = "Please enter valid numbers"
+//            return
+//        }
+//        
+//        isSaving = true
+//        
+//        // Update cart item with actual data
+//        if mode == .edit {
+//            if abs(priceValue - currentPrice) > 0.01 ||
+//                abs(portionValue - currentQuantity) > 0.01 {
+//                cartItem.actualPrice = priceValue
+//                cartItem.actualQuantity = portionValue
+//                cartItem.wasEditedDuringShopping = true
+//                
+//                vaultService.updateCartTotals(cart: cart)
+//                
+//                NotificationCenter.default.post(
+//                    name: NSNotification.Name("ShoppingDataUpdated"),
+//                    object: nil,
+//                    userInfo: ["cartItemId": cartItem.itemId]
+//                )
+//            }
+//        } else {
+//            // Fulfill mode - always update and mark as fulfilled
+//            cartItem.actualPrice = priceValue
+//            cartItem.actualQuantity = portionValue
+//            cartItem.isFulfilled = true
+//            cartItem.wasEditedDuringShopping = true
+//            
+//            vaultService.updateCartTotals(cart: cart)
+//        }
+//        
+//        isSaving = false
+//        onSave?()
+//        dismissPopover()
+//    }
     private func saveChanges() {
         guard let priceValue = Double(price),
               let portionValue = Double(portion) else {
@@ -303,9 +342,21 @@ struct UnifiedItemPopover: View {
         if mode == .edit {
             if abs(priceValue - currentPrice) > 0.01 ||
                 abs(portionValue - currentQuantity) > 0.01 {
-                cartItem.actualPrice = priceValue
-                cartItem.actualQuantity = portionValue
-                cartItem.wasEditedDuringShopping = true
+                
+                // CHECK: Is this a shopping-only item?
+                if cartItem.isShoppingOnlyItem {
+                    // Update shopping-only item properties
+                    cartItem.shoppingOnlyPrice = priceValue
+                    cartItem.shoppingOnlyUnit = plannedUnit // or actual unit if changed
+                    cartItem.actualPrice = priceValue
+                    cartItem.actualQuantity = portionValue
+                    cartItem.wasEditedDuringShopping = true
+                } else {
+                    // Regular vault item
+                    cartItem.actualPrice = priceValue
+                    cartItem.actualQuantity = portionValue
+                    cartItem.wasEditedDuringShopping = true
+                }
                 
                 vaultService.updateCartTotals(cart: cart)
                 
@@ -316,13 +367,31 @@ struct UnifiedItemPopover: View {
                 )
             }
         } else {
-            // Fulfill mode - always update and mark as fulfilled
-            cartItem.actualPrice = priceValue
-            cartItem.actualQuantity = portionValue
-            cartItem.isFulfilled = true
-            cartItem.wasEditedDuringShopping = true
+            // FULFILL MODE - always update and mark as fulfilled
+            // Check if this is a shopping-only item
+            if cartItem.isShoppingOnlyItem {
+                // Update shopping-only item properties
+                cartItem.shoppingOnlyPrice = priceValue
+                cartItem.shoppingOnlyUnit = plannedUnit
+                cartItem.actualPrice = priceValue
+                cartItem.actualQuantity = portionValue
+                cartItem.isFulfilled = true
+                cartItem.wasEditedDuringShopping = true
+            } else {
+                // Regular vault item
+                cartItem.actualPrice = priceValue
+                cartItem.actualQuantity = portionValue
+                cartItem.isFulfilled = true
+                cartItem.wasEditedDuringShopping = true
+            }
             
             vaultService.updateCartTotals(cart: cart)
+            
+            NotificationCenter.default.post(
+                name: NSNotification.Name("ShoppingDataUpdated"),
+                object: nil,
+                userInfo: ["cartItemId": cartItem.itemId]
+            )
         }
         
         isSaving = false
