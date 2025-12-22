@@ -845,6 +845,8 @@ struct ItemsListView: View {
     let onEditItem: (CartItem) -> Void
     let onDeleteItem: (CartItem) -> Void
     
+    @Environment(VaultService.self) private var vaultService
+    
     // Calculate available width based on screen width minus total padding
     private var availableWidth: CGFloat {
         let screenWidth = UIScreen.main.bounds.width
@@ -1056,6 +1058,13 @@ struct ItemsListView: View {
                     .background(Color(hex: "F7F2ED").darker(by: 0.02))
                     .cornerRadius(16)
                     .animation(.spring(response: 0.4, dampingFraction: 0.8), value: calculatedHeight)
+                    
+                    if cart.isShopping {
+                        ShoppingProgressSummary(cart: cart)
+                            .environment(vaultService)
+                            .transition(.opacity.combined(with: .move(edge: .bottom)))
+                  
+                    }
                 }
             }
         }
@@ -1230,3 +1239,5 @@ extension View {
             }
     }
 }
+
+

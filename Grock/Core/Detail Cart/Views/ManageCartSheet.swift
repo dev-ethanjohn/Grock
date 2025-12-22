@@ -99,7 +99,7 @@ struct ManageCartSheet: View {
                         isPresented: $showAddItemPopover,
                         createCartButtonVisible: $createCartButtonVisible,
                         onSave: { itemName, category, store, unit, price in
-                            let success = vaultService.addItem(
+                            _ = vaultService.addItem(
                                 name: itemName,
                                 to: category,
                                 store: store,

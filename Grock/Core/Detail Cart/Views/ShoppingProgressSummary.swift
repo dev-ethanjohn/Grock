@@ -1,0 +1,157 @@
+import SwiftUI
+import Lottie
+import SwiftData
+
+struct ShoppingProgressSummary: View {
+    let cart: Cart
+    @Environment(VaultService.self) private var vaultService
+    
+    private var totalItems: Int {
+        cart.cartItems.count
+    }
+    
+    private var fulfilledItems: Int {
+        cart.cartItems.filter { $0.isFulfilled }.count
+    }
+    
+    private var skippedItems: Int {
+        cart.cartItems.filter { $0.isSkippedDuringShopping }.count
+    }
+    
+    // NEW: Calculate total value of fulfilled items only
+    private var fulfilledItemsTotal: String {
+        let fulfilledTotal = cart.cartItems
+            .filter { $0.isFulfilled }
+            .reduce(0.0) { total, cartItem in
+                if cartItem.isShoppingOnlyItem {
+                    // For shopping-only items, use the shoppingOnlyPrice
+                    return total + (cartItem.shoppingOnlyPrice ?? 0)
+                } else {
+                    // For vault items, use the actualPrice with safe unwrapping
+                    let actualPrice = cartItem.actualPrice ?? 0
+                    return total + actualPrice
+                }
+            }
+        
+        return CurrencyFormatter.shared.format(amount: fulfilledTotal)
+    }
+    
+    var body: some View {
+        HStack(alignment: .top, spacing: 0) { // Add alignment: .top
+            LottieView(animation: .named("Arrow"))
+                .playing(.fromProgress(0, toProgress: 0.5, loopMode: .playOnce))
+                .scaleEffect(x: -0.8, y: -0.8)
+                .allowsHitTesting(false)
+                .frame(height: 32)
+                .frame(width: 40)
+                .rotationEffect(.degrees(210))
+                .offset(y: -4)
+            
+            VStack(alignment: .leading, spacing: 4) {
+                CharacterRevealView(
+                    text: "\(fulfilledItems)/\(totalItems) items fulfilled, totalling \(fulfilledItemsTotal)",
+                    delay: 0.15
+                )
+                .fuzzyBubblesFont(13, weight: .bold)
+                .foregroundColor(Color(hex: "717171"))
+                
+                if skippedItems > 0 {
+                    CharacterRevealView(
+                        text: "\(skippedItems) item\(skippedItems == 1 ? "" : "s") skipped",
+                        delay: 0.25
+                    )
+                    .fuzzyBubblesFont(13, weight: .bold)
+                    .foregroundColor(Color(hex: "717171"))
+                } else {
+                    // Placeholder to maintain layout
+                    Color.clear
+                        .frame(height: 0)
+                }
+            }
+            .padding(.top, 10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            
+            Spacer()
+        }
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+
+class CurrencyFormatter {
+    static let shared = CurrencyFormatter()
+    
+    private let formatter: NumberFormatter
+    
+    private init() {
+        formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.locale = Locale.current
+    }
+    
+    func format(amount: Double, locale: Locale = .current) -> String {
+        formatter.locale = locale
+        return formatter.string(from: NSNumber(value: amount)) ?? "\(locale.currencySymbol ?? "$")\(String(format: "%.2f", amount))"
+    }
+    
+    func format(amount: Double, currencyCode: String) -> String {
+        let locale = Locale(identifier: Locale.identifier(fromComponents: [NSLocale.Key.currencyCode.rawValue: currencyCode]))
+        return format(amount: amount, locale: locale)
+    }
+}
+
+struct CharacterRevealView: View {
+    let text: String
+    let delay: Double
+    @State private var revealedCharacters: Int = 0
+    @State private var isAnimating = false
+    
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(Array(text.enumerated()), id: \.offset) { index, character in
+                Text(String(character))
+                    .opacity(index < revealedCharacters ? 1 : 0)
+                    .offset(y: index < revealedCharacters ? 0 : 4)
+                    .animation(
+                        .interpolatingSpring(
+                            stiffness: 240, // Increased stiffness for faster spring
+                            damping: 14    // Adjusted damping
+                        )
+                        .delay(Double(index) * 0.01 + delay), // Faster stagger (0.015 vs 0.03)
+                        value: revealedCharacters
+                    )
+            }
+        }
+        .onAppear {
+            // Stagger the reveal of each character with shorter delay
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                withAnimation(
+                    .easeOut(duration: 0.32) // Faster duration (0.5 vs 0.8)
+                ) {
+                    revealedCharacters = text.count
+                }
+            }
+            
+            // Add a subtle bounce effect after complete with shorter delay
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay + 0.25) { // 0.4 vs 0.8
+                withAnimation(
+                    .spring(
+                        response: 0.2, // Faster response (0.25 vs 0.4)
+                        dampingFraction: 0.8,
+                        blendDuration: 0.1
+                    )
+                ) {
+                    isAnimating = true
+                }
+            }
+        }
+        .scaleEffect(isAnimating ? 1.007 : 1.0)
+        .animation(
+            .easeInOut(duration: 0.15)
+            .repeatCount(1, autoreverses: true)
+            .delay(delay + 0.5),
+            value: isAnimating
+        )
+    }
+}
