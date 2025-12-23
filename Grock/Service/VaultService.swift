@@ -761,7 +761,7 @@ extension VaultService {
         print("📋 Added Vault item to cart: \(item.name) ×\(quantity)")
     }
     
-    // MARK: - Shopping-Only Operations (No Vault)
+    // MARK: - Shopping-Only Operations (No Vault Shopping Mode)
     func addShoppingItemToCart(
         name: String,
         store: String,
@@ -784,8 +784,13 @@ extension VaultService {
         cart.cartItems.append(cartItem)
         updateCartTotals(cart: cart)
         
-        // IMPORTANT: Save changes immediately
         saveContext()
+        
+        NotificationCenter.default.post(
+            name: NSNotification.Name("ShoppingDataUpdated"),
+            object: nil,
+            userInfo: ["cartItemId": cart.id]
+        )
         
         print("✅ Added Shopping-only item to cart: \(name) ×\(quantity)")
         print("   Cart now has \(cart.cartItems.count) items")
@@ -1099,4 +1104,5 @@ extension VaultService {
         // You could add other cleanup logic here
         print("🧹 Cleaning up completed cart: \(cart.name)")
     }
+    
 }

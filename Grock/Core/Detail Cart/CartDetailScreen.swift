@@ -263,6 +263,23 @@ struct CartDetailScreen: View {
             itemsChanged: handleItemsChange,
             checkAndShowCelebration: checkAndShowCelebration
         )
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ShoppingDataUpdated"))) { notification in
+            print("🔄 Received ShoppingDataUpdated notification")
+            
+            // Force a complete refresh of the view
+            DispatchQueue.main.async {
+                // Force SwiftUI to recalculate everything
+                refreshTrigger = UUID()
+                
+                // Also force vault service to update
+                vaultService.updateCartTotals(cart: cart)
+                
+                // Additional update after a short delay to ensure everything syncs
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    refreshTrigger = UUID()
+                }
+            }
+        }
     }
     
     // MARK: - Helper Methods
@@ -946,29 +963,22 @@ struct ItemsListView: View {
             let planningItems = allItems.filter { cartItem, _ in
                 !cartItem.isShoppingOnlyItem
             }
-            print("📋 Planning mode: Showing \(planningItems.count) vault items (filtered out shopping-only)")
             return planningItems
             
         case .shopping:
             // Shopping mode: Show items that should be visible during shopping
             let shoppingItems = allItems.filter { cartItem, _ in
                 if cartItem.isShoppingOnlyItem {
-                    // Always show shopping-only items in shopping mode
-                    return true
+                    // Shopping-only items: show unfulfilled, non-skipped
+                    return !cartItem.isFulfilled && !cartItem.isSkippedDuringShopping
                 } else {
                     // For vault items: show unfulfilled, non-skipped
                     return !cartItem.isFulfilled && !cartItem.isSkippedDuringShopping
                 }
             }
-            print("🛍️ Shopping mode: Showing \(shoppingItems.count) items")
-            print("   Breakdown:")
-            print("   - Shopping-only: \(shoppingItems.filter { $0.cartItem.isShoppingOnlyItem }.count)")
-            print("   - Vault items: \(shoppingItems.filter { !$0.cartItem.isShoppingOnlyItem }.count)")
             return shoppingItems
             
         case .completed:
-            // Completed mode: Show all items
-            print("✅ Completed mode: Showing all \(allItems.count) items")
             return allItems
         }
     }
@@ -1093,6 +1103,41 @@ extension View {
           refreshTrigger: Binding<UUID>
       ) -> some View {
           self
+//              .sheet(isPresented: showingCartSheet) {
+//                  if cart.isPlanning {
+//                      ManageCartSheet(cart: cart)
+//                          .environment(vaultService)
+//                          .environment(cartViewModel)
+//                          .onDisappear {
+//                              vaultService.updateCartTotals(cart: cart)
+//                              refreshTrigger.wrappedValue = UUID()
+//                          }
+//                  } else {
+//                      AddNewItemToCartSheet(
+//                          isPresented: showingCartSheet,
+//                          cart: cart,
+//                          onItemAdded: {
+//                              print("🎯 onItemAdded callback triggered")
+//                              
+//                              // Force multiple updates
+//                              vaultService.updateCartTotals(cart: cart)
+//                              
+//                              // Update refresh trigger multiple times to ensure update
+//                              refreshTrigger.wrappedValue = UUID()
+//                              DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+//                                  refreshTrigger.wrappedValue = UUID()
+//                              }
+//                          }
+//                      )
+//                      .environment(vaultService)
+//                      .environment(cartViewModel)
+//                      .onDisappear {
+//                          print("🔄 Sheet dismissed, forcing refresh")
+//                          vaultService.updateCartTotals(cart: cart)
+//                          refreshTrigger.wrappedValue = UUID()
+//                      }
+//                  }
+//              }
               .sheet(isPresented: showingCartSheet) {
                   if cart.isPlanning {
                       ManageCartSheet(cart: cart)
@@ -1107,22 +1152,32 @@ extension View {
                           isPresented: showingCartSheet,
                           cart: cart,
                           onItemAdded: {
-                              print("🎯 onItemAdded callback triggered")
+                              print("🎯 Shopping-only item added callback triggered")
                               
                               // Force multiple updates
                               vaultService.updateCartTotals(cart: cart)
+                              
+                              // Send notification
+                              NotificationCenter.default.post(
+                                  name: NSNotification.Name("ShoppingDataUpdated"),
+                                  object: nil,
+                                  userInfo: ["cartItemId": cart.id]
+                              )
                               
                               // Update refresh trigger multiple times to ensure update
                               refreshTrigger.wrappedValue = UUID()
                               DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                                   refreshTrigger.wrappedValue = UUID()
+                                  DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                                      refreshTrigger.wrappedValue = UUID()
+                                  }
                               }
                           }
                       )
                       .environment(vaultService)
                       .environment(cartViewModel)
                       .onDisappear {
-                          print("🔄 Sheet dismissed, forcing refresh")
+                          print("🔄 Shopping sheet dismissed, forcing refresh")
                           vaultService.updateCartTotals(cart: cart)
                           refreshTrigger.wrappedValue = UUID()
                       }
