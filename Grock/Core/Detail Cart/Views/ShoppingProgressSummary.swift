@@ -6,6 +6,8 @@ struct ShoppingProgressSummary: View {
     let cart: Cart
     @Environment(VaultService.self) private var vaultService
     
+    @State private var showCompletedItemsSheet = false
+    
     private var totalItems: Int {
         cart.cartItems.count
     }
@@ -18,16 +20,13 @@ struct ShoppingProgressSummary: View {
         cart.cartItems.filter { $0.isSkippedDuringShopping }.count
     }
     
-    // NEW: Calculate total value of fulfilled items only
     private var fulfilledItemsTotal: String {
         let fulfilledTotal = cart.cartItems
             .filter { $0.isFulfilled }
             .reduce(0.0) { total, cartItem in
                 if cartItem.isShoppingOnlyItem {
-                    // For shopping-only items, use the shoppingOnlyPrice
                     return total + (cartItem.shoppingOnlyPrice ?? 0)
                 } else {
-                    // For vault items, use the actualPrice with safe unwrapping
                     let actualPrice = cartItem.actualPrice ?? 0
                     return total + actualPrice
                 }
@@ -36,8 +35,10 @@ struct ShoppingProgressSummary: View {
         return CurrencyFormatter.shared.format(amount: fulfilledTotal)
     }
     
+    @State private var pulseOpacity = 0.0
+    
     var body: some View {
-        HStack(alignment: .top, spacing: 0) { // Add alignment: .top
+        HStack(alignment: .top, spacing: 0) {
             LottieView(animation: .named("Arrow"))
                 .playing(.fromProgress(0, toProgress: 0.5, loopMode: .playOnce))
                 .scaleEffect(x: -0.8, y: -0.8)
@@ -63,18 +64,37 @@ struct ShoppingProgressSummary: View {
                     .fuzzyBubblesFont(13, weight: .bold)
                     .foregroundColor(Color(hex: "717171"))
                 } else {
-                    // Placeholder to maintain layout
                     Color.clear
                         .frame(height: 0)
                 }
             }
             .padding(.top, 10)
             .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle()) // Makes the entire area tappable
+                      .onTapGesture {
+                          showCompletedItemsSheet = true
+                      }
             
             Spacer()
         }
         .padding(.vertical, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .sheet(isPresented: $showCompletedItemsSheet) {
+            CompletedItemsSheet(cart: cart) { cartItem in
+                // Handle unfulfilling an item
+                // You'll need to implement this callback
+                onUnfulfillItem(cartItem)
+            }
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+        }
+    }
+    
+    private func onUnfulfillItem(_ cartItem: CartItem) {
+        // Implement your logic here
+        // For example:
+        // cartItem.isFulfilled = false
+        // Save the context if needed
     }
 }
 
@@ -106,38 +126,64 @@ struct CharacterRevealView: View {
     let delay: Double
     @State private var revealedCharacters: Int = 0
     @State private var isAnimating = false
+    @State private var underlineWidth: CGFloat = 0
+    @State private var textWidth: CGFloat = 0
     
     var body: some View {
-        HStack(spacing: 0) {
-            ForEach(Array(text.enumerated()), id: \.offset) { index, character in
-                Text(String(character))
-                    .opacity(index < revealedCharacters ? 1 : 0)
-                    .offset(y: index < revealedCharacters ? 0 : 4)
-                    .animation(
-                        .interpolatingSpring(
-                            stiffness: 240, // Increased stiffness for faster spring
-                            damping: 14    // Adjusted damping
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 0) {
+                ForEach(Array(text.enumerated()), id: \.offset) { index, character in
+                    Text(String(character))
+                        .opacity(index < revealedCharacters ? 1 : 0)
+                        .offset(y: index < revealedCharacters ? 0 : 4)
+                        .animation(
+                            .interpolatingSpring(
+                                stiffness: 240,
+                                damping: 14
+                            )
+                            .delay(Double(index) * 0.01 + delay),
+                            value: revealedCharacters
                         )
-                        .delay(Double(index) * 0.01 + delay), // Faster stagger (0.015 vs 0.03)
-                        value: revealedCharacters
-                    )
+                }
             }
-        }
-        .onAppear {
-            // Stagger the reveal of each character with shorter delay
-            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-                withAnimation(
-                    .easeOut(duration: 0.32) // Faster duration (0.5 vs 0.8)
-                ) {
+            .background(
+                GeometryReader { geometry in
+                    Color.clear.onAppear {
+                        textWidth = geometry.size.width
+                    }
+                }
+            )
+            .onAppear {
+                // Ensure all characters are revealed after animation completes
+                DispatchQueue.main.asyncAfter(deadline: .now() + delay + (Double(text.count) * 0.01) + 0.5) {
                     revealedCharacters = text.count
                 }
             }
             
-            // Add a subtle bounce effect after complete with shorter delay
-            DispatchQueue.main.asyncAfter(deadline: .now() + delay + 0.25) { // 0.4 vs 0.8
+            Rectangle()
+                .fill(Color(hex: "717171"))
+                .frame(width: underlineWidth, height: 1)
+                .offset(y: -0.5)
+        }
+        .onAppear {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                withAnimation(
+                    .easeOut(duration: 0.32)
+                ) {
+                    revealedCharacters = text.count
+                }
+                
+                withAnimation(
+                    .easeOut(duration: Double(text.count) * 0.01 + 0.32)
+                ) {
+                    underlineWidth = textWidth
+                }
+            }
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay + 0.25) {
                 withAnimation(
                     .spring(
-                        response: 0.2, // Faster response (0.25 vs 0.4)
+                        response: 0.2,
                         dampingFraction: 0.8,
                         blendDuration: 0.1
                     )
