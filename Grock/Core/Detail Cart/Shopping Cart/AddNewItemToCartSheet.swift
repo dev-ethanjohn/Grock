@@ -132,45 +132,6 @@ struct AddNewItemToCartSheet: View {
         }
     }
     
-    // MARK: - Helper Methods
-    
-//    private func handleAddToCart() {
-//        guard formViewModel.attemptSubmission(),
-//              let category = formViewModel.selectedCategory,
-//              let priceValue = Double(formViewModel.itemPrice) else {
-//            return
-//        }
-//        
-//        if cart.isShopping {
-//            // Shopping mode: Add shopping-only item
-//            vaultService.addShoppingItemToCart(
-//                name: formViewModel.itemName,
-//                store: formViewModel.storeName,
-//                price: priceValue,
-//                unit: formViewModel.unit,
-//                cart: cart,
-//                quantity: 1
-//            )
-//            print("🛍️ Added shopping-only item: \(formViewModel.itemName)")
-//        } else {
-//            // Planning mode: Add to vault first
-//            let success = addNewItemToVaultAndCart(
-//                name: formViewModel.itemName,
-//                category: category,
-//                store: formViewModel.storeName,
-//                unit: formViewModel.unit,
-//                price: priceValue
-//            )
-//            
-//            if success {
-//                print("📋 Added vault item: \(formViewModel.itemName)")
-//            }
-//        }
-//        
-//        // IMPORTANT: Call the callback AND dismiss
-//        onItemAdded?()
-//        resetAndClose()
-//    }
     private func handleAddToCart() {
         guard formViewModel.attemptSubmission(),
               let category = formViewModel.selectedCategory,

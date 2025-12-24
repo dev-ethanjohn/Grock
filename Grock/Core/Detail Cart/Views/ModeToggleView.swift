@@ -46,7 +46,7 @@ struct ModeToggleView: View {
                         }
                     }) {
                         Text("Planning")
-                            .lexendFont(12, weight: cart.isPlanning ? .bold : .medium)
+                            .shantellSansFont(13)
                             .foregroundColor(cart.isPlanning ? .black : Color(hex: "999999"))
                             .frame(width: 88, height: 26)
                             .offset(x: cart.isPlanning ? anticipationOffset : 0)
@@ -66,7 +66,7 @@ struct ModeToggleView: View {
                         }
                     }) {
                         Text("Shopping")
-                            .lexendFont(12, weight: cart.isShopping ? .bold : .medium)
+                            .shantellSansFont(13)
                             .foregroundColor(cart.isShopping ? .black : Color(hex: "999999"))
                             .frame(width: 88, height: 26)
                             .offset(x: cart.isShopping ? anticipationOffset : 0)

@@ -1,20 +1,12 @@
-//  CartDetailViewModel.swift
-//  Grock
-//
-//  Created by Ethan John Paguntalan on 12/20/25.
-//
-
 import Foundation
 import SwiftUI
 
 @MainActor
 class CartDetailViewModel: ObservableObject {
-    // MARK: - Dependencies
     private let vaultService: VaultService
     private let cartViewModel: CartViewModel
     let cart: Cart
     
-    // MARK: - Published State
     @Published var showingDeleteAlert = false
     @Published var editingItem: CartItem?
     @Published var showingCompleteAlert = false

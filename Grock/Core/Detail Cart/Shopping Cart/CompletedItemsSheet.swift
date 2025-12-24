@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import Lottie
 
 struct CompletedItemsSheet: View {
     let cart: Cart
@@ -87,37 +88,30 @@ private struct CompletedHeader: View {
     var body: some View {
         VStack(spacing: 0) {
             Spacer()
-                .frame(height: 24)
+                .frame(height: 16)
             
             VStack(spacing: 8) {
                 HStack(spacing: 8) {
-                    Text("\(fulfilledCount)/\(totalFulfillableItems)")
-                        .fuzzyBubblesFont(16, weight: .bold)
-                        .contentTransition(.numericText())
-                        .foregroundStyle(.primary)
-                    
-                    Text("items fulfilled")
-                        .lexendFont(16)
-                        .foregroundStyle(.black.opacity(0.6))
+                    if fulfilledCount > 0 {
+                        Text("Fulfilled total so far:")
+                            .fuzzyBubblesFont(16, weight: .bold)
+                            .foregroundStyle(.black.opacity(0.6))
+                        
+                        + Text(" \(totalAmount.formattedCurrency)")
+                            .fuzzyBubblesFont(18, weight: .bold)
+                            .foregroundStyle(.black.opacity(0.6))
+                    } else if skippedCount > 0 {
+                        Text("\(skippedCount) skipped item\(skippedCount == 1 ? "" : "s")")
+                            .lexendFont(16)
+                            .foregroundStyle(.orange.opacity(0.8))
+                    } else {
+                        
+                        
+                        Text("No fulfilled items yet")
+                            .lexendFont(16)
+                            .foregroundStyle(.black.opacity(0.6))
+                    }
                 }
-                
-                if skippedCount > 0 {
-                    Text("+ \(skippedCount) skipped for this trip")
-                        .lexendFont(14)
-                        .foregroundStyle(.orange)
-                }
-                
-                HStack(spacing: 8) {
-                    Text("Total spent:")
-                        .lexendFont(16)
-                        .foregroundStyle(.black.opacity(0.6))
-                    
-                    Text(totalAmount.formattedCurrency)
-                        .fuzzyBubblesFont(16, weight: .bold)
-                        .foregroundStyle(.primary)
-                        .contentTransition(.numericText())
-                }
-                .padding(.top, 4)
             }
         }
     }
@@ -213,19 +207,19 @@ private struct CompletedItemsList: View {
 private struct EmptyStateView: View {
     var body: some View {
         VStack(spacing: 12) {
-            Image(systemName: "checkmark.circle")
-                .font(.system(size: 40))
-                .foregroundColor(Color(hex: "999"))
-            
-            Text("No completed items yet")
-                .lexendFont(14)
-                .foregroundColor(Color(hex: "666"))
+            LottieView(animation: .named("Empty"))
+                .playing(.fromProgress(0, toProgress: 0.5, loopMode: .loop))
+                .allowsHitTesting(false)
+                .frame(height: 140)
+                .frame(width: 140)
+                .rotationEffect(.degrees(0))
             
             Text("Start by fulfilling items or continue your shopping")
-                .lexendFont(12)
-                .foregroundColor(Color(hex: "999"))
+                .fuzzyBubblesFont(14)
+                .foregroundColor(Color(hex: "777"))
                 .multilineTextAlignment(.center)
-                .padding(.horizontal)
+                .padding(.horizontal, 40)
+                .offset(y: -40)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 40)

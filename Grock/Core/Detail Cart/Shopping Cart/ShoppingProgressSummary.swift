@@ -58,7 +58,7 @@ struct ShoppingProgressSummary: View {
                 
                 if skippedItems > 0 {
                     CharacterRevealView(
-                        text: "\(skippedItems) item\(skippedItems == 1 ? "" : "s") skipped",
+                        text: "\(skippedItems) item\(skippedItems == 1 ? "" : "s") skipped ",
                         delay: 0.25
                     )
                     .fuzzyBubblesFont(13, weight: .bold)
@@ -70,7 +70,7 @@ struct ShoppingProgressSummary: View {
             }
             .padding(.top, 10)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(Rectangle()) // Makes the entire area tappable
+            .contentShape(Rectangle()) 
                       .onTapGesture {
                           showCompletedItemsSheet = true
                       }
@@ -87,6 +87,7 @@ struct ShoppingProgressSummary: View {
             }
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
+            .presentationCornerRadius(24)
         }
     }
     

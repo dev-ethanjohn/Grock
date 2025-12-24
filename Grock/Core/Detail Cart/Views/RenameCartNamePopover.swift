@@ -1,4 +1,5 @@
 import SwiftUI
+import Lottie
 
 struct RenameCartNamePopover: View {
     @Binding var isPresented: Bool

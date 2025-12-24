@@ -1,28 +1,13 @@
-//
-//  EmptyCartView.swift
-//  Grock
-//
-//  Created by Ethan John Paguntalan on 12/9/25.
-//
-
 import SwiftUI
 import Lottie
 
 struct EmptyCartView: View {
     var body: some View {
-        VStack(spacing: 16) {
-            VStack(spacing: 6) {
+        VStack(spacing: 8) {
                 Text("Add items to your cart")
-                    .lexendFont(20, weight: .medium)
+                    .fuzzyBubblesFont(20, weight: .bold)
                     .foregroundColor(.black.opacity(0.6))
                     .multilineTextAlignment(.center)
-                
-                Text("via 'Manage Cart' below")
-                    .lexendFont(16, weight: .regular)
-                    .foregroundColor(.gray.opacity(0.8))
-                    .multilineTextAlignment(.center)
-                    .padding(.bottom, 40)
-            }
             
             LottieView(animation: .named("Arrow"))
                 .playbackMode(.playing(.fromProgress(0, toProgress: 1, loopMode: .loop)))

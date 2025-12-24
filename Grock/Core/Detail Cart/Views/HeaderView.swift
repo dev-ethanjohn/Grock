@@ -9,8 +9,8 @@ struct HeaderView: View {
        @Binding var showingStartShoppingAlert: Bool
        @Binding var headerHeight: CGFloat
        let dismiss: DismissAction
-       @Binding var showingEditCartName: Bool  // These two parameters
-       @Binding var refreshTrigger: UUID      // are in this order
+       @Binding var showingEditCartName: Bool 
+       @Binding var refreshTrigger: UUID
        var onBudgetTap: (() -> Void)?
     
     private var progress: Double {

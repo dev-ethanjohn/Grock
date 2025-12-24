@@ -1034,11 +1034,9 @@ struct ItemsListView: View {
                     )
                     .transition(.opacity.combined(with: .scale))
                 } else if !hasDisplayItems && cart.isPlanning {
-                    // FIXED: Only show empty state when in planning mode AND truly no items
-                    // Return to the original EmptyCartView
                     EmptyCartView()
                         .transition(.scale)
-                        .offset(y: 80)
+                        .offset(y: UIScreen.main.bounds.height * 0.4)
                 } else {
                     List {
                         ForEach(Array(sortedStoresWithRefresh.enumerated()), id: \.offset) { (index, store) in
@@ -1071,6 +1069,7 @@ struct ItemsListView: View {
                     
                     if cart.isShopping {
                         ShoppingProgressSummary(cart: cart)
+                            .presentationCornerRadius(24)
                             .environment(vaultService)
                             .transition(.opacity.combined(with: .move(edge: .bottom)))
                   
@@ -1103,41 +1102,6 @@ extension View {
           refreshTrigger: Binding<UUID>
       ) -> some View {
           self
-//              .sheet(isPresented: showingCartSheet) {
-//                  if cart.isPlanning {
-//                      ManageCartSheet(cart: cart)
-//                          .environment(vaultService)
-//                          .environment(cartViewModel)
-//                          .onDisappear {
-//                              vaultService.updateCartTotals(cart: cart)
-//                              refreshTrigger.wrappedValue = UUID()
-//                          }
-//                  } else {
-//                      AddNewItemToCartSheet(
-//                          isPresented: showingCartSheet,
-//                          cart: cart,
-//                          onItemAdded: {
-//                              print("🎯 onItemAdded callback triggered")
-//                              
-//                              // Force multiple updates
-//                              vaultService.updateCartTotals(cart: cart)
-//                              
-//                              // Update refresh trigger multiple times to ensure update
-//                              refreshTrigger.wrappedValue = UUID()
-//                              DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-//                                  refreshTrigger.wrappedValue = UUID()
-//                              }
-//                          }
-//                      )
-//                      .environment(vaultService)
-//                      .environment(cartViewModel)
-//                      .onDisappear {
-//                          print("🔄 Sheet dismissed, forcing refresh")
-//                          vaultService.updateCartTotals(cart: cart)
-//                          refreshTrigger.wrappedValue = UUID()
-//                      }
-//                  }
-//              }
               .sheet(isPresented: showingCartSheet) {
                   if cart.isPlanning {
                       ManageCartSheet(cart: cart)
