@@ -22,51 +22,43 @@ struct AddNewItemToCartSheet: View {
     
     var body: some View {
         NavigationStack {
-            Group {
-                if currentPage == .addNew {
-                    AddNewItemView(
-                        cart: cart,
-                        formViewModel: $formViewModel,
-                        itemNameFieldIsFocused: $itemNameFieldIsFocused,
-                        onAddToCart: {
-                            // FIXED: Handle add to cart and dismiss
-                            handleAddToCart()
-                        },
-                        onBrowseVault: {
-                            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                                currentPage = .browseVault
-                            }
+            ZStack {
+                // Page 1: Add New Item
+                AddNewItemView(
+                    cart: cart,
+                    formViewModel: $formViewModel,
+                    itemNameFieldIsFocused: $itemNameFieldIsFocused,
+                    onAddToCart: {
+                        handleAddToCart()
+                    },
+                    onBrowseVault: {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                            currentPage = .browseVault
                         }
-                    )
-                    .transition(.asymmetric(
-                        insertion: .move(edge: .leading),
-                        removal: .move(edge: .leading)
-                    ))
-                } else {
-                    BrowseVaultView(
-                        cart: cart,
-                        selectedCategory: $selectedCategory,
-                        onItemSelected: { item in
-                            // FIXED: Handle vault item selection
-                            handleVaultItemSelection(item)
-                        },
-                        onBack: {
-                            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                                currentPage = .addNew
-                            }
-                        },
-                        onAddNewItem: {
-                            showAddItemPopoverInVault = true
+                    }
+                )
+                .offset(x: currentPage == .addNew ? 0 : -UIScreen.main.bounds.width)
+                .opacity(currentPage == .addNew ? 1 : 0)
+                
+                // Page 2: Browse Vault
+                BrowseVaultView(
+                    cart: cart,
+                    selectedCategory: $selectedCategory,
+                    onItemSelected: { item in
+                        handleVaultItemSelection(item)
+                    },
+                    onBack: {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                            currentPage = .addNew
                         }
-                    )
-                    .transition(.asymmetric(
-                        insertion: .move(edge: .trailing),
-                        removal: .move(edge: .trailing)
-                    ))
-                }
+                    },
+                    onAddNewItem: {
+                        showAddItemPopoverInVault = true
+                    }
+                )
+                .offset(x: currentPage == .browseVault ? 0 : UIScreen.main.bounds.width)
+                .opacity(currentPage == .browseVault ? 1 : 0)
             }
-            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: currentPage)
-            .navigationTitle(currentPage == .addNew ? "Add Item" : "Vault")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -75,16 +67,42 @@ struct AddNewItemToCartSheet: View {
                     }
                 }
                 
-                if currentPage == .browseVault {
-                    ToolbarItem(placement: .principal) {
+                ToolbarItem(placement: .principal) {
+                    HStack(spacing: 8) {
+                        // Back button when on vault page
+                        if currentPage == .browseVault {
+                            Button(action: {
+                                withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                                    currentPage = .addNew
+                                }
+                            }) {
+                                Image(systemName: "chevron.left")
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundColor(.blue)
+                                    .frame(width: 24, height: 24)
+                            }
+                            .transition(.opacity.combined(with: .scale(scale: 0.8)))
+                        }
+                        
+                        // Two-dot page indicator with animation
                         HStack(spacing: 8) {
                             Circle()
                                 .fill(currentPage == .addNew ? Color.black : Color.gray.opacity(0.3))
                                 .frame(width: 6, height: 6)
+                                .scaleEffect(currentPage == .addNew ? 1.2 : 1.0)
+                                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: currentPage)
                             
                             Circle()
                                 .fill(currentPage == .browseVault ? Color.black : Color.gray.opacity(0.3))
                                 .frame(width: 6, height: 6)
+                                .scaleEffect(currentPage == .browseVault ? 1.2 : 1.0)
+                                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: currentPage)
+                        }
+                        
+                        // Spacer to balance when on addNew page
+                        if currentPage == .addNew {
+                            Spacer()
+                                .frame(width: 24, height: 24)
                         }
                     }
                 }
@@ -98,7 +116,6 @@ struct AddNewItemToCartSheet: View {
                 isPresented: $showAddItemPopoverInVault,
                 createCartButtonVisible: .constant(false),
                 onSave: { itemName, category, store, unit, price in
-                    // FIXED: Handle save from popover and dismiss
                     if cart.isShopping {
                         vaultService.addShoppingItemToCart(
                             name: itemName,
@@ -108,7 +125,6 @@ struct AddNewItemToCartSheet: View {
                             cart: cart,
                             quantity: 1
                         )
-                        // IMPORTANT: Call onItemAdded and dismiss
                         onItemAdded?()
                         resetAndClose()
                     } else {
@@ -121,7 +137,6 @@ struct AddNewItemToCartSheet: View {
                         )
                         
                         if success {
-                            // IMPORTANT: Call onItemAdded and dismiss
                             onItemAdded?()
                             showAddItemPopoverInVault = false
                             resetAndClose()
@@ -140,7 +155,6 @@ struct AddNewItemToCartSheet: View {
         }
         
         if cart.isShopping {
-            // Shopping mode: Add shopping-only item
             vaultService.addShoppingItemToCart(
                 name: formViewModel.itemName,
                 store: formViewModel.storeName,
@@ -151,18 +165,15 @@ struct AddNewItemToCartSheet: View {
             )
             print("🛍️ Added shopping-only item: \(formViewModel.itemName)")
             
-            // FIXED: Force immediate update
             vaultService.updateCartTotals(cart: cart)
             
-            // Send notification for shopping data update
             NotificationCenter.default.post(
                 name: NSNotification.Name("ShoppingDataUpdated"),
                 object: nil,
-                userInfo: ["cartItemId": cart.id] // Use cart ID instead of item ID
+                userInfo: ["cartItemId": cart.id]
             )
             
         } else {
-            // Planning mode: Add to vault first
             let success = addNewItemToVaultAndCart(
                 name: formViewModel.itemName,
                 category: category,
@@ -176,7 +187,6 @@ struct AddNewItemToCartSheet: View {
             }
         }
         
-        // IMPORTANT: Call the callback AND dismiss
         onItemAdded?()
         resetAndClose()
     }
@@ -185,7 +195,6 @@ struct AddNewItemToCartSheet: View {
         guard let priceOption = item.priceOptions.first else { return }
         
         if cart.isShopping {
-            // Shopping mode: Use shopping item method
             vaultService.addShoppingItemToCart(
                 name: item.name,
                 store: priceOption.store,
@@ -196,7 +205,6 @@ struct AddNewItemToCartSheet: View {
             )
             print("🛍️ Selected vault item for shopping: \(item.name)")
         } else {
-            // Planning mode: Use vault item method
             vaultService.addVaultItemToCart(
                 item: item,
                 cart: cart,
@@ -206,13 +214,11 @@ struct AddNewItemToCartSheet: View {
             print("📋 Selected vault item for planning: \(item.name)")
         }
         
-        // IMPORTANT: Call the callback AND dismiss
         onItemAdded?()
         resetAndClose()
     }
     
     private func addNewItemToVaultAndCart(name: String, category: GroceryCategory, store: String, unit: String, price: Double) -> Bool {
-        // Create item in vault
         let success = vaultService.addItem(
             name: name,
             to: category,
@@ -222,12 +228,10 @@ struct AddNewItemToCartSheet: View {
         )
         
         if success {
-            // Find the newly created item
             let newItems = vaultService.findItemsByName(name)
             if let newItem = newItems.first(where: { item in
                 item.priceOptions.contains { $0.store == store }
             }) {
-                // Add to cart using vault item
                 vaultService.addVaultItemToCart(
                     item: newItem,
                     cart: cart,
@@ -243,7 +247,7 @@ struct AddNewItemToCartSheet: View {
     private func resetAndClose() {
         formViewModel.resetForm()
         currentPage = .addNew
-        isPresented = false // FIXED: This dismisses the sheet
+        isPresented = false
     }
 }
 
@@ -302,7 +306,7 @@ struct AddNewItemView: View {
             
             // Action bar at bottom
             VStack(spacing: 16) {
-                // Add to Cart button - FIXED: Added explicit action
+                // Add to Cart button
                 Button(action: {
                     if formViewModel.isFormValid && duplicateError == nil {
                         onAddToCart()
@@ -500,23 +504,58 @@ struct BrowseVaultView: View {
                 .scrollContentBackground(.hidden)
             }
             
-            // Add New Item Button at bottom
-            Button(action: onAddNewItem) {
-                HStack {
-                    Image(systemName: "plus.circle.fill")
-                    Text("Add New Item to Vault")
-                        .lexendFont(14, weight: .medium)
+            // Bottom buttons
+            VStack(spacing: 12) {
+                // Add New Item Button
+                Button(action: onAddNewItem) {
+                    HStack {
+                        Image(systemName: "plus.circle.fill")
+                        Text("Add New Item to Vault")
+                            .lexendFont(14, weight: .medium)
+                    }
+                    .foregroundColor(.blue)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color.blue.opacity(0.1))
+                    )
                 }
-                .foregroundColor(.blue)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.blue.opacity(0.1))
-                )
                 .padding(.horizontal)
-                .padding(.vertical, 12)
+                
+                // Back to Add Form Button
+                Button(action: onBack) {
+                    HStack {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 12))
+                        Text("Back to Add Item Form")
+                            .lexendFont(14, weight: .medium)
+                    }
+                    .foregroundColor(.gray)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color.gray.opacity(0.1))
+                    )
+                }
+                .padding(.horizontal)
+                .padding(.bottom, 8)
             }
+            
+            // Swipe back gesture area
+            Color.clear
+                .contentShape(Rectangle())
+                .frame(height: 40)
+                .gesture(
+                    DragGesture(minimumDistance: 20, coordinateSpace: .local)
+                        .onEnded { value in
+                            let horizontalAmount = value.translation.width
+                            if horizontalAmount > 50 { // Swipe right to go back
+                                onBack()
+                            }
+                        }
+                )
         }
         .onAppear {
             if selectedCategory == nil {
