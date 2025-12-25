@@ -30,11 +30,6 @@ struct AddNewItemToCartSheet: View {
                     itemNameFieldIsFocused: $itemNameFieldIsFocused,
                     onAddToCart: {
                         handleAddToCart()
-                    },
-                    onBrowseVault: {
-                        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
-                            currentPage = .browseVault
-                        }
                     }
                 )
                 .offset(x: currentPage == .addNew ? 0 : -UIScreen.main.bounds.width)
@@ -62,47 +57,87 @@ struct AddNewItemToCartSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
+                    Button {
                         resetAndClose()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(.black)
+                    }
+                }
+                        
+                ToolbarItem(placement: .principal) {
+                    HStack(spacing: 8) {
+                        Circle()
+                            .fill(currentPage == .addNew ? Color.black : Color.gray.opacity(0.3))
+                            .frame(width: 6, height: 6)
+                            .scaleEffect(currentPage == .addNew ? 1.2 : 1.0)
+                            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: currentPage)
+                        
+                        Circle()
+                            .fill(currentPage == .browseVault ? Color.black : Color.gray.opacity(0.3))
+                            .frame(width: 6, height: 6)
+                            .scaleEffect(currentPage == .browseVault ? 1.2 : 1.0)
+                            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: currentPage)
                     }
                 }
                 
-                ToolbarItem(placement: .principal) {
-                    HStack(spacing: 8) {
-                        // Back button when on vault page
-                        if currentPage == .browseVault {
-                            Button(action: {
-                                withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
-                                    currentPage = .addNew
-                                }
-                            }) {
-                                Image(systemName: "chevron.left")
-                                    .font(.system(size: 16, weight: .medium))
-                                    .foregroundColor(.blue)
-                                    .frame(width: 24, height: 24)
+                ToolbarItem(placement: .topBarTrailing) {
+                    if currentPage == .addNew {
+                        Button(action: {
+                            withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                                currentPage = .browseVault
                             }
-                            .transition(.opacity.combined(with: .scale(scale: 0.8)))
+                        }) {
+                            HStack(spacing: 8) {
+                                Text("vault")
+                                    .fuzzyBubblesFont(13, weight: .bold)
+                                Image(systemName: "shippingbox")
+                                    .resizable()
+                                    .frame(width: 15, height: 15)
+                                    .symbolRenderingMode(.monochrome)
+                                    .fontWeight(.medium)
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .foregroundColor(.black)
+                            .background(
+                                ZStack {
+                                    Color(.systemGray6)
+                                    LinearGradient(
+                                        colors: [
+                                            .white.opacity(0.2),
+                                            .clear,
+                                            .black.opacity(0.1),
+                                        ],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                }
+                            )
+                            .clipShape(Capsule())
+                            .shadow(
+                                color: .black.opacity(0.4),
+                                radius: 1,
+                                x: 0,
+                                y: 0.5
+                            )
                         }
                         
-                        // Two-dot page indicator with animation
-                        HStack(spacing: 8) {
-                            Circle()
-                                .fill(currentPage == .addNew ? Color.black : Color.gray.opacity(0.3))
-                                .frame(width: 6, height: 6)
-                                .scaleEffect(currentPage == .addNew ? 1.2 : 1.0)
-                                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: currentPage)
-                            
-                            Circle()
-                                .fill(currentPage == .browseVault ? Color.black : Color.gray.opacity(0.3))
-                                .frame(width: 6, height: 6)
-                                .scaleEffect(currentPage == .browseVault ? 1.2 : 1.0)
-                                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: currentPage)
-                        }
-                        
-                        // Spacer to balance when on addNew page
-                        if currentPage == .addNew {
-                            Spacer()
-                                .frame(width: 24, height: 24)
+                    } else {
+                        // Back button when on browse vault page
+                        Button(action: {
+                            withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                                currentPage = .addNew
+                            }
+                        }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "chevron.left")
+                                    .font(.system(size: 12))
+                                Text("Back")
+                                    .lexendFont(14, weight: .medium)
+                            }
+                            .foregroundColor(.blue)
                         }
                     }
                 }
@@ -257,7 +292,6 @@ struct AddNewItemView: View {
     @Binding var formViewModel: ItemFormViewModel
     @FocusState.Binding var itemNameFieldIsFocused: Bool
     let onAddToCart: () -> Void
-    let onBrowseVault: () -> Void
     
     @State private var duplicateError: String?
     @State private var isCheckingDuplicate = false
@@ -265,23 +299,17 @@ struct AddNewItemView: View {
     @Environment(VaultService.self) private var vaultService
     
     var body: some View {
-        VStack(spacing: 0) {
-            // Context header
-            VStack(alignment: .leading, spacing: 8) {
-                Text(cart.isShopping ? "🛍️ Add to Shopping Trip" : "📋 Add to Plan")
-                    .lexendFont(18, weight: .bold)
-                    .foregroundColor(cart.isShopping ? .orange : .blue)
+        VStack(spacing: 32) {
+            VStack(alignment: .center, spacing: 2) {
+                Text("Found an extra item?")
+                    .fuzzyBubblesFont(20, weight: .bold)
                 
-                Text(cart.isShopping ?
-                     "This item will only exist in this shopping trip." :
-                     "This item will be saved to your Vault for future use.")
-                    .lexendFont(12)
+                Text("This wasn't on your plan, but you can add it to this trip")
+                    .lexendFont(12, weight: .light)
                     .foregroundColor(.gray)
-                    .padding(.bottom, 4)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal)
-            .padding(.top)
+            .padding(.top, 32)
             
             // Main form content
             ScrollView {
@@ -304,47 +332,24 @@ struct AddNewItemView: View {
             }
             .scrollIndicators(.hidden)
             
-            // Action bar at bottom
             VStack(spacing: 16) {
-                // Add to Cart button
-                Button(action: {
-                    if formViewModel.isFormValid && duplicateError == nil {
-                        onAddToCart()
+                FormCompletionButton(
+                    title: "Add to Cart",
+                    isEnabled: formViewModel.isFormValid && duplicateError == nil,
+                    cornerRadius: 100,
+                    verticalPadding: 12,
+                    maxRadius: 1000,
+                    bounceScale: (0.95, 1.05, 1.0),
+                    bounceTiming: (0.1, 0.3, 0.3),
+                    maxWidth: true,
+                    action: {
+                        if formViewModel.isFormValid && duplicateError == nil {
+                            onAddToCart()
+                        }
                     }
-                }) {
-                    Text("Add to Cart")
-                        .lexendFont(16, weight: .bold)
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(formViewModel.isFormValid && duplicateError == nil ? Color.black : Color.gray)
-                        )
-                }
-                .disabled(!formViewModel.isFormValid || duplicateError != nil)
+                )
                 .padding(.horizontal)
-                
-                // Browse Vault option
-                Button(action: onBrowseVault) {
-                    HStack {
-                        Image(systemName: "archivebox")
-                            .font(.system(size: 14))
-                        Text("Browse Vault")
-                            .lexendFont(14, weight: .medium)
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 12))
-                    }
-                    .foregroundColor(.blue)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color.blue.opacity(0.1))
-                    )
-                }
-                .padding(.horizontal)
-                .padding(.bottom, 8)
+                .padding(.bottom)
             }
             .background(
                 LinearGradient(
@@ -502,45 +507,6 @@ struct BrowseVaultView: View {
                 }
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)
-            }
-            
-            // Bottom buttons
-            VStack(spacing: 12) {
-                // Add New Item Button
-                Button(action: onAddNewItem) {
-                    HStack {
-                        Image(systemName: "plus.circle.fill")
-                        Text("Add New Item to Vault")
-                            .lexendFont(14, weight: .medium)
-                    }
-                    .foregroundColor(.blue)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color.blue.opacity(0.1))
-                    )
-                }
-                .padding(.horizontal)
-                
-                // Back to Add Form Button
-                Button(action: onBack) {
-                    HStack {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 12))
-                        Text("Back to Add Item Form")
-                            .lexendFont(14, weight: .medium)
-                    }
-                    .foregroundColor(.gray)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color.gray.opacity(0.1))
-                    )
-                }
-                .padding(.horizontal)
-                .padding(.bottom, 8)
             }
             
             // Swipe back gesture area
