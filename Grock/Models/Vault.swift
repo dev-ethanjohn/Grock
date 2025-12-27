@@ -65,9 +65,10 @@ class Item: Identifiable {
     var createdAt: Date
     
     // MARK: - New properties for shopping context
-    var isTemporaryShoppingItem: Bool = false
+    var isTemporaryShoppingItem: Bool? = false
     var shoppingPrice: Double?
     var shoppingUnit: String?
+    
     
     init(
         id: String = UUID().uuidString,
