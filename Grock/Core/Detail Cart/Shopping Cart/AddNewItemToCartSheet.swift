@@ -1,5 +1,327 @@
 import SwiftUI
 
+//struct AddNewItemToCartSheet: View {
+//    @Binding var isPresented: Bool
+//    let cart: Cart
+//    var onItemAdded: (() -> Void)?
+//    
+//    @Environment(VaultService.self) private var vaultService
+//    @Environment(CartViewModel.self) private var cartViewModel
+//    
+//    @State private var currentPage: AddItemPage = .addNew
+//    @State private var formViewModel = ItemFormViewModel(requiresPortion: false, requiresStore: true)
+//    @FocusState private var itemNameFieldIsFocused: Bool
+//    
+//    @State private var selectedCategory: GroceryCategory?
+//    @State private var showAddItemPopoverInVault = false
+//    
+//    enum AddItemPage {
+//        case addNew
+//        case browseVault
+//    }
+//    
+//    var body: some View {
+//        NavigationStack {
+//            ZStack {
+//                // Page 1: Add New Item
+//                AddNewItemView(
+//                    cart: cart,
+//                    formViewModel: $formViewModel,
+//                    itemNameFieldIsFocused: $itemNameFieldIsFocused,
+//                    onAddToCart: {
+//                        handleAddToCart()
+//                    }
+//                )
+//                .offset(x: currentPage == .addNew ? 0 : -UIScreen.main.bounds.width)
+//                .opacity(currentPage == .addNew ? 1 : 0)
+//                
+//                // Page 2: Browse Vault
+//                BrowseVaultView(
+//                    cart: cart,
+//                    selectedCategory: $selectedCategory,
+//                    onItemSelected: { item in
+//                        handleVaultItemSelection(item)
+//                    },
+//                    onBack: {
+//                        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+//                            currentPage = .addNew
+//                        }
+//                    },
+//                    onAddNewItem: {
+//                        showAddItemPopoverInVault = true
+//                    }
+//                )
+//                .offset(x: currentPage == .browseVault ? 0 : UIScreen.main.bounds.width)
+//                .opacity(currentPage == .browseVault ? 1 : 0)
+//            }
+//            .navigationBarTitleDisplayMode(.inline)
+//            .toolbar {
+//                ToolbarItem(placement: .cancellationAction) {
+//                    Button {
+//                        resetAndClose()
+//                    } label: {
+//                        Image(systemName: "xmark")
+//                            .font(.system(size: 14, weight: .bold))
+//                            .foregroundStyle(.black)
+//                    }
+//                }
+//                        
+//                ToolbarItem(placement: .principal) {
+//                    HStack(spacing: 8) {
+//                        Circle()
+//                            .fill(currentPage == .addNew ? Color.black : Color.gray.opacity(0.3))
+//                            .frame(width: 6, height: 6)
+//                            .scaleEffect(currentPage == .addNew ? 1.2 : 1.0)
+//                            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: currentPage)
+//                        
+//                        Circle()
+//                            .fill(currentPage == .browseVault ? Color.black : Color.gray.opacity(0.3))
+//                            .frame(width: 6, height: 6)
+//                            .scaleEffect(currentPage == .browseVault ? 1.2 : 1.0)
+//                            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: currentPage)
+//                    }
+//                }
+//                
+//                ToolbarItem(placement: .topBarTrailing) {
+//                    if currentPage == .addNew {
+//                        Button(action: {
+//                            withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+//                                currentPage = .browseVault
+//                            }
+//                        }) {
+//                            HStack(spacing: 8) {
+//                                Text("vault")
+//                                    .fuzzyBubblesFont(13, weight: .bold)
+//                                Image(systemName: "shippingbox")
+//                                    .resizable()
+//                                    .frame(width: 15, height: 15)
+//                                    .symbolRenderingMode(.monochrome)
+//                                    .fontWeight(.medium)
+//                            }
+//                            .padding(.horizontal, 12)
+//                            .padding(.vertical, 6)
+//                            .foregroundColor(.black)
+//                            .background(
+//                                ZStack {
+//                                    Color(.systemGray6)
+//                                    LinearGradient(
+//                                        colors: [
+//                                            .white.opacity(0.2),
+//                                            .clear,
+//                                            .black.opacity(0.1),
+//                                        ],
+//                                        startPoint: .topLeading,
+//                                        endPoint: .bottomTrailing
+//                                    )
+//                                }
+//                            )
+//                            .clipShape(Capsule())
+//                            .shadow(
+//                                color: .black.opacity(0.4),
+//                                radius: 1,
+//                                x: 0,
+//                                y: 0.5
+//                            )
+//                        }
+//                        
+//                    } else {
+//                        // Back button when on browse vault page
+//                        Button(action: {
+//                            withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+//                                currentPage = .addNew
+//                            }
+//                        }) {
+//                            HStack(spacing: 4) {
+//                                Image(systemName: "chevron.left")
+//                                    .font(.system(size: 12))
+//                                Text("Back")
+//                                    .lexendFont(14, weight: .medium)
+//                            }
+//                            .foregroundColor(.blue)
+//                        }
+//                    }
+//                }
+//            }
+//        }
+//        .presentationDetents(currentPage == .addNew ? [.height(500)] : [.large])
+//        .presentationDragIndicator(.visible)
+//        .presentationCornerRadius(24)
+//        .sheet(isPresented: $showAddItemPopoverInVault) {
+//            AddItemPopover(
+//                isPresented: $showAddItemPopoverInVault,
+//                createCartButtonVisible: .constant(false),
+//                onSave: { itemName, category, store, unit, price in
+//                    if cart.isShopping {
+//                        vaultService.addShoppingItemToCart(
+//                            name: itemName,
+//                            store: store,
+//                            price: price,
+//                            unit: unit,
+//                            cart: cart,
+//                            quantity: 1
+//                        )
+//                        onItemAdded?()
+//                        resetAndClose()
+//                    } else {
+//                        let success = addNewItemToVaultAndCart(
+//                            name: itemName,
+//                            category: category,
+//                            store: store,
+//                            unit: unit,
+//                            price: price
+//                        )
+//                        
+//                        if success {
+//                            onItemAdded?()
+//                            showAddItemPopoverInVault = false
+//                            resetAndClose()
+//                        }
+//                    }
+//                }
+//            )
+//        }
+//    }
+//    
+//    private func handleAddToCart() {
+//        guard formViewModel.attemptSubmission(),
+//              let category = formViewModel.selectedCategory,
+//              let priceValue = Double(formViewModel.itemPrice) else {
+//            return
+//        }
+//        
+//        if cart.isShopping {
+//            vaultService.addShoppingItemToCart(
+//                name: formViewModel.itemName,
+//                store: formViewModel.storeName,
+//                price: priceValue,
+//                unit: formViewModel.unit,
+//                cart: cart,
+//                quantity: 1
+//            )
+//            print("🛍️ Added shopping-only item: \(formViewModel.itemName)")
+//            
+//            vaultService.updateCartTotals(cart: cart)
+//            
+//            NotificationCenter.default.post(
+//                name: NSNotification.Name("ShoppingDataUpdated"),
+//                object: nil,
+//                userInfo: ["cartItemId": cart.id]
+//            )
+//            
+//        } else {
+//            let success = addNewItemToVaultAndCart(
+//                name: formViewModel.itemName,
+//                category: category,
+//                store: formViewModel.storeName,
+//                unit: formViewModel.unit,
+//                price: priceValue
+//            )
+//            
+//            if success {
+//                print("📋 Added vault item: \(formViewModel.itemName)")
+//            }
+//        }
+//        
+//        onItemAdded?()
+//        resetAndClose()
+//    }
+//    
+//    private func handleVaultItemSelection(_ item: Item) {
+//        // Check if it's a temporary shopping-only item
+//        if item.isTemporaryShoppingItem == true {
+//            // Handle shopping-only item selection
+//            guard let price = item.shoppingPrice,
+//                  let store = item.priceOptions.first?.store,
+//                  let unit = item.shoppingUnit else { return }
+//            
+//            // Find the existing cartItem (shopping-only)
+//            if let existingCartItem = cart.cartItems.first(where: {
+//                $0.isShoppingOnlyItem &&
+//                $0.shoppingOnlyName?.lowercased() == item.name.lowercased() &&
+//                $0.shoppingOnlyStore?.lowercased() == store.lowercased()
+//            }) {
+//                // Item exists, activate it if skipped
+//                if existingCartItem.isSkippedDuringShopping {
+//                    existingCartItem.isSkippedDuringShopping = false
+//                    existingCartItem.quantity = 1
+//                } else {
+//                    // Already active, just update quantity
+//                    existingCartItem.quantity += 1
+//                }
+//                vaultService.updateCartTotals(cart: cart)
+//            } else {
+//                // This shouldn't happen, but fallback
+//                vaultService.addShoppingItemToCart(
+//                    name: item.name,
+//                    store: store,
+//                    price: price,
+//                    unit: unit,
+//                    cart: cart,
+//                    quantity: 1
+//                )
+//            }
+//            
+//        } else {
+//            // Handle regular Vault item
+//            guard let priceOption = item.priceOptions.first else { return }
+//            
+//            if cart.isShopping {
+//                vaultService.addShoppingItemToCart(
+//                    name: item.name,
+//                    store: priceOption.store,
+//                    price: priceOption.pricePerUnit.priceValue,
+//                    unit: priceOption.pricePerUnit.unit,
+//                    cart: cart,
+//                    quantity: 1
+//                )
+//                print("🛍️ Selected vault item for shopping: \(item.name)")
+//            } else {
+//                vaultService.addVaultItemToCart(
+//                    item: item,
+//                    cart: cart,
+//                    quantity: 1,
+//                    selectedStore: priceOption.store
+//                )
+//                print("📋 Selected vault item for planning: \(item.name)")
+//            }
+//        }
+//        
+//        onItemAdded?()
+//        resetAndClose()
+//    }
+//    
+//    private func addNewItemToVaultAndCart(name: String, category: GroceryCategory, store: String, unit: String, price: Double) -> Bool {
+//        let success = vaultService.addItem(
+//            name: name,
+//            to: category,
+//            store: store,
+//            price: price,
+//            unit: unit
+//        )
+//        
+//        if success {
+//            let newItems = vaultService.findItemsByName(name)
+//            if let newItem = newItems.first(where: { item in
+//                item.priceOptions.contains { $0.store == store }
+//            }) {
+//                vaultService.addVaultItemToCart(
+//                    item: newItem,
+//                    cart: cart,
+//                    quantity: 1,
+//                    selectedStore: store
+//                )
+//                return true
+//            }
+//        }
+//        return false
+//    }
+//    
+//    private func resetAndClose() {
+//        formViewModel.resetForm()
+//        currentPage = .addNew
+//        isPresented = false
+//    }
+//}
 struct AddNewItemToCartSheet: View {
     @Binding var isPresented: Bool
     let cart: Cart
@@ -15,171 +337,194 @@ struct AddNewItemToCartSheet: View {
     @State private var selectedCategory: GroceryCategory?
     @State private var showAddItemPopoverInVault = false
     
+    // Keyboard state for done button
+    @State private var keyboardResponder = KeyboardResponder()
+    @State private var focusedItemId: String?
+    
     enum AddItemPage {
         case addNew
         case browseVault
     }
     
     var body: some View {
-        NavigationStack {
-            ZStack {
-                // Page 1: Add New Item
-                AddNewItemView(
-                    cart: cart,
-                    formViewModel: $formViewModel,
-                    itemNameFieldIsFocused: $itemNameFieldIsFocused,
-                    onAddToCart: {
-                        handleAddToCart()
-                    }
-                )
-                .offset(x: currentPage == .addNew ? 0 : -UIScreen.main.bounds.width)
-                .opacity(currentPage == .addNew ? 1 : 0)
-                
-                // Page 2: Browse Vault
-                BrowseVaultView(
-                    cart: cart,
-                    selectedCategory: $selectedCategory,
-                    onItemSelected: { item in
-                        handleVaultItemSelection(item)
-                    },
-                    onBack: {
-                        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
-                            currentPage = .addNew
+        ZStack(alignment: .bottom) {
+            NavigationStack {
+                ZStack {
+                    // Page 1: Add New Item
+                    AddNewItemView(
+                        cart: cart,
+                        formViewModel: $formViewModel,
+                        itemNameFieldIsFocused: $itemNameFieldIsFocused,
+                        onAddToCart: {
+                            handleAddToCart()
                         }
-                    },
-                    onAddNewItem: {
-                        showAddItemPopoverInVault = true
-                    }
-                )
-                .offset(x: currentPage == .browseVault ? 0 : UIScreen.main.bounds.width)
-                .opacity(currentPage == .browseVault ? 1 : 0)
-            }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button {
-                        resetAndClose()
-                    } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundStyle(.black)
-                    }
-                }
-                        
-                ToolbarItem(placement: .principal) {
-                    HStack(spacing: 8) {
-                        Circle()
-                            .fill(currentPage == .addNew ? Color.black : Color.gray.opacity(0.3))
-                            .frame(width: 6, height: 6)
-                            .scaleEffect(currentPage == .addNew ? 1.2 : 1.0)
-                            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: currentPage)
-                        
-                        Circle()
-                            .fill(currentPage == .browseVault ? Color.black : Color.gray.opacity(0.3))
-                            .frame(width: 6, height: 6)
-                            .scaleEffect(currentPage == .browseVault ? 1.2 : 1.0)
-                            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: currentPage)
-                    }
-                }
-                
-                ToolbarItem(placement: .topBarTrailing) {
-                    if currentPage == .addNew {
-                        Button(action: {
-                            withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
-                                currentPage = .browseVault
-                            }
-                        }) {
-                            HStack(spacing: 8) {
-                                Text("vault")
-                                    .fuzzyBubblesFont(13, weight: .bold)
-                                Image(systemName: "shippingbox")
-                                    .resizable()
-                                    .frame(width: 15, height: 15)
-                                    .symbolRenderingMode(.monochrome)
-                                    .fontWeight(.medium)
-                            }
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .foregroundColor(.black)
-                            .background(
-                                ZStack {
-                                    Color(.systemGray6)
-                                    LinearGradient(
-                                        colors: [
-                                            .white.opacity(0.2),
-                                            .clear,
-                                            .black.opacity(0.1),
-                                        ],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                }
-                            )
-                            .clipShape(Capsule())
-                            .shadow(
-                                color: .black.opacity(0.4),
-                                radius: 1,
-                                x: 0,
-                                y: 0.5
-                            )
-                        }
-                        
-                    } else {
-                        // Back button when on browse vault page
-                        Button(action: {
+                    )
+                    .offset(x: currentPage == .addNew ? 0 : -UIScreen.main.bounds.width)
+                    .opacity(currentPage == .addNew ? 1 : 0)
+                    
+                    // Page 2: Browse Vault
+                    BrowseVaultView(
+                        cart: cart,
+                        selectedCategory: $selectedCategory,
+                        onItemSelected: { item in
+                            handleVaultItemSelection(item)
+                        },
+                        onBack: {
                             withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
                                 currentPage = .addNew
                             }
-                        }) {
-                            HStack(spacing: 4) {
-                                Image(systemName: "chevron.left")
-                                    .font(.system(size: 12))
-                                Text("Back")
-                                    .lexendFont(14, weight: .medium)
+                        },
+                        onAddNewItem: {
+                            showAddItemPopoverInVault = true
+                        }
+                    )
+                    .offset(x: currentPage == .browseVault ? 0 : UIScreen.main.bounds.width)
+                    .opacity(currentPage == .browseVault ? 1 : 0)
+                }
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button {
+                            resetAndClose()
+                        } label: {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundStyle(.black)
+                        }
+                    }
+                            
+                    ToolbarItem(placement: .principal) {
+                        HStack(spacing: 8) {
+                            Circle()
+                                .fill(currentPage == .addNew ? Color.black : Color.gray.opacity(0.3))
+                                .frame(width: 6, height: 6)
+                                .scaleEffect(currentPage == .addNew ? 1.2 : 1.0)
+                                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: currentPage)
+                            
+                            Circle()
+                                .fill(currentPage == .browseVault ? Color.black : Color.gray.opacity(0.3))
+                                .frame(width: 6, height: 6)
+                                .scaleEffect(currentPage == .browseVault ? 1.2 : 1.0)
+                                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: currentPage)
+                        }
+                    }
+                    
+                    ToolbarItem(placement: .topBarTrailing) {
+                        if currentPage == .addNew {
+                            Button(action: {
+                                withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                                    currentPage = .browseVault
+                                }
+                            }) {
+                                HStack(spacing: 8) {
+                                    Text("vault")
+                                        .fuzzyBubblesFont(13, weight: .bold)
+                                    Image(systemName: "shippingbox")
+                                        .resizable()
+                                        .frame(width: 15, height: 15)
+                                        .symbolRenderingMode(.monochrome)
+                                        .fontWeight(.medium)
+                                }
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .foregroundColor(.black)
+                                .background(
+                                    ZStack {
+                                        Color(.systemGray6)
+                                        LinearGradient(
+                                            colors: [
+                                                .white.opacity(0.2),
+                                                .clear,
+                                                .black.opacity(0.1),
+                                            ],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    }
+                                )
+                                .clipShape(Capsule())
+                                .shadow(
+                                    color: .black.opacity(0.4),
+                                    radius: 1,
+                                    x: 0,
+                                    y: 0.5
+                                )
                             }
-                            .foregroundColor(.blue)
+                            
+                        } else {
+                            // Back button when on browse vault page
+                            Button(action: {
+                                withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                                    currentPage = .addNew
+                                }
+                            }) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "chevron.left")
+                                        .font(.system(size: 12))
+                                    Text("Back")
+                                        .lexendFont(14, weight: .medium)
+                                }
+                                .foregroundColor(.blue)
+                            }
                         }
                     }
                 }
             }
-        }
-        .presentationDetents(currentPage == .addNew ? [.height(500)] : [.large])
-        .presentationDragIndicator(.visible)
-        .presentationCornerRadius(24)
-        .sheet(isPresented: $showAddItemPopoverInVault) {
-            AddItemPopover(
-                isPresented: $showAddItemPopoverInVault,
-                createCartButtonVisible: .constant(false),
-                onSave: { itemName, category, store, unit, price in
-                    if cart.isShopping {
-                        vaultService.addShoppingItemToCart(
-                            name: itemName,
-                            store: store,
-                            price: price,
-                            unit: unit,
-                            cart: cart,
-                            quantity: 1
-                        )
-                        onItemAdded?()
-                        resetAndClose()
-                    } else {
-                        let success = addNewItemToVaultAndCart(
-                            name: itemName,
-                            category: category,
-                            store: store,
-                            unit: unit,
-                            price: price
-                        )
-                        
-                        if success {
+            .presentationDetents(currentPage == .addNew ? [.height(500)] : [.large])
+            .presentationDragIndicator(.visible)
+            .presentationCornerRadius(24)
+            .sheet(isPresented: $showAddItemPopoverInVault) {
+                AddItemPopover(
+                    isPresented: $showAddItemPopoverInVault,
+                    createCartButtonVisible: .constant(false),
+                    onSave: { itemName, category, store, unit, price in
+                        if cart.isShopping {
+                            vaultService.addShoppingItemToCart(
+                                name: itemName,
+                                store: store,
+                                price: price,
+                                unit: unit,
+                                cart: cart,
+                                quantity: 1
+                            )
                             onItemAdded?()
-                            showAddItemPopoverInVault = false
                             resetAndClose()
+                        } else {
+                            let success = addNewItemToVaultAndCart(
+                                name: itemName,
+                                category: category,
+                                store: store,
+                                unit: unit,
+                                price: price
+                            )
+                            
+                            if success {
+                                onItemAdded?()
+                                showAddItemPopoverInVault = false
+                                resetAndClose()
+                            }
                         }
                     }
-                }
-            )
+                )
+            }
+            
+            // Keyboard Done Button overlay (shows on top of everything)
+            if keyboardResponder.isVisible && focusedItemId != nil {
+                KeyboardDoneButton(
+                    keyboardHeight: keyboardResponder.currentHeight,
+                    onDone: {
+                        // Dismiss keyboard
+                        UIApplication.shared.endEditing()
+                    }
+                )
+                .transition(.opacity)
+                .zIndex(100)
+            }
         }
+        .onPreferenceChange(TextFieldFocusPreferenceKey.self) { itemId in
+            focusedItemId = itemId
+        }
+        .ignoresSafeArea(.keyboard)
     }
     
     private func handleAddToCart() {
@@ -432,7 +777,7 @@ struct AddNewItemView: View {
     }
 }
 
-// MARK: - Browse Vault View (Page 2)
+// MARK: - Browse Vault View (Page 2) - Optimized for Automatic Updates
 struct BrowseVaultView: View {
     let cart: Cart
     @Binding var selectedCategory: GroceryCategory?
@@ -444,60 +789,78 @@ struct BrowseVaultView: View {
     @State private var searchText = ""
     
     private var itemsByStore: [(store: String, items: [StoreItem])] {
+        print("🔄 Computing itemsByStore for cart: \(cart.name)")
         guard let vault = vaultService.vault else { return [] }
         
         // Get all items from all categories
         var allStoreItems: [StoreItem] = []
+        var seenItemStoreCombinations = Set<String>()
         
-        // 1. Add Vault items
+        // 1. Add Vault items - ONE PER STORE
         for category in vault.categories {
             for item in category.items {
-                // Create a StoreItem for each price option
+                // For each price option, create a StoreItem
                 for priceOption in item.priceOptions {
-                    let storeItem = StoreItem(
-                        item: item,
-                        categoryName: category.name,
-                        priceOption: priceOption,
-                        isShoppingOnlyItem: false // VAULT ITEMS ARE NOT SHOPPING-ONLY
-                    )
-                    allStoreItems.append(storeItem)
+                    let combinationKey = "\(item.id)-\(priceOption.store)"
+                    if !seenItemStoreCombinations.contains(combinationKey) {
+                        let storeItem = StoreItem(
+                            item: item,
+                            categoryName: category.name,
+                            priceOption: priceOption,
+                            isShoppingOnlyItem: false
+                        )
+                        allStoreItems.append(storeItem)
+                        seenItemStoreCombinations.insert(combinationKey)
+                    }
                 }
             }
         }
         
         // 2. Add shopping-only items from the current cart
-        let shoppingOnlyItems = cart.cartItems.filter { $0.isShoppingOnlyItem }
-        for cartItem in shoppingOnlyItems {
+        // But only if they don't already exist as vault items with the same name and store
+        for cartItem in cart.cartItems where cartItem.isShoppingOnlyItem {
             if let name = cartItem.shoppingOnlyName,
                let price = cartItem.shoppingOnlyPrice,
                let store = cartItem.shoppingOnlyStore,
-               let unit = cartItem.shoppingOnlyUnit {
+               let unit = cartItem.shoppingOnlyUnit,
+               !cartItem.isSkippedDuringShopping,
+               cartItem.getQuantity(cart: cart) > 0 {
                 
-                // Create a temporary Item for shopping-only
-                let tempItem = Item(
-                    id: cartItem.itemId,
-                    name: name,
-                    priceOptions: [
-                        PriceOption(
-                            store: store,
-                            pricePerUnit: PricePerUnit(priceValue: price, unit: unit)
-                        )
-                    ]
-                )
+                // Check if this shopping-only item already exists as a vault item
+                let alreadyExistsAsVaultItem = allStoreItems.contains { storeItem in
+                    storeItem.item.name.lowercased() == name.lowercased() &&
+                    storeItem.priceOption.store.lowercased() == store.lowercased() &&
+                    !storeItem.isShoppingOnlyItem
+                }
                 
-                let priceOption = PriceOption(
-                    store: store,
-                    pricePerUnit: PricePerUnit(priceValue: price, unit: unit)
-                )
-                
-                let storeItem = StoreItem(
-                    item: tempItem,
-                    categoryName: "Shopping Items",
-                    priceOption: priceOption,
-                    isShoppingOnlyItem: true // SHOPPING-ONLY ITEMS
-                )
-                
-                allStoreItems.append(storeItem)
+                // Only add shopping-only item if there's no matching vault item
+                if !alreadyExistsAsVaultItem {
+                    // Create a temporary Item for shopping-only
+                    let tempItem = Item(
+                        id: cartItem.itemId,
+                        name: name,
+                        priceOptions: [
+                            PriceOption(
+                                store: store,
+                                pricePerUnit: PricePerUnit(priceValue: price, unit: unit)
+                            )
+                        ]
+                    )
+                    
+                    let priceOption = PriceOption(
+                        store: store,
+                        pricePerUnit: PricePerUnit(priceValue: price, unit: unit)
+                    )
+                    
+                    let storeItem = StoreItem(
+                        item: tempItem,
+                        categoryName: "Shopping Items",
+                        priceOption: priceOption,
+                        isShoppingOnlyItem: true
+                    )
+                    
+                    allStoreItems.append(storeItem)
+                }
             }
         }
         
@@ -622,8 +985,10 @@ struct BrowseVaultView: View {
                     }
                 }
             }
-            
-            
+        }
+        // Optional: Listen for cart changes at the view level
+        .onChange(of: cart.cartItems) { oldItems, newItems in
+            print("🛒 Cart items changed in BrowseVaultView: \(newItems.count) items")
         }
     }
 }
@@ -714,7 +1079,6 @@ struct StoreItem: Identifiable {
     }
 }
 
-// MARK: - BrowseVaultItemRow (With Quantity Controls - UPDATED FOR SYNC AND ZERO HANDLING)
 //struct BrowseVaultItemRow: View {
 //    let storeItem: StoreItem
 //    let cart: Cart
@@ -729,66 +1093,159 @@ struct StoreItem: Identifiable {
 //    @State private var textValue: String = ""
 //    @FocusState private var isFocused: Bool
 //    
-//    // Alert state for zero quantity confirmation
-//    @State private var showingZeroQuantityAlert = false
-//    @State private var pendingZeroQuantityUpdate = false
+//    @State private var associatedCartItem: CartItem?
+//    @State private var currentQuantity: Double = 0
 //    
-//    private var currentQuantity: Double {
-//        if let cartItem = cart.cartItems.first(where: { $0.itemId == storeItem.item.id }) {
-//            return cartItem.getQuantity(cart: cart)
+//    // Keyboard state
+//    @State private var keyboardResponder = KeyboardResponder()
+//    
+//    private var itemType: ItemType {
+//        // Check shopping-only first using the storeItem property
+//        if storeItem.isShoppingOnlyItem {
+//            return .shoppingOnly
 //        }
-//        return 0
+//        
+//        // Check if it's a planned cart item (vault item in cart)
+//        let isInCartAsPlanned = cart.cartItems.contains(where: {
+//            $0.itemId == storeItem.item.id && !$0.isShoppingOnlyItem
+//        })
+//        
+//        if isInCartAsPlanned {
+//            return .plannedCart
+//        }
+//        
+//        // Check if it's a shopping-only item (added during shopping)
+//        // This only applies to items that don't exist in vault
+//        let isInCartAsShopping = cart.cartItems.contains(where: {
+//            $0.isShoppingOnlyItem &&
+//            $0.shoppingOnlyName?.lowercased() == storeItem.item.name.lowercased() &&
+//            $0.shoppingOnlyStore?.lowercased() == storeItem.priceOption.store.lowercased()
+//        })
+//        
+//        if isInCartAsShopping {
+//            return .shoppingOnly
+//        }
+//        
+//        // Otherwise, it's vault-only
+//        return .vaultOnly
 //    }
 //    
-//    private var isActive: Bool {
-//        currentQuantity > 0
+//    // Helper to check if this is a true shopping-only item (created via add form, not from vault)
+//    private var isTrueShoppingOnlyItem: Bool {
+//        // Check if storeItem is marked as shopping-only
+//        if storeItem.isShoppingOnlyItem {
+//            return true
+//        }
+//        
+//        // Check if there's a shopping-only cart item but no vault item with same ID
+//        let hasShoppingOnlyCartItem = cart.cartItems.contains(where: {
+//            $0.isShoppingOnlyItem &&
+//            $0.shoppingOnlyName?.lowercased() == storeItem.item.name.lowercased() &&
+//            $0.shoppingOnlyStore?.lowercased() == storeItem.priceOption.store.lowercased()
+//        })
+//        
+//        let hasVaultItemInCart = cart.cartItems.contains(where: {
+//            $0.itemId == storeItem.item.id && !$0.isShoppingOnlyItem
+//        })
+//        
+//        return hasShoppingOnlyCartItem && !hasVaultItemInCart
 //    }
 //    
 //    var body: some View {
 //        HStack(alignment: .bottom, spacing: 4) {
-//            // Indicator circle
+//            // State indicator based on item type
 //            VStack {
 //                Circle()
-//                    .fill(isActive ? storeBadgeColor : .clear)
+//                    .fill(indicatorColor)
 //                    .frame(width: 9, height: 9)
-//                    .scaleEffect(isActive ? 1 : 0)
-//                    .animation(.spring(response: 0.3, dampingFraction: 0.5), value: isActive)
+//                    .scaleEffect(shouldShowIndicator ? 1 : 0)
+//                    .animation(.spring(response: 0.3, dampingFraction: 0.5), value: shouldShowIndicator)
 //                    .padding(.top, 8)
 //                Spacer()
 //            }
 //            
 //            // Item details
-//            VStack(alignment: .leading, spacing: 1) {
-//                Text(storeItem.item.name)
-//                    .foregroundColor(isActive ? .black : Color(hex: "999"))
-//                    .lexendFont(17)
+//            VStack(alignment: .leading, spacing: 2) {
+//                HStack(spacing: 4) {
+//                    Text(storeItem.item.name)
+//                        .lexendFont(17)
+//                        .foregroundColor(textColor)
+//                        .opacity(contentOpacity)
+//                    
+//                    // State label - ONLY for true shopping-only items when active
+//                    if let badgeText = badgeText {
+//                        Text(badgeText)
+//                            .lexendFont(11, weight: .medium)
+//                            .foregroundColor(badgeTextColor)
+//                            .padding(.horizontal, 6)
+//                            .padding(.vertical, 2)
+//                            .background(badgeBackground)
+//                            .cornerRadius(4)
+//                            .transition(.scale.combined(with: .opacity))
+//                    }
+//                }
 //                
 //                HStack(spacing: 0) {
 //                    Text("₱\(storeItem.priceOption.pricePerUnit.priceValue, specifier: "%g")")
+//                        .foregroundColor(priceColor)
+//                        .opacity(contentOpacity)
+//                    
 //                    Text("/\(storeItem.priceOption.pricePerUnit.unit)")
+//                        .foregroundColor(priceColor)
+//                        .opacity(contentOpacity)
+//                    
 //                    Text(" • \(storeItem.categoryName)")
 //                        .font(.caption)
-//                        .foregroundColor(isActive ? .gray : Color(hex: "999"))
+//                        .foregroundColor(priceColor.opacity(0.7))
+//                        .opacity(contentOpacity)
+//                    
 //                    Spacer()
 //                }
 //                .lexendFont(12)
-//                .foregroundColor(isActive ? .gray : Color(hex: "999"))
 //            }
-//            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isActive)
 //            
 //            Spacer()
 //            
-//            // Quantity controls
+//            // MARK: - Quantity Controls
 //            HStack(spacing: 8) {
-//                if isActive {
-//                    minusButton
+//                switch itemType {
+//                case .vaultOnly:
+//                    // Vault-only items: only show plus button
+//                    plusButton
 //                        .transition(.scale.combined(with: .opacity))
-//                    quantityTextField
-//                        .transition(.scale.combined(with: .opacity))
+//                    
+//                case .plannedCart:
+//                    // Planned cart items: show controls based on quantity
+//                    if currentQuantity > 0 {
+//                        minusButton
+//                            .transition(.scale.combined(with: .opacity))
+//                        quantityTextField
+//                            .transition(.scale.combined(with: .opacity))
+//                        plusButton
+//                            .transition(.scale.combined(with: .opacity))
+//                    } else {
+//                        // Quantity is 0 - show only plus button (reactivate)
+//                        plusButton
+//                            .transition(.scale.combined(with: .opacity))
+//                    }
+//                    
+//                case .shoppingOnly:
+//                    // Shopping-only items: show controls if active, remove button if skipped
+//                    if currentQuantity > 0 {
+//                        minusButton
+//                            .transition(.scale.combined(with: .opacity))
+//                        quantityTextField
+//                            .transition(.scale.combined(with: .opacity))
+//                        plusButton
+//                            .transition(.scale.combined(with: .opacity))
+//                    } else {
+//                        // Show remove button for skipped/empty shopping-only items
+//                        removeButton
+//                            .transition(.scale.combined(with: .opacity))
+//                    }
 //                }
-//                plusButton
 //            }
-//            .animation(.spring(response: 0.35, dampingFraction: 0.7), value: isActive)
+//            .animation(.spring(response: 0.35, dampingFraction: 0.7), value: currentQuantity)
 //            .padding(.top, 6)
 //        }
 //        .padding(.bottom, 4)
@@ -797,19 +1254,32 @@ struct StoreItem: Identifiable {
 //        .background(.white)
 //        .scaleEffect(appearScale)
 //        .opacity(appearOpacity)
-//        .animation(.spring(response: 0.4, dampingFraction: 0.7), value: isActive)
+//        .animation(.spring(response: 0.4, dampingFraction: 0.7), value: currentQuantity)
+//        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: itemType)
 //        .onTapGesture {
 //            if isFocused {
+//                // Commit and dismiss keyboard when tapping outside
 //                isFocused = false
+//                commitTextField()
 //            }
 //        }
-//        .allowsHitTesting(!isFocused)
-//        .onChange(of: currentQuantity) { _, newValue in
-//            if !isFocused {
-//                textValue = formatValue(newValue)
+//        // REMOVED: .allowsHitTesting(!isFocused) - This was preventing button taps
+//        .overlay(
+//            Group {
+//                if isFocused && keyboardResponder.isVisible {
+//                    KeyboardDoneButton(
+//                        keyboardHeight: keyboardResponder.currentHeight,
+//                        onDone: {
+//                            isFocused = false
+//                            commitTextField()
+//                        }
+//                    )
+//                }
 //            }
-//        }
+//        )
 //        .onAppear {
+//            updateState()
+//            
 //            if isNewlyAdded {
 //                withAnimation(.spring(response: 0.25, dampingFraction: 0.75)) {
 //                    appearScale = 1.0
@@ -828,26 +1298,97 @@ struct StoreItem: Identifiable {
 //                textValue = formatValue(currentQuantity)
 //            }
 //        }
+//        .onChange(of: cart.cartItems) { oldItems, newItems in
+//            updateState()
+//        }
+//        .onChange(of: currentQuantity) { oldValue, newValue in
+//            if !isFocused {
+//                textValue = formatValue(newValue)
+//            }
+//        }
+//        .onChange(of: textValue) { oldValue, newValue in
+//            if isFocused && newValue.isEmpty {
+//                return
+//            }
+//        }
 //        .onDisappear {
 //            isNewlyAdded = true
 //        }
-//        .alert("Remove Item?", isPresented: $showingZeroQuantityAlert) {
-//            Button("Cancel", role: .cancel) {
-//                // Reset to previous quantity
-//                if pendingZeroQuantityUpdate {
-//                    // Keep at 1 instead of going to 0
-//                    textValue = "1"
-//                    updateCartItemQuantity(quantity: 1)
-//                }
-//            }
-//            Button("Remove", role: .destructive) {
-//                // Actually remove item from cart
-//                updateCartItemQuantity(quantity: 0)
-//            }
-//        } message: {
-//            Text("Setting quantity to 0 will remove '\(storeItem.item.name)' from your cart. Are you sure?")
+//    }
+//    
+//    // MARK: - UI Properties based on item type and quantity
+//    
+//    private var shouldShowIndicator: Bool {
+//        switch itemType {
+//        case .vaultOnly:
+//            return false
+//        case .plannedCart, .shoppingOnly:
+//            return currentQuantity > 0
 //        }
 //    }
+//    
+//    private var indicatorColor: Color {
+//        switch itemType {
+//        case .vaultOnly:
+//            return .clear
+//        case .plannedCart:
+//            return .blue
+//        case .shoppingOnly:
+//            return .orange
+//        }
+//    }
+//    
+//    private var textColor: Color {
+//        switch itemType {
+//        case .vaultOnly:
+//            return Color(hex: "333").opacity(0.7)
+//        case .plannedCart:
+//            return currentQuantity > 0 ? .black : Color(hex: "333").opacity(0.7)
+//        case .shoppingOnly:
+//            return currentQuantity > 0 ? .black : Color(hex: "333").opacity(0.7)
+//        }
+//    }
+//    
+//    private var priceColor: Color {
+//        switch itemType {
+//        case .vaultOnly:
+//            return Color(hex: "666").opacity(0.7)
+//        case .plannedCart:
+//            return currentQuantity > 0 ? .gray : Color(hex: "888").opacity(0.7)
+//        case .shoppingOnly:
+//            return currentQuantity > 0 ? .gray : Color(hex: "888").opacity(0.7)
+//        }
+//    }
+//    
+//    private var contentOpacity: Double {
+//        switch itemType {
+//        case .vaultOnly:
+//            return 0.7
+//        case .plannedCart:
+//            return currentQuantity > 0 ? 1.0 : 0.7
+//        case .shoppingOnly:
+//            return currentQuantity > 0 ? 1.0 : 0.7
+//        }
+//    }
+//    
+//    private var badgeText: String? {
+//        // Only show "New" badge for TRUE shopping-only items when active
+//        // TRUE shopping-only items are those created via add form, not vault items
+//        if isTrueShoppingOnlyItem && currentQuantity > 0 {
+//            return "New"
+//        }
+//        return nil
+//    }
+//    
+//    private var badgeTextColor: Color {
+//        return .white
+//    }
+//    
+//    private var badgeBackground: Color {
+//        return .orange
+//    }
+//    
+//    // MARK: - Buttons
 //    
 //    private var minusButton: some View {
 //        Button {
@@ -862,8 +1403,66 @@ struct StoreItem: Identifiable {
 //        }
 //        .buttonStyle(.plain)
 //        .contentShape(Rectangle())
-//        .disabled(currentQuantity <= 0 || isFocused)
+//        .disabled(currentQuantity <= 0)
 //        .opacity(currentQuantity <= 0 ? 0.5 : 1)
+//    }
+//    
+//    private var removeButton: some View {
+//        Button {
+//            handleRemove()
+//        } label: {
+//            Image(systemName: "trash")
+//                .font(.footnote)
+//                .foregroundColor(.red)
+//                .frame(width: 24, height: 24)
+//                .background(.white)
+//                .clipShape(Circle())
+//                .overlay(
+//                    Circle()
+//                        .stroke(Color.red.opacity(0.3), lineWidth: 1)
+//                )
+//        }
+//        .buttonStyle(.plain)
+//    }
+//    
+//    private var plusButton: some View {
+//        Button(action: handlePlus) {
+//            Image(systemName: "plus")
+//                .font(.footnote)
+//                .bold()
+//                .foregroundColor(plusButtonColor)
+//        }
+//        .frame(width: 24, height: 24)
+//        .background(.white)
+//        .clipShape(Circle())
+//        .overlay(
+//            Circle()
+//                .stroke(plusButtonStrokeColor, lineWidth: 1)
+//        )
+//        .contentShape(Circle())
+//        .buttonStyle(.plain)
+//    }
+//    
+//    private var plusButtonColor: Color {
+//        switch itemType {
+//        case .vaultOnly:
+//            return Color(hex: "888888").opacity(0.7)
+//        case .plannedCart:
+//            return currentQuantity > 0 ? Color(hex: "1E2A36") : .blue.opacity(0.7)
+//        case .shoppingOnly:
+//            return currentQuantity > 0 ? Color(hex: "1E2A36") : .orange.opacity(0.7)
+//        }
+//    }
+//    
+//    private var plusButtonStrokeColor: Color {
+//        switch itemType {
+//        case .vaultOnly:
+//            return Color(hex: "F2F2F2").darker(by: 0.1)
+//        case .plannedCart:
+//            return currentQuantity > 0 ? .clear : .blue.opacity(0.3)
+//        case .shoppingOnly:
+//            return currentQuantity > 0 ? .clear : .orange.opacity(0.3)
+//        }
 //    }
 //    
 //    private var quantityTextField: some View {
@@ -889,11 +1488,7 @@ struct StoreItem: Identifiable {
 //                    }
 //                }
 //                .onChange(of: textValue) { _, newText in
-//                    // Check if user typed "0"
-//                    if newText == "0" || newText == "0.0" || newText == "0.00" {
-//                        pendingZeroQuantityUpdate = true
-//                        showingZeroQuantityAlert = true
-//                    } else if let number = Double(newText), number > 100 {
+//                    if let number = Double(newText), number > 100 {
 //                        textValue = "100"
 //                    }
 //                }
@@ -908,103 +1503,185 @@ struct StoreItem: Identifiable {
 //        .fixedSize(horizontal: true, vertical: false)
 //    }
 //    
-//    private var plusButton: some View {
-//        Button(action: {
-//            if isActive {
-//                handlePlus()
-//            } else {
-//                withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-//                    addItemToCart(quantity: 1)
-//                }
-//            }
-//        }) {
-//            Image(systemName: "plus")
-//                .font(.footnote)
-//                .bold()
-//                .foregroundColor(isActive ? Color(hex: "1E2A36") : Color(hex: "888888"))
+//    // MARK: - State Management
+//    
+//    private func updateState() {
+//        let foundCartItem = findCartItem()
+//        self.associatedCartItem = foundCartItem
+//        
+//        // Get quantity from cart item
+//        let quantity = foundCartItem?.getQuantity(cart: cart) ?? 0
+//        self.currentQuantity = quantity
+//        
+//        // Update text value if it doesn't match
+//        if !isFocused && textValue != formatValue(quantity) {
+//            textValue = formatValue(quantity)
 //        }
-//        .frame(width: 24, height: 24)
-//        .background(.white)
-//        .clipShape(Circle())
-//        .contentShape(Circle())
-//        .buttonStyle(.plain)
-//        .disabled(isFocused)
 //    }
 //    
-//    private func handlePlus() {
-//        let newValue: Double
-//        if currentQuantity.truncatingRemainder(dividingBy: 1) != 0 {
-//            newValue = ceil(currentQuantity)
-//        } else {
-//            newValue = currentQuantity + 1
+//    private func findCartItem() -> CartItem? {
+//        // First check for shopping-only items by name and store
+//        let shoppingCartItem = cart.cartItems.first(where: {
+//            $0.isShoppingOnlyItem &&
+//            $0.shoppingOnlyName?.lowercased() == storeItem.item.name.lowercased() &&
+//            $0.shoppingOnlyStore?.lowercased() == storeItem.priceOption.store.lowercased()
+//        })
+//        
+//        if shoppingCartItem != nil {
+//            return shoppingCartItem
 //        }
-//
-//        let clamped = min(newValue, 100)
-//        updateCartItemQuantity(quantity: clamped)
-//        textValue = formatValue(clamped)
+//        
+//        // Then check for planned cart items by itemId
+//        let plannedCartItem = cart.cartItems.first(where: {
+//            $0.itemId == storeItem.item.id && !$0.isShoppingOnlyItem
+//        })
+//        
+//        return plannedCartItem
+//    }
+//    
+//    // MARK: - Quantity Handlers
+//    
+//    private func handlePlus() {
+//        switch itemType {
+//        case .vaultOnly:
+//            // Add vault-only item to cart
+//            // IMPORTANT: For vault items, always add as planned items (not shopping-only)
+//            // even during shopping mode, because they exist in the vault
+//            vaultService.addVaultItemToCart(
+//                item: storeItem.item,
+//                cart: cart,
+//                quantity: 1,
+//                selectedStore: storeItem.priceOption.store
+//            )
+//            
+//            updateState()
+//            
+//        case .plannedCart:
+//            if let cartItem = associatedCartItem {
+//                let newQuantity = cartItem.getQuantity(cart: cart) + 1
+//                cartItem.quantity = newQuantity
+//                cartItem.isSkippedDuringShopping = false
+//                vaultService.updateCartTotals(cart: cart)
+//                currentQuantity = newQuantity
+//                textValue = formatValue(newQuantity)
+//            } else {
+//                vaultService.addVaultItemToCart(
+//                    item: storeItem.item,
+//                    cart: cart,
+//                    quantity: 1,
+//                    selectedStore: storeItem.priceOption.store
+//                )
+//                updateState()
+//            }
+//            
+//        case .shoppingOnly:
+//            if let cartItem = associatedCartItem {
+//                let newQuantity = cartItem.getQuantity(cart: cart) + 1
+//                cartItem.quantity = newQuantity
+//                cartItem.isSkippedDuringShopping = false
+//                vaultService.updateCartTotals(cart: cart)
+//                currentQuantity = newQuantity
+//                textValue = formatValue(newQuantity)
+//            } else {
+//                vaultService.addShoppingItemToCart(
+//                    name: storeItem.item.name,
+//                    store: storeItem.priceOption.store,
+//                    price: storeItem.priceOption.pricePerUnit.priceValue,
+//                    unit: storeItem.priceOption.pricePerUnit.unit,
+//                    cart: cart,
+//                    quantity: 1
+//                )
+//                updateState()
+//            }
+//        }
 //        
 //        let generator = UIImpactFeedbackGenerator(style: .light)
 //        generator.impactOccurred()
 //    }
-//
+//    
 //    private func handleMinus() {
-//        // Check if going from 1 to 0
-//        if currentQuantity <= 1 {
-//            showingZeroQuantityAlert = true
-//            pendingZeroQuantityUpdate = true
-//            return
-//        }
+//        guard currentQuantity > 0 else { return }
 //        
-//        let newValue: Double
-//        if currentQuantity.truncatingRemainder(dividingBy: 1) != 0 {
-//            newValue = floor(currentQuantity)
+//        let newQuantity = max(currentQuantity - 1, 0)
+//        
+//        if newQuantity <= 0 {
+//            handleZeroQuantity()
 //        } else {
-//            newValue = currentQuantity - 1
+//            updateCartItemQuantity(quantity: newQuantity)
+//            textValue = formatValue(newQuantity)
 //        }
-//
-//        let clamped = max(newValue, 0)
-//        updateCartItemQuantity(quantity: clamped)
-//        textValue = formatValue(clamped)
 //        
 //        let generator = UIImpactFeedbackGenerator(style: .light)
 //        generator.impactOccurred()
+//    }
+//    
+//    private func handleRemove() {
+//        if let cartItem = associatedCartItem, itemType == .shoppingOnly {
+//            if let index = cart.cartItems.firstIndex(where: { $0.id == cartItem.id }) {
+//                cart.cartItems.remove(at: index)
+//                vaultService.updateCartTotals(cart: cart)
+//            }
+//        }
 //    }
 //    
 //    private func commitTextField() {
+//        guard !textValue.isEmpty else {
+//            handleZeroQuantity()
+//            return
+//        }
+//        
 //        let formatter = NumberFormatter()
 //        formatter.numberStyle = .decimal
 //
 //        if let number = formatter.number(from: textValue) {
 //            let doubleValue = number.doubleValue
 //            
-//            // Check if value is 0
-//            if doubleValue == 0 {
-//                pendingZeroQuantityUpdate = true
-//                showingZeroQuantityAlert = true
-//                return
-//            }
-//            
-//            let clamped = min(max(doubleValue, 0.01), 100) // Minimum 0.01
-//            updateCartItemQuantity(quantity: clamped)
-//
-//            if doubleValue != clamped {
-//                textValue = formatValue(clamped)
+//            if doubleValue <= 0 {
+//                handleZeroQuantity()
 //            } else {
-//                textValue = textValue.trimmingCharacters(in: .whitespacesAndNewlines)
+//                let clamped = min(max(doubleValue, 0.01), 100)
+//                updateCartItemQuantity(quantity: clamped)
+//                
+//                if doubleValue != clamped {
+//                    textValue = formatValue(clamped)
+//                }
 //            }
 //        } else {
 //            textValue = formatValue(currentQuantity)
 //        }
-//        isFocused = false
+//    }
+//
+//    private func handleZeroQuantity() {
+//        guard let cartItem = associatedCartItem else {
+//            textValue = ""
+//            updateState()
+//            return
+//        }
+//        
+//        switch itemType {
+//        case .plannedCart:
+//            cartItem.quantity = 0
+//            cartItem.isSkippedDuringShopping = false
+//            vaultService.updateCartTotals(cart: cart)
+//            
+//            currentQuantity = 0
+//            textValue = ""
+//            
+//        case .shoppingOnly:
+//            handleRemove()
+//            
+//        case .vaultOnly:
+//            break
+//        }
 //    }
 //    
 //    private func formatValue(_ val: Double) -> String {
 //        guard !val.isNaN && val.isFinite else {
-//            return "0"
+//            return "1"
 //        }
 //        
 //        if val <= 0 {
-//            return "1" // Default to 1 instead of 0
+//            return "1"
 //        }
 //        
 //        if val.truncatingRemainder(dividingBy: 1) == 0 {
@@ -1017,65 +1694,19 @@ struct StoreItem: Identifiable {
 //        }
 //    }
 //    
-//    private func addItemToCart(quantity: Double) {
-//        if cart.isShopping {
-//            vaultService.addShoppingItemToCart(
-//                name: storeItem.item.name,
-//                store: storeItem.priceOption.store,
-//                price: storeItem.priceOption.pricePerUnit.priceValue,
-//                unit: storeItem.priceOption.pricePerUnit.unit,
-//                cart: cart,
-//                quantity: quantity
-//            )
-//        } else {
-//            vaultService.addVaultItemToCart(
-//                item: storeItem.item,
-//                cart: cart,
-//                quantity: quantity,
-//                selectedStore: storeItem.priceOption.store
-//            )
-//        }
-//    }
+//    // MARK: - Cart Operations
 //    
 //    private func updateCartItemQuantity(quantity: Double) {
-//        if quantity <= 0 {
-//            // Remove item from cart
-//            vaultService.removeItemFromCart(cart: cart, itemId: storeItem.item.id)
-//        } else {
-//            // Check if item already exists in cart
-//            if let cartItem = cart.cartItems.first(where: { $0.itemId == storeItem.item.id }) {
-//                // Update quantity of existing item
-//                if cart.isShopping && cartItem.isFulfilled {
-//                    cartItem.actualQuantity = quantity
-//                } else {
-//                    cartItem.quantity = quantity
-//                }
-//                vaultService.updateCartTotals(cart: cart)
-//            } else {
-//                // Add new item with specified quantity
-//                addItemToCart(quantity: quantity)
-//            }
-//        }
-//    }
-//    
-//    private var storeBadgeColor: Color {
-//        let colors: [Color] = [
-//            Color(hex: "4A90E2"),
-//            Color(hex: "50E3C2"),
-//            Color(hex: "B8E986"),
-//            Color(hex: "F5A623"),
-//            Color(hex: "D0021B"),
-//            Color(hex: "9013FE"),
-//            Color(hex: "8B572A"),
-//        ]
+//        guard let cartItem = associatedCartItem else { return }
 //        
-//        let hash = storeItem.priceOption.store.hash
-//        let index = abs(hash) % colors.count
-//        return colors[index]
+//        cartItem.quantity = quantity
+//        cartItem.isSkippedDuringShopping = false
+//        vaultService.updateCartTotals(cart: cart)
+//        
+//        currentQuantity = quantity
 //    }
 //}
 
-// MARK: - BrowseVaultItemRow (With Three-State Shopping Context)
 struct BrowseVaultItemRow: View {
     let storeItem: StoreItem
     let cart: Cart
@@ -1090,63 +1721,72 @@ struct BrowseVaultItemRow: View {
     @State private var textValue: String = ""
     @FocusState private var isFocused: Bool
     
-    // Track if this is a shopping-only item
-    private var isShoppingOnlyItem: Bool {
-        storeItem.isShoppingOnlyItem
-    }
+    @State private var associatedCartItem: CartItem?
+    @State private var currentQuantity: Double = 0
     
-    private var cartItem: CartItem? {
-        cart.cartItems.first(where: {
-            if isShoppingOnlyItem {
-                // For shopping-only items, match by name and store
-                return $0.isShoppingOnlyItem &&
-                       $0.shoppingOnlyName?.lowercased() == storeItem.item.name.lowercased() &&
-                       $0.shoppingOnlyStore?.lowercased() == storeItem.priceOption.store.lowercased()
-            } else {
-                // For Vault items, match by ID
-                return $0.itemId == storeItem.item.id
-            }
+    private var itemType: ItemType {
+        // Check shopping-only first using the storeItem property
+        if storeItem.isShoppingOnlyItem {
+            return .shoppingOnly
+        }
+        
+        // Check if it's a planned cart item (vault item in cart)
+        let isInCartAsPlanned = cart.cartItems.contains(where: {
+            $0.itemId == storeItem.item.id && !$0.isShoppingOnlyItem
         })
+        
+        if isInCartAsPlanned {
+            return .plannedCart
+        }
+        
+        // Check if it's a shopping-only item (added during shopping)
+        // This only applies to items that don't exist in vault
+        let isInCartAsShopping = cart.cartItems.contains(where: {
+            $0.isShoppingOnlyItem &&
+            $0.shoppingOnlyName?.lowercased() == storeItem.item.name.lowercased() &&
+            $0.shoppingOnlyStore?.lowercased() == storeItem.priceOption.store.lowercased()
+        })
+        
+        if isInCartAsShopping {
+            return .shoppingOnly
+        }
+        
+        // Otherwise, it's vault-only
+        return .vaultOnly
     }
     
-    // Determine the item's current state
-    private var itemState: ItemState {
-        guard let cartItem = cartItem else {
-            return .inactive
+    // Helper to check if this is a true shopping-only item (created via add form, not from vault)
+    private var isTrueShoppingOnlyItem: Bool {
+        // Check if storeItem is marked as shopping-only
+        if storeItem.isShoppingOnlyItem {
+            return true
         }
         
-        if cartItem.isSkippedDuringShopping {
-            return .skipped
-        }
+        // Check if there's a shopping-only cart item but no vault item with same ID
+        let hasShoppingOnlyCartItem = cart.cartItems.contains(where: {
+            $0.isShoppingOnlyItem &&
+            $0.shoppingOnlyName?.lowercased() == storeItem.item.name.lowercased() &&
+            $0.shoppingOnlyStore?.lowercased() == storeItem.priceOption.store.lowercased()
+        })
         
-        // Check if it's actually in the cart (has quantity > 0)
-        let quantity = cartItem.getQuantity(cart: cart)
-        if quantity > 0 {
-            return .active
-        }
+        let hasVaultItemInCart = cart.cartItems.contains(where: {
+            $0.itemId == storeItem.item.id && !$0.isShoppingOnlyItem
+        })
         
-        // If it has a cartItem but quantity is 0, treat as skipped
-        return .skipped
-    }
-    
-    private var currentQuantity: Double {
-        cartItem?.getQuantity(cart: cart) ?? 0
+        return hasShoppingOnlyCartItem && !hasVaultItemInCart
     }
     
     var body: some View {
         HStack(alignment: .bottom, spacing: 4) {
-            // State indicator (only for Active and Skipped states)
-            if itemState != .inactive || !isShoppingOnlyItem {
-                VStack {
-                    Circle()
-                        .fill(itemState == .active ? .green : .clear)
-                        .frame(width: 9, height: 9)
-                        .scaleEffect(itemState == .active  ? 1 : 0)
-                        .animation(.spring(response: 0.3, dampingFraction: 0.5), value: itemState == .active)
-                        .padding(.top, 8)
-                    Spacer()
-                }
-                .transition(.scale.combined(with: .opacity))
+            // State indicator based on item type
+            VStack {
+                Circle()
+                    .fill(indicatorColor)
+                    .frame(width: 9, height: 9)
+                    .scaleEffect(shouldShowIndicator ? 1 : 0)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.5), value: shouldShowIndicator)
+                    .padding(.top, 8)
+                Spacer()
             }
             
             // Item details
@@ -1154,83 +1794,83 @@ struct BrowseVaultItemRow: View {
                 HStack(spacing: 4) {
                     Text(storeItem.item.name)
                         .lexendFont(17)
-                        .foregroundColor(itemState.textColor)
-                        .opacity(itemState.contentOpacity)
+                        .foregroundColor(textColor)
+                        .opacity(contentOpacity)
                     
-                    // State label (only for Active and Skipped)
-                    if itemState != .inactive {
-                        Text(itemState.labelText)
+                    // State label - ONLY for true shopping-only items when active
+                    if let badgeText = badgeText {
+                        Text(badgeText)
                             .lexendFont(11, weight: .medium)
-                            .foregroundColor(itemState.labelColor)
+                            .foregroundColor(badgeTextColor)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
-                            .background(itemState.labelBackground)
+                            .background(badgeBackground)
                             .cornerRadius(4)
                             .transition(.scale.combined(with: .opacity))
-                    }
-                    
-                    // Shopping-only badge
-                    if isShoppingOnlyItem {
-                        Text("Temp")
-                            .lexendFont(9, weight: .medium)
-                            .foregroundColor(.orange)
-                            .padding(.horizontal, 4)
-                            .padding(.vertical, 1)
-                            .background(Color.orange.opacity(0.1))
-                            .cornerRadius(3)
                     }
                 }
                 
                 HStack(spacing: 0) {
                     Text("₱\(storeItem.priceOption.pricePerUnit.priceValue, specifier: "%g")")
-                        .foregroundColor(itemState.priceColor)
-                        .opacity(itemState.contentOpacity)
+                        .foregroundColor(priceColor)
+                        .opacity(contentOpacity)
                     
                     Text("/\(storeItem.priceOption.pricePerUnit.unit)")
-                        .foregroundColor(itemState.priceColor)
-                        .opacity(itemState.contentOpacity)
+                        .foregroundColor(priceColor)
+                        .opacity(contentOpacity)
                     
                     Text(" • \(storeItem.categoryName)")
                         .font(.caption)
-                        .foregroundColor(itemState.priceColor.opacity(0.7))
-                        .opacity(itemState.contentOpacity)
+                        .foregroundColor(priceColor.opacity(0.7))
+                        .opacity(contentOpacity)
                     
                     Spacer()
                 }
                 .lexendFont(12)
             }
-            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: itemState)
             
             Spacer()
             
-            // Quantity controls based on state
+            // MARK: - Quantity Controls
             HStack(spacing: 8) {
-                switch itemState {
-                case .active:
-                    // Active: Show minus button and quantity field
-                    minusButton
-                        .transition(.scale.combined(with: .opacity))
-                    quantityTextField
-                        .transition(.scale.combined(with: .opacity))
+                switch itemType {
+                case .vaultOnly:
+                    // Vault-only items: only show plus button
                     plusButton
+                        .transition(.scale.combined(with: .opacity))
                     
-                case .skipped:
-                    // Skipped: Show only plus button to re-activate
-                    if isShoppingOnlyItem {
-                        // For shopping-only items, show remove button instead
-                        removeButton
-                    } else {
+                case .plannedCart:
+                    // Planned cart items: show controls based on quantity
+                    if currentQuantity > 0 {
+                        minusButton
+                            .transition(.scale.combined(with: .opacity))
+                        quantityTextField
+                            .transition(.scale.combined(with: .opacity))
                         plusButton
+                            .transition(.scale.combined(with: .opacity))
+                    } else {
+                        // Quantity is 0 - show only plus button (reactivate)
+                        plusButton
+                            .transition(.scale.combined(with: .opacity))
                     }
-//                        .transition(.scale.combined(with: .opacity))
                     
-                case .inactive:
-                    // Inactive: Show plus button to add
-                    plusButton
-                        .transition(.scale.combined(with: .opacity))
+                case .shoppingOnly:
+                    // Shopping-only items: show controls if active, remove button if skipped
+                    if currentQuantity > 0 {
+                        minusButton
+                            .transition(.scale.combined(with: .opacity))
+                        quantityTextField
+                            .transition(.scale.combined(with: .opacity))
+                        plusButton
+                            .transition(.scale.combined(with: .opacity))
+                    } else {
+                        // Show remove button for skipped/empty shopping-only items
+                        removeButton
+                            .transition(.scale.combined(with: .opacity))
+                    }
                 }
             }
-            .animation(.spring(response: 0.35, dampingFraction: 0.7), value: itemState)
+            .animation(.spring(response: 0.35, dampingFraction: 0.7), value: currentQuantity)
             .padding(.top, 6)
         }
         .padding(.bottom, 4)
@@ -1239,19 +1879,19 @@ struct BrowseVaultItemRow: View {
         .background(.white)
         .scaleEffect(appearScale)
         .opacity(appearOpacity)
-        .animation(.spring(response: 0.4, dampingFraction: 0.7), value: itemState)
+        .animation(.spring(response: 0.4, dampingFraction: 0.7), value: currentQuantity)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: itemType)
         .onTapGesture {
             if isFocused {
                 isFocused = false
+                commitTextField()
             }
         }
-        .allowsHitTesting(!isFocused)
-        .onChange(of: currentQuantity) { _, newValue in
-            if !isFocused {
-                textValue = formatValue(newValue)
-            }
-        }
+        // Send focus preference to parent
+        .preference(key: TextFieldFocusPreferenceKey.self, value: isFocused ? storeItem.id : nil)
         .onAppear {
+            updateState()
+            
             if isNewlyAdded {
                 withAnimation(.spring(response: 0.25, dampingFraction: 0.75)) {
                     appearScale = 1.0
@@ -1270,12 +1910,103 @@ struct BrowseVaultItemRow: View {
                 textValue = formatValue(currentQuantity)
             }
         }
+        .onChange(of: cart.cartItems) { oldItems, newItems in
+            updateState()
+        }
+        .onChange(of: currentQuantity) { oldValue, newValue in
+            if !isFocused {
+                textValue = formatValue(newValue)
+            }
+        }
+        .onChange(of: textValue) { oldValue, newValue in
+            if isFocused && newValue.isEmpty {
+                return
+            }
+        }
+        .onChange(of: isFocused) { oldValue, newValue in
+            if !newValue {
+                commitTextField()
+            }
+        }
         .onDisappear {
             isNewlyAdded = true
         }
     }
     
+    // MARK: - UI Properties based on item type and quantity
+    
+    private var shouldShowIndicator: Bool {
+        switch itemType {
+        case .vaultOnly:
+            return false
+        case .plannedCart, .shoppingOnly:
+            return currentQuantity > 0
+        }
+    }
+    
+    private var indicatorColor: Color {
+        switch itemType {
+        case .vaultOnly:
+            return .clear
+        case .plannedCart:
+            return .blue
+        case .shoppingOnly:
+            return .orange
+        }
+    }
+    
+    private var textColor: Color {
+        switch itemType {
+        case .vaultOnly:
+            return Color(hex: "333").opacity(0.7)
+        case .plannedCart:
+            return currentQuantity > 0 ? .black : Color(hex: "333").opacity(0.7)
+        case .shoppingOnly:
+            return currentQuantity > 0 ? .black : Color(hex: "333").opacity(0.7)
+        }
+    }
+    
+    private var priceColor: Color {
+        switch itemType {
+        case .vaultOnly:
+            return Color(hex: "666").opacity(0.7)
+        case .plannedCart:
+            return currentQuantity > 0 ? .gray : Color(hex: "888").opacity(0.7)
+        case .shoppingOnly:
+            return currentQuantity > 0 ? .gray : Color(hex: "888").opacity(0.7)
+        }
+    }
+    
+    private var contentOpacity: Double {
+        switch itemType {
+        case .vaultOnly:
+            return 0.7
+        case .plannedCart:
+            return currentQuantity > 0 ? 1.0 : 0.7
+        case .shoppingOnly:
+            return currentQuantity > 0 ? 1.0 : 0.7
+        }
+    }
+    
+    private var badgeText: String? {
+        // Only show "New" badge for TRUE shopping-only items when active
+        // TRUE shopping-only items are those created via add form, not vault items
+        if isTrueShoppingOnlyItem && currentQuantity > 0 {
+            return "New"
+        }
+        return nil
+    }
+    
+    private var badgeTextColor: Color {
+        return .white
+    }
+    
+    private var badgeBackground: Color {
+        return .orange
+    }
+    
     // MARK: - Buttons
+    
     private var minusButton: some View {
         Button {
             handleMinus()
@@ -1289,25 +2020,13 @@ struct BrowseVaultItemRow: View {
         }
         .buttonStyle(.plain)
         .contentShape(Rectangle())
-        .disabled(currentQuantity <= 0 || isFocused)
+        .disabled(currentQuantity <= 0)
         .opacity(currentQuantity <= 0 ? 0.5 : 1)
     }
     
     private var removeButton: some View {
         Button {
-            // COMPLETELY REMOVE shopping-only item when inactive
-            if let cartItem = cartItem, isShoppingOnlyItem {
-                if let index = cart.cartItems.firstIndex(where: { $0.id == cartItem.id }) {
-                    cart.cartItems.remove(at: index)
-                    vaultService.updateCartTotals(cart: cart)
-                    // Send notification to refresh BrowseVaultView
-                    NotificationCenter.default.post(
-                        name: NSNotification.Name("ShoppingDataUpdated"),
-                        object: nil,
-                        userInfo: ["cartItemId": cart.id]
-                    )
-                }
-            }
+            handleRemove()
         } label: {
             Image(systemName: "trash")
                 .font(.footnote)
@@ -1321,6 +2040,46 @@ struct BrowseVaultItemRow: View {
                 )
         }
         .buttonStyle(.plain)
+    }
+    
+    private var plusButton: some View {
+        Button(action: handlePlus) {
+            Image(systemName: "plus")
+                .font(.footnote)
+                .bold()
+                .foregroundColor(plusButtonColor)
+        }
+        .frame(width: 24, height: 24)
+        .background(.white)
+        .clipShape(Circle())
+        .overlay(
+            Circle()
+                .stroke(plusButtonStrokeColor, lineWidth: 1)
+        )
+        .contentShape(Circle())
+        .buttonStyle(.plain)
+    }
+    
+    private var plusButtonColor: Color {
+        switch itemType {
+        case .vaultOnly:
+            return Color(hex: "888888").opacity(0.7)
+        case .plannedCart:
+            return currentQuantity > 0 ? Color(hex: "1E2A36") : .blue.opacity(0.7)
+        case .shoppingOnly:
+            return currentQuantity > 0 ? Color(hex: "1E2A36") : .orange.opacity(0.7)
+        }
+    }
+    
+    private var plusButtonStrokeColor: Color {
+        switch itemType {
+        case .vaultOnly:
+            return Color(hex: "F2F2F2").darker(by: 0.1)
+        case .plannedCart:
+            return currentQuantity > 0 ? .clear : .blue.opacity(0.3)
+        case .shoppingOnly:
+            return currentQuantity > 0 ? .clear : .orange.opacity(0.3)
+        }
     }
     
     private var quantityTextField: some View {
@@ -1340,11 +2099,6 @@ struct BrowseVaultItemRow: View {
                 .multilineTextAlignment(.center)
                 .focused($isFocused)
                 .normalizedNumber($textValue, allowDecimal: true, maxDecimalPlaces: 2)
-                .onChange(of: isFocused) { _, focused in
-                    if !focused {
-                        commitTextField()
-                    }
-                }
                 .onChange(of: textValue) { _, newText in
                     if let number = Double(newText), number > 100 {
                         textValue = "100"
@@ -1361,174 +2115,176 @@ struct BrowseVaultItemRow: View {
         .fixedSize(horizontal: true, vertical: false)
     }
     
-    private var plusButton: some View {
-        Button(action: handlePlus) {
-            Image(systemName: "plus")
-                .font(.footnote)
-                .bold()
-                .foregroundColor(plusButtonColor)
-        }
-        .frame(width: 24, height: 24)
-        .background(.white)
-        .clipShape(Circle())
-        .overlay(
-            Circle()
-                .stroke(plusButtonStrokeColor, lineWidth: 1)
-        )
-        .contentShape(Circle())
-        .buttonStyle(.plain)
-        .disabled(isFocused)
-    }
+    // MARK: - State Management
     
-    private var plusButtonColor: Color {
-        switch itemState {
-        case .active:
-            return Color(hex: "1E2A36")
-        case .skipped:
-            return .orange
-        case .inactive:
-            return Color(hex: "888888")
+    private func updateState() {
+        let foundCartItem = findCartItem()
+        self.associatedCartItem = foundCartItem
+        
+        // Get quantity from cart item
+        let quantity = foundCartItem?.getQuantity(cart: cart) ?? 0
+        self.currentQuantity = quantity
+        
+        // Update text value if it doesn't match
+        if !isFocused && textValue != formatValue(quantity) {
+            textValue = formatValue(quantity)
         }
     }
     
-    private var plusButtonStrokeColor: Color {
-        switch itemState {
-        case .skipped:
-            return .orange.opacity(0.3)
-        case .inactive:
-            return Color(hex: "F2F2F2").darker(by: 0.1)
-        default:
-            return .clear
+    private func findCartItem() -> CartItem? {
+        // First check for shopping-only items by name and store
+        let shoppingCartItem = cart.cartItems.first(where: {
+            $0.isShoppingOnlyItem &&
+            $0.shoppingOnlyName?.lowercased() == storeItem.item.name.lowercased() &&
+            $0.shoppingOnlyStore?.lowercased() == storeItem.priceOption.store.lowercased()
+        })
+        
+        if shoppingCartItem != nil {
+            return shoppingCartItem
         }
+        
+        // Then check for planned cart items by itemId
+        let plannedCartItem = cart.cartItems.first(where: {
+            $0.itemId == storeItem.item.id && !$0.isShoppingOnlyItem
+        })
+        
+        return plannedCartItem
     }
     
     // MARK: - Quantity Handlers
+    
     private func handlePlus() {
-        switch itemState {
-        case .active:
-            // Increment quantity for active items
-            let newValue: Double
-            if currentQuantity.truncatingRemainder(dividingBy: 1) != 0 {
-                newValue = ceil(currentQuantity)
-            } else {
-                newValue = currentQuantity + 1
-            }
+        switch itemType {
+        case .vaultOnly:
+            // Add vault-only item to cart
+            // IMPORTANT: For vault items, always add as planned items (not shopping-only)
+            // even during shopping mode, because they exist in the vault
+            vaultService.addVaultItemToCart(
+                item: storeItem.item,
+                cart: cart,
+                quantity: 1,
+                selectedStore: storeItem.priceOption.store
+            )
             
-            let clamped = min(newValue, 100)
-            updateCartItemQuantity(quantity: clamped)
-            textValue = formatValue(clamped)
+            updateState()
             
-        case .skipped:
-            // Re-activate skipped item with quantity 1
-            if let cartItem = cartItem {
-                // Unskip the item
+        case .plannedCart:
+            if let cartItem = associatedCartItem {
+                let newQuantity = cartItem.getQuantity(cart: cart) + 1
+                cartItem.quantity = newQuantity
                 cartItem.isSkippedDuringShopping = false
-                cartItem.quantity = 1
                 vaultService.updateCartTotals(cart: cart)
-                textValue = "1"
+                currentQuantity = newQuantity
+                textValue = formatValue(newQuantity)
+            } else {
+                vaultService.addVaultItemToCart(
+                    item: storeItem.item,
+                    cart: cart,
+                    quantity: 1,
+                    selectedStore: storeItem.priceOption.store
+                )
+                updateState()
             }
             
-        case .inactive:
-            // Add new item with quantity 1
-            addItemToCart(quantity: 1)
-        }
-        
-        let generator = UIImpactFeedbackGenerator(style: .light)
-        generator.impactOccurred()
-    }
-
-    private func handleMinus() {
-        // For active items only
-        guard itemState == .active else { return }
-        
-        let newValue: Double
-        if currentQuantity <= 1 {
-            // When reducing from 1 to 0
-            if isShoppingOnlyItem {
-                // For shopping-only items: COMPLETELY REMOVE
-                if let cartItem = cartItem {
-                    if let index = cart.cartItems.firstIndex(where: { $0.id == cartItem.id }) {
-                        cart.cartItems.remove(at: index)
-                        vaultService.updateCartTotals(cart: cart)
-                        // Send notification to refresh BrowseVaultView
-                        NotificationCenter.default.post(
-                            name: NSNotification.Name("ShoppingDataUpdated"),
-                            object: nil,
-                            userInfo: ["cartItemId": cart.id]
-                        )
-                    }
-                }
+        case .shoppingOnly:
+            if let cartItem = associatedCartItem {
+                let newQuantity = cartItem.getQuantity(cart: cart) + 1
+                cartItem.quantity = newQuantity
+                cartItem.isSkippedDuringShopping = false
+                vaultService.updateCartTotals(cart: cart)
+                currentQuantity = newQuantity
+                textValue = formatValue(newQuantity)
             } else {
-                // For Vault items: mark as skipped
-                if let cartItem = cartItem {
-                    cartItem.isSkippedDuringShopping = true
-                    cartItem.quantity = 0
-                    vaultService.updateCartTotals(cart: cart)
-                    textValue = ""
-                }
+                vaultService.addShoppingItemToCart(
+                    name: storeItem.item.name,
+                    store: storeItem.priceOption.store,
+                    price: storeItem.priceOption.pricePerUnit.priceValue,
+                    unit: storeItem.priceOption.pricePerUnit.unit,
+                    cart: cart,
+                    quantity: 1
+                )
+                updateState()
             }
-            return
-        } else if currentQuantity.truncatingRemainder(dividingBy: 1) != 0 {
-            newValue = floor(currentQuantity)
-        } else {
-            newValue = currentQuantity - 1
         }
-
-        let clamped = max(newValue, 0)
-        updateCartItemQuantity(quantity: clamped)
-        textValue = formatValue(clamped)
         
         let generator = UIImpactFeedbackGenerator(style: .light)
         generator.impactOccurred()
     }
     
+    private func handleMinus() {
+        guard currentQuantity > 0 else { return }
+        
+        let newQuantity = max(currentQuantity - 1, 0)
+        
+        if newQuantity <= 0 {
+            handleZeroQuantity()
+        } else {
+            updateCartItemQuantity(quantity: newQuantity)
+            textValue = formatValue(newQuantity)
+        }
+        
+        let generator = UIImpactFeedbackGenerator(style: .light)
+        generator.impactOccurred()
+    }
+    
+    private func handleRemove() {
+        if let cartItem = associatedCartItem, itemType == .shoppingOnly {
+            if let index = cart.cartItems.firstIndex(where: { $0.id == cartItem.id }) {
+                cart.cartItems.remove(at: index)
+                vaultService.updateCartTotals(cart: cart)
+            }
+        }
+    }
+    
     private func commitTextField() {
+        guard !textValue.isEmpty else {
+            handleZeroQuantity()
+            return
+        }
+        
         let formatter = NumberFormatter()
         formatter.numberStyle = .decimal
 
         if let number = formatter.number(from: textValue) {
             let doubleValue = number.doubleValue
             
-            // Handle zero quantity
-            if doubleValue == 0 && itemState == .active {
-                if isShoppingOnlyItem {
-                    // For shopping-only items: COMPLETELY REMOVE
-                    if let cartItem = cartItem {
-                        if let index = cart.cartItems.firstIndex(where: { $0.id == cartItem.id }) {
-                            cart.cartItems.remove(at: index)
-                            vaultService.updateCartTotals(cart: cart)
-                            // Send notification to refresh BrowseVaultView
-                            NotificationCenter.default.post(
-                                name: NSNotification.Name("ShoppingDataUpdated"),
-                                object: nil,
-                                userInfo: ["cartItemId": cart.id]
-                            )
-                        }
-                    }
-                } else {
-                    // For Vault items: mark as skipped
-                    if let cartItem = cartItem {
-                        cartItem.isSkippedDuringShopping = true
-                        cartItem.quantity = 0
-                        vaultService.updateCartTotals(cart: cart)
-                        textValue = ""
-                    }
-                }
-                return
-            }
-            
-            let clamped = min(max(doubleValue, 0.01), 100)
-            updateCartItemQuantity(quantity: clamped)
-
-            if doubleValue != clamped {
-                textValue = formatValue(clamped)
+            if doubleValue <= 0 {
+                handleZeroQuantity()
             } else {
-                textValue = textValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                let clamped = min(max(doubleValue, 0.01), 100)
+                updateCartItemQuantity(quantity: clamped)
+                
+                if doubleValue != clamped {
+                    textValue = formatValue(clamped)
+                }
             }
         } else {
             textValue = formatValue(currentQuantity)
         }
-        isFocused = false
+    }
+
+    private func handleZeroQuantity() {
+        guard let cartItem = associatedCartItem else {
+            textValue = ""
+            updateState()
+            return
+        }
+        
+        switch itemType {
+        case .plannedCart:
+            cartItem.quantity = 0
+            cartItem.isSkippedDuringShopping = false
+            vaultService.updateCartTotals(cart: cart)
+            
+            currentQuantity = 0
+            textValue = ""
+            
+        case .shoppingOnly:
+            handleRemove()
+            
+        case .vaultOnly:
+            break
+        }
     }
     
     private func formatValue(_ val: Double) -> String {
@@ -1551,140 +2307,100 @@ struct BrowseVaultItemRow: View {
     }
     
     // MARK: - Cart Operations
-    private func addItemToCart(quantity: Double) {
-        if cart.isShopping {
-            // Check if there's already a shopping-only item with same name and store
-            let existingItem = cart.cartItems.first(where: {
-                $0.isShoppingOnlyItem &&
-                $0.shoppingOnlyName?.lowercased() == storeItem.item.name.lowercased() &&
-                $0.shoppingOnlyStore?.lowercased() == storeItem.priceOption.store.lowercased()
-            })
-            
-            if let existingItem = existingItem {
-                // Reactivate existing shopping-only item
-                existingItem.isSkippedDuringShopping = false
-                existingItem.quantity = quantity
-            } else {
-                // Create new shopping-only item
-                vaultService.addShoppingItemToCart(
-                    name: storeItem.item.name,
-                    store: storeItem.priceOption.store,
-                    price: storeItem.priceOption.pricePerUnit.priceValue,
-                    unit: storeItem.priceOption.pricePerUnit.unit,
-                    cart: cart,
-                    quantity: quantity
-                )
-            }
-        } else {
-            // Planning mode: add as Vault item
-            vaultService.addVaultItemToCart(
-                item: storeItem.item,
-                cart: cart,
-                quantity: quantity,
-                selectedStore: storeItem.priceOption.store
-            )
-        }
-    }
     
     private func updateCartItemQuantity(quantity: Double) {
-        guard let cartItem = cartItem else { return }
+        guard let cartItem = associatedCartItem else { return }
         
-        if quantity <= 0 {
-            if isShoppingOnlyItem {
-                // For shopping-only items: COMPLETELY REMOVE
-                if let index = cart.cartItems.firstIndex(where: { $0.id == cartItem.id }) {
-                    cart.cartItems.remove(at: index)
-                    vaultService.updateCartTotals(cart: cart)
-                    // Send notification to refresh BrowseVaultView
-                    NotificationCenter.default.post(
-                        name: NSNotification.Name("ShoppingDataUpdated"),
-                        object: nil,
-                        userInfo: ["cartItemId": cart.id]
-                    )
-                }
-            } else {
-                // For Vault items: mark as skipped
-                cartItem.isSkippedDuringShopping = true
-                cartItem.quantity = 0
-                vaultService.updateCartTotals(cart: cart)
-            }
-        } else {
-            // Update quantity of existing item
-            cartItem.quantity = quantity
-            cartItem.isSkippedDuringShopping = false
-            vaultService.updateCartTotals(cart: cart)
-        }
+        cartItem.quantity = quantity
+        cartItem.isSkippedDuringShopping = false
+        vaultService.updateCartTotals(cart: cart)
+        
+        currentQuantity = quantity
     }
 }
 
-// MARK: - Item State Enum
+// MARK: - Supporting Types
+
+enum ItemType {
+    case vaultOnly      // Never been in any cart
+    case plannedCart    // Vault item added to cart during planning
+    case shoppingOnly   // Added via add form during shopping
+}
+
 enum ItemState {
     case active
     case skipped
     case inactive
-    
-    var indicatorColor: Color {
-        switch self {
-        case .active: return storeBadgeColor
-        case .skipped: return .orange.opacity(0.6)
-        case .inactive: return .clear
-        }
-    }
-    
-    var textColor: Color {
-        switch self {
-        case .active: return .black
-        case .skipped: return Color(hex: "666")
-        case .inactive: return Color(hex: "333")
-        }
-    }
-    
-    var priceColor: Color {
-        switch self {
-        case .active: return .gray
-        case .skipped: return Color(hex: "888")
-        case .inactive: return Color(hex: "666")
-        }
-    }
-    
-    var contentOpacity: Double {
-        switch self {
-        case .active: return 1.0
-        case .skipped: return 0.75  // 75% opacity for skipped items
-        case .inactive: return 1.0
-        }
-    }
-    
-    var labelText: String {
-        switch self {
-        case .active: return "In cart"
-        case .skipped: return "Skipped today"
-        case .inactive: return ""
-        }
-    }
-    
-    var labelColor: Color {
-        switch self {
-        case .active: return .white
-        case .skipped: return .orange
-        case .inactive: return .clear
-        }
-    }
-    
-    var labelBackground: Color {
-        switch self {
-        case .active: return storeBadgeColor
-        case .skipped: return .orange.opacity(0.1)
-        case .inactive: return .clear
-        }
-    }
-    
-    // Helper for store badge color (used in indicator)
-    private var storeBadgeColor: Color {
-        // This would need access to storeItem, but we'll use a placeholder
-        Color(hex: "4A90E2") // Default blue
-    }
 }
+
+// MARK: - Item State Enum
+//enum ItemState {
+//    case active
+//    case skipped
+//    case inactive
+//    
+//    var indicatorColor: Color {
+//        switch self {
+//        case .active: return storeBadgeColor
+//        case .skipped: return .orange.opacity(0.6)
+//        case .inactive: return .clear
+//        }
+//    }
+//    
+//    var textColor: Color {
+//        switch self {
+//        case .active: return .black
+//        case .skipped: return Color(hex: "666")
+//        case .inactive: return Color(hex: "333")
+//        }
+//    }
+//    
+//    var priceColor: Color {
+//        switch self {
+//        case .active: return .gray
+//        case .skipped: return Color(hex: "888")
+//        case .inactive: return Color(hex: "666")
+//        }
+//    }
+//    
+//    var contentOpacity: Double {
+//        switch self {
+//        case .active: return 1.0
+//        case .skipped: return 0.75  // 75% opacity for skipped items
+//        case .inactive: return 1.0
+//        }
+//    }
+//    
+//    var labelText: String {
+//        switch self {
+//        case .active: return "In cart"
+//        case .skipped: return "Skipped today"
+//        case .inactive: return ""
+//        }
+//    }
+//    
+//    var labelColor: Color {
+//        switch self {
+//        case .active: return .white
+//        case .skipped: return .orange
+//        case .inactive: return .clear
+//        }
+//    }
+//    
+//    var labelBackground: Color {
+//        switch self {
+//        case .active: return storeBadgeColor
+//        case .skipped: return .orange.opacity(0.1)
+//        case .inactive: return .clear
+//        }
+//    }
+//    
+//    // Helper for store badge color (used in indicator)
+//    private var storeBadgeColor: Color {
+//        // This would need access to storeItem, but we'll use a placeholder
+//        Color(hex: "4A90E2") // Default blue
+//    }
+//}
 
 
 

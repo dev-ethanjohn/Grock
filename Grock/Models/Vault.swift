@@ -1,6 +1,8 @@
 import Foundation
 import SwiftData
 
+
+
 @Model
 class User {
     var id: String
