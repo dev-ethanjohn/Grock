@@ -147,47 +147,90 @@ extension VaultService {
 extension VaultService {
    
     /// Checks if an item name already exists in the vault (case insensitive, trimmed)
+//    func isItemNameDuplicate(_ name: String, store: String, excluding itemId: String? = nil) -> Bool {
+//         guard let vault = vault else { return false }
+//        
+//         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+//         let trimmedStore = store.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+//        
+//         for category in vault.categories {
+//             for item in category.items {
+//                 // If we're excluding an item (during edit), skip it
+//                 if let excludedId = itemId, item.id == excludedId {
+//                     continue
+//                 }
+//                
+//                 let existingName = item.name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+//                
+//                 // Check if this item has a price option for the same store
+//                 let hasSameStore = item.priceOptions.contains { priceOption in
+//                     priceOption.store.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == trimmedStore
+//                 }
+//                
+//                 if existingName == trimmedName && hasSameStore {
+//                     return true
+//                 }
+//             }
+//         }
+//        
+//         return false
+//     }
     func isItemNameDuplicate(_ name: String, store: String, excluding itemId: String? = nil) -> Bool {
-         guard let vault = vault else { return false }
+        guard let vault = vault else { return false }
         
-         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-         let trimmedStore = store.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let trimmedStore = store.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         
-         for category in vault.categories {
-             for item in category.items {
-                 // If we're excluding an item (during edit), skip it
-                 if let excludedId = itemId, item.id == excludedId {
-                     continue
-                 }
+        for category in vault.categories {
+            for item in category.items {
+                // If we're excluding an item (during edit), skip it
+                if let excludedId = itemId, item.id == excludedId {
+                    continue
+                }
                 
-                 let existingName = item.name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                let existingName = item.name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
                 
-                 // Check if this item has a price option for the same store
-                 let hasSameStore = item.priceOptions.contains { priceOption in
-                     priceOption.store.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == trimmedStore
-                 }
+                // Check if this item has a price option for the EXACT SAME STORE (case-insensitive)
+                let hasSameStore = item.priceOptions.contains { priceOption in
+                    priceOption.store.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == trimmedStore
+                }
                 
-                 if existingName == trimmedName && hasSameStore {
-                     return true
-                 }
-             }
-         }
+                // Only duplicate if BOTH name AND store match (case-insensitive)
+                if existingName == trimmedName && hasSameStore {
+                    return true
+                }
+            }
+        }
         
-         return false
-     }
+        return false
+    }
    
     /// Validates if an item name is available (not empty and not duplicate)
+//    func validateItemName(_ name: String, store: String, excluding itemId: String? = nil) -> (isValid: Bool, errorMessage: String?) {
+//        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+//       
+//        if trimmedName.isEmpty {
+//            return (false, "Item name cannot be empty")
+//        }
+//       
+//        if isItemNameDuplicate(trimmedName, store: store, excluding: itemId) {
+//            return (false, "An item with this name already exists at \(store)")
+//        }
+//       
+//        return (true, nil)
+//    }
     func validateItemName(_ name: String, store: String, excluding itemId: String? = nil) -> (isValid: Bool, errorMessage: String?) {
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
-       
+        
         if trimmedName.isEmpty {
             return (false, "Item name cannot be empty")
         }
-       
+        
         if isItemNameDuplicate(trimmedName, store: store, excluding: itemId) {
-            return (false, "An item with this name already exists at \(store)")
+            // Make error message clearer
+            return (false, "An item with name '\(trimmedName)' already exists at \(store)")
         }
-       
+        
         return (true, nil)
     }
 }
