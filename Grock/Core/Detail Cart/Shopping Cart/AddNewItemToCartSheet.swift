@@ -455,223 +455,266 @@ struct AddNewItemView: View {
     }
 }
 
-// MARK: - Browse Vault View (Page 2) - Optimized for Automatic Updates
-struct BrowseVaultView: View {
-    let cart: Cart
-    @Binding var selectedCategory: GroceryCategory?
-    let onItemSelected: (Item) -> Void
-    let onBack: () -> Void
-    let onAddNewItem: () -> Void
-    
-    @Environment(VaultService.self) private var vaultService
-    @State private var searchText = ""
-    
-    private var itemsByStore: [(store: String, items: [StoreItem])] {
-        
-        let _ = cart.cartItems.count
-        print("🔄 Computing itemsByStore for cart: \(cart.name)")
-        guard let vault = vaultService.vault else { return [] }
-        
-        // Get all items from all categories
-        var allStoreItems: [StoreItem] = []
-        var seenItemStoreCombinations = Set<String>()
-        
-        // 1. Add Vault items - ONE PER STORE
-        for category in vault.categories {
-            for item in category.items {
-                // For each price option, create a StoreItem
-                for priceOption in item.priceOptions {
-                    let combinationKey = "\(item.id)-\(priceOption.store)"
-                    if !seenItemStoreCombinations.contains(combinationKey) {
-                        let storeItem = StoreItem(
-                            item: item,
-                            categoryName: category.name,
-                            priceOption: priceOption,
-                            isShoppingOnlyItem: false
-                        )
-                        allStoreItems.append(storeItem)
-                        seenItemStoreCombinations.insert(combinationKey)
-                    }
-                }
-            }
-        }
-        
-        // 2. Add shopping-only items from the current cart
-        // But only if they don't already exist as vault items with the same name and store
-        for cartItem in cart.cartItems where cartItem.isShoppingOnlyItem {
-            if let name = cartItem.shoppingOnlyName,
-               let price = cartItem.shoppingOnlyPrice,
-               let store = cartItem.shoppingOnlyStore,
-               let unit = cartItem.shoppingOnlyUnit,
-               !cartItem.isSkippedDuringShopping,
-               cartItem.getQuantity(cart: cart) > 0 {
-                
-                // Check if this shopping-only item already exists as a vault item
-                let alreadyExistsAsVaultItem = allStoreItems.contains { storeItem in
-                    storeItem.item.name.lowercased() == name.lowercased() &&
-                    storeItem.priceOption.store.lowercased() == store.lowercased() &&
-                    !storeItem.isShoppingOnlyItem
-                }
-                
-                // Only add shopping-only item if there's no matching vault item
-                if !alreadyExistsAsVaultItem {
-                    // Create a temporary Item for shopping-only
-                    let tempItem = Item(
-                        id: cartItem.itemId,
-                        name: name,
-                        priceOptions: [
-                            PriceOption(
-                                store: store,
-                                pricePerUnit: PricePerUnit(priceValue: price, unit: unit)
-                            )
-                        ]
-                    )
-                    
-                    let priceOption = PriceOption(
-                        store: store,
-                        pricePerUnit: PricePerUnit(priceValue: price, unit: unit)
-                    )
-                    
-                    let storeItem = StoreItem(
-                        item: tempItem,
-                        categoryName: "Shopping Items",
-                        priceOption: priceOption,
-                        isShoppingOnlyItem: true
-                    )
-                    
-                    allStoreItems.append(storeItem)
-                }
-            }
-        }
-        
-        // Filter by search text if applicable
-        let filteredItems = searchText.isEmpty ? allStoreItems : allStoreItems.filter { storeItem in
-            storeItem.item.name.localizedCaseInsensitiveContains(searchText)
-        }
-        
-        // Group by store
-        var storeDict: [String: [StoreItem]] = [:]
-        
-        for storeItem in filteredItems {
-            let store = storeItem.priceOption.store
-            if storeDict[store] == nil {
-                storeDict[store] = []
-            }
-            storeDict[store]?.append(storeItem)
-        }
-        
-        // Sort stores alphabetically
-        let sortedStores = storeDict.keys.sorted()
-        
-        // Sort items within each store alphabetically by name
-        return sortedStores.compactMap { store in
-            guard let items = storeDict[store], !items.isEmpty else { return nil }
-            let sortedItems = items.sorted {
-                $0.item.name.localizedCaseInsensitiveCompare($1.item.name) == .orderedAscending
-            }
-            return (store: store, items: sortedItems)
-        }
-    }
-    
-    private var availableStores: [String] {
-        itemsByStore.map { $0.store }
-    }
-    
-    private var showEndIndicator: Bool {
-        itemsByStore.reduce(0) { $0 + $1.items.count } >= 6
-    }
-    
-    var body: some View {
-        VStack(spacing: 0) {
-            // Search bar
-            HStack {
-                Image(systemName: "magnifyingglass")
-                    .foregroundColor(.gray)
-                TextField("Looking for something in your Vault", text: $searchText)
-                    .textFieldStyle(.plain)
-                if !searchText.isEmpty {
-                    Button(action: { searchText = "" }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(.gray)
-                    }
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .background(Color.gray.opacity(0.1))
-            .cornerRadius(12)
-            .padding(.horizontal)
-            .padding(.top)
-            
-            // Items List organized by store
-            if itemsByStore.isEmpty {
-                VStack(spacing: 16) {
-                    Image(systemName: searchText.isEmpty ? "archivebox" : "magnifyingglass")
-                        .font(.system(size: 40))
-                        .foregroundColor(.gray)
-                    Text(searchText.isEmpty ? "Your vault is empty" : "No items found")
-                        .foregroundColor(.gray)
-                    
-                    if searchText.isEmpty {
-                        Button(action: onAddNewItem) {
-                            Label("Add New Item", systemImage: "plus.circle.fill")
-                                .foregroundColor(.blue)
-                        }
-                    }
-                }
-                .frame(maxHeight: .infinity)
-            } else {
-                List {
-                    ForEach(availableStores, id: \.self) { store in
-                        if let storeGroup = itemsByStore.first(where: { $0.store == store }) {
-                            BrowseVaultStoreSection(
-                                storeName: store,
-                                items: storeGroup.items,
-                                cart: cart,
-                                onItemSelected: onItemSelected,
-                                isLastStore: store == availableStores.last
-                            )
-                        }
-                    }
-                    
-                    if showEndIndicator {
-                        HStack {
-                            Spacer()
-                            Text("You've reached the end.")
-                                .fuzzyBubblesFont(14, weight: .regular)
-                                .foregroundColor(.gray.opacity(0.8))
-                                .padding(.vertical, 32)
-                            Spacer()
-                        }
-                        .listRowInsets(EdgeInsets())
-                        .listRowSeparator(.hidden)
-                        .listRowBackground(Color.clear)
-                    }
-                    
-                    if !availableStores.isEmpty {
-                        Color.clear
-                            .frame(height: 100)
-                            .listRowInsets(EdgeInsets())
-                            .listRowSeparator(.hidden)
-                            .listRowBackground(Color.clear)
-                    }
-                }
-                .listStyle(PlainListStyle())
-                .listSectionSpacing(16)
-                .scrollContentBackground(.hidden)
-                .safeAreaInset(edge: .bottom) {
-                    if !availableStores.isEmpty {
-                        Color.clear.frame(height: 20)
-                    }
-                }
-            }
-        }
-        // Optional: Listen for cart changes at the view level
-        .onChange(of: cart.cartItems) { oldItems, newItems in
-            print("🛒 Cart items changed in BrowseVaultView: \(newItems.count) items")
-        }
-    }
-}
+//struct BrowseVaultView: View {
+//    let cart: Cart
+//    @Binding var selectedCategory: GroceryCategory?
+//    let onItemSelected: (Item) -> Void
+//    let onBack: () -> Void
+//    let onAddNewItem: () -> Void
+//    
+//    @Environment(VaultService.self) private var vaultService
+//    @State private var searchText = ""
+//    
+//    // MARK: - Computed Properties
+//    
+//    private var vault: Vault? {
+//        vaultService.vault
+//    }
+//    
+//    private var cartItemCount: Int {
+//        cart.cartItems.count
+//    }
+//    
+//    private var vaultStoreItems: [StoreItem] {
+//        guard let vault = vault else { return [] }
+//        
+//        var allStoreItems: [StoreItem] = []
+//        var seenItemStoreCombinations = Set<String>()
+//        
+//        for category in vault.categories {
+//            for item in category.items {
+//                for priceOption in item.priceOptions {
+//                    let combinationKey = "\(item.id)-\(priceOption.store)"
+//                    if !seenItemStoreCombinations.contains(combinationKey) {
+//                        let storeItem = StoreItem(
+//                            item: item,
+//                            categoryName: category.name,
+//                            priceOption: priceOption,
+//                            isShoppingOnlyItem: false
+//                        )
+//                        allStoreItems.append(storeItem)
+//                        seenItemStoreCombinations.insert(combinationKey)
+//                    }
+//                }
+//            }
+//        }
+//        
+//        return allStoreItems
+//    }
+//    
+//    private var shoppingOnlyStoreItems: [StoreItem] {
+//        var shoppingOnlyItems: [StoreItem] = []
+//        
+//        for cartItem in cart.cartItems where cartItem.isShoppingOnlyItem {
+//            if let name = cartItem.shoppingOnlyName,
+//               let price = cartItem.shoppingOnlyPrice,
+//               let store = cartItem.shoppingOnlyStore,
+//               let unit = cartItem.shoppingOnlyUnit,
+//               !cartItem.isSkippedDuringShopping,
+//               cartItem.getQuantity(cart: cart) > 0 {
+//                
+//                // Check if this shopping-only item already exists as a vault item
+//                let alreadyExistsAsVaultItem = vaultStoreItems.contains { storeItem in
+//                    let nameMatches = storeItem.item.name.lowercased() == name.lowercased()
+//                    let storeMatches = storeItem.priceOption.store.lowercased() == store.lowercased()
+//                    let isNotShoppingOnly = !storeItem.isShoppingOnlyItem
+//                    return nameMatches && storeMatches && isNotShoppingOnly
+//                }
+//                
+//                // Only add shopping-only item if there's no matching vault item
+//                if !alreadyExistsAsVaultItem {
+//                    let tempItem = Item(
+//                        id: cartItem.itemId,
+//                        name: name,
+//                        priceOptions: [
+//                            PriceOption(
+//                                store: store,
+//                                pricePerUnit: PricePerUnit(priceValue: price, unit: unit)
+//                            )
+//                        ]
+//                    )
+//                    
+//                    let priceOption = PriceOption(
+//                        store: store,
+//                        pricePerUnit: PricePerUnit(priceValue: price, unit: unit)
+//                    )
+//                    
+//                    let storeItem = StoreItem(
+//                        item: tempItem,
+//                        categoryName: "Shopping Items",
+//                        priceOption: priceOption,
+//                        isShoppingOnlyItem: true
+//                    )
+//                    
+//                    shoppingOnlyItems.append(storeItem)
+//                }
+//            }
+//        }
+//        
+//        return shoppingOnlyItems
+//    }
+//    
+//    private var allStoreItems: [StoreItem] {
+//        vaultStoreItems + shoppingOnlyStoreItems
+//    }
+//    
+//    private var filteredStoreItems: [StoreItem] {
+//        if searchText.isEmpty {
+//            return allStoreItems
+//        } else {
+//            return allStoreItems.filter { storeItem in
+//                storeItem.item.name.localizedCaseInsensitiveContains(searchText)
+//            }
+//        }
+//    }
+//    
+//    private var groupedStoreItems: [String: [StoreItem]] {
+//        var storeDict: [String: [StoreItem]] = [:]
+//        
+//        for storeItem in filteredStoreItems {
+//            let store = storeItem.priceOption.store
+//            if storeDict[store] == nil {
+//                storeDict[store] = []
+//            }
+//            storeDict[store]?.append(storeItem)
+//        }
+//        
+//        return storeDict
+//    }
+//    
+//    private var itemsByStore: [(store: String, items: [StoreItem])] {
+//        let _ = cartItemCount
+//        print("🔄 Computing itemsByStore for cart: \(cart.name)")
+//        
+//        // Get the grouped items
+//        let storeDict = groupedStoreItems
+//        
+//        // Sort stores alphabetically
+//        let sortedStores = storeDict.keys.sorted()
+//        
+//        // Create result array
+//        var result: [(store: String, items: [StoreItem])] = []
+//        
+//        for store in sortedStores {
+//            guard let items = storeDict[store], !items.isEmpty else { continue }
+//            
+//            // Sort items within each store alphabetically by name
+//            let sortedItems = items.sorted { item1, item2 in
+//                item1.item.name.localizedCaseInsensitiveCompare(item2.item.name) == .orderedAscending
+//            }
+//            
+//            result.append((store: store, items: sortedItems))
+//        }
+//        
+//        return result
+//    }
+//    
+//    private var availableStores: [String] {
+//        itemsByStore.map { $0.store }
+//    }
+//    
+//    private var showEndIndicator: Bool {
+//        let totalItems = itemsByStore.reduce(0) { $0 + $1.items.count }
+//        return totalItems >= 6
+//    }
+//    
+//    // MARK: - Body
+//    
+//    var body: some View {
+//        VStack(spacing: 0) {
+//            // Search bar
+//            HStack {
+//                Image(systemName: "magnifyingglass")
+//                    .foregroundColor(.gray)
+//                TextField("Looking for something in your Vault", text: $searchText)
+//                    .textFieldStyle(.plain)
+//                if !searchText.isEmpty {
+//                    Button(action: { searchText = "" }) {
+//                        Image(systemName: "xmark.circle.fill")
+//                            .foregroundColor(.gray)
+//                    }
+//                }
+//            }
+//            .padding(.horizontal, 16)
+//            .padding(.vertical, 12)
+//            .background(Color.gray.opacity(0.1))
+//            .cornerRadius(12)
+//            .padding(.horizontal)
+//            .padding(.top)
+//            
+//            // Items List organized by store
+//            if itemsByStore.isEmpty {
+//                VStack(spacing: 16) {
+//                    Image(systemName: searchText.isEmpty ? "archivebox" : "magnifyingglass")
+//                        .font(.system(size: 40))
+//                        .foregroundColor(.gray)
+//                    Text(searchText.isEmpty ? "Your vault is empty" : "No items found")
+//                        .foregroundColor(.gray)
+//                    
+//                    if searchText.isEmpty {
+//                        Button(action: onAddNewItem) {
+//                            Label("Add New Item", systemImage: "plus.circle.fill")
+//                                .foregroundColor(.blue)
+//                        }
+//                    }
+//                }
+//                .frame(maxHeight: .infinity)
+//            } else {
+//                List {
+//                    ForEach(availableStores, id: \.self) { store in
+//                        if let storeGroup = itemsByStore.first(where: { $0.store == store }) {
+//                            BrowseVaultStoreSection(
+//                                storeName: store,
+//                                items: storeGroup.items,
+//                                cart: cart,
+//                                onItemSelected: onItemSelected,
+//                                isLastStore: store == availableStores.last
+//                            )
+//                            .transition(.asymmetric(
+//                                insertion: .move(edge: .top).combined(with: .opacity),
+//                                removal: .move(edge: .leading).combined(with: .opacity)
+//                            ))
+//                        }
+//                    }
+//                    
+//                    if showEndIndicator {
+//                        HStack {
+//                            Spacer()
+//                            Text("You've reached the end.")
+//                                .fuzzyBubblesFont(14, weight: .regular)
+//                                .foregroundColor(.gray.opacity(0.8))
+//                                .padding(.vertical, 32)
+//                            Spacer()
+//                        }
+//                        .listRowInsets(EdgeInsets())
+//                        .listRowSeparator(.hidden)
+//                        .listRowBackground(Color.clear)
+//                    }
+//                    
+//                    if !availableStores.isEmpty {
+//                        Color.clear
+//                            .frame(height: 100)
+//                            .listRowInsets(EdgeInsets())
+//                            .listRowSeparator(.hidden)
+//                            .listRowBackground(Color.clear)
+//                    }
+//                }
+//                .listStyle(PlainListStyle())
+//                .listSectionSpacing(16)
+//                .scrollContentBackground(.hidden)
+//                .safeAreaInset(edge: .bottom) {
+//                    if !availableStores.isEmpty {
+//                        Color.clear.frame(height: 20)
+//                    }
+//                }
+//                .animation(.spring(response: 0.4, dampingFraction: 0.7), value: itemsByStore)
+//            }
+//        }
+//        .onChange(of: cart.cartItems) { oldItems, newItems in
+//            print("🛒 Cart items changed in BrowseVaultView: \(newItems.count) items")
+//        }
+//    }
+//}
 
 struct BrowseVaultStoreSection: View {
     let storeName: String
@@ -765,6 +808,7 @@ struct BrowseVaultItemRow: View {
     @State private var appearScale: CGFloat = 0.9
     @State private var appearOpacity: Double = 0
     @State private var isNewlyAdded: Bool = true
+    @State private var isRemoving: Bool = false
     
     @Environment(VaultService.self) private var vaultService
     
@@ -921,8 +965,10 @@ struct BrowseVaultItemRow: View {
         .padding(.horizontal)
         .padding(.vertical, 8)
         .background(.white)
-        .scaleEffect(appearScale)
-        .opacity(appearOpacity)
+        .scaleEffect(isRemoving ? 0.9 : appearScale)
+        .opacity(isRemoving ? 0 : appearOpacity)
+        .offset(x: isRemoving ? -UIScreen.main.bounds.width : 0)
+        .animation(.spring(response: 0.4, dampingFraction: 0.75), value: isRemoving)
         .animation(.spring(response: 0.4, dampingFraction: 0.7), value: currentQuantity)
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: itemType)
         .onTapGesture {
@@ -1317,11 +1363,22 @@ struct BrowseVaultItemRow: View {
     }
     
     private func handleRemove() {
-        if let cartItem = findCartItem(), itemType == .shoppingOnly {
-            if let index = cart.cartItems.firstIndex(where: { $0.id == cartItem.id }) {
-                cart.cartItems.remove(at: index)
-                vaultService.updateCartTotals(cart: cart)
-                updateTextValue()
+        print("🗑️ Remove button tapped for shopping-only item: \(itemName)")
+        
+        // Trigger removal animation first
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+            isRemoving = true
+        }
+        
+        // Wait for animation to complete, then remove from cart
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            if let cartItem = findCartItem(), itemType == .shoppingOnly {
+                if let index = cart.cartItems.firstIndex(where: { $0.id == cartItem.id }) {
+                    print("   Removing from cart at index \(index)")
+                    cart.cartItems.remove(at: index)
+                    vaultService.updateCartTotals(cart: cart)
+                    updateTextValue()
+                }
             }
         }
     }
@@ -1390,7 +1447,21 @@ struct BrowseVaultItemRow: View {
         case .shoppingOnly:
             // For shopping-only items, remove completely when quantity becomes 0
             print("🛍️ Removing shopping-only item from cart: \(itemName)")
-            handleRemove()
+            
+            // Trigger removal animation first
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+                isRemoving = true
+            }
+            
+            // Wait for animation to complete, then remove from cart
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                if let index = cart.cartItems.firstIndex(where: { $0.id == cartItem.id }) {
+                    print("   Removing from cart at index \(index)")
+                    cart.cartItems.remove(at: index)
+                    vaultService.updateCartTotals(cart: cart)
+                    updateTextValue()
+                }
+            }
             
         case .vaultOnly:
             // Shouldn't happen, but just in case
