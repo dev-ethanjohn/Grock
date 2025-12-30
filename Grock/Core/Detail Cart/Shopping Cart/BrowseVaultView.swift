@@ -1,14 +1,5 @@
 import SwiftUI
 
-//
-//  BrowseVaultView.swift
-//  Grock
-//
-//  Created by Ethan John Paguntalan on 12/29/25.
-//
-
-import SwiftUI
-
 struct BrowseVaultView: View {
     let cart: Cart
     @Binding var selectedCategory: GroceryCategory?
@@ -62,7 +53,6 @@ struct BrowseVaultView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // Search bar
             SearchBarView(searchText: $searchText)
             
             // Items List organized by store

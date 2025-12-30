@@ -19,6 +19,12 @@ struct AddNewItemToCartSheet: View {
     @State private var keyboardResponder = KeyboardResponder()
     @State private var focusedItemId: String?
     
+    // Pulse animation states - icons only
+    @State private var vaultIconScale: CGFloat = 1.0
+    @State private var addItemIconScale: CGFloat = 1.0
+    @State private var vaultIconOpacity: Double = 1.0
+    @State private var addItemIconOpacity: Double = 1.0
+    
     enum AddItemPage {
         case addNew
         case browseVault
@@ -61,16 +67,7 @@ struct AddNewItemToCartSheet: View {
                 }
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button {
-                            resetAndClose()
-                        } label: {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundStyle(.black)
-                        }
-                    }
-                            
+                    // Page indicator dots (shown on both pages)
                     ToolbarItem(placement: .principal) {
                         HStack(spacing: 8) {
                             Circle()
@@ -87,64 +84,78 @@ struct AddNewItemToCartSheet: View {
                         }
                     }
                     
+                    // Right side button (shows different buttons based on current page)
                     ToolbarItem(placement: .topBarTrailing) {
-                        if currentPage == .addNew {
-                            Button(action: {
-                                withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
-                                    currentPage = .browseVault
-                                }
-                            }) {
+                        Group {
+                            if currentPage == .addNew {
+                                // Vault button with icon pulse only
                                 HStack(spacing: 8) {
-                                    Text("vault")
-                                        .fuzzyBubblesFont(13, weight: .bold)
+                                    Text("check vault?")
+                                        .fuzzyBubblesFont(14, weight: .bold)
+                                        .foregroundColor(.gray)
+                                        .contentTransition(.interpolate)
+                                    
+                                    // Pulsing vault icon only
                                     Image(systemName: "shippingbox")
                                         .resizable()
-                                        .frame(width: 15, height: 15)
+                                        .frame(width: 18, height: 18)
                                         .symbolRenderingMode(.monochrome)
-                                        .fontWeight(.medium)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(.black)
+                                        .scaleEffect(vaultIconScale)
+                                        .opacity(vaultIconOpacity)
+                                        .onAppear {
+                                            startVaultPulse()
+                                        }
+                                        .onDisappear {
+                                            vaultIconScale = 1.0
+                                            vaultIconOpacity = 1.0
+                                        }
                                 }
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
-                                .foregroundColor(.black)
-                                .background(
-                                    ZStack {
-                                        Color(.systemGray6)
-                                        LinearGradient(
-                                            colors: [
-                                                .white.opacity(0.2),
-                                                .clear,
-                                                .black.opacity(0.1),
-                                            ],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        )
+                                .onTapGesture {
+                                    withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                                        currentPage = .browseVault
                                     }
-                                )
-                                .clipShape(Capsule())
-                                .shadow(
-                                    color: .black.opacity(0.4),
-                                    radius: 1,
-                                    x: 0,
-                                    y: 0.5
-                                )
-                            }
-                            
-                        } else {
-                            // Back button when on browse vault page
-                            Button(action: {
-                                withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
-                                    currentPage = .addNew
                                 }
-                            }) {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "chevron.left")
-                                        .font(.system(size: 12))
-                                    Text("Back")
-                                        .lexendFont(14, weight: .medium)
+                                .transition(.asymmetric(
+                                    insertion: .move(edge: .trailing).combined(with: .opacity),
+                                    removal: .move(edge: .trailing).combined(with: .opacity)
+                                ))
+                                
+                            } else if currentPage == .browseVault {
+                                // Back button with icon pulse only
+                                HStack(spacing: 8) {
+                                    Text("add item?")
+                                        .fuzzyBubblesFont(14, weight: .bold)
+                                        .foregroundColor(.gray)
+                                        .contentTransition(.interpolate)
+                                    
+                                    // Pulsing plus icon only
+                                    Image(systemName: "plus")
+                                        .font(.system(size: 18, weight: .bold))
+                                        .foregroundColor(.black)
+                                        .scaleEffect(addItemIconScale)
+                                        .opacity(addItemIconOpacity)
+                                        .onAppear {
+                                            startAddItemPulse()
+                                        }
+                                        .onDisappear {
+                                            addItemIconScale = 1.0
+                                            addItemIconOpacity = 1.0
+                                        }
                                 }
-                                .foregroundColor(.blue)
+                                .onTapGesture {
+                                    withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                                        currentPage = .addNew
+                                    }
+                                }
+                                .transition(.asymmetric(
+                                    insertion: .move(edge: .trailing).combined(with: .opacity),
+                                    removal: .move(edge: .trailing).combined(with: .opacity)
+                                ))
                             }
                         }
+                        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: currentPage)
                     }
                 }
             }
@@ -204,6 +215,58 @@ struct AddNewItemToCartSheet: View {
         }
         .ignoresSafeArea(.keyboard)
     }
+    
+    // MARK: - Pulse Animation Functions (Icons Only)
+    
+    private func startVaultPulse() {
+        // Reset to initial state
+        vaultIconScale = 1.0
+        vaultIconOpacity = 1.0
+        
+        // Pronounced scale pulse animation
+        withAnimation(
+            .easeInOut(duration: 0.9)
+            .repeatForever(autoreverses: true)
+        ) {
+            vaultIconScale = 1.25
+        }
+        
+        // Opacity pulse (slightly delayed)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            withAnimation(
+                .easeInOut(duration: 1.1)
+                .repeatForever(autoreverses: true)
+            ) {
+                vaultIconOpacity = 0.7
+            }
+        }
+    }
+    
+    private func startAddItemPulse() {
+        // Reset to initial state
+        addItemIconScale = 1.0
+        addItemIconOpacity = 1.0
+        
+        // Pronounced scale pulse animation
+        withAnimation(
+            .easeInOut(duration: 1.0)
+            .repeatForever(autoreverses: true)
+        ) {
+            addItemIconScale = 1.22
+        }
+        
+        // Opacity pulse (slightly delayed)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            withAnimation(
+                .easeInOut(duration: 1.2)
+                .repeatForever(autoreverses: true)
+            ) {
+                addItemIconOpacity = 0.75
+            }
+        }
+    }
+    
+    // MARK: - Business Logic Functions
     
     private func handleAddToCart() {
         guard formViewModel.attemptSubmission(),
@@ -1221,6 +1284,7 @@ struct BrowseVaultItemRow: View {
             return vaultCartItem
         }
         
+        
         // For shopping-only items: find by name and store (CASE INSENSITIVE)
         let searchName = itemName.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
         let searchStore = storeName.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
@@ -1617,4 +1681,5 @@ struct CategoryChip: View {
         }
     }
 }
+
 
