@@ -6,6 +6,8 @@ struct BrowseVaultView: View {
     let onItemSelected: (Item) -> Void
     let onBack: () -> Void
     let onAddNewItem: () -> Void
+    @Binding var hasUnsavedChanges: Bool  // Add this binding
+    let onDone: (() -> Void)?  // Add this optional callback
     
     @Environment(VaultService.self) private var vaultService
     @State private var searchText = ""
@@ -68,13 +70,24 @@ struct BrowseVaultView: View {
                     availableStores: availableStores,
                     showEndIndicator: showEndIndicator,
                     cart: cart,
-                    onItemSelected: onItemSelected
+                    onItemSelected: { item in
+                        onItemSelected(item)
+                        hasUnsavedChanges = true
+                    },
+                    onQuantityChange: {  // ADD THIS CLOSURE
+                        hasUnsavedChanges = true
+                    }
                 )
             }
         }
         .animation(.spring(response: 0.4, dampingFraction: 0.7), value: itemsByStore)
         .onChange(of: cart.cartItems) { oldItems, newItems in
             print("🛒 Cart items changed in BrowseVaultView: \(newItems.count) items")
+            // Check if items actually changed (not just count)
+            if oldItems.map({ $0.id }) != newItems.map({ $0.id }) ||
+               oldItems.map({ $0.quantity }) != newItems.map({ $0.quantity }) {
+                hasUnsavedChanges = true
+            }
         }
     }
 }
@@ -270,18 +283,20 @@ private struct StoreItemsListView: View {
     let showEndIndicator: Bool
     let cart: Cart
     let onItemSelected: (Item) -> Void
+    let onQuantityChange: (() -> Void)?  // Make optional with default value
     
     var body: some View {
         List {
             ForEach(availableStores, id: \.self) { store in
-                if let storeGroup = itemsByStore.first(where: { $0.store == store }) {
-                    BrowseVaultStoreSection(
-                        storeName: store,
-                        items: storeGroup.items,
-                        cart: cart,
-                        onItemSelected: onItemSelected,
-                        isLastStore: store == availableStores.last
-                    )
+                            if let storeGroup = itemsByStore.first(where: { $0.store == store }) {
+                                BrowseVaultStoreSection(
+                                    storeName: store,
+                                    items: storeGroup.items,
+                                    cart: cart,
+                                    onItemSelected: onItemSelected,
+//                                    onQuantityChange: onQuantityChange,  // ...but not passed here in the original code
+                                    isLastStore: store == availableStores.last
+                                )
                     .transition(.asymmetric(
                         insertion: .move(edge: .top).combined(with: .opacity),
                         removal: .move(edge: .leading).combined(with: .opacity)
