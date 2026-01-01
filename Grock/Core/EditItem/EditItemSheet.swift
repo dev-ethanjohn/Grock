@@ -340,7 +340,6 @@ struct EditItemSheet: View {
             oldCategoryName: oldCategoryName
         )
     }
-    
     private func saveCartItemChanges(
         cart: Cart,
         cartItem: CartItem,
@@ -363,7 +362,7 @@ struct EditItemSheet: View {
             oldCategoryName: oldCategoryName
         )
     }
-    
+
     private func saveCartItem(
         cart: Cart,
         cartItem: CartItem,
@@ -376,24 +375,55 @@ struct EditItemSheet: View {
             return false
         }
         
+        // Get the trimmed values
+        let trimmedStoreName = formViewModel.storeName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedItemName = formViewModel.itemName.trimmingCharacters(in: .whitespacesAndNewlines)
+        
         let success = vaultService.updateItem(
             item: item,
-            newName: formViewModel.itemName.trimmingCharacters(in: .whitespacesAndNewlines),
+            newName: trimmedItemName,
             newCategory: selectedCategory,
-            newStore: formViewModel.storeName.trimmingCharacters(in: .whitespacesAndNewlines),
+            newStore: trimmedStoreName,
             newPrice: priceValue,
             newUnit: formViewModel.unit
         )
         
         if success {
+            // Update the specific cart item's planned data
+            cartItem.plannedPrice = priceValue
+            cartItem.plannedUnit = formViewModel.unit
+            cartItem.plannedStore = trimmedStoreName
+            // REMOVED: cartItem.itemName = trimmedItemName // CartItem doesn't have this property
+            
+            // Also update the CartItem's quantity if needed
+            if let portion = formViewModel.portion {
+                cartItem.quantity = portion
+            }
+            
+            // Call the update function to refresh other planning carts
             updateAllCartsWithItem(
                 itemId: item.id,
                 price: priceValue,
                 unit: formViewModel.unit,
-                store: formViewModel.storeName
+                store: trimmedStoreName
             )
-            updateCartItemQuantity(cart: cart, cartItem: cartItem, portion: formViewModel.portion)
+            
+            // IMPORTANT: Update cart totals to trigger UI refresh
             vaultService.updateCartTotals(cart: cart)
+            
+            // Post notification to refresh UI
+            NotificationCenter.default.post(
+                name: NSNotification.Name("CartItemUpdated"),
+                object: nil,
+                userInfo: [
+                    "cartId": cart.id,
+                    "itemId": item.id,
+                    "itemName": trimmedItemName, // Pass item name in notification
+                    "plannedPrice": priceValue,
+                    "plannedUnit": formViewModel.unit,
+                    "plannedStore": trimmedStoreName
+                ]
+            )
         }
         
         return success
@@ -433,6 +463,15 @@ struct EditItemSheet: View {
             // ✅ Ensure new store exists
             vaultService.ensureStoreExists(formViewModel.storeName)
             
+            // Notify about cart item update
+            if context == .cart, let cart = cart {
+                NotificationCenter.default.post(
+                    name: NSNotification.Name("CartUpdated"),
+                    object: nil,
+                    userInfo: ["cartId": cart.id]
+                )
+            }
+            
             // Call save callback
             onSave?(item)
             dismiss()
@@ -449,6 +488,12 @@ struct EditItemSheet: View {
                     ]
                 )
             }
+            
+            // Post a general refresh notification
+            NotificationCenter.default.post(
+                name: NSNotification.Name("DataUpdated"),
+                object: nil
+            )
         } else {
             duplicateError = "Failed to update item. Please try again."
         }

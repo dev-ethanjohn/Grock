@@ -3,36 +3,86 @@ import SwiftData
 
 struct CartItemRowListView: View {
     @Bindable var cartItem: CartItem
-    let item: Item?
+    @State private var item: Item? // Local state for the item
     let cart: Cart
     let onFulfillItem: () -> Void
     let onEditItem: () -> Void
     let onDeleteItem: () -> Void
     let isLastItem: Bool
     
+    @Environment(VaultService.self) private var vaultService
+    @State private var refreshTrigger = 0
+    
     var body: some View {
         MainRowContent(
             cartItem: cartItem,
-            item: item,
+            item: item, // Pass the locally fetched item
             cart: cart,
             onFulfillItem: onFulfillItem,
             onEditItem: onEditItem,
             onDeleteItem: onDeleteItem,
             isLastItem: isLastItem
         )
-        .onChange(of: cartItem.quantity) { oldValue, newValue in
-                 print("🔄 CartItemRowListView: quantity changed from \(oldValue) to \(newValue)")
-                 if newValue <= 0 && cart.status == .planning {
-                     print("🗑️ Quantity is 0, this item should be removed from display")
-                 }
-             }
+        .onAppear {
+            loadItem() // Load item when view appears
+        }
+        .onChange(of: cartItem.itemId) { oldValue, newValue in
+            loadItem() // Reload if itemId changes
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("VaultItemUpdated"))) { notification in
+            handleVaultItemUpdate(notification)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("CartItemUpdated"))) { notification in
+            handleCartItemUpdate(notification)
+        }
+        .id("\(cartItem.itemId)_\(refreshTrigger)_\(item?.name ?? "")") // Include item name in ID
+    }
+    
+    private func loadItem() {
+        // Always fetch fresh from vault
+        item = vaultService.findItemById(cartItem.itemId)
+        print("🔄 Loaded item for \(cartItem.itemId): \(item?.name ?? "nil")")
+    }
+    
+    private func handleVaultItemUpdate(_ notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let updatedItemId = userInfo["itemId"] as? String,
+              updatedItemId == cartItem.itemId else {
+            return
+        }
+        
+        print("📢 VaultItemUpdated received - reloading item")
+        loadItem()
+        refreshTrigger += 1
+    }
+    
+    private func handleCartItemUpdate(_ notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let updatedItemId = userInfo["itemId"] as? String,
+              updatedItemId == cartItem.itemId else {
+            return
+        }
+        
+        print("📢 CartItemUpdated received")
+        // Update cart item properties
+        if let plannedPrice = userInfo["plannedPrice"] as? Double {
+            cartItem.plannedPrice = plannedPrice
+        }
+        if let plannedUnit = userInfo["plannedUnit"] as? String {
+            cartItem.plannedUnit = plannedUnit
+        }
+        if let plannedStore = userInfo["plannedStore"] as? String {
+            cartItem.plannedStore = plannedStore
+        }
+        
+        refreshTrigger += 1
     }
 }
 
 // MARK: - Main Row Content
 private struct MainRowContent: View {
     @Bindable var cartItem: CartItem
-    let item: Item?
+    let item: Item? // This comes from parent view's fetch
     let cart: Cart
     let onFulfillItem: () -> Void
     let onEditItem: () -> Void
@@ -55,10 +105,6 @@ private struct MainRowContent: View {
     @State private var currentTotalPrice: Double = 0
     @State private var displayUnit: String = ""
     
-    private var itemName: String {
-        item?.name ?? "Unknown Item"
-    }
-    
     var body: some View {
         HStack(alignment: .top, spacing: 0) {
             if cart.isShopping {
@@ -80,11 +126,12 @@ private struct MainRowContent: View {
                         .contentTransition(.numericText())
                         .animation(.spring(response: 0.5, dampingFraction: 0.7), value: currentQuantity)
                     
-                    Text(itemName)
+                    Text(item?.name ?? cartItem.shoppingOnlyName ?? "Unknown Item")
                         .lexendFont(16, weight: .regular)
                         .lineLimit(3)
                         .fixedSize(horizontal: false, vertical: true)
                         .strikethrough(cart.isShopping && (cartItem.isFulfilled || cartItem.isSkippedDuringShopping))
+                        .id(item?.name ?? cartItem.shoppingOnlyName ?? "Unknown") // Force re-render when name changes
                 }
                 
                 HStack(spacing: 4) {
@@ -150,7 +197,25 @@ private struct MainRowContent: View {
         .onDisappear {
             isNewlyAdded = true
         }
-        // SIMPLIFIED FIX: Use individual onChange observers instead of tuple
+        // Add observers for planned data changes
+        .onChange(of: cartItem.plannedPrice) { oldValue, newValue in
+            if oldValue != newValue {
+                print("💰 plannedPrice changed: \(oldValue ?? 0) → \(newValue ?? 0)")
+                updateDerivedValues(animated: true)
+            }
+        }
+        .onChange(of: cartItem.plannedUnit) { oldValue, newValue in
+            if oldValue != newValue {
+                print("📏 plannedUnit changed: \(oldValue ?? "nil") → \(newValue ?? "nil")")
+                updateDerivedValues(animated: true)
+            }
+        }
+        .onChange(of: item?.name) { oldValue, newValue in
+            if oldValue != newValue {
+                print("📝 Item name changed in MainRowContent: \(oldValue ?? "nil") → \(newValue ?? "nil")")
+                updateDerivedValues(animated: true)
+            }
+        }
         .onChange(of: cartItem.quantity) { oldValue, newValue in
             if oldValue != newValue {
                 print("🔢 cartItem.quantity changed: \(oldValue) → \(newValue)")
@@ -194,23 +259,36 @@ private struct MainRowContent: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ShoppingDataUpdated"))) { _ in
-            print("📢 ShoppingDataUpdated received for: \(itemName)")
+            print("📢 ShoppingDataUpdated received for: \(item?.name ?? "Unknown")")
             updateDerivedValues(animated: true)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("CartItemUpdated"))) { notification in
+            if let userInfo = notification.userInfo,
+               let updatedItemId = userInfo["itemId"] as? String,
+               updatedItemId == cartItem.itemId {
+                updateDerivedValues(animated: true)
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("VaultItemUpdated"))) { notification in
+            if let userInfo = notification.userInfo,
+               let updatedItemId = userInfo["itemId"] as? String,
+               updatedItemId == cartItem.itemId {
+                updateDerivedValues(animated: true)
+            }
         }
     }
     
     private func updateDerivedValues(animated: Bool = false) {
          guard let vault = vaultService.vault else { return }
          
-         // FIX: Use cartItem.quantity directly instead of getQuantity(cart:)
          let newQuantity = cartItem.quantity
          let newPrice = cartItem.getPrice(from: vault, cart: cart)
          let newTotalPrice = cartItem.getTotalPrice(from: vault, cart: cart)
          let newUnit = cartItem.getUnit(from: vault, cart: cart)
          
-         print("📊 Updating derived values for \(itemName): qty=\(newQuantity), price=\(newPrice), total=\(newTotalPrice)")
+         print("📊 Updating derived values for \(item?.name ?? "Unknown"): qty=\(newQuantity), price=\(newPrice), unit=\(newUnit), total=\(newTotalPrice)")
         
-        cartItem.syncQuantities(cart: cart)  // <-- ADD HERE
+        cartItem.syncQuantities(cart: cart)
          
          if animated {
              withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
@@ -228,7 +306,7 @@ private struct MainRowContent: View {
      }
 }
 
-// MARK: - Fulfillment Button Component (keep your existing one)
+// MARK: - Fulfillment Button Component
 private struct FulfillmentButton: View {
     let cartItem: CartItem
     @Binding var isFulfilling: Bool
@@ -294,56 +372,3 @@ private struct FulfillmentButton: View {
         .help(cartItem.isFulfilled ? "Already purchased" : "Tap to confirm purchase")
     }
 }
-
-// MARK: - Item Details Content Component
-private struct ItemDetailsContent: View {
-    let cartItem: CartItem
-    let item: Item?
-    let cart: Cart
-    let animatedPrice: Double
-    let animatedQuantity: Double
-    let animatedTotalPrice: Double
-    let displayUnit: String
-    let itemName: String
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Quantity with numeric transition
-            HStack(spacing: 4) {
-                Text(animatedQuantity.formattedQuantity)
-                    .lexendFont(16, weight: .regular)
-                    .contentTransition(.numericText())
-                    .animation(.spring(response: 0.5, dampingFraction: 0.7), value: animatedQuantity)
-                
-                Text(itemName)
-                    .lexendFont(16, weight: .regular)
-                    .lineLimit(3)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .strikethrough(cart.isShopping && (cartItem.isFulfilled || cartItem.isSkippedDuringShopping))
-            }
-            
-            HStack(spacing: 4) {
-                // Price per unit with numeric transition
-                Text("\(animatedPrice.formattedCurrency) / \(displayUnit)")
-                    .lexendFont(12)
-                    .lineLimit(1)
-                    .contentTransition(.numericText())
-                    .animation(.spring(response: 0.5, dampingFraction: 0.7), value: animatedPrice)
-                
-                Spacer()
-                
-                // Total price with numeric transition
-                Text(animatedTotalPrice.formattedCurrency)
-                    .lexendFont(14, weight: .bold)
-                    .lineLimit(1)
-                    .contentTransition(.numericText())
-                    .animation(.spring(response: 0.5, dampingFraction: 0.7), value: animatedTotalPrice)
-            }
-            .foregroundColor(Color(hex: "231F30"))
-            .opacity(cart.isShopping && (cartItem.isFulfilled || cartItem.isSkippedDuringShopping) ? 0.5 : 1.0)
-        }
-        .opacity(cart.isShopping && (cartItem.isFulfilled || cartItem.isSkippedDuringShopping) ? 0.5 : 1.0)
-    }
-}
-
-
