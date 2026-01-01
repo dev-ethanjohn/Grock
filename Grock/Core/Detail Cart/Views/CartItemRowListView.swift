@@ -20,6 +20,12 @@ struct CartItemRowListView: View {
             onDeleteItem: onDeleteItem,
             isLastItem: isLastItem
         )
+        .onChange(of: cartItem.quantity) { oldValue, newValue in
+                 print("🔄 CartItemRowListView: quantity changed from \(oldValue) to \(newValue)")
+                 if newValue <= 0 && cart.status == .planning {
+                     print("🗑️ Quantity is 0, this item should be removed from display")
+                 }
+             }
     }
 }
 
@@ -35,6 +41,7 @@ private struct MainRowContent: View {
     
     @Environment(VaultService.self) private var vaultService
     
+    // Add back all the missing state variables
     @State private var isNewlyAdded: Bool = true
     @State private var buttonScale: CGFloat = 0.1
     @State private var isFulfilling: Bool = false
@@ -42,16 +49,11 @@ private struct MainRowContent: View {
     @State private var checkmarkScale: CGFloat = 0.1
     @State private var rowOpacity: Double = 1.0
     
-    // ANIMATED VALUES - Separate from cartItem
-    @State private var animatedPrice: Double = 0
-    @State private var animatedQuantity: Double = 0
-    @State private var animatedTotalPrice: Double = 0
+    // Derived state
+    @State private var currentQuantity: Double = 0
+    @State private var currentPrice: Double = 0
+    @State private var currentTotalPrice: Double = 0
     @State private var displayUnit: String = ""
-    
-    // Store previous values for animation
-    @State private var previousPrice: Double = 0
-    @State private var previousQuantity: Double = 0
-    @State private var previousTotalPrice: Double = 0
     
     private var itemName: String {
         item?.name ?? "Unknown Item"
@@ -70,17 +72,40 @@ private struct MainRowContent: View {
                 )
             }
             
-            // The rest of your item content
-            ItemDetailsContent(
-                cartItem: cartItem,
-                item: item,
-                cart: cart,
-                animatedPrice: animatedPrice,
-                animatedQuantity: animatedQuantity,
-                animatedTotalPrice: animatedTotalPrice,
-                displayUnit: displayUnit,
-                itemName: itemName
-            )
+            // Item details using the derived state
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: 4) {
+                    Text(currentQuantity.formattedQuantity)
+                        .lexendFont(16, weight: .regular)
+                        .contentTransition(.numericText())
+                        .animation(.spring(response: 0.5, dampingFraction: 0.7), value: currentQuantity)
+                    
+                    Text(itemName)
+                        .lexendFont(16, weight: .regular)
+                        .lineLimit(3)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .strikethrough(cart.isShopping && (cartItem.isFulfilled || cartItem.isSkippedDuringShopping))
+                }
+                
+                HStack(spacing: 4) {
+                    Text("\(currentPrice.formattedCurrency) / \(displayUnit)")
+                        .lexendFont(12)
+                        .lineLimit(1)
+                        .contentTransition(.numericText())
+                        .animation(.spring(response: 0.5, dampingFraction: 0.7), value: currentPrice)
+                    
+                    Spacer()
+                    
+                    Text(currentTotalPrice.formattedCurrency)
+                        .lexendFont(14, weight: .bold)
+                        .lineLimit(1)
+                        .contentTransition(.numericText())
+                        .animation(.spring(response: 0.5, dampingFraction: 0.7), value: currentTotalPrice)
+                }
+                .foregroundColor(Color(hex: "231F30"))
+                .opacity(cart.isShopping && (cartItem.isFulfilled || cartItem.isSkippedDuringShopping) ? 0.5 : 1.0)
+            }
+            .opacity(cart.isShopping && (cartItem.isFulfilled || cartItem.isSkippedDuringShopping) ? 0.5 : 1.0)
         }
         .opacity(rowOpacity)
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: cart.isShopping)
@@ -111,8 +136,8 @@ private struct MainRowContent: View {
             // Set initial scale based on cart mode
             buttonScale = cart.isShopping ? 1.0 : 0.1
             
-            // Initialize animated values without animation
-            updateValues(animated: false)
+            // Initialize derived values
+            updateDerivedValues()
             
             if isNewlyAdded {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
@@ -125,86 +150,83 @@ private struct MainRowContent: View {
         .onDisappear {
             isNewlyAdded = true
         }
-        .onChange(of: cart.status) { oldValue, newValue in
-            updateValues(animated: true)
+        // SIMPLIFIED FIX: Use individual onChange observers instead of tuple
+        .onChange(of: cartItem.quantity) { oldValue, newValue in
+            if oldValue != newValue {
+                print("🔢 cartItem.quantity changed: \(oldValue) → \(newValue)")
+                updateDerivedValues(animated: true)
+            }
         }
         .onChange(of: cartItem.actualPrice) { oldValue, newValue in
             if oldValue != newValue {
                 print("💰 actualPrice changed: \(oldValue ?? 0) → \(newValue ?? 0)")
-                triggerAnimation()
+                updateDerivedValues(animated: true)
             }
         }
         .onChange(of: cartItem.actualQuantity) { oldValue, newValue in
             if oldValue != newValue {
                 print("📦 actualQuantity changed: \(oldValue ?? 0) → \(newValue ?? 0)")
-                triggerAnimation()
+                updateDerivedValues(animated: true)
             }
         }
         .onChange(of: cartItem.shoppingOnlyPrice) { oldValue, newValue in
             if oldValue != newValue {
                 print("🛍️ shoppingOnlyPrice changed: \(oldValue ?? 0) → \(newValue ?? 0)")
-                triggerAnimation()
+                updateDerivedValues(animated: true)
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ShoppingDataUpdated"))) { notification in
-            if let userInfo = notification.userInfo,
-               let updatedItemId = userInfo["cartItemId"] as? String,
-               updatedItemId == cartItem.itemId {
-                print("📢 ShoppingDataUpdated received for: \(itemName)")
-                triggerAnimation()
+        .onChange(of: cartItem.isFulfilled) { oldValue, newValue in
+            if oldValue != newValue {
+                print("✅ isFulfilled changed: \(oldValue) → \(newValue)")
+                updateDerivedValues(animated: true)
             }
+        }
+        .onChange(of: cartItem.isSkippedDuringShopping) { oldValue, newValue in
+            if oldValue != newValue {
+                print("⏸️ isSkippedDuringShopping changed: \(oldValue) → \(newValue)")
+                updateDerivedValues(animated: true)
+            }
+        }
+        .onChange(of: cart.status) { oldValue, newValue in
+            if oldValue != newValue {
+                print("🛒 cart.status changed: \(oldValue) → \(newValue)")
+                updateDerivedValues(animated: true)
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ShoppingDataUpdated"))) { _ in
+            print("📢 ShoppingDataUpdated received for: \(itemName)")
+            updateDerivedValues(animated: true)
         }
     }
     
-    private func getCurrentValues() -> (price: Double, quantity: Double, totalPrice: Double, unit: String) {
-        guard let vault = vaultService.vault else { return (0, 0, 0, "") }
-        
-        let price = cartItem.getPrice(from: vault, cart: cart)
-        let unit = cartItem.getUnit(from: vault, cart: cart)
-        let quantity = cartItem.getQuantity(cart: cart)
-        let totalPrice = cartItem.getTotalPrice(from: vault, cart: cart)
-        
-        return (price, quantity, totalPrice, unit)
-    }
-    
-    private func updateValues(animated: Bool = true) {
-        let current = getCurrentValues()
-        
-        // Store current animated values as previous
-        previousPrice = animatedPrice
-        previousQuantity = animatedQuantity
-        previousTotalPrice = animatedTotalPrice
-        
-        if animated {
-            print("🎬 Animating \(itemName):")
-            print("   Price: \(previousPrice) → \(current.price)")
-            print("   Quantity: \(previousQuantity) → \(current.quantity)")
-            print("   Total: \(previousTotalPrice) → \(current.totalPrice)")
-            
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
-                animatedPrice = current.price
-                animatedQuantity = current.quantity
-                animatedTotalPrice = current.totalPrice
-                displayUnit = current.unit
-            }
-        } else {
-            // No animation - just set values
-            animatedPrice = current.price
-            animatedQuantity = current.quantity
-            animatedTotalPrice = current.totalPrice
-            displayUnit = current.unit
-        }
-    }
-    
-    private func triggerAnimation() {
-        // Small delay to ensure SwiftData updates are complete
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-            updateValues(animated: true)
-        }
-    }
+    private func updateDerivedValues(animated: Bool = false) {
+         guard let vault = vaultService.vault else { return }
+         
+         // FIX: Use cartItem.quantity directly instead of getQuantity(cart:)
+         let newQuantity = cartItem.quantity
+         let newPrice = cartItem.getPrice(from: vault, cart: cart)
+         let newTotalPrice = cartItem.getTotalPrice(from: vault, cart: cart)
+         let newUnit = cartItem.getUnit(from: vault, cart: cart)
+         
+         print("📊 Updating derived values for \(itemName): qty=\(newQuantity), price=\(newPrice), total=\(newTotalPrice)")
+         
+         if animated {
+             withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+                 currentQuantity = newQuantity
+                 currentPrice = newPrice
+                 currentTotalPrice = newTotalPrice
+                 displayUnit = newUnit
+             }
+         } else {
+             currentQuantity = newQuantity
+             currentPrice = newPrice
+             currentTotalPrice = newTotalPrice
+             displayUnit = newUnit
+         }
+     }
 }
 
-// MARK: - Fulfillment Button Component
+// MARK: - Fulfillment Button Component (keep your existing one)
 private struct FulfillmentButton: View {
     let cartItem: CartItem
     @Binding var isFulfilling: Bool

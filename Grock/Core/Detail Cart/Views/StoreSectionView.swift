@@ -14,16 +14,33 @@ struct StoreSectionListView: View {
     
     // FIXED: Proper filtering for shopping mode
     private var displayItems: [(cartItem: CartItem, item: Item?)] {
-        if cart.isShopping {
-            // In shopping mode: show only unfulfilled AND non-skipped items
-            return items.filter { cartItem, _ in
-                !cartItem.isFulfilled && !cartItem.isSkippedDuringShopping
-            }
-        } else {
-            // In planning mode, show all items
-            return items
-        }
-    }
+          let filteredItems = items.filter { cartItem, _ in
+              // Always exclude items with quantity <= 0
+              guard cartItem.quantity > 0 else {
+                  return false
+              }
+              
+              // Filter based on cart status
+              switch cart.status {
+              case .planning:
+                  // In planning mode: show all items with quantity > 0
+                  return true
+                  
+              case .shopping:
+                  // In shopping mode: show only unfulfilled, non-skipped items
+                  return !cartItem.isFulfilled && !cartItem.isSkippedDuringShopping
+                  
+              case .completed:
+                  // In completed mode: show all items
+                  return true
+              }
+          }
+          
+          // Sort items by name for consistent display
+          return filteredItems.sorted { ($0.item?.name ?? "") < ($1.item?.name ?? "") }
+      }
+      
+    
     
     // ADD THIS: Track item count changes for animation
     @State private var previousDisplayCount: Int = 0

@@ -409,9 +409,12 @@ class CartItem {
     func getQuantity(cart: Cart) -> Double {
         switch cart.status {
         case .planning:
+            print("🔍 getQuantity - Planning: quantity = \(quantity)")
             return quantity
         case .shopping, .completed:
-            return actualQuantity ?? quantity
+            let result = actualQuantity ?? quantity
+            print("🔍 getQuantity - Shopping/Completed: quantity = \(quantity), actualQuantity = \(actualQuantity ?? -1), returning = \(result)")
+            return result
         }
     }
     

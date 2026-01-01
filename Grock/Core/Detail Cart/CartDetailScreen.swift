@@ -1,6 +1,8 @@
 import SwiftUI
 import SwiftData
 
+
+
 struct CartDetailScreen: View {
     let cart: Cart
     @Environment(VaultService.self) private var vaultService
@@ -263,26 +265,96 @@ struct CartDetailScreen: View {
             itemsChanged: handleItemsChange,
             checkAndShowCelebration: checkAndShowCelebration
         )
-        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ShoppingDataUpdated"))) { notification in
-            print("🔄 Received ShoppingDataUpdated notification")
-            
-            // Force a complete refresh of the view
-            DispatchQueue.main.async {
-                // Force SwiftUI to recalculate everything
-                refreshTrigger = UUID()
-                
-                // Also force vault service to update
-                vaultService.updateCartTotals(cart: cart)
-                
-                // Additional update after a short delay to ensure everything syncs
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    refreshTrigger = UUID()
-                }
-            }
-        }
+        .onReceive(NotificationCenter.default.publisher(for: .shoppingItemQuantityChanged)) { notification in
+                   handleShoppingItemQuantityChange(notification)
+               }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ShoppingItemQuantityChanged"))) { notification in
+                 print("🔄 Received ShoppingItemQuantityChanged notification")
+                 
+                 // Check if this notification is for our current cart
+                 if let cartId = notification.userInfo?["cartId"] as? String,
+                    cartId == cart.id {
+                     
+                     print("✅ Quantity change for current cart: \(cart.name)")
+                     print("   Item: \(notification.userInfo?["itemName"] as? String ?? "Unknown")")
+                     print("   New quantity: \(notification.userInfo?["newQuantity"] as? Double ?? 0)")
+                     print("   Item type: \(notification.userInfo?["itemType"] as? String ?? "Unknown")")
+                     
+                     // Force a refresh
+                     DispatchQueue.main.async {
+                         // Update totals first
+                         vaultService.updateCartTotals(cart: cart)
+                         
+                         // Force UI refresh
+                         refreshTrigger = UUID()
+                         
+                         // Additional delayed refresh to ensure UI updates
+                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                             refreshTrigger = UUID()
+                         }
+                     }
+                 }
+             }
+             // Keep the existing notification listener too
+        .onReceive(NotificationCenter.default.publisher(for: .shoppingDataUpdated)) { notification in
+                 print("🔄 Received ShoppingDataUpdated notification")
+                 
+                 DispatchQueue.main.async {
+                     refreshTrigger = UUID()
+                     vaultService.updateCartTotals(cart: cart)
+                     
+                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                         refreshTrigger = UUID()
+                     }
+                 }
+             }
+         
     }
     
     // MARK: - Helper Methods
+    
+    private func handleShoppingItemQuantityChange(_ notification: Notification) {
+         print("🔄 Received ShoppingItemQuantityChanged notification")
+         
+         guard let cartId = notification.userInfo?["cartId"] as? String,
+               cartId == cart.id else {
+             print("❌ Notification not for current cart")
+             return
+         }
+         
+         if let itemName = notification.userInfo?["itemName"] as? String,
+            let newQuantity = notification.userInfo?["newQuantity"] as? Double,
+            let itemType = notification.userInfo?["itemType"] as? String {
+             
+             print("✅ Quantity changed for: \(itemName)")
+             print("   New quantity: \(newQuantity)")
+             print("   Item type: \(itemType)")
+             
+             // Verify the actual cart item quantity
+             if let itemId = notification.userInfo?["itemId"] as? String {
+                 if let cartItem = cart.cartItems.first(where: { $0.itemId == itemId }) {
+                     print("   🔍 Verification - CartItem.quantity: \(cartItem.quantity)")
+                     
+                     // If there's a mismatch, update the cart item
+                     if cartItem.quantity != newQuantity {
+                         print("   ⚠️ Mismatch detected! Updating cartItem.quantity from \(cartItem.quantity) to \(newQuantity)")
+                         cartItem.quantity = newQuantity
+                     }
+                 }
+             }
+             
+             // Force UI refresh
+             DispatchQueue.main.async {
+                 vaultService.updateCartTotals(cart: cart)
+                 refreshTrigger = UUID()
+                 
+                 // Additional refresh to ensure UI is updated
+                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                     refreshTrigger = UUID()
+                 }
+             }
+         }
+     }
     
     private func checkAndShowCelebration() {
         let hasSeenCelebration = UserDefaults.standard.bool(forKey: "hasSeenFirstShoppingCartCelebration")
@@ -1260,3 +1332,23 @@ extension View {
 }
 
 
+
+//// Add this extension somewhere in your project
+//extension Notification.Name {
+//    static let shoppingItemQuantityChanged = Notification.Name("ShoppingItemQuantityChanged")
+//}
+//
+//// Then in your BrowseVaultItemRow, use this instead:
+//private func sendShoppingUpdateNotification() {
+//    NotificationCenter.default.post(
+//        name: .shoppingItemQuantityChanged,
+//        object: nil,
+//        userInfo: [
+//            "cartId": cart.id,
+//            "itemId": storeItem.item.id,
+//            "itemName": itemName,
+//            "newQuantity": currentQuantity,
+//            "itemType": itemType
+//        ]
+//    )
+//}

@@ -1,16 +1,26 @@
 import SwiftUI
 
+extension Notification.Name {
+    static let shoppingItemQuantityChanged = Notification.Name("ShoppingItemQuantityChanged")
+    static let shoppingDataUpdated = Notification.Name("ShoppingDataUpdated")
+}
+
 struct BrowseVaultView: View {
     let cart: Cart
     @Binding var selectedCategory: GroceryCategory?
     let onItemSelected: (Item) -> Void
     let onBack: () -> Void
     let onAddNewItem: () -> Void
-    @Binding var hasUnsavedChanges: Bool  // Add this binding
-    let onDone: (() -> Void)?  // Add this optional callback
+    @Binding var hasUnsavedChanges: Bool
     
     @Environment(VaultService.self) private var vaultService
     @State private var searchText = ""
+    
+    // Add a debounced search text to prevent excessive recomputation
+    @State private var debouncedSearchText = ""
+    
+    // Add a timer for debouncing
+    private let debounceTimer = Timer.publish(every: 0.3, on: .main, in: .common).autoconnect()
     
     // MARK: - StoreGroup Struct (Equatable)
     
@@ -31,9 +41,8 @@ struct BrowseVaultView: View {
         let itemManager = ItemManager(
             vault: vaultService.vault,
             cart: cart,
-            searchText: searchText
+            searchText: debouncedSearchText // Use debounced text
         )
-        let _ = cart.cartItems.count
         print("🔄 Computing itemsByStore for cart: \(cart.name)")
         return itemManager.storeGroups
     }
@@ -60,7 +69,7 @@ struct BrowseVaultView: View {
             // Items List organized by store
             if isEmptyState {
                 EmptyStateView(
-                    searchText: searchText,
+                    searchText: debouncedSearchText,
                     onAddNewItem: onAddNewItem
                 )
                 .frame(maxHeight: .infinity)
@@ -74,20 +83,34 @@ struct BrowseVaultView: View {
                         onItemSelected(item)
                         hasUnsavedChanges = true
                     },
-                    onQuantityChange: {  // ADD THIS CLOSURE
+                    onQuantityChange: {
                         hasUnsavedChanges = true
                     }
                 )
             }
         }
         .animation(.spring(response: 0.4, dampingFraction: 0.7), value: itemsByStore)
+        .onChange(of: searchText) { oldValue, newValue in
+            // Debounce the search text updates
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                debouncedSearchText = newValue
+            }
+        }
         .onChange(of: cart.cartItems) { oldItems, newItems in
-            print("🛒 Cart items changed in BrowseVaultView: \(newItems.count) items")
-            // Check if items actually changed (not just count)
-            if oldItems.map({ $0.id }) != newItems.map({ $0.id }) ||
-               oldItems.map({ $0.quantity }) != newItems.map({ $0.quantity }) {
+            // Add a guard to prevent unnecessary updates
+            let oldIds = oldItems.map { $0.id }
+            let newIds = newItems.map { $0.id }
+            let oldQuantities = oldItems.map { $0.quantity }
+            let newQuantities = newItems.map { $0.quantity }
+            
+            if oldIds != newIds || oldQuantities != newQuantities {
+                print("🛒 Cart items changed in BrowseVaultView: \(newItems.count) items")
                 hasUnsavedChanges = true
             }
+        }
+        // Clean up timer
+        .onDisappear {
+            debounceTimer.upstream.connect().cancel()
         }
     }
 }
@@ -283,20 +306,20 @@ private struct StoreItemsListView: View {
     let showEndIndicator: Bool
     let cart: Cart
     let onItemSelected: (Item) -> Void
-    let onQuantityChange: (() -> Void)?  // Make optional with default value
+    let onQuantityChange: (() -> Void)?  // This is already here
     
     var body: some View {
         List {
             ForEach(availableStores, id: \.self) { store in
-                            if let storeGroup = itemsByStore.first(where: { $0.store == store }) {
-                                BrowseVaultStoreSection(
-                                    storeName: store,
-                                    items: storeGroup.items,
-                                    cart: cart,
-                                    onItemSelected: onItemSelected,
-//                                    onQuantityChange: onQuantityChange,  // ...but not passed here in the original code
-                                    isLastStore: store == availableStores.last
-                                )
+                if let storeGroup = itemsByStore.first(where: { $0.store == store }) {
+                    BrowseVaultStoreSection(
+                        storeName: store,
+                        items: storeGroup.items,
+                        cart: cart,
+                        onItemSelected: onItemSelected,
+                        onQuantityChange: onQuantityChange,  // PASS IT HERE
+                        isLastStore: store == availableStores.last
+                    )
                     .transition(.asymmetric(
                         insertion: .move(edge: .top).combined(with: .opacity),
                         removal: .move(edge: .leading).combined(with: .opacity)

@@ -4,7 +4,6 @@ struct AddNewItemToCartSheet: View {
     @Binding var isPresented: Bool
     let cart: Cart
     var onItemAdded: (() -> Void)?
-    var onAddNewItem: (() -> Void)?
     
     @Environment(VaultService.self) private var vaultService
     @Environment(CartViewModel.self) private var cartViewModel
@@ -64,26 +63,16 @@ struct AddNewItemToCartSheet: View {
                             }
                         },
                         onAddNewItem: {
-                            // Call the onAddNewItem handler passed from parent
-                            onAddNewItem?()
-                            // OR show the add item popover directly:
-                            // showAddItemPopoverInVault = true
+                            withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                                currentPage = .addNew
+                            }
                         },
-                        hasUnsavedChanges: $hasUnsavedChanges,
-                        onDone: {
-                            // Save changes and dismiss
-                            vaultService.updateCartTotals(cart: cart)
-                            onItemAdded?()
-                            resetAndClose()
-                        }
+                        hasUnsavedChanges: $hasUnsavedChanges
                     )
                     .offset(x: currentPage == .browseVault ? 0 : UIScreen.main.bounds.width)
                     .opacity(currentPage == .browseVault ? 1 : 0)
                 }
                 .navigationBarTitleDisplayMode(.inline)
-                // ... (keep all your existing code above) ...
-                
-                // In the toolbar section:
                 .toolbar {
                     // Page indicator dots (shown on both pages)
                     ToolbarItem(placement: .principal) {
@@ -196,8 +185,6 @@ struct AddNewItemToCartSheet: View {
                         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: currentPage)
                     }
                 }
-                
-                // ... (keep all your existing code below) ...
             }
             .presentationDetents(currentPage == .addNew ? [.height(500)] : [.large])
             .presentationDragIndicator(.visible)
@@ -256,7 +243,13 @@ struct AddNewItemToCartSheet: View {
             focusedItemId = itemId
         }
         .ignoresSafeArea(.keyboard)
+        .onChange(of: hasUnsavedChanges) { oldValue, newValue in
+            if newValue {
+                print("🔄 hasUnsavedChanges set to true in BrowseVaultView")
+            }
+        }
     }
+    
     
     // MARK: - Pulse Animation Functions (Icons Only)
     
@@ -352,6 +345,12 @@ struct AddNewItemToCartSheet: View {
         
         onItemAdded?()
         resetAndClose()
+        
+        NotificationCenter.default.post(
+                   name: .shoppingItemQuantityChanged,
+                   object: nil,
+                   userInfo: ["cartId": cart.id]
+               )
     }
     
     private func handleVaultItemSelection(_ item: Item) {
@@ -416,7 +415,30 @@ struct AddNewItemToCartSheet: View {
         
         hasUnsavedChanges = true
         onItemAdded?()
+        
+        if let cartItem = cart.cartItems.first(where: {
+              $0.itemId == item.id ||
+              ($0.isShoppingOnlyItem && $0.shoppingOnlyName?.lowercased() == item.name.lowercased())
+          }) {
+              sendQuantityChangeNotification(for: cartItem, itemName: item.name)
+          }
     }
+    
+    private func sendQuantityChangeNotification(for cartItem: CartItem, itemName: String) {
+         let itemTypeString = cartItem.isShoppingOnlyItem ? "shoppingOnly" : "plannedCart"
+         
+         NotificationCenter.default.post(
+             name: .shoppingItemQuantityChanged,
+             object: nil,
+             userInfo: [
+                 "cartId": cart.id,
+                 "itemId": cartItem.itemId,
+                 "itemName": itemName,
+                 "newQuantity": cartItem.quantity,
+                 "itemType": itemTypeString
+             ]
+         )
+     }
     
     private func addNewItemToVaultAndCart(name: String, category: GroceryCategory, store: String, unit: String, price: Double) -> Bool {
         let success = vaultService.addItem(
@@ -568,12 +590,13 @@ struct BrowseVaultStoreSection: View {
     let items: [StoreItem]
     let cart: Cart
     let onItemSelected: (Item) -> Void
-    let onQuantityChange: (() -> Void)? = nil  // Make optional with default value
+    let onQuantityChange: (() -> Void)?  // Add this
     let isLastStore: Bool
     
     private var itemsWithStableIdentifiers: [(id: String, storeItem: StoreItem)] {
-        items.map { ($0.id, $0) }
-    }
+          items.map { ($0.id, $0) }
+      }
+      
     
     var body: some View {
         Section(
@@ -595,8 +618,8 @@ struct BrowseVaultStoreSection: View {
                 .cornerRadius(6)
                 Spacer()
             }
-                .padding(.leading)
-                .listRowInsets(EdgeInsets())
+            .padding(.leading)
+            .listRowInsets(EdgeInsets())
         ) {
             ForEach(itemsWithStableIdentifiers, id: \.id) { tuple in
                 VStack(spacing: 0) {
@@ -606,7 +629,7 @@ struct BrowseVaultStoreSection: View {
                         action: {
                             onItemSelected(tuple.storeItem.item)
                         },
-                        //                        onQuantityChange: onQuantityChange  // Pass the callback
+                        onQuantityChange: onQuantityChange  // Pass it here
                     )
                     
                     if tuple.id != itemsWithStableIdentifiers.last?.id {
@@ -653,7 +676,7 @@ struct BrowseVaultItemRow: View {
     let storeItem: StoreItem
     let cart: Cart
     let action: () -> Void
-    let onQuantityChange: (() -> Void)? = nil
+    let onQuantityChange: (() -> Void)?
     
     @State private var appearScale: CGFloat = 0.9
     @State private var appearOpacity: Double = 0
@@ -676,12 +699,20 @@ struct BrowseVaultItemRow: View {
     
     // Helper to get current quantity - directly from cart
     private var currentQuantity: Double {
-        // Always find fresh from cart to avoid stale state
-        if let cartItem = findCartItem() {
-            return cartItem.getQuantity(cart: cart)
-        }
-        return 0
-    }
+          if let cartItem = findCartItem() {
+              // DEBUG: Log both values
+              let directQty = cartItem.quantity
+              let getQty = cartItem.getQuantity(cart: cart)
+              if directQty != getQty {
+                  print("🔄 DEBUG: Quantity mismatch - direct: \(directQty), getQuantity: \(getQty)")
+              }
+              
+              // Use the direct quantity property
+              return directQty
+          }
+          return 0
+      }
+      
     
     private var itemType: ItemType {
         if storeItem.isShoppingOnlyItem {
@@ -704,7 +735,7 @@ struct BrowseVaultItemRow: View {
             let cartItemStore = cartItem.shoppingOnlyStore?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             
             return cartItemName.lowercased() == itemName.lowercased() &&
-            cartItemStore.lowercased() == storeName.lowercased()
+                   cartItemStore.lowercased() == storeName.lowercased()
         })
         
         if isInCartAsShopping {
@@ -712,6 +743,171 @@ struct BrowseVaultItemRow: View {
         }
         
         return .vaultOnly
+    }
+    
+    // MARK: - UI Properties based on item type and quantity
+    
+    private var shouldShowIndicator: Bool {
+        switch itemType {
+        case .vaultOnly:
+            return false
+        case .plannedCart, .shoppingOnly:
+            return currentQuantity > 0
+        }
+    }
+    
+    private var indicatorColor: Color {
+        switch itemType {
+        case .vaultOnly:
+            return .clear
+        case .plannedCart:
+            return .blue
+        case .shoppingOnly:
+            return .orange
+        }
+    }
+    
+    private var textColor: Color {
+        switch itemType {
+        case .vaultOnly:
+            return Color(hex: "333").opacity(0.7)
+        case .plannedCart:
+            return currentQuantity > 0 ? .black : Color(hex: "333").opacity(0.7)
+        case .shoppingOnly:
+            return currentQuantity > 0 ? .black : Color(hex: "333").opacity(0.7)
+        }
+    }
+    
+    private var priceColor: Color {
+        switch itemType {
+        case .vaultOnly:
+            return Color(hex: "666").opacity(0.7)
+        case .plannedCart:
+            return currentQuantity > 0 ? .gray : Color(hex: "888").opacity(0.7)
+        case .shoppingOnly:
+            return currentQuantity > 0 ? .gray : Color(hex: "888").opacity(0.7)
+        }
+    }
+    
+    private var contentOpacity: Double {
+        switch itemType {
+        case .vaultOnly:
+            return 0.7
+        case .plannedCart:
+            return currentQuantity > 0 ? 1.0 : 0.7
+        case .shoppingOnly:
+            return currentQuantity > 0 ? 1.0 : 0.7
+        }
+    }
+    
+    // MARK: - Buttons and UI Components
+    
+    private var minusButton: some View {
+        Button {
+            handleMinus()
+        } label: {
+            Image(systemName: "minus")
+                .font(.footnote).bold()
+                .foregroundColor(Color(hex: "1E2A36"))
+                .frame(width: 24, height: 24)
+                .background(.white)
+                .clipShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .contentShape(Rectangle())
+        .disabled(currentQuantity <= 0)
+        .opacity(currentQuantity <= 0 ? 0.5 : 1)
+    }
+    
+    private var removeButton: some View {
+        Button {
+            handleRemove()
+        } label: {
+            Image(systemName: "trash")
+                .font(.footnote)
+                .foregroundColor(.red)
+                .frame(width: 24, height: 24)
+                .background(.white)
+                .clipShape(Circle())
+                .overlay(
+                    Circle()
+                        .stroke(Color.red.opacity(0.3), lineWidth: 1)
+                )
+        }
+        .buttonStyle(.plain)
+    }
+    
+    private var plusButton: some View {
+        Button(action: handlePlus) {
+            Image(systemName: "plus")
+                .font(.footnote)
+                .bold()
+                .foregroundColor(plusButtonColor)
+        }
+        .frame(width: 24, height: 24)
+        .background(.white)
+        .clipShape(Circle())
+        .overlay(
+            Circle()
+                .stroke(plusButtonStrokeColor, lineWidth: 1)
+        )
+        .contentShape(Circle())
+        .buttonStyle(.plain)
+    }
+    
+    private var plusButtonColor: Color {
+        switch itemType {
+        case .vaultOnly:
+            return Color(hex: "888888").opacity(0.7)
+        case .plannedCart:
+            return currentQuantity > 0 ? Color(hex: "1E2A36") : .blue.opacity(0.7)
+        case .shoppingOnly:
+            return currentQuantity > 0 ? Color(hex: "1E2A36") : .orange.opacity(0.7)
+        }
+    }
+    
+    private var plusButtonStrokeColor: Color {
+        switch itemType {
+        case .vaultOnly:
+            return Color(hex: "F2F2F2").darker(by: 0.1)
+        case .plannedCart:
+            return currentQuantity > 0 ? .clear : .blue.opacity(0.3)
+        case .shoppingOnly:
+            return currentQuantity > 0 ? .clear : .orange.opacity(0.3)
+        }
+    }
+    
+    private var quantityTextField: some View {
+        ZStack {
+            Text(textValue)
+                .font(.system(size: 15, weight: .bold))
+                .foregroundColor(Color(hex: "2C3E50"))
+                .multilineTextAlignment(.center)
+                .contentTransition(.numericText())
+                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: textValue)
+                .fixedSize()
+
+            TextField("", text: $textValue)
+                .keyboardType(.decimalPad)
+                .font(.system(size: 15, weight: .bold))
+                .foregroundColor(.clear)
+                .multilineTextAlignment(.center)
+                .focused($isFocused)
+                .normalizedNumber($textValue, allowDecimal: true, maxDecimalPlaces: 2)
+                .onChange(of: textValue) { _, newText in
+                    if let number = Double(newText), number > 100 {
+                        textValue = "100"
+                    }
+                }
+        }
+        .padding(.horizontal, 6)
+        .background(
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(Color(hex: "F2F2F2").darker(by: 0.1), lineWidth: 1)
+        )
+        .frame(minWidth: 40)
+        .frame(maxWidth: 80)
+        .fixedSize(horizontal: true, vertical: false)
     }
     
     var body: some View {
@@ -749,7 +945,10 @@ struct BrowseVaultItemRow: View {
                 }
                 
                 HStack(spacing: 0) {
-                    Text("₱\(storeItem.priceOption.pricePerUnit.priceValue, specifier: "%g")")
+                    let price = storeItem.priceOption.pricePerUnit.priceValue
+                    let isValidPrice = !price.isNaN && price.isFinite
+                    
+                    Text("₱\(isValidPrice ? price : 0, specifier: "%g")")
                         .foregroundColor(priceColor)
                         .opacity(contentOpacity)
                     
@@ -846,15 +1045,10 @@ struct BrowseVaultItemRow: View {
                 appearOpacity = 1.0
             }
         }
-        // Listen to cart items changes
-        .onChange(of: cart.cartItems) { oldItems, newItems in
-            // Force update when cart items change
-            let oldQty = oldItems.first(where: { isCartItemForThisRow($0) })?.getQuantity(cart: cart) ?? 0
-            let newQty = newItems.first(where: { isCartItemForThisRow($0) })?.getQuantity(cart: cart) ?? 0
-            
-            if oldQty != newQty {
-                updateTextValue()
-            }
+        // Fix for the type-checking issue: Use a simpler approach
+        .onChange(of: cart.cartItems.count) { oldCount, newCount in
+            // Force update when cart items count changes
+            updateTextValue()
         }
         .onChange(of: textValue) { oldValue, newValue in
             if isFocused && newValue.isEmpty {
@@ -871,185 +1065,36 @@ struct BrowseVaultItemRow: View {
         }
     }
     
-    // Helper to check if a cart item belongs to this row
-    private func isCartItemForThisRow(_ cartItem: CartItem) -> Bool {
-        if cartItem.isShoppingOnlyItem {
-            let cartItemName = cartItem.shoppingOnlyName?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
-            let cartItemStore = cartItem.shoppingOnlyStore?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
-            
-            return cartItemName == itemName.lowercased() &&
-            cartItemStore == storeName.lowercased()
-        } else {
-            return cartItem.itemId == storeItem.item.id
-        }
-    }
-    
-    // MARK: - UI Properties based on item type and quantity
-    
-    private var shouldShowIndicator: Bool {
-        switch itemType {
-        case .vaultOnly:
-            return false
-        case .plannedCart, .shoppingOnly:
-            return currentQuantity > 0
-        }
-    }
-    
-    private var indicatorColor: Color {
-        switch itemType {
-        case .vaultOnly:
-            return .clear
-        case .plannedCart:
-            return .blue
-        case .shoppingOnly:
-            return .orange
-        }
-    }
-    
-    private var textColor: Color {
-        switch itemType {
-        case .vaultOnly:
-            return Color(hex: "333").opacity(0.7)
-        case .plannedCart:
-            return currentQuantity > 0 ? .black : Color(hex: "333").opacity(0.7)
-        case .shoppingOnly:
-            return currentQuantity > 0 ? .black : Color(hex: "333").opacity(0.7)
-        }
-    }
-    
-    private var priceColor: Color {
-        switch itemType {
-        case .vaultOnly:
-            return Color(hex: "666").opacity(0.7)
-        case .plannedCart:
-            return currentQuantity > 0 ? .gray : Color(hex: "888").opacity(0.7)
-        case .shoppingOnly:
-            return currentQuantity > 0 ? .gray : Color(hex: "888").opacity(0.7)
-        }
-    }
-    
-    private var contentOpacity: Double {
-        switch itemType {
-        case .vaultOnly:
-            return 0.7
-        case .plannedCart:
-            return currentQuantity > 0 ? 1.0 : 0.7
-        case .shoppingOnly:
-            return currentQuantity > 0 ? 1.0 : 0.7
-        }
-    }
-    
-    // MARK: - Buttons
-    
-    private var minusButton: some View {
-        Button {
-            handleMinus()
-        } label: {
-            Image(systemName: "minus")
-                .font(.footnote).bold()
-                .foregroundColor(Color(hex: "1E2A36"))
-                .frame(width: 24, height: 24)
-                .background(.white)
-                .clipShape(Circle())
-        }
-        .buttonStyle(.plain)
-        .contentShape(Rectangle())
-        .disabled(currentQuantity <= 0)
-        .opacity(currentQuantity <= 0 ? 0.5 : 1)
-    }
-    
-    private var removeButton: some View {
-        Button {
-            handleRemove()
-        } label: {
-            Image(systemName: "trash")
-                .font(.footnote)
-                .foregroundColor(.red)
-                .frame(width: 24, height: 24)
-                .background(.white)
-                .clipShape(Circle())
-                .overlay(
-                    Circle()
-                        .stroke(Color.red.opacity(0.3), lineWidth: 1)
-                )
-        }
-        .buttonStyle(.plain)
-    }
-    
-    private var plusButton: some View {
-        Button(action: handlePlus) {
-            Image(systemName: "plus")
-                .font(.footnote)
-                .bold()
-                .foregroundColor(plusButtonColor)
-        }
-        .frame(width: 24, height: 24)
-        .background(.white)
-        .clipShape(Circle())
-        .overlay(
-            Circle()
-                .stroke(plusButtonStrokeColor, lineWidth: 1)
-        )
-        .contentShape(Circle())
-        .buttonStyle(.plain)
-    }
-    
-    private var plusButtonColor: Color {
-        switch itemType {
-        case .vaultOnly:
-            return Color(hex: "888888").opacity(0.7)
-        case .plannedCart:
-            return currentQuantity > 0 ? Color(hex: "1E2A36") : .blue.opacity(0.7)
-        case .shoppingOnly:
-            return currentQuantity > 0 ? Color(hex: "1E2A36") : .orange.opacity(0.7)
-        }
-    }
-    
-    private var plusButtonStrokeColor: Color {
-        switch itemType {
-        case .vaultOnly:
-            return Color(hex: "F2F2F2").darker(by: 0.1)
-        case .plannedCart:
-            return currentQuantity > 0 ? .clear : .blue.opacity(0.3)
-        case .shoppingOnly:
-            return currentQuantity > 0 ? .clear : .orange.opacity(0.3)
-        }
-    }
-    
-    private var quantityTextField: some View {
-        ZStack {
-            Text(textValue)
-                .font(.system(size: 15, weight: .bold))
-                .foregroundColor(Color(hex: "2C3E50"))
-                .multilineTextAlignment(.center)
-                .contentTransition(.numericText())
-                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: textValue)
-                .fixedSize()
-            
-            TextField("", text: $textValue)
-                .keyboardType(.decimalPad)
-                .font(.system(size: 15, weight: .bold))
-                .foregroundColor(.clear)
-                .multilineTextAlignment(.center)
-                .focused($isFocused)
-                .normalizedNumber($textValue, allowDecimal: true, maxDecimalPlaces: 2)
-                .onChange(of: textValue) { _, newText in
-                    if let number = Double(newText), number > 100 {
-                        textValue = "100"
-                    }
-                }
-        }
-        .padding(.horizontal, 6)
-        .background(
-            RoundedRectangle(cornerRadius: 6)
-                .stroke(Color(hex: "F2F2F2").darker(by: 0.1), lineWidth: 1)
-        )
-        .frame(minWidth: 40)
-        .frame(maxWidth: 80)
-        .fixedSize(horizontal: true, vertical: false)
-    }
     
     // MARK: - Helper Functions
+    
+    private func sendShoppingUpdateNotification() {
+        guard let cartItem = findCartItem() else { return }
+        
+        let directQuantity = cartItem.quantity
+        let getQuantityValue = cartItem.getQuantity(cart: cart)
+        
+        print("📢 DEBUG: cartItem.quantity = \(directQuantity), getQuantity(cart:) = \(getQuantityValue), actualQuantity = \(cartItem.actualQuantity ?? -1)")
+        
+        // Send the CORRECT quantity - use directQuantity since that's what we're changing
+        let notificationQuantity = directQuantity
+        
+        NotificationCenter.default.post(
+            name: .shoppingItemQuantityChanged,
+            object: nil,
+            userInfo: [
+                "cartId": cart.id,
+                "itemId": storeItem.item.id,
+                "itemName": itemName,
+                "newQuantity": notificationQuantity,
+                "itemType": String(describing: itemType),
+                "debug_directQuantity": directQuantity,
+                "debug_getQuantity": getQuantityValue,
+                "debug_actualQuantity": cartItem.actualQuantity ?? -1
+            ]
+        )
+    }
+     
     
     private func updateTextValue() {
         // Update text value to match current quantity (only if not focused)
@@ -1059,54 +1104,27 @@ struct BrowseVaultItemRow: View {
     }
     
     private func findCartItem() -> CartItem? {
-        // Debug logging
-        print("🛍️ Looking for cart item: '\(itemName)' at '\(storeName)'")
-        print("   Cart has \(cart.cartItems.count) items")
-        
-        // First, try to find by exact itemId match (for vault items)
-        if let vaultCartItem = cart.cartItems.first(where: {
-            $0.itemId == storeItem.item.id && !$0.isShoppingOnlyItem
-        }) {
-            print("✅ Found vault item by ID: \(vaultCartItem.itemId)")
-            return vaultCartItem
-        }
-        
-        
         // For shopping-only items: find by name and store (CASE INSENSITIVE)
         let searchName = itemName.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
         let searchStore = storeName.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
         
-        print("   Searching for shopping-only item: '\(searchName)' at '\(searchStore)'")
-        
-        let foundItem = cart.cartItems.first(where: { cartItem in
-            guard cartItem.isShoppingOnlyItem else { return false }
-            
-            let cartItemName = cartItem.shoppingOnlyName?.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            let cartItemStore = cartItem.shoppingOnlyStore?.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            
-            let matches = cartItemName == searchName && cartItemStore == searchStore
-            
-            if matches {
-                print("✅ Found shopping-only cart item: '\(cartItemName)' at '\(cartItemStore)'")
-                print("   Quantity: \(cartItem.quantity)")
-            }
-            
-            return matches
-        })
-        
-        if foundItem == nil {
-            print("❌ No matching cart item found")
-            // Log all shopping-only items for debugging
-            cart.cartItems.forEach { cartItem in
-                if cartItem.isShoppingOnlyItem {
-                    let cartItemName = cartItem.shoppingOnlyName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-                    let cartItemStore = cartItem.shoppingOnlyStore?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-                    print("   Available: '\(cartItemName)' at '\(cartItemStore)'")
+        for cartItem in cart.cartItems {
+            if cartItem.isShoppingOnlyItem {
+                let cartItemName = cartItem.shoppingOnlyName?.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                let cartItemStore = cartItem.shoppingOnlyStore?.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                
+                if cartItemName == searchName && cartItemStore == searchStore {
+                    return cartItem
+                }
+            } else {
+                // Check vault items
+                if cartItem.itemId == storeItem.item.id {
+                    return cartItem
                 }
             }
         }
         
-        return foundItem
+        return nil
     }
     
     // MARK: - Quantity Handlers
@@ -1114,8 +1132,7 @@ struct BrowseVaultItemRow: View {
     private func handlePlus() {
         print("➕ Plus button tapped for: \(itemName)")
         
-        let currentQty = currentQuantity
-        print("   Current quantity: \(currentQty)")
+        let foundItem = findCartItem()
         
         switch itemType {
         case .vaultOnly:
@@ -1125,19 +1142,15 @@ struct BrowseVaultItemRow: View {
                 quantity: 1,
                 selectedStore: storeItem.priceOption.store
             )
-            updateTextValue()
-            onQuantityChange?()  // Optional call
             
         case .plannedCart:
-            if let cartItem = findCartItem() {
-                // Use cartItem.quantity directly
+            if let cartItem = foundItem {
                 let newQuantity = cartItem.quantity + 1
                 print("   Updating planned item to: \(newQuantity)")
                 cartItem.quantity = newQuantity
                 cartItem.isSkippedDuringShopping = false
                 vaultService.updateCartTotals(cart: cart)
                 textValue = formatValue(newQuantity)
-                onQuantityChange?()  // Optional call
             } else {
                 vaultService.addVaultItemToCart(
                     item: storeItem.item,
@@ -1145,20 +1158,16 @@ struct BrowseVaultItemRow: View {
                     quantity: 1,
                     selectedStore: storeItem.priceOption.store
                 )
-                updateTextValue()
-                onQuantityChange?()  // Optional call
             }
             
         case .shoppingOnly:
-            if let cartItem = findCartItem() {
-                // Use cartItem.quantity directly
+            if let cartItem = foundItem {
                 let newQuantity = cartItem.quantity + 1
                 print("   Updating shopping-only item to: \(newQuantity)")
                 cartItem.quantity = newQuantity
                 cartItem.isSkippedDuringShopping = false
                 vaultService.updateCartTotals(cart: cart)
                 textValue = formatValue(newQuantity)
-                onQuantityChange?()  // Optional call
             } else {
                 print("   Creating new shopping-only item")
                 vaultService.addShoppingItemToCart(
@@ -1169,56 +1178,46 @@ struct BrowseVaultItemRow: View {
                     cart: cart,
                     quantity: 1
                 )
-                updateTextValue()
-                onQuantityChange?()  // Optional call
             }
         }
         
+        updateTextValue()
+        onQuantityChange?()
+        sendShoppingUpdateNotification() // ADD THIS
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
     }
-    
+
     private func handleMinus() {
-        print("➖ Minus button tapped for: '\(itemName)'")
-        
-        // First, find the cart item fresh
-        guard let cartItem = findCartItem() else {
-            print("❌ Could not find cart item to decrement")
-            return
-        }
-        
-        // Get the actual quantity directly from the cart item
-        let currentQty = cartItem.quantity
-        print("   Current cartItem.quantity: \(currentQty)")
-        
-        guard currentQty > 0 else {
-            print("⚠️ Quantity is already 0")
-            return
-        }
-        
-        let newQuantity = currentQty - 1
-        print("   Calculated new quantity: \(newQuantity)")
-        
-        if newQuantity <= 0 {
-            // Handle zero quantity (this will remove shopping-only items)
-            print("   Quantity will be 0, calling handleZeroQuantity")
-            handleZeroQuantity()
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            return
-        }
-        
-        // Update the cart item for non-zero quantities
-        cartItem.quantity = newQuantity
-        cartItem.isSkippedDuringShopping = false
-        vaultService.updateCartTotals(cart: cart)
-        
-        // Update text value to match the new quantity
-        textValue = formatValue(newQuantity)
-        print("✅ Decremented to: \(newQuantity)")
-        onQuantityChange?()  // Optional call
-        
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-    }
-    
+         print("➖ Minus button tapped for: '\(itemName)'")
+         
+         guard let cartItem = findCartItem() else {
+             print("❌ Could not find cart item to decrement")
+             return
+         }
+         
+         let currentQty = cartItem.quantity
+         guard currentQty > 0 else {
+             print("⚠️ Quantity is already 0")
+             return
+         }
+         
+         let newQuantity = currentQty - 1
+         
+         if newQuantity <= 0 {
+             handleZeroQuantity()
+             return
+         }
+         
+         cartItem.quantity = newQuantity
+         cartItem.isSkippedDuringShopping = false
+         vaultService.updateCartTotals(cart: cart)
+         textValue = formatValue(newQuantity)
+         onQuantityChange?()
+         sendShoppingUpdateNotification() // ADD THIS
+         
+         UIImpactFeedbackGenerator(style: .light).impactOccurred()
+     }
+
     
     private func handleRemove() {
         print("🗑️ Remove button tapped for shopping-only item: \(itemName)")
@@ -1236,107 +1235,99 @@ struct BrowseVaultItemRow: View {
                     cart.cartItems.remove(at: index)
                     vaultService.updateCartTotals(cart: cart)
                     updateTextValue()
-                    onQuantityChange?()  // Optional call
+                    onQuantityChange?()
                 }
             }
         }
     }
     
     private func commitTextField() {
-        guard !textValue.isEmpty else {
-            handleZeroQuantity()
-            return
-        }
-        
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .decimal
-        
-        if let number = formatter.number(from: textValue) {
-            let doubleValue = number.doubleValue
-            
-            if doubleValue <= 0 {
+            guard !textValue.isEmpty else {
                 handleZeroQuantity()
                 return
+            }
+            
+            let formatter = NumberFormatter()
+            formatter.numberStyle = .decimal
+
+            if let number = formatter.number(from: textValue) {
+                let doubleValue = number.doubleValue
+                
+                if doubleValue <= 0 {
+                    handleZeroQuantity()
+                    return
+                } else {
+                    let clamped = min(max(doubleValue, 0.01), 100)
+                    if let cartItem = findCartItem() {
+                        cartItem.quantity = clamped
+                        cartItem.isSkippedDuringShopping = false
+                        vaultService.updateCartTotals(cart: cart)
+                        textValue = formatValue(clamped)
+                        onQuantityChange?()
+                        sendShoppingUpdateNotification() // ADD THIS
+                    } else if itemType == .shoppingOnly {
+                        vaultService.addShoppingItemToCart(
+                            name: itemName,
+                            store: storeName,
+                            price: storeItem.priceOption.pricePerUnit.priceValue,
+                            unit: storeItem.priceOption.pricePerUnit.unit,
+                            cart: cart,
+                            quantity: clamped
+                        )
+                        updateTextValue()
+                        onQuantityChange?()
+                        sendShoppingUpdateNotification() // ADD THIS
+                    }
+                }
             } else {
-                let clamped = min(max(doubleValue, 0.01), 100)
-                if let cartItem = findCartItem() {
-                    cartItem.quantity = clamped
-                    cartItem.isSkippedDuringShopping = false
-                    vaultService.updateCartTotals(cart: cart)
-                    textValue = formatValue(clamped)
-                    onQuantityChange?()  // Optional call
-                } else if itemType == .shoppingOnly {
-                    // Create new shopping-only item with specified quantity
-                    vaultService.addShoppingItemToCart(
-                        name: itemName,
-                        store: storeName,
-                        price: storeItem.priceOption.pricePerUnit.priceValue,
-                        unit: storeItem.priceOption.pricePerUnit.unit,
-                        cart: cart,
-                        quantity: clamped
-                    )
-                    updateTextValue()
-                    onQuantityChange?()  // Optional call
-                }
+                textValue = formatValue(currentQuantity)
             }
-        } else {
-            // Invalid input, restore from actual quantity
-            textValue = formatValue(currentQuantity)
         }
-    }
-    
+
     private func handleZeroQuantity() {
-        // First, find the cart item fresh
-        guard let cartItem = findCartItem() else {
-            textValue = ""
-            return
-        }
-        
-        print("🔄 handleZeroQuantity called for: \(itemName)")
-        print("   Item type: \(itemType)")
-        print("   Current quantity: \(cartItem.quantity)")
-        
-        switch itemType {
-        case .plannedCart:
-            // For planned cart items (vault items), set quantity to 0 but keep in cart
-            cartItem.quantity = 0
-            cartItem.isSkippedDuringShopping = false
-            vaultService.updateCartTotals(cart: cart)
-            textValue = ""
-            print("✅ Planned item set to quantity 0 (kept in cart)")
-            
-        case .shoppingOnly:
-            // For shopping-only items, remove completely when quantity becomes 0
-            print("🛍️ Removing shopping-only item from cart: \(itemName)")
-            
-            // Trigger removal animation first
-            withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
-                isRemoving = true
-            }
-            
-            // Wait for animation to complete, then remove from cart
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                if let index = cart.cartItems.firstIndex(where: { $0.id == cartItem.id }) {
-                    print("   Removing from cart at index \(index)")
-                    cart.cartItems.remove(at: index)
-                    vaultService.updateCartTotals(cart: cart)
-                    updateTextValue()
-                }
-            }
-            
-        case .vaultOnly:
-            // Shouldn't happen, but just in case
-            break
-        }
-    }
+           guard let cartItem = findCartItem() else {
+               textValue = ""
+               return
+           }
+           
+           print("🔄 handleZeroQuantity called for: \(itemName)")
+           print("   Item type: \(itemType)")
+           print("   Current quantity: \(cartItem.quantity)")
+           
+           switch itemType {
+           case .plannedCart:
+               cartItem.quantity = 0
+               cartItem.isSkippedDuringShopping = false
+               vaultService.updateCartTotals(cart: cart)
+               textValue = ""
+               sendShoppingUpdateNotification() // ADD THIS
+               
+           case .shoppingOnly:
+               print("🛍️ Removing shopping-only item from cart: \(itemName)")
+               
+               withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+                   isRemoving = true
+               }
+               
+               DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                   if let index = cart.cartItems.firstIndex(where: { $0.id == cartItem.id }) {
+                       print("   Removing from cart at index \(index)")
+                       cart.cartItems.remove(at: index)
+                       vaultService.updateCartTotals(cart: cart)
+                       sendShoppingUpdateNotification() // ADD THIS
+                   }
+               }
+               
+           case .vaultOnly:
+               break
+           }
+       }
+       
+       
     
     private func formatValue(_ val: Double) -> String {
-        guard !val.isNaN && val.isFinite else {
-            return "1"
-        }
-        
-        // Allow 0 to be displayed
-        if val < 0 {
+        // Prevent NaN or invalid values
+        guard !val.isNaN && val.isFinite && val >= 0 else {
             return "0"
         }
         
@@ -1349,6 +1340,20 @@ struct BrowseVaultItemRow: View {
             return result
         }
     }
+    
+//    private func sendShoppingUpdateNotification() {
+//         // Send notification to update cart detail screen
+//         NotificationCenter.default.post(
+//             name: NSNotification.Name("ShoppingDataUpdated"),
+//             object: nil,
+//             userInfo: [
+//                 "cartId": cart.id,
+//                 "action": "quantityChanged",
+//                 "itemId": storeItem.item.id
+//             ]
+//         )
+//     }
+
 }
 
 // MARK: - Supporting Types
