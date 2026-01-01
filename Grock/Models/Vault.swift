@@ -226,6 +226,9 @@ class CartItem {
     var shoppingOnlyPrice: Double?
     var shoppingOnlyUnit: String?
     
+    // MARK: - NEW: Original planning quantity for restoration
+    var originalPlanningQuantity: Double?
+    
     init(
         itemId: String,
         quantity: Double,
@@ -242,7 +245,8 @@ class CartItem {
         shoppingOnlyName: String? = nil,
         shoppingOnlyStore: String? = nil,
         shoppingOnlyPrice: Double? = nil,
-        shoppingOnlyUnit: String? = nil
+        shoppingOnlyUnit: String? = nil,
+        originalPlanningQuantity: Double? = nil  // NEW parameter
     ) {
         self.itemId = itemId
         self.quantity = quantity
@@ -260,6 +264,7 @@ class CartItem {
         self.shoppingOnlyStore = shoppingOnlyStore
         self.shoppingOnlyPrice = shoppingOnlyPrice
         self.shoppingOnlyUnit = shoppingOnlyUnit
+        self.originalPlanningQuantity = originalPlanningQuantity
     }
     
     static func createShoppingOnlyItem(
@@ -285,7 +290,8 @@ class CartItem {
             shoppingOnlyName: name,
             shoppingOnlyStore: store,
             shoppingOnlyPrice: price,
-            shoppingOnlyUnit: unit
+            shoppingOnlyUnit: unit,
+            originalPlanningQuantity: nil  // Shopping-only items don't need original planning quantity
         )
     }
     
@@ -412,9 +418,27 @@ class CartItem {
             print("🔍 getQuantity - Planning: quantity = \(quantity)")
             return quantity
         case .shopping, .completed:
-            let result = actualQuantity ?? quantity
-            print("🔍 getQuantity - Shopping/Completed: quantity = \(quantity), actualQuantity = \(actualQuantity ?? -1), returning = \(result)")
-            return result
+            // CRITICAL FIX: Always return quantity, not actualQuantity
+            // The quantity field should be the single source of truth
+            print("🔍 getQuantity - Shopping/Completed: using quantity = \(quantity)")
+            return quantity
+        }
+    }
+    
+    func syncQuantities(cart: Cart) {
+        // Keep quantity and actualQuantity in sync
+        switch cart.status {
+        case .planning:
+            // In planning, actualQuantity should match quantity
+            if actualQuantity != quantity {
+                actualQuantity = quantity
+            }
+        case .shopping, .completed:
+            // In shopping/completed, quantity is the primary source
+            // Only update actualQuantity if it's different
+            if actualQuantity != quantity {
+                actualQuantity = quantity
+            }
         }
     }
     
@@ -480,6 +504,28 @@ class CartItem {
         case .completed:
             return actualPrice ?? plannedPrice ?? 0
         }
+    }
+    
+    // MARK: - NEW: Save original planning quantity
+    func saveOriginalPlanningQuantity() {
+        // Only save if not already saved and this is a vault item
+        if originalPlanningQuantity == nil && !isShoppingOnlyItem {
+            originalPlanningQuantity = quantity
+            print("📝 Saved original planning quantity: \(quantity)")
+        }
+    }
+    
+    // MARK: - NEW: Restore to original planning quantity
+    func restoreToOriginalPlanningQuantity() -> Bool {
+        guard let originalQty = originalPlanningQuantity else {
+            print("⚠️ No original planning quantity saved")
+            return false
+        }
+        
+        print("↩️ Restoring to original planning quantity: \(quantity) → \(originalQty)")
+        quantity = originalQty
+        originalPlanningQuantity = nil  // Clear after restoring
+        return true
     }
 }
 

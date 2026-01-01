@@ -269,32 +269,40 @@ struct CartDetailScreen: View {
                    handleShoppingItemQuantityChange(notification)
                }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ShoppingItemQuantityChanged"))) { notification in
-                 print("🔄 Received ShoppingItemQuantityChanged notification")
-                 
-                 // Check if this notification is for our current cart
-                 if let cartId = notification.userInfo?["cartId"] as? String,
-                    cartId == cart.id {
-                     
-                     print("✅ Quantity change for current cart: \(cart.name)")
-                     print("   Item: \(notification.userInfo?["itemName"] as? String ?? "Unknown")")
-                     print("   New quantity: \(notification.userInfo?["newQuantity"] as? Double ?? 0)")
-                     print("   Item type: \(notification.userInfo?["itemType"] as? String ?? "Unknown")")
-                     
-                     // Force a refresh
-                     DispatchQueue.main.async {
-                         // Update totals first
-                         vaultService.updateCartTotals(cart: cart)
-                         
-                         // Force UI refresh
-                         refreshTrigger = UUID()
-                         
-                         // Additional delayed refresh to ensure UI updates
-                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                             refreshTrigger = UUID()
-                         }
-                     }
-                 }
-             }
+            print("🔄 Received ShoppingItemQuantityChanged notification")
+            
+            // Check if this notification is for our current cart
+            if let cartId = notification.userInfo?["cartId"] as? String,
+               cartId == cart.id {
+                
+                // Get the updated quantity from the notification
+                if let newQuantity = notification.userInfo?["newQuantity"] as? Double {
+                    print("✅ Received quantity update: \(newQuantity)")
+                    
+                    // CRITICAL: Sync quantity across all fields
+                    if let itemId = notification.userInfo?["itemId"] as? String,
+                       let cartItem = cart.cartItems.first(where: { $0.itemId == itemId }) {
+                        
+                        // Update both quantity and actualQuantity
+                        cartItem.quantity = newQuantity
+                        cartItem.syncQuantities(cart: cart) 
+                        
+                        // If in shopping mode, also update actualQuantity
+                        if cart.isShopping {
+                            cartItem.actualQuantity = newQuantity
+                        }
+                        
+                        print("🔁 Synced cartItem.quantity to: \(cartItem.quantity)")
+                    }
+                }
+                
+                // Force UI refresh
+                DispatchQueue.main.async {
+                    vaultService.updateCartTotals(cart: cart)
+                    refreshTrigger = UUID()
+                }
+            }
+        }
              // Keep the existing notification listener too
         .onReceive(NotificationCenter.default.publisher(for: .shoppingDataUpdated)) { notification in
                  print("🔄 Received ShoppingDataUpdated notification")

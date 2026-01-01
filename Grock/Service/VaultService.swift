@@ -403,58 +403,113 @@ extension VaultService {
         saveContext()
     }
     
+//    func returnToPlanning(cart: Cart) {
+//        guard cart.status == .shopping else { return }
+//        
+//        print("🔄 Returning cart '\(cart.name)' to planning mode")
+//        
+//        cleanupShoppingOnlyItems(cart: cart)
+//        
+//        // First, count shopping-only items for debugging
+//        let shoppingOnlyCountBefore = cart.cartItems.filter { $0.isShoppingOnlyItem }.count
+//        print("   Shopping-only items before reset: \(shoppingOnlyCountBefore)")
+//        
+//        // Create a new array with ONLY non-shopping-only items (vault items)
+//        let vaultItemsOnly = cart.cartItems.filter { !$0.isShoppingOnlyItem }
+//        
+//        // Remove ALL items from cart
+//        cart.cartItems.removeAll()
+//        
+//        // Add back ONLY the vault items
+//        cart.cartItems.append(contentsOf: vaultItemsOnly)
+//        
+//        print("   Kept \(cart.cartItems.count) vault items, removed \(shoppingOnlyCountBefore) shopping-only items")
+//        
+//        // Now reset all vault items to planning state
+//        for cartItem in cart.cartItems {
+//            // IMPORTANT: Reset ALL shopping-specific flags
+//            cartItem.isFulfilled = false
+//            cartItem.isSkippedDuringShopping = false
+//            cartItem.wasEditedDuringShopping = false
+//            
+//            // Clear all shopping data
+//            cartItem.actualPrice = nil
+//            cartItem.actualQuantity = nil
+//            cartItem.actualUnit = nil
+//            cartItem.actualStore = nil
+//            
+//            // Reset planned data from current Vault
+//            if let vault = vault {
+//                // Get current price and unit from vault
+//                cartItem.plannedPrice = cartItem.getCurrentPrice(from: vault, store: cartItem.plannedStore)
+//                cartItem.plannedUnit = cartItem.getCurrentUnit(from: vault, store: cartItem.plannedStore)
+//            }
+//        }
+//        
+//        // Update cart status
+//        cart.status = .planning
+//        cart.startedAt = nil // Clear shopping start time
+//        cart.updatedAt = Date()
+//        
+//        updateCartTotals(cart: cart)
+//        saveContext()
+//        
+//        print("✅ Cart '\(cart.name)' reset to planning mode - only vault items retained")
+//    }
     func returnToPlanning(cart: Cart) {
         guard cart.status == .shopping else { return }
         
         print("🔄 Returning cart '\(cart.name)' to planning mode")
         
-        cleanupShoppingOnlyItems(cart: cart)
+        // STEP 1: Get all vault items (non-shopping-only)
+        let vaultItems = cart.cartItems.filter { !$0.isShoppingOnlyItem }
+        print("   Found \(vaultItems.count) vault items to restore")
         
-        // First, count shopping-only items for debugging
-        let shoppingOnlyCountBefore = cart.cartItems.filter { $0.isShoppingOnlyItem }.count
-        print("   Shopping-only items before reset: \(shoppingOnlyCountBefore)")
+        // STEP 2: Remove all shopping-only items
+        let shoppingOnlyItems = cart.cartItems.filter { $0.isShoppingOnlyItem }
+        cart.cartItems.removeAll { $0.isShoppingOnlyItem }
+        print("   Removed \(shoppingOnlyItems.count) shopping-only items")
         
-        // Create a new array with ONLY non-shopping-only items (vault items)
-        let vaultItemsOnly = cart.cartItems.filter { !$0.isShoppingOnlyItem }
-        
-        // Remove ALL items from cart
-        cart.cartItems.removeAll()
-        
-        // Add back ONLY the vault items
-        cart.cartItems.append(contentsOf: vaultItemsOnly)
-        
-        print("   Kept \(cart.cartItems.count) vault items, removed \(shoppingOnlyCountBefore) shopping-only items")
-        
-        // Now reset all vault items to planning state
-        for cartItem in cart.cartItems {
-            // IMPORTANT: Reset ALL shopping-specific flags
+        // STEP 3: Restore each vault item to its ORIGINAL planning quantity
+        for cartItem in vaultItems {
+            if let originalQty = cartItem.originalPlanningQuantity {
+                // RESTORE ORIGINAL QUANTITY (e.g., 10.5 kg)
+                cartItem.quantity = originalQty
+                print("   ↳ Restored \(cartItem.itemId) to original quantity: \(originalQty)")
+            } else {
+                // Fallback: If no original saved, keep current (but shouldn't happen)
+                print("   ⚠️ No original quantity saved for \(cartItem.itemId), keeping: \(cartItem.quantity)")
+            }
+            
+            // Reset shopping data
             cartItem.isFulfilled = false
             cartItem.isSkippedDuringShopping = false
             cartItem.wasEditedDuringShopping = false
-            
-            // Clear all shopping data
             cartItem.actualPrice = nil
             cartItem.actualQuantity = nil
             cartItem.actualUnit = nil
             cartItem.actualStore = nil
             
-            // Reset planned data from current Vault
+            // Clear the saved original (for next shopping session)
+            cartItem.originalPlanningQuantity = nil
+            
+            // Refresh planned data from vault
             if let vault = vault {
-                // Get current price and unit from vault
                 cartItem.plannedPrice = cartItem.getCurrentPrice(from: vault, store: cartItem.plannedStore)
                 cartItem.plannedUnit = cartItem.getCurrentUnit(from: vault, store: cartItem.plannedStore)
             }
         }
         
-        // Update cart status
+        // STEP 4: Update cart status
         cart.status = .planning
-        cart.startedAt = nil // Clear shopping start time
+        cart.startedAt = nil
         cart.updatedAt = Date()
         
         updateCartTotals(cart: cart)
         saveContext()
         
-        print("✅ Cart '\(cart.name)' reset to planning mode - only vault items retained")
+        print("✅ Cart '\(cart.name)' reset to planning mode")
+        print("   Restored \(vaultItems.count) items with their original quantities")
     }
     
     /// Deletes an item from the vault
@@ -647,21 +702,27 @@ extension VaultService {
    
     /// Starts shopping session for a cart
     func startShopping(cart: Cart) {
-           guard cart.status == .planning else { return }
+        guard cart.status == .planning else { return }
         
         cleanupShoppingOnlyItems(cart: cart)
-          
-           for cartItem in cart.cartItems {
-               cartItem.capturePlannedData(from: vault!)
-           }
-          
-           cart.status = .shopping
-           cart.startedAt = Date()  // ✅ Set when shopping starts
-           cart.updatedAt = Date()  // ✅ Update timestamp
-           updateCartTotals(cart: cart)
-           saveContext()
-           print("🛒 Started shopping for: \(cart.name)")
-       }
+        
+        // CRITICAL: Save original planning quantities
+        for cartItem in cart.cartItems where !cartItem.isShoppingOnlyItem {
+            cartItem.originalPlanningQuantity = cartItem.quantity  // Save original
+            print("💾 Saved original planning quantity: \(cartItem.itemId) = \(cartItem.quantity)")
+        }
+        
+        for cartItem in cart.cartItems {
+            cartItem.capturePlannedData(from: vault!)
+        }
+        
+        cart.status = .shopping
+        cart.startedAt = Date()
+        cart.updatedAt = Date()
+        updateCartTotals(cart: cart)
+        saveContext()
+        print("🛒 Started shopping for: \(cart.name)")
+    }
    
     /// Completes shopping session for a cart
     func completeShopping(cart: Cart) {

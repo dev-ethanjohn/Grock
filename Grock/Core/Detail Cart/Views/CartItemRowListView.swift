@@ -209,6 +209,8 @@ private struct MainRowContent: View {
          let newUnit = cartItem.getUnit(from: vault, cart: cart)
          
          print("📊 Updating derived values for \(itemName): qty=\(newQuantity), price=\(newPrice), total=\(newTotalPrice)")
+        
+        cartItem.syncQuantities(cart: cart)  // <-- ADD HERE
          
          if animated {
              withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {

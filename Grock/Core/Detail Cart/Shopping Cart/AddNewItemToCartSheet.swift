@@ -699,47 +699,57 @@ struct BrowseVaultItemRow: View {
     
     // Helper to get current quantity - directly from cart
     private var currentQuantity: Double {
-          if let cartItem = findCartItem() {
-              // DEBUG: Log both values
-              let directQty = cartItem.quantity
-              let getQty = cartItem.getQuantity(cart: cart)
-              if directQty != getQty {
-                  print("🔄 DEBUG: Quantity mismatch - direct: \(directQty), getQuantity: \(getQty)")
-              }
-              
-              // Use the direct quantity property
-              return directQty
-          }
-          return 0
-      }
+        if let cartItem = findCartItem() {
+            return cartItem.quantity  // This will now be in sync
+        }
+        return 0
+    }
+    
+     
       
     
+//    private var itemType: ItemType {
+//        if storeItem.isShoppingOnlyItem {
+//            return .shoppingOnly
+//        }
+//        
+//        // Check if it's in cart as a planned item (vault item with same ID)
+//        let isInCartAsPlanned = cart.cartItems.contains(where: {
+//            $0.itemId == storeItem.item.id && !$0.isShoppingOnlyItem
+//        })
+//        
+//        if isInCartAsPlanned {
+//            return .plannedCart
+//        }
+//        
+//        // Check if it's in cart as a shopping-only item
+//        let isInCartAsShopping = cart.cartItems.contains(where: { cartItem in
+//            guard cartItem.isShoppingOnlyItem else { return false }
+//            let cartItemName = cartItem.shoppingOnlyName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+//            let cartItemStore = cartItem.shoppingOnlyStore?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+//            
+//            return cartItemName.lowercased() == itemName.lowercased() &&
+//                   cartItemStore.lowercased() == storeName.lowercased()
+//        })
+//        
+//        if isInCartAsShopping {
+//            return .shoppingOnly
+//        }
+//        
+//        return .vaultOnly
+//    }
     private var itemType: ItemType {
         if storeItem.isShoppingOnlyItem {
             return .shoppingOnly
         }
         
         // Check if it's in cart as a planned item (vault item with same ID)
-        let isInCartAsPlanned = cart.cartItems.contains(where: {
-            $0.itemId == storeItem.item.id && !$0.isShoppingOnlyItem
-        })
-        
-        if isInCartAsPlanned {
+        if let cartItem = findCartItem() {
+            // If cart item exists but quantity is 0, treat it as vault-only for UI purposes
+            if cartItem.quantity <= 0 {
+                return .vaultOnly
+            }
             return .plannedCart
-        }
-        
-        // Check if it's in cart as a shopping-only item
-        let isInCartAsShopping = cart.cartItems.contains(where: { cartItem in
-            guard cartItem.isShoppingOnlyItem else { return false }
-            let cartItemName = cartItem.shoppingOnlyName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            let cartItemStore = cartItem.shoppingOnlyStore?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            
-            return cartItemName.lowercased() == itemName.lowercased() &&
-                   cartItemStore.lowercased() == storeName.lowercased()
-        })
-        
-        if isInCartAsShopping {
-            return .shoppingOnly
         }
         
         return .vaultOnly
@@ -1071,13 +1081,10 @@ struct BrowseVaultItemRow: View {
     private func sendShoppingUpdateNotification() {
         guard let cartItem = findCartItem() else { return }
         
-        let directQuantity = cartItem.quantity
-        let getQuantityValue = cartItem.getQuantity(cart: cart)
+        // Always use cartItem.quantity as the source of truth
+        let currentQuantity = cartItem.quantity
         
-        print("📢 DEBUG: cartItem.quantity = \(directQuantity), getQuantity(cart:) = \(getQuantityValue), actualQuantity = \(cartItem.actualQuantity ?? -1)")
-        
-        // Send the CORRECT quantity - use directQuantity since that's what we're changing
-        let notificationQuantity = directQuantity
+        print("📢 DEBUG: Sending notification - cartItem.quantity = \(currentQuantity), actualQuantity = \(cartItem.actualQuantity ?? -1)")
         
         NotificationCenter.default.post(
             name: .shoppingItemQuantityChanged,
@@ -1086,11 +1093,8 @@ struct BrowseVaultItemRow: View {
                 "cartId": cart.id,
                 "itemId": storeItem.item.id,
                 "itemName": itemName,
-                "newQuantity": notificationQuantity,
-                "itemType": String(describing: itemType),
-                "debug_directQuantity": directQuantity,
-                "debug_getQuantity": getQuantityValue,
-                "debug_actualQuantity": cartItem.actualQuantity ?? -1
+                "newQuantity": currentQuantity,  // Use quantity field
+                "itemType": String(describing: itemType)
             ]
         )
     }
@@ -1132,91 +1136,63 @@ struct BrowseVaultItemRow: View {
     private func handlePlus() {
         print("➕ Plus button tapped for: \(itemName)")
         
-        let foundItem = findCartItem()
-        
-        switch itemType {
-        case .vaultOnly:
-            vaultService.addVaultItemToCart(
-                item: storeItem.item,
+        if let cartItem = findCartItem() {
+            cartItem.quantity += 1
+            cartItem.syncQuantities(cart: cart)  // ADDED: Sync quantities
+            cartItem.isSkippedDuringShopping = false
+            vaultService.updateCartTotals(cart: cart)
+            textValue = formatValue(cartItem.quantity)
+        } else {
+            // Handle new item addition...
+            vaultService.addShoppingItemToCart(
+                name: itemName,
+                store: storeName,
+                price: storeItem.priceOption.pricePerUnit.priceValue,
+                unit: storeItem.priceOption.pricePerUnit.unit,
                 cart: cart,
-                quantity: 1,
-                selectedStore: storeItem.priceOption.store
+                quantity: 1
             )
-            
-        case .plannedCart:
-            if let cartItem = foundItem {
-                let newQuantity = cartItem.quantity + 1
-                print("   Updating planned item to: \(newQuantity)")
-                cartItem.quantity = newQuantity
-                cartItem.isSkippedDuringShopping = false
-                vaultService.updateCartTotals(cart: cart)
-                textValue = formatValue(newQuantity)
-            } else {
-                vaultService.addVaultItemToCart(
-                    item: storeItem.item,
-                    cart: cart,
-                    quantity: 1,
-                    selectedStore: storeItem.priceOption.store
-                )
-            }
-            
-        case .shoppingOnly:
-            if let cartItem = foundItem {
-                let newQuantity = cartItem.quantity + 1
-                print("   Updating shopping-only item to: \(newQuantity)")
-                cartItem.quantity = newQuantity
-                cartItem.isSkippedDuringShopping = false
-                vaultService.updateCartTotals(cart: cart)
-                textValue = formatValue(newQuantity)
-            } else {
-                print("   Creating new shopping-only item")
-                vaultService.addShoppingItemToCart(
-                    name: itemName,
-                    store: storeName,
-                    price: storeItem.priceOption.pricePerUnit.priceValue,
-                    unit: storeItem.priceOption.pricePerUnit.unit,
-                    cart: cart,
-                    quantity: 1
-                )
-            }
+            updateTextValue()
+            onQuantityChange?()
+            sendShoppingUpdateNotification()
         }
         
-        updateTextValue()
-        onQuantityChange?()
-        sendShoppingUpdateNotification() // ADD THIS
+        sendShoppingUpdateNotification()
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
     }
 
+
     private func handleMinus() {
-         print("➖ Minus button tapped for: '\(itemName)'")
-         
-         guard let cartItem = findCartItem() else {
-             print("❌ Could not find cart item to decrement")
-             return
-         }
-         
-         let currentQty = cartItem.quantity
-         guard currentQty > 0 else {
-             print("⚠️ Quantity is already 0")
-             return
-         }
-         
-         let newQuantity = currentQty - 1
-         
-         if newQuantity <= 0 {
-             handleZeroQuantity()
-             return
-         }
-         
-         cartItem.quantity = newQuantity
-         cartItem.isSkippedDuringShopping = false
-         vaultService.updateCartTotals(cart: cart)
-         textValue = formatValue(newQuantity)
-         onQuantityChange?()
-         sendShoppingUpdateNotification() // ADD THIS
-         
-         UIImpactFeedbackGenerator(style: .light).impactOccurred()
-     }
+        print("➖ Minus button tapped for: '\(itemName)'")
+        
+        guard let cartItem = findCartItem() else {
+            print("❌ Could not find cart item to decrement")
+            return
+        }
+        
+        let currentQty = cartItem.quantity
+        guard currentQty > 0 else {
+            print("⚠️ Quantity is already 0")
+            return
+        }
+        
+        let newQuantity = currentQty - 1
+        
+        if newQuantity <= 0 {
+            handleZeroQuantity()
+            return
+        }
+        
+        cartItem.quantity = newQuantity
+        cartItem.syncQuantities(cart: cart)  // ADDED: Sync quantities
+        cartItem.isSkippedDuringShopping = false
+        vaultService.updateCartTotals(cart: cart)
+        textValue = formatValue(newQuantity)
+        onQuantityChange?()
+        sendShoppingUpdateNotification()
+        
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+    }
 
     
     private func handleRemove() {
@@ -1242,86 +1218,103 @@ struct BrowseVaultItemRow: View {
     }
     
     private func commitTextField() {
-            guard !textValue.isEmpty else {
+        guard !textValue.isEmpty else {
+            handleZeroQuantity()
+            return
+        }
+        
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+
+        if let number = formatter.number(from: textValue) {
+            let doubleValue = number.doubleValue
+            
+            if doubleValue <= 0 {
                 handleZeroQuantity()
                 return
-            }
-            
-            let formatter = NumberFormatter()
-            formatter.numberStyle = .decimal
-
-            if let number = formatter.number(from: textValue) {
-                let doubleValue = number.doubleValue
-                
-                if doubleValue <= 0 {
-                    handleZeroQuantity()
-                    return
-                } else {
-                    let clamped = min(max(doubleValue, 0.01), 100)
-                    if let cartItem = findCartItem() {
-                        cartItem.quantity = clamped
-                        cartItem.isSkippedDuringShopping = false
-                        vaultService.updateCartTotals(cart: cart)
-                        textValue = formatValue(clamped)
-                        onQuantityChange?()
-                        sendShoppingUpdateNotification() // ADD THIS
-                    } else if itemType == .shoppingOnly {
-                        vaultService.addShoppingItemToCart(
-                            name: itemName,
-                            store: storeName,
-                            price: storeItem.priceOption.pricePerUnit.priceValue,
-                            unit: storeItem.priceOption.pricePerUnit.unit,
-                            cart: cart,
-                            quantity: clamped
-                        )
-                        updateTextValue()
-                        onQuantityChange?()
-                        sendShoppingUpdateNotification() // ADD THIS
-                    }
-                }
             } else {
-                textValue = formatValue(currentQuantity)
+                let clamped = min(max(doubleValue, 0.01), 100)
+                if let cartItem = findCartItem() {
+                    cartItem.quantity = clamped
+                    cartItem.syncQuantities(cart: cart)  // ADDED: Sync quantities
+                    cartItem.isSkippedDuringShopping = false
+                    vaultService.updateCartTotals(cart: cart)
+                    textValue = formatValue(clamped)
+                    onQuantityChange?()
+                    sendShoppingUpdateNotification()
+                } else if itemType == .shoppingOnly {
+                    vaultService.addShoppingItemToCart(
+                        name: itemName,
+                        store: storeName,
+                        price: storeItem.priceOption.pricePerUnit.priceValue,
+                        unit: storeItem.priceOption.pricePerUnit.unit,
+                        cart: cart,
+                        quantity: clamped
+                    )
+                    updateTextValue()
+                    onQuantityChange?()
+                    sendShoppingUpdateNotification()
+                }
             }
+        } else {
+            textValue = formatValue(currentQuantity)
         }
+    }
 
     private func handleZeroQuantity() {
-           guard let cartItem = findCartItem() else {
-               textValue = ""
-               return
-           }
-           
-           print("🔄 handleZeroQuantity called for: \(itemName)")
-           print("   Item type: \(itemType)")
-           print("   Current quantity: \(cartItem.quantity)")
-           
-           switch itemType {
-           case .plannedCart:
-               cartItem.quantity = 0
-               cartItem.isSkippedDuringShopping = false
-               vaultService.updateCartTotals(cart: cart)
-               textValue = ""
-               sendShoppingUpdateNotification() // ADD THIS
-               
-           case .shoppingOnly:
-               print("🛍️ Removing shopping-only item from cart: \(itemName)")
-               
-               withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
-                   isRemoving = true
-               }
-               
-               DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                   if let index = cart.cartItems.firstIndex(where: { $0.id == cartItem.id }) {
-                       print("   Removing from cart at index \(index)")
-                       cart.cartItems.remove(at: index)
-                       vaultService.updateCartTotals(cart: cart)
-                       sendShoppingUpdateNotification() // ADD THIS
-                   }
-               }
-               
-           case .vaultOnly:
-               break
-           }
-       }
+        guard let cartItem = findCartItem() else {
+            textValue = ""
+            return
+        }
+        
+        print("🔄 handleZeroQuantity called for: \(itemName)")
+        print("   Item type: \(itemType)")
+        print("   Current quantity: \(cartItem.quantity)")
+        
+        switch itemType {
+         case .plannedCart:
+             print("📋 Setting quantity to 0 (keeping in cart): \(itemName)")
+             
+             // Set to 0 but KEEP IN CART
+             cartItem.quantity = 0
+             cartItem.syncQuantities(cart: cart)
+             
+             if cart.isShopping {
+                 cartItem.isSkippedDuringShopping = true
+                 print("   🛒 Marked as skipped (hidden)")
+             }
+             
+             // IMPORTANT: originalPlanningQuantity is STILL SAVED (e.g., 10.5)
+             // It will be restored when returning to planning
+             
+             vaultService.updateCartTotals(cart: cart)
+             textValue = formatValue(0)
+             onQuantityChange?()
+             sendShoppingUpdateNotification()
+            
+        case .shoppingOnly:
+            print("🛍️ Removing shopping-only item from cart (WITH slide animation): \(itemName)")
+            
+            // Sync before removing
+            cartItem.syncQuantities(cart: cart)  // ADDED: Sync quantities
+            
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+                isRemoving = true
+            }
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                if let index = cart.cartItems.firstIndex(where: { $0.id == cartItem.id }) {
+                    print("   Removing from cart at index \(index)")
+                    cart.cartItems.remove(at: index)
+                    vaultService.updateCartTotals(cart: cart)
+                    sendShoppingUpdateNotification()
+                }
+            }
+            
+        case .vaultOnly:
+            break // Nothing to do for vault-only items
+        }
+    }
        
        
     

@@ -338,23 +338,23 @@ struct UnifiedItemPopover: View {
         
         isSaving = true
         
-        // Update cart item with actual data
         if mode == .edit {
             if abs(priceValue - currentPrice) > 0.01 ||
                 abs(portionValue - currentQuantity) > 0.01 {
                 
-                // CHECK: Is this a shopping-only item?
                 if cartItem.isShoppingOnlyItem {
-                    // Update shopping-only item properties
                     cartItem.shoppingOnlyPrice = priceValue
-                    cartItem.shoppingOnlyUnit = plannedUnit // or actual unit if changed
+                    cartItem.shoppingOnlyUnit = plannedUnit
                     cartItem.actualPrice = priceValue
                     cartItem.actualQuantity = portionValue
+                    cartItem.quantity = portionValue  // FIX: Sync quantity too
+                    cartItem.syncQuantities(cart: cart)
                     cartItem.wasEditedDuringShopping = true
                 } else {
-                    // Regular vault item
                     cartItem.actualPrice = priceValue
                     cartItem.actualQuantity = portionValue
+                    cartItem.quantity = portionValue  // FIX: Sync quantity too
+                    cartItem.syncQuantities(cart: cart)
                     cartItem.wasEditedDuringShopping = true
                 }
                 
@@ -367,20 +367,21 @@ struct UnifiedItemPopover: View {
                 )
             }
         } else {
-            // FULFILL MODE - always update and mark as fulfilled
-            // Check if this is a shopping-only item
+            // FULFILL MODE
             if cartItem.isShoppingOnlyItem {
-                // Update shopping-only item properties
                 cartItem.shoppingOnlyPrice = priceValue
                 cartItem.shoppingOnlyUnit = plannedUnit
                 cartItem.actualPrice = priceValue
                 cartItem.actualQuantity = portionValue
+                cartItem.quantity = portionValue  // FIX: Sync quantity too
+                cartItem.syncQuantities(cart: cart)
                 cartItem.isFulfilled = true
                 cartItem.wasEditedDuringShopping = true
             } else {
-                // Regular vault item
                 cartItem.actualPrice = priceValue
                 cartItem.actualQuantity = portionValue
+                cartItem.quantity = portionValue  // FIX: Sync quantity too
+                cartItem.syncQuantities(cart: cart)
                 cartItem.isFulfilled = true
                 cartItem.wasEditedDuringShopping = true
             }

@@ -371,3 +371,4 @@ private struct BottomSpacerView: View {
             .listRowBackground(Color.clear)
     }
 }
+
