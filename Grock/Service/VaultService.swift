@@ -838,31 +838,34 @@ extension VaultService {
 extension VaultService {
     
     // MARK: - Vault-Based Operations (Planning Mode)
+    // In VaultService.swift
     func addVaultItemToCart(item: Item, cart: Cart, quantity: Double, selectedStore: String? = nil) {
         let store = selectedStore ?? item.priceOptions.first?.store ?? "Unknown Store"
+        let priceOption = item.priceOptions.first(where: { $0.store == store })
         
         let cartItem = CartItem(
             itemId: item.id,
             quantity: quantity,
-            plannedStore: store
+            plannedStore: store,
+            plannedPrice: priceOption?.pricePerUnit.priceValue,
+            plannedUnit: priceOption?.pricePerUnit.unit,
+            // During shopping mode, also set actual data
+            actualStore: cart.isShopping ? store : nil,
+            actualPrice: cart.isShopping ? priceOption?.pricePerUnit.priceValue : nil,
+            actualQuantity: cart.isShopping ? quantity : nil,
+            actualUnit: cart.isShopping ? priceOption?.pricePerUnit.unit : nil,
+            // CRITICAL: This is a vault item, NOT shopping-only!
+            isShoppingOnlyItem: false,
+            shoppingOnlyName: nil,
+            shoppingOnlyStore: nil,
+            shoppingOnlyPrice: nil,
+            shoppingOnlyUnit: nil
         )
-        
-        // Set planned price during planning mode
-        if cart.status == .planning {
-            if let vault = vault {
-                cartItem.plannedPrice = cartItem.getCurrentPrice(from: vault, store: store)
-                cartItem.plannedUnit = cartItem.getCurrentUnit(from: vault, store: store)
-            }
-        }
-        
-        if cart.status == .shopping {
-            cartItem.capturePlannedData(from: vault!)
-        }
         
         cart.cartItems.append(cartItem)
         updateCartTotals(cart: cart)
         saveContext()
-        print("📋 Added Vault item to cart: \(item.name) ×\(quantity)")
+        print("📋 Added Vault item to cart: \(item.name) ×\(quantity) (isShoppingOnlyItem: \(cartItem.isShoppingOnlyItem))")
     }
     
     // MARK: - Shopping-Only Operations (No Vault Shopping Mode)
@@ -1215,6 +1218,52 @@ extension VaultService {
         
         // You could add other cleanup logic here
         print("🧹 Cleaning up completed cart: \(cart.name)")
+    }
+    
+    // In VaultService.swift
+    func addVaultItemToCartDuringShopping(
+        item: Item,
+        store: String,
+        price: Double,
+        unit: String,
+        cart: Cart,
+        quantity: Double = 1
+    ) {
+        print("🛍️ Adding vault item during shopping: \(item.name)")
+        
+        // Check if this vault item is already in cart
+        if let existingCartItem = cart.cartItems.first(where: {
+            !$0.isShoppingOnlyItem && $0.itemId == item.id
+        }) {
+            // Already in cart as vault item
+            existingCartItem.quantity += quantity
+            existingCartItem.isSkippedDuringShopping = false
+        } else {
+            // Not in cart - add as vault item
+            let cartItem = CartItem(
+                itemId: item.id,
+                quantity: quantity,
+                plannedStore: store,
+                plannedPrice: price,
+                plannedUnit: unit,
+                // During shopping mode, also set actual data
+                actualStore: store,
+                actualPrice: price,
+                actualQuantity: quantity,
+                actualUnit: unit,
+                // CRITICAL: This is NOT a shopping-only item!
+                isShoppingOnlyItem: false,
+                shoppingOnlyName: nil,
+                shoppingOnlyStore: nil,
+                shoppingOnlyPrice: nil,
+                shoppingOnlyUnit: nil
+            )
+            cart.cartItems.append(cartItem)
+        }
+        
+        updateCartTotals(cart: cart)
+        saveContext()
+        print("📋 Added Vault item during shopping: \(item.name) ×\(quantity) (isShoppingOnlyItem: false)")
     }
     
 }

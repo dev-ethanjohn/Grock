@@ -79,7 +79,7 @@ struct CartItemRowListView: View {
     }
 }
 
-// MARK: - Main Row Content
+// MARK: - Main Row Content (WITH PERSISTENT BADGE)
 private struct MainRowContent: View {
     @Bindable var cartItem: CartItem
     let item: Item?
@@ -91,11 +91,11 @@ private struct MainRowContent: View {
     
     @Environment(VaultService.self) private var vaultService
     
-    // Persistence for new badge - use AppStorage or UserDefaults
+    // PERSISTENT badge state using AppStorage
     @AppStorage private var hasShownNewBadge: Bool
     @State private var showNewBadge: Bool = false
     
-    // Animation state for badge appearance (only used once)
+    // Animation state for badge
     @State private var sparkleOpacity: Double = 0.0
     @State private var sparkleScale: CGFloat = 0.8
     @State private var badgeScale: CGFloat = 0.1
@@ -115,7 +115,7 @@ private struct MainRowContent: View {
     @State private var currentTotalPrice: Double = 0
     @State private var displayUnit: String = ""
     
-    // Custom initializer to handle AppStorage with dynamic key
+    // Custom initializer with AppStorage key
     init(cartItem: CartItem, item: Item?, cart: Cart, onFulfillItem: @escaping () -> Void, onEditItem: @escaping () -> Void, onDeleteItem: @escaping () -> Void, isLastItem: Bool) {
         self.cartItem = cartItem
         self.item = item
@@ -125,15 +125,22 @@ private struct MainRowContent: View {
         self.onDeleteItem = onDeleteItem
         self.isLastItem = isLastItem
         
-        // Create unique storage key for each cart item
-        let storageKey = "hasShownNewBadge_\(cartItem.id)"
-        self._hasShownNewBadge = AppStorage(wrappedValue: false, storageKey)
+        // Create unique storage key for each shopping-only item
+        // Only create for shopping-only items, vault items don't need badge persistence
+        if cartItem.isShoppingOnlyItem, let shoppingName = cartItem.shoppingOnlyName {
+            // Use a combination of cart ID and item name for unique key
+            let storageKey = "hasShownNewBadge_\(cart.id)_\(shoppingName)"
+            self._hasShownNewBadge = AppStorage(wrappedValue: false, storageKey)
+        } else {
+            // For vault items, use a dummy key that never shows badge
+            self._hasShownNewBadge = AppStorage(wrappedValue: true, "vault_item_no_badge")
+        }
     }
     
     var body: some View {
         ZStack {
-            // Background sparkle effect (behind the row)
-            if showNewBadge && !hasShownNewBadge {
+            // Background sparkle effect - ONLY for shopping-only items with badge
+            if isShoppingOnlyItem && showNewBadge && !hasShownNewBadge {
                 SparkleEffectView(opacity: sparkleOpacity, scale: sparkleScale)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .allowsHitTesting(false)
@@ -151,7 +158,7 @@ private struct MainRowContent: View {
                     )
                 }
                 
-                // Item details using the derived state
+                // Item details
                 VStack(alignment: .leading, spacing: 0) {
                     HStack(spacing: 4) {
                         Text(currentQuantity.formattedQuantity)
@@ -168,11 +175,11 @@ private struct MainRowContent: View {
                         
                         Spacer()
                         
-                        // New badge (only for shopping-only items in shopping mode)
-                        if showNewBadge && cart.isShopping && cartItem.isShoppingOnlyItem && (hasShownNewBadge || !hasShownNewBadge) {
+                        // PERSISTENT BADGE: Only show for shopping-only items that haven't been marked as shown
+                        if shouldDisplayBadge {
                             NewBadgeView(
                                 scale: hasShownNewBadge ? 1.0 : badgeScale,
-                                rotation: badgeRotation
+                                rotation: hasShownNewBadge ? 0 : badgeRotation
                             )
                             .transition(.scale.combined(with: .opacity))
                         }
@@ -203,11 +210,10 @@ private struct MainRowContent: View {
             .padding(.trailing, 16)
             .background(
                 ZStack {
-                    // Base background
                     Color(hex: "F7F2ED").darker(by: 0.02)
                     
-                    // Highlight overlay for new items (only during initial animation)
-                    if rowHighlight && showNewBadge && !hasShownNewBadge {
+                    // Highlight only for shopping-only items with badge animation
+                    if isShoppingOnlyItem && showNewBadge && !hasShownNewBadge && rowHighlight {
                         LinearGradient(
                             colors: [
                                 Color(hex: "FFE082").opacity(0.15),
@@ -223,12 +229,11 @@ private struct MainRowContent: View {
             )
             .cornerRadius(8)
             .overlay(
-                // Highlight border for new items (only during initial animation)
                 RoundedRectangle(cornerRadius: 8)
                     .stroke(
-                        rowHighlight && showNewBadge && !hasShownNewBadge ?
+                        isShoppingOnlyItem && showNewBadge && !hasShownNewBadge && rowHighlight ?
                         Color(hex: "FFB300").opacity(0.4) : Color.clear,
-                        lineWidth: rowHighlight && showNewBadge && !hasShownNewBadge ? 1.5 : 0
+                        lineWidth: isShoppingOnlyItem && showNewBadge && !hasShownNewBadge && rowHighlight ? 1.5 : 0
                     )
             )
         }
@@ -254,93 +259,66 @@ private struct MainRowContent: View {
             }
         }
         .onAppear {
-            // Set initial scale based on cart mode
             buttonScale = cart.isShopping ? 1.0 : 0.1
-            
-            // Initialize derived values
             updateDerivedValues()
             
-            // Check if this item was recently added (within the last 3 seconds)
-            let timeSinceAdded = Date().timeIntervalSince(cartItem.addedAt)
-            if cart.isShopping && timeSinceAdded < 3.0 && cartItem.isShoppingOnlyItem {
-                // If we've never shown the badge before, show it with animation
-                if !hasShownNewBadge {
-                    showNewBadge = true
-                    startNewItemAnimation()
-                } else {
-                    // If we've shown it before, just show it without animation
-                    showNewBadge = true
-                }
-            } else if hasShownNewBadge {
-                // If badge was shown before, keep it visible
-                showNewBadge = true
-            }
+            // Check if we should show badge
+            checkAndShowBadgeIfNeeded()
         }
         .onDisappear {
-            // Don't hide the badge when view disappears if we've already shown it
-            if !hasShownNewBadge {
-                showNewBadge = false
+            // Don't reset showNewBadge - let AppStorage handle persistence
+            // Only reset animation states
+            if isShoppingOnlyItem && !hasShownNewBadge {
                 rowHighlight = false
             }
         }
-        // Add observers for planned data changes
         .onChange(of: cartItem.plannedPrice) { oldValue, newValue in
             if oldValue != newValue {
-                print("💰 plannedPrice changed: \(oldValue ?? 0) → \(newValue ?? 0)")
                 updateDerivedValues(animated: true)
             }
         }
         .onChange(of: cartItem.plannedUnit) { oldValue, newValue in
             if oldValue != newValue {
-                print("📏 plannedUnit changed: \(oldValue ?? "nil") → \(newValue ?? "nil")")
                 updateDerivedValues(animated: true)
             }
         }
         .onChange(of: item?.name) { oldValue, newValue in
             if oldValue != newValue {
-                print("📝 Item name changed in MainRowContent: \(oldValue ?? "nil") → \(newValue ?? "nil")")
                 updateDerivedValues(animated: true)
             }
         }
         .onChange(of: cartItem.quantity) { oldValue, newValue in
             if oldValue != newValue {
-                print("🔢 cartItem.quantity changed: \(oldValue) → \(newValue)")
                 updateDerivedValues(animated: true)
             }
         }
         .onChange(of: cartItem.actualPrice) { oldValue, newValue in
             if oldValue != newValue {
-                print("💰 actualPrice changed: \(oldValue ?? 0) → \(newValue ?? 0)")
                 updateDerivedValues(animated: true)
             }
         }
         .onChange(of: cartItem.actualQuantity) { oldValue, newValue in
             if oldValue != newValue {
-                print("📦 actualQuantity changed: \(oldValue ?? 0) → \(newValue ?? 0)")
                 updateDerivedValues(animated: true)
             }
         }
         .onChange(of: cartItem.shoppingOnlyPrice) { oldValue, newValue in
             if oldValue != newValue {
-                print("🛍️ shoppingOnlyPrice changed: \(oldValue ?? 0) → \(newValue ?? 0)")
                 updateDerivedValues(animated: true)
             }
         }
         .onChange(of: cartItem.isFulfilled) { oldValue, newValue in
             if oldValue != newValue {
-                print("✅ isFulfilled changed: \(oldValue) → \(newValue)")
                 updateDerivedValues(animated: true)
             }
         }
         .onChange(of: cartItem.isSkippedDuringShopping) { oldValue, newValue in
             if oldValue != newValue {
-                print("⏸️ isSkippedDuringShopping changed: \(oldValue) → \(newValue)")
                 updateDerivedValues(animated: true)
             }
         }
         .onChange(of: cart.status) { oldValue, newValue in
             if oldValue != newValue {
-                print("🛒 cart.status changed: \(oldValue) → \(newValue)")
                 updateDerivedValues(animated: true)
             }
         }
@@ -364,44 +342,91 @@ private struct MainRowContent: View {
         }
     }
     
+    // MARK: - Computed Properties
+    
+    private var isShoppingOnlyItem: Bool {
+        // Check if it's a shopping-only item in multiple ways
+        if let item = item, item.isTemporaryShoppingItem == true {
+            return true
+        }
+        return cartItem.isShoppingOnlyItem && cartItem.shoppingOnlyName != nil
+    }
+    
+    private var shouldDisplayBadge: Bool {
+        // Must be shopping-only item AND showNewBadge is true
+        // The badge will stay visible until hasShownNewBadge is set to true
+        return isShoppingOnlyItem && showNewBadge
+    }
+    
+    // MARK: - Helper Methods
+    
     private func updateDerivedValues(animated: Bool = false) {
-         guard let vault = vaultService.vault else { return }
-         
-         let newQuantity = cartItem.quantity
-         let newPrice = cartItem.getPrice(from: vault, cart: cart)
-         let newTotalPrice = cartItem.getTotalPrice(from: vault, cart: cart)
-         let newUnit = cartItem.getUnit(from: vault, cart: cart)
-         
-         print("📊 Updating derived values for \(item?.name ?? "Unknown"): qty=\(newQuantity), price=\(newPrice), unit=\(newUnit), total=\(newTotalPrice)")
+        guard let vault = vaultService.vault else { return }
+        
+        let newQuantity = cartItem.quantity
+        let newPrice = cartItem.getPrice(from: vault, cart: cart)
+        let newTotalPrice = cartItem.getTotalPrice(from: vault, cart: cart)
+        let newUnit = cartItem.getUnit(from: vault, cart: cart)
         
         cartItem.syncQuantities(cart: cart)
-         
-         if animated {
-             withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
-                 currentQuantity = newQuantity
-                 currentPrice = newPrice
-                 currentTotalPrice = newTotalPrice
-                 displayUnit = newUnit
-             }
-         } else {
-             currentQuantity = newQuantity
-             currentPrice = newPrice
-             currentTotalPrice = newTotalPrice
-             displayUnit = newUnit
-         }
-     }
+        
+        if animated {
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+                currentQuantity = newQuantity
+                currentPrice = newPrice
+                currentTotalPrice = newTotalPrice
+                displayUnit = newUnit
+            }
+        } else {
+            currentQuantity = newQuantity
+            currentPrice = newPrice
+            currentTotalPrice = newTotalPrice
+            displayUnit = newUnit
+        }
+    }
+    
+    private func checkAndShowBadgeIfNeeded() {
+        // Only check for shopping-only items in shopping mode
+        guard cart.isShopping && isShoppingOnlyItem else {
+            // Vault items or not in shopping mode - never show badge
+            showNewBadge = false
+            return
+        }
+        
+        // Check if item was added very recently (less than 5 seconds ago)
+        let timeSinceAdded = Date().timeIntervalSince(cartItem.addedAt)
+        
+        // Only show badge if:
+        // 1. Item was recently added (< 5 seconds ago) AND
+        // 2. We haven't shown the badge before for this item
+        if timeSinceAdded < 5.0 && !hasShownNewBadge {
+            showNewBadge = true
+            startNewItemAnimation()
+        } else if hasShownNewBadge {
+            // Badge was shown before - keep it visible but no animation
+            showNewBadge = true
+        } else {
+            // Item is too old and badge hasn't been shown - don't show badge
+            showNewBadge = false
+        }
+    }
     
     private func startNewItemAnimation() {
+        // Safety check
+        guard isShoppingOnlyItem else { return }
+        
+        print("🎬 Starting new badge animation for shopping-only item: \(cartItem.shoppingOnlyName ?? "Unknown")")
+        
         // Sequence 1: Row highlight pulse
         withAnimation(.easeInOut(duration: 0.3)) {
             rowHighlight = true
         }
         
-        // Sequence 2: Badge appears with spring and slight initial rotation
+        // Sequence 2: Badge appears with spring
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
             withAnimation(.interpolatingSpring(mass: 0.5, stiffness: 100, damping: 10)) {
                 badgeScale = 1.0
-                badgeRotation = 3 // Small initial tilt
+                badgeRotation = 3
             }
             
             withAnimation(.easeInOut(duration: 0.5)) {
@@ -412,18 +437,15 @@ private struct MainRowContent: View {
         
         // Sequence 3: Single smooth rocking motion
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            // Gentle rocking motion
             withAnimation(.interpolatingSpring(mass: 1.0, stiffness: 50, damping: 7)) {
                 badgeRotation = -2
             }
             
-            // Return to center
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
                 withAnimation(.interpolatingSpring(mass: 1.0, stiffness: 50, damping: 7)) {
                     badgeRotation = 1
                 }
                 
-                // Final settle
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
                     withAnimation(.interpolatingSpring(mass: 1.0, stiffness: 60, damping: 8)) {
                         badgeRotation = 0
@@ -451,16 +473,22 @@ private struct MainRowContent: View {
             }
         }
         
-        // Sequence 5: Mark as shown and remove animations after 2.8 seconds
+        // Sequence 5: Mark as shown in persistent storage and keep badge visible
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.8) {
-            // Save that we've shown the badge
+            // Mark badge as shown in persistent storage
             hasShownNewBadge = true
+            print("💾 Marked badge as shown for: \(cartItem.shoppingOnlyName ?? "Unknown")")
             
+            // Fade out animations but keep badge visible
             withAnimation(.easeOut(duration: 0.3)) {
                 sparkleOpacity = 0
                 sparkleScale = 0.8
                 badgeRotation = 0
+                rowHighlight = false
             }
+            
+            // Keep showNewBadge = true so badge stays visible
+            // Badge will now be static (no animation)
         }
     }
 }

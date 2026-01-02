@@ -389,20 +389,31 @@ struct AddNewItemToCartSheet: View {
             }
             
         } else {
-            // Handle regular Vault item
+            // Handle regular Vault item - FIXED!
             guard let priceOption = item.priceOptions.first else { return }
             
             if cart.isShopping {
-                vaultService.addShoppingItemToCart(
-                    name: item.name,
-                    store: priceOption.store,
-                    price: priceOption.pricePerUnit.priceValue,
-                    unit: priceOption.pricePerUnit.unit,
-                    cart: cart,
-                    quantity: 1
-                )
-                print("🛍️ Selected vault item for shopping: \(item.name)")
+                // FIX: Check if vault item already exists in cart
+                if let existingCartItem = cart.cartItems.first(where: {
+                    !$0.isShoppingOnlyItem && $0.itemId == item.id
+                }) {
+                    // Already exists as vault item - activate it
+                    existingCartItem.quantity += 1
+                    existingCartItem.isSkippedDuringShopping = false
+                    vaultService.updateCartTotals(cart: cart)
+                    print("🔄 Activated existing vault item: \(item.name)")
+                } else {
+                    // Doesn't exist - add as vault item using addVaultItemToCart
+                    vaultService.addVaultItemToCart(
+                        item: item,
+                        cart: cart,
+                        quantity: 1,
+                        selectedStore: priceOption.store
+                    )
+                    print("📋 Added new vault item to shopping cart: \(item.name)")
+                }
             } else {
+                // Planning mode
                 vaultService.addVaultItemToCart(
                     item: item,
                     cart: cart,
@@ -705,16 +716,20 @@ struct BrowseVaultItemRow: View {
     
     // Custom initializer for AppStorage with dynamic key
     init(storeItem: StoreItem, cart: Cart, action: @escaping () -> Void, onQuantityChange: (() -> Void)? = nil) {
-        self.storeItem = storeItem
-        self.cart = cart
-        self.action = action
-        self.onQuantityChange = onQuantityChange
-        
-        // Create unique storage key for each item-store combination
-        let storageKey = "hasShownNewBadge_\(storeItem.id)"
-        self._hasShownNewBadge = AppStorage(wrappedValue: false, storageKey)
-    }
-    
+          self.storeItem = storeItem
+          self.cart = cart
+          self.action = action
+          self.onQuantityChange = onQuantityChange
+          
+          // FIXED: Only create storage key for shopping-only items
+          if storeItem.isShoppingOnlyItem {
+              let storageKey = "hasShownNewBadge_\(storeItem.id)"
+              self._hasShownNewBadge = AppStorage(wrappedValue: false, storageKey)
+          } else {
+              // For vault items, use a dummy key
+              self._hasShownNewBadge = AppStorage(wrappedValue: false, "vault_dummy_\(storeItem.id)")
+          }
+      }
     // MARK: - Computed Properties
     
     // Helper to get current quantity - directly from cart
@@ -929,9 +944,14 @@ struct BrowseVaultItemRow: View {
                         .opacity(contentOpacity)
                     
                     // NEW: Use the reusable NewBadgeView component
-                    if showNewBadge && itemType == .shoppingOnly && currentQuantity > 0 && cart.isShopping {
+                    // Replace the current badge condition with:
+                    if showNewBadge
+                        && storeItem.isShoppingOnlyItem  // Explicitly check storeItem
+                        && currentQuantity > 0
+                        && cart.isShopping
+                        && hasShownNewBadge == false {
                         NewBadgeView(
-                            scale: hasShownNewBadge ? 1.0 : badgeScale,
+                            scale: badgeScale,
                             rotation: badgeRotation
                         )
                         .transition(.scale.combined(with: .opacity))
@@ -1023,25 +1043,27 @@ struct BrowseVaultItemRow: View {
         .preference(key: TextFieldFocusPreferenceKey.self, value: isFocused ? storeItem.id : nil)
         .onAppear {
             // Set initial text value to current quantity
-            textValue = formatValue(currentQuantity)
-            
-            // Check if this item was recently added (within the last 3 seconds)
-            if let cartItem = findCartItem(), itemType == .shoppingOnly && cart.isShopping {
-                let timeSinceAdded = Date().timeIntervalSince(cartItem.addedAt)
-                if timeSinceAdded < 3.0 {
-                    // If we've never shown the badge before, show it with animation
-                    if !hasShownNewBadge {
-                        showNewBadge = true
-                        startNewBadgeAnimation()
-                    } else {
-                        // If we've shown it before, just show it without animation
-                        showNewBadge = true
-                    }
-                } else if hasShownNewBadge {
-                    // If badge was shown before, keep it visible
-                    showNewBadge = true
-                }
-            }
+             textValue = formatValue(currentQuantity)
+             
+            // FIXED: Only check for shopping-only items
+                 if storeItem.isShoppingOnlyItem {
+                     if let cartItem = findCartItem(), cart.isShopping {
+                         let timeSinceAdded = Date().timeIntervalSince(cartItem.addedAt)
+                         if timeSinceAdded < 3.0 {
+                             // If we've never shown the badge before, show it with animation
+                             if !hasShownNewBadge {
+                                 showNewBadge = true
+                                 startNewBadgeAnimation()
+                             } else {
+                                 // If we've shown it before, just show it without animation
+                                 showNewBadge = true
+                             }
+                         } else if hasShownNewBadge {
+                             // If badge was shown before, keep it visible
+                             showNewBadge = true
+                         }
+                     }
+                 }
             
             if isNewlyAdded {
                 withAnimation(.spring(response: 0.25, dampingFraction: 0.75)) {
@@ -1083,6 +1105,11 @@ struct BrowseVaultItemRow: View {
     // MARK: - New Badge Animation
     
     private func startNewBadgeAnimation() {
+        
+        guard storeItem.isShoppingOnlyItem else { return }
+        
+        showNewBadge = true
+        
         // Badge appears with spring and slight initial rotation
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
             withAnimation(.interpolatingSpring(mass: 0.5, stiffness: 100, damping: 10)) {
@@ -1279,20 +1306,45 @@ struct BrowseVaultItemRow: View {
         
         if let cartItem = findCartItem() {
             cartItem.quantity += 1
-            cartItem.syncQuantities(cart: cart)  // ADDED: Sync quantities
+            cartItem.syncQuantities(cart: cart)
             cartItem.isSkippedDuringShopping = false
             vaultService.updateCartTotals(cart: cart)
             textValue = formatValue(cartItem.quantity)
         } else {
-            // Handle new item addition...
-            vaultService.addShoppingItemToCart(
-                name: itemName,
-                store: storeName,
-                price: storeItem.priceOption.pricePerUnit.priceValue,
-                unit: storeItem.priceOption.pricePerUnit.unit,
-                cart: cart,
-                quantity: 1
-            )
+            // Handle new item addition
+            if storeItem.isShoppingOnlyItem {
+                // Shopping-only item
+                vaultService.addShoppingItemToCart(
+                    name: itemName,
+                    store: storeName,
+                    price: storeItem.priceOption.pricePerUnit.priceValue,
+                    unit: storeItem.priceOption.pricePerUnit.unit,
+                    cart: cart,
+                    quantity: 1
+                )
+            } else {
+                // Vault item - get the actual Item object
+                if let vaultItem = vaultService.findItemById(storeItem.item.id) {
+                    vaultService.addVaultItemToCartDuringShopping(
+                        item: vaultItem,
+                        store: storeName,
+                        price: storeItem.priceOption.pricePerUnit.priceValue,
+                        unit: storeItem.priceOption.pricePerUnit.unit,
+                        cart: cart,
+                        quantity: 1
+                    )
+                } else {
+                    // Fallback
+                    vaultService.addShoppingItemToCart(
+                        name: itemName,
+                        store: storeName,
+                        price: storeItem.priceOption.pricePerUnit.priceValue,
+                        unit: storeItem.priceOption.pricePerUnit.unit,
+                        cart: cart,
+                        quantity: 1
+                    )
+                }
+            }
             updateTextValue()
             onQuantityChange?()
             sendShoppingUpdateNotification()
