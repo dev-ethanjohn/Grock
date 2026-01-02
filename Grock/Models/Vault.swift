@@ -246,7 +246,7 @@ class CartItem {
         shoppingOnlyStore: String? = nil,
         shoppingOnlyPrice: Double? = nil,
         shoppingOnlyUnit: String? = nil,
-        originalPlanningQuantity: Double? = nil  // NEW parameter
+        originalPlanningQuantity: Double? = nil
     ) {
         self.itemId = itemId
         self.quantity = quantity
@@ -265,6 +265,8 @@ class CartItem {
         self.shoppingOnlyPrice = shoppingOnlyPrice
         self.shoppingOnlyUnit = shoppingOnlyUnit
         self.originalPlanningQuantity = originalPlanningQuantity
+        // ⬇️ ADDED: This ensures all items get a proper timestamp
+        self.addedAt = Date()
     }
     
     static func createShoppingOnlyItem(
@@ -280,7 +282,7 @@ class CartItem {
             itemId: UUID().uuidString,
             quantity: quantity,
             plannedStore: store,
-            isFulfilled: false, // CHANGE TO FALSE - so it appears in shopping list
+            isFulfilled: false,
             // Shopping-only flags
             actualStore: store,
             actualPrice: price,
@@ -291,7 +293,8 @@ class CartItem {
             shoppingOnlyStore: store,
             shoppingOnlyPrice: price,
             shoppingOnlyUnit: unit,
-            originalPlanningQuantity: nil  // Shopping-only items don't need original planning quantity
+            originalPlanningQuantity: nil
+            // ⬆️ The initializer will automatically set addedAt to Date()
         )
     }
     

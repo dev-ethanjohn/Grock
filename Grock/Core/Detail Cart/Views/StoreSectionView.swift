@@ -3,7 +3,7 @@ import SwiftData
 
 struct StoreSectionListView: View {
     let store: String
-    let items: [(cartItem: CartItem, item: Item?)]
+    let items: [(cartItem: CartItem, item: Item?)] // This is a constant, not a function
     let cart: Cart
     let onFulfillItem: (CartItem) -> Void
     let onEditItem: (CartItem) -> Void
@@ -12,7 +12,7 @@ struct StoreSectionListView: View {
     
     @Environment(VaultService.self) private var vaultService
     
-    // FIXED: Proper filtering for shopping mode
+    // FIXED: Proper filtering and sorting for items
     private var displayItems: [(cartItem: CartItem, item: Item?)] {
         let filteredItems = items.filter { cartItem, _ in
             // Always exclude items with quantity <= 0
@@ -36,8 +36,11 @@ struct StoreSectionListView: View {
             }
         }
         
-        // Sort items by name for consistent display
-        return filteredItems.sorted { ($0.item?.name ?? "") < ($1.item?.name ?? "") }
+        // FIX: Sort items by addedAt (newest first) for consistent display
+        return filteredItems.sorted {
+            // Sort by addedAt in descending order (newest first)
+            $0.cartItem.addedAt > $1.cartItem.addedAt
+        }
     }
     
     // ADD THIS: Track item count changes for animation
@@ -90,8 +93,6 @@ struct StoreSectionListView: View {
     }
 }
 
-// MARK: - Private Subviews
-
 private struct StoreSectionHeader: View {
     let store: String
     
@@ -99,10 +100,8 @@ private struct StoreSectionHeader: View {
         VStack(spacing: 0) {
             HStack {
                 HStack(spacing: 2) {
-                    Image("store")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 10, height: 10)
+                    Image(systemName: "storefront") // Using SF Symbol instead of custom image
+                        .font(.system(size: 10))
                         .foregroundColor(.white)
                     
                     Text(store)

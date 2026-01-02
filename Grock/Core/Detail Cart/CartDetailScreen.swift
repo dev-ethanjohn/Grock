@@ -1058,35 +1058,57 @@ struct ItemsListView: View {
         return false
     }
     
-    private func getDisplayItems(for store: String) -> [(cartItem: CartItem, item: Item?)] {
-        let allItems = storeItemsWithRefresh(store)
+    // FIXED: Helper function to get display items
+     private func getDisplayItems(for store: String) -> [(cartItem: CartItem, item: Item?)] {
+         // Call the function with the store name
+         let allItems = storeItemsWithRefresh(store)
+         
+         let filteredItems = allItems.filter { cartItem, _ in
+             // Always exclude items with quantity <= 0
+             guard cartItem.quantity > 0 else {
+                 return false
+             }
+             
+             // Filter based on cart status
+             switch cart.status {
+             case .planning:
+                 // In planning mode: show all items with quantity > 0
+                 return true
+                 
+             case .shopping:
+                 // In shopping mode: show only unfulfilled, non-skipped items
+                 return !cartItem.isFulfilled && !cartItem.isSkippedDuringShopping
+                 
+             case .completed:
+                 // In completed mode: show all items
+                 return true
+             }
+         }
+         
+         // Sort items by addedAt (newest first)
+         return filteredItems.sorted {
+             $0.cartItem.addedAt > $1.cartItem.addedAt
+         }
+     }
+    
+    // FIX: Sort stores by the newest item in each store
+    private var sortedStoresByNewestItem: [String] {
+        var storeTimestamps: [String: Date] = [:]
         
-        switch cart.status {
-        case .planning:
-            // Planning mode: Show ONLY vault items (non-shopping-only)
-            let planningItems = allItems.filter { cartItem, _ in
-                !cartItem.isShoppingOnlyItem
-            }
-            return planningItems
+        for store in sortedStoresWithRefresh {
+            let displayItems = getDisplayItems(for: store)
+            // Find the newest item in this store
+            let newestDate = displayItems
+                .map { $0.cartItem.addedAt }
+                .max() ?? Date.distantPast
             
-        case .shopping:
-            // Shopping mode: Show items that should be visible during shopping
-            let shoppingItems = allItems.filter { cartItem, _ in
-                if cartItem.isShoppingOnlyItem {
-                    // Shopping-only items: show only if they have quantity > 0 and are not skipped
-                    return cartItem.quantity > 0 &&
-                           !cartItem.isSkippedDuringShopping
-                } else {
-                    // For vault items: show unfulfilled, non-skipped
-                    return !cartItem.isFulfilled && !cartItem.isSkippedDuringShopping
-                }
-            }
-            return shoppingItems
-            
-        case .completed:
-            return allItems
+            storeTimestamps[store] = newestDate
         }
+        
+        // Sort stores by newest item (descending)
+        return storeTimestamps.sorted { $0.value > $1.value }.map { $0.key }
     }
+    
     
     var body: some View {
         GeometryReader { geometry in
@@ -1144,26 +1166,26 @@ struct ItemsListView: View {
                         .offset(y: UIScreen.main.bounds.height * 0.4)
                 } else {
                     List {
-                        ForEach(Array(sortedStoresWithRefresh.enumerated()), id: \.offset) { (index, store) in
-                            let displayItems = getDisplayItems(for: store)
-                            
-                            if !displayItems.isEmpty {
-                                StoreSectionListView(
-                                    store: store,
-                                    items: displayItems,
-                                    cart: cart,
-                                    onFulfillItem: { cartItem in
-                                        onFulfillItem(cartItem)
-                                    },
-                                    onEditItem: onEditItem,
-                                    onDeleteItem: onDeleteItem,
-                                    isLastStore: index == sortedStoresWithRefresh.count - 1
-                                )
-                                .listRowInsets(EdgeInsets())
-                                .listRowSeparator(.hidden)
-                                .listRowBackground(Color(hex: "F7F2ED"))
-                            }
-                        }
+                        ForEach(Array(sortedStoresByNewestItem.enumerated()), id: \.offset) { (index, store) in
+                                         let displayItems = getDisplayItems(for: store)
+                                         
+                                         if !displayItems.isEmpty {
+                                             StoreSectionListView(
+                                                 store: store,
+                                                 items: displayItems, // Pass the array directly
+                                                 cart: cart,
+                                                 onFulfillItem: { cartItem in
+                                                     onFulfillItem(cartItem)
+                                                 },
+                                                 onEditItem: onEditItem,
+                                                 onDeleteItem: onDeleteItem,
+                                                 isLastStore: index == sortedStoresByNewestItem.count - 1
+                                             )
+                                             .listRowInsets(EdgeInsets())
+                                             .listRowSeparator(.hidden)
+                                             .listRowBackground(Color(hex: "F7F2ED"))
+                                         }
+                                     }
                     }
                     .frame(height: min(calculatedHeight, maxAllowedHeight))
                     .listStyle(PlainListStyle())
