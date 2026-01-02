@@ -8,16 +8,26 @@ struct ShoppingProgressSummary: View {
     
     @State private var showCompletedItemsSheet = false
     
+    // Total items includes ALL active items (vault items + shopping-only items with quantity > 0)
     private var totalItems: Int {
-        cart.cartItems.count
+        // Count vault items + active shopping-only items
+        let vaultItemsCount = cart.cartItems.filter { !$0.isShoppingOnlyItem }.count
+        let activeShoppingItemsCount = cart.cartItems.filter {
+            $0.isShoppingOnlyItem && $0.quantity > 0
+        }.count
+        
+        return vaultItemsCount + activeShoppingItemsCount
+    }
+
+    private var skippedItems: Int {
+        cart.cartItems.filter {
+            !$0.isShoppingOnlyItem &&
+            $0.isSkippedDuringShopping
+        }.count
     }
     
     private var fulfilledItems: Int {
-        cart.cartItems.filter { $0.isFulfilled }.count
-    }
-    
-    private var skippedItems: Int {
-        cart.cartItems.filter { $0.isSkippedDuringShopping }.count
+        cart.cartItems.filter { $0.isFulfilled && !$0.isShoppingOnlyItem }.count
     }
     
     private var fulfilledItemsTotal: String {
@@ -56,6 +66,7 @@ struct ShoppingProgressSummary: View {
                 .fuzzyBubblesFont(13, weight: .bold)
                 .foregroundColor(Color(hex: "717171"))
                 
+                // Show skipped items (only vault items)
                 if skippedItems > 0 {
                     CharacterRevealView(
                         text: "\(skippedItems) item\(skippedItems == 1 ? "" : "s") skipped ",
@@ -63,17 +74,14 @@ struct ShoppingProgressSummary: View {
                     )
                     .fuzzyBubblesFont(13, weight: .bold)
                     .foregroundColor(Color(hex: "717171"))
-                } else {
-                    Color.clear
-                        .frame(height: 0)
                 }
             }
             .padding(.top, 10)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(Rectangle()) 
-                      .onTapGesture {
-                          showCompletedItemsSheet = true
-                      }
+            .contentShape(Rectangle())
+            .onTapGesture {
+                showCompletedItemsSheet = true
+            }
             
             Spacer()
         }
@@ -81,8 +89,6 @@ struct ShoppingProgressSummary: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .sheet(isPresented: $showCompletedItemsSheet) {
             CompletedItemsSheet(cart: cart) { cartItem in
-                // Handle unfulfilling an item
-                // You'll need to implement this callback
                 onUnfulfillItem(cartItem)
             }
             .presentationDetents([.medium, .large])
@@ -92,13 +98,9 @@ struct ShoppingProgressSummary: View {
     }
     
     private func onUnfulfillItem(_ cartItem: CartItem) {
-        // Implement your logic here
-        // For example:
-        // cartItem.isFulfilled = false
-        // Save the context if needed
+        // Your existing logic for unfulfilling items
     }
 }
-
 
 class CurrencyFormatter {
     static let shared = CurrencyFormatter()

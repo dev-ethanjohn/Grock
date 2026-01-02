@@ -150,7 +150,7 @@ struct ItemManager {
         
         return allStoreItems
     }
-    
+
     var shoppingOnlyStoreItems: [StoreItem] {
         var shoppingOnlyItems: [StoreItem] = []
         
@@ -160,7 +160,8 @@ struct ItemManager {
                let store = cartItem.shoppingOnlyStore,
                let unit = cartItem.shoppingOnlyUnit,
                !cartItem.isSkippedDuringShopping,
-               cartItem.getQuantity(cart: cart) > 0 {
+               // CHANGE: Check if cartItem still exists AND has quantity > 0
+               cartItem.quantity > 0 {
                 
                 // Check if this shopping-only item already exists as a vault item
                 let alreadyExistsAsVaultItem = vaultStoreItems.contains { storeItem in

@@ -703,25 +703,43 @@ struct CartDetailContent: View {
                             ZStack {
                                 if hasItems {
                                     VStack(spacing: 24) {
+//                                        ItemsListView(
+//                                            cart: cart,
+//                                            totalItemCount: totalItemCount,
+//                                            // CHANGED: Use sortedStores instead of sortedStoresWithRefresh
+//                                            sortedStoresWithRefresh: sortedStores,
+//                                            // CHANGED: Use storeItems instead of storeItemsWithRefresh
+//                                            storeItemsWithRefresh: storeItems,
+//                                            fulfilledCount: $fulfilledCount,
+//                                            onFulfillItem: { cartItem in
+//                                                // Handle fulfillment - show the popover
+//                                                handleFulfillItem(cartItem: cartItem)
+//                                            },
+//                                            onEditItem: { cartItem in
+//                                                handleEditItem(cartItem: cartItem)
+//                                            },
+//                                            onDeleteItem: { cartItem in
+//                                                handleDeleteItem(cartItem)
+//                                            }
+//                                        )
                                         ItemsListView(
                                             cart: cart,
                                             totalItemCount: totalItemCount,
-                                            // CHANGED: Use sortedStores instead of sortedStoresWithRefresh
                                             sortedStoresWithRefresh: sortedStores,
-                                            // CHANGED: Use storeItems instead of storeItemsWithRefresh
                                             storeItemsWithRefresh: storeItems,
                                             fulfilledCount: $fulfilledCount,
                                             onFulfillItem: { cartItem in
-                                                // Handle fulfillment - show the popover
                                                 handleFulfillItem(cartItem: cartItem)
                                             },
                                             onEditItem: { cartItem in
                                                 handleEditItem(cartItem: cartItem)
                                             },
                                             onDeleteItem: { cartItem in
+                                                // This should properly remove shopping-only items
                                                 handleDeleteItem(cartItem)
                                             }
                                         )
+
                                         .transition(.scale)
                                     }
                                     
@@ -909,11 +927,19 @@ struct CartDetailContent: View {
         }
     }
     
+//    private func handleDeleteItem(_ cartItem: CartItem) {
+//        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+//            vaultService.removeItemFromCart(cart: cart, itemId: cartItem.itemId)
+//            vaultService.updateCartTotals(cart: cart)
+//            refreshTrigger = UUID()
+//        }
+//    }
     private func handleDeleteItem(_ cartItem: CartItem) {
         withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+            // This should remove the item from cart
             vaultService.removeItemFromCart(cart: cart, itemId: cartItem.itemId)
             vaultService.updateCartTotals(cart: cart)
-            refreshTrigger = UUID()
+            refreshTrigger = UUID() // This triggers a gentle refresh
         }
     }
     
@@ -930,14 +956,12 @@ struct CartDetailContent: View {
 }
 
 
-
 struct ItemsListView: View {
     let cart: Cart
     let totalItemCount: Int
     let sortedStoresWithRefresh: [String]
     let storeItemsWithRefresh: (String) -> [(cartItem: CartItem, item: Item?)]
     @Binding var fulfilledCount: Int
-    //    let onToggleFulfillment: (CartItem) -> Void
     let onFulfillItem: (CartItem) -> Void
     let onEditItem: (CartItem) -> Void
     let onDeleteItem: (CartItem) -> Void
@@ -1049,8 +1073,9 @@ struct ItemsListView: View {
             // Shopping mode: Show items that should be visible during shopping
             let shoppingItems = allItems.filter { cartItem, _ in
                 if cartItem.isShoppingOnlyItem {
-                    // Shopping-only items: show unfulfilled, non-skipped
-                    return !cartItem.isFulfilled && !cartItem.isSkippedDuringShopping
+                    // Shopping-only items: show only if they have quantity > 0 and are not skipped
+                    return cartItem.quantity > 0 &&
+                           !cartItem.isSkippedDuringShopping
                 } else {
                     // For vault items: show unfulfilled, non-skipped
                     return !cartItem.isFulfilled && !cartItem.isSkippedDuringShopping
@@ -1152,7 +1177,6 @@ struct ItemsListView: View {
                             .presentationCornerRadius(24)
                             .environment(vaultService)
                             .transition(.opacity.combined(with: .move(edge: .bottom)))
-                  
                     }
                 }
             }
@@ -1170,6 +1194,7 @@ struct ItemsListView: View {
         }
     }
 }
+
 
 extension View {
     func cartSheets(

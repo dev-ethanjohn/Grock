@@ -82,7 +82,7 @@ struct CartItemRowListView: View {
 // MARK: - Main Row Content
 private struct MainRowContent: View {
     @Bindable var cartItem: CartItem
-    let item: Item? // This comes from parent view's fetch
+    let item: Item?
     let cart: Cart
     let onFulfillItem: () -> Void
     let onEditItem: () -> Void
@@ -91,8 +91,18 @@ private struct MainRowContent: View {
     
     @Environment(VaultService.self) private var vaultService
     
-    // Add back all the missing state variables
-    @State private var isNewlyAdded: Bool = true
+    // Persistence for new badge - use AppStorage or UserDefaults
+    @AppStorage private var hasShownNewBadge: Bool
+    @State private var showNewBadge: Bool = false
+    
+    // Animation state for badge appearance (only used once)
+    @State private var sparkleOpacity: Double = 0.0
+    @State private var sparkleScale: CGFloat = 0.8
+    @State private var badgeScale: CGFloat = 0.1
+    @State private var badgeRotation: Double = 0
+    @State private var rowHighlight: Bool = false
+    
+    // Existing state variables
     @State private var buttonScale: CGFloat = 0.1
     @State private var isFulfilling: Bool = false
     @State private var iconScale: CGFloat = 1.0
@@ -105,61 +115,125 @@ private struct MainRowContent: View {
     @State private var currentTotalPrice: Double = 0
     @State private var displayUnit: String = ""
     
+    // Custom initializer to handle AppStorage with dynamic key
+    init(cartItem: CartItem, item: Item?, cart: Cart, onFulfillItem: @escaping () -> Void, onEditItem: @escaping () -> Void, onDeleteItem: @escaping () -> Void, isLastItem: Bool) {
+        self.cartItem = cartItem
+        self.item = item
+        self.cart = cart
+        self.onFulfillItem = onFulfillItem
+        self.onEditItem = onEditItem
+        self.onDeleteItem = onDeleteItem
+        self.isLastItem = isLastItem
+        
+        // Create unique storage key for each cart item
+        let storageKey = "hasShownNewBadge_\(cartItem.id)"
+        self._hasShownNewBadge = AppStorage(wrappedValue: false, storageKey)
+    }
+    
     var body: some View {
-        HStack(alignment: .top, spacing: 0) {
-            if cart.isShopping {
-                FulfillmentButton(
-                    cartItem: cartItem,
-                    isFulfilling: $isFulfilling,
-                    iconScale: $iconScale,
-                    checkmarkScale: $checkmarkScale,
-                    buttonScale: buttonScale,
-                    onFulfillItem: onFulfillItem
-                )
+        ZStack {
+            // Background sparkle effect (behind the row)
+            if showNewBadge && !hasShownNewBadge {
+                SparkleEffectView(opacity: sparkleOpacity, scale: sparkleScale)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .allowsHitTesting(false)
             }
             
-            // Item details using the derived state
-            VStack(alignment: .leading, spacing: 0) {
-                HStack(spacing: 4) {
-                    Text(currentQuantity.formattedQuantity)
-                        .lexendFont(16, weight: .regular)
-                        .contentTransition(.numericText())
-                        .animation(.spring(response: 0.5, dampingFraction: 0.7), value: currentQuantity)
-                    
-                    Text(item?.name ?? cartItem.shoppingOnlyName ?? "Unknown Item")
-                        .lexendFont(16, weight: .regular)
-                        .lineLimit(3)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .strikethrough(cart.isShopping && (cartItem.isFulfilled || cartItem.isSkippedDuringShopping))
-                        .id(item?.name ?? cartItem.shoppingOnlyName ?? "Unknown") // Force re-render when name changes
+            HStack(alignment: .top, spacing: 0) {
+                if cart.isShopping {
+                    FulfillmentButton(
+                        cartItem: cartItem,
+                        isFulfilling: $isFulfilling,
+                        iconScale: $iconScale,
+                        checkmarkScale: $checkmarkScale,
+                        buttonScale: buttonScale,
+                        onFulfillItem: onFulfillItem
+                    )
                 }
                 
-                HStack(spacing: 4) {
-                    Text("\(currentPrice.formattedCurrency) / \(displayUnit)")
-                        .lexendFont(12)
-                        .lineLimit(1)
-                        .contentTransition(.numericText())
-                        .animation(.spring(response: 0.5, dampingFraction: 0.7), value: currentPrice)
+                // Item details using the derived state
+                VStack(alignment: .leading, spacing: 0) {
+                    HStack(spacing: 4) {
+                        Text(currentQuantity.formattedQuantity)
+                            .lexendFont(16, weight: .regular)
+                            .contentTransition(.numericText())
+                            .animation(.spring(response: 0.5, dampingFraction: 0.7), value: currentQuantity)
+                        
+                        Text(item?.name ?? cartItem.shoppingOnlyName ?? "Unknown Item")
+                            .lexendFont(16, weight: .regular)
+                            .lineLimit(3)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .strikethrough(cart.isShopping && (cartItem.isFulfilled || cartItem.isSkippedDuringShopping))
+                            .id(item?.name ?? cartItem.shoppingOnlyName ?? "Unknown")
+                        
+                        Spacer()
+                        
+                        // New badge (only for shopping-only items in shopping mode)
+                        if showNewBadge && cart.isShopping && cartItem.isShoppingOnlyItem && (hasShownNewBadge || !hasShownNewBadge) {
+                            NewBadgeView(
+                                scale: hasShownNewBadge ? 1.0 : badgeScale,
+                                rotation: badgeRotation
+                            )
+                            .transition(.scale.combined(with: .opacity))
+                        }
+                    }
                     
-                    Spacer()
-                    
-                    Text(currentTotalPrice.formattedCurrency)
-                        .lexendFont(14, weight: .bold)
-                        .lineLimit(1)
-                        .contentTransition(.numericText())
-                        .animation(.spring(response: 0.5, dampingFraction: 0.7), value: currentTotalPrice)
+                    HStack(spacing: 4) {
+                        Text("\(currentPrice.formattedCurrency) / \(displayUnit)")
+                            .lexendFont(12)
+                            .lineLimit(1)
+                            .contentTransition(.numericText())
+                            .animation(.spring(response: 0.5, dampingFraction: 0.7), value: currentPrice)
+                        
+                        Spacer()
+                        
+                        Text(currentTotalPrice.formattedCurrency)
+                            .lexendFont(14, weight: .bold)
+                            .lineLimit(1)
+                            .contentTransition(.numericText())
+                            .animation(.spring(response: 0.5, dampingFraction: 0.7), value: currentTotalPrice)
+                    }
+                    .foregroundColor(Color(hex: "231F30"))
+                    .opacity(cart.isShopping && (cartItem.isFulfilled || cartItem.isSkippedDuringShopping) ? 0.5 : 1.0)
                 }
-                .foregroundColor(Color(hex: "231F30"))
                 .opacity(cart.isShopping && (cartItem.isFulfilled || cartItem.isSkippedDuringShopping) ? 0.5 : 1.0)
             }
-            .opacity(cart.isShopping && (cartItem.isFulfilled || cartItem.isSkippedDuringShopping) ? 0.5 : 1.0)
+            .padding(.vertical, 12)
+            .padding(.leading, cart.isShopping ? 16 : 16)
+            .padding(.trailing, 16)
+            .background(
+                ZStack {
+                    // Base background
+                    Color(hex: "F7F2ED").darker(by: 0.02)
+                    
+                    // Highlight overlay for new items (only during initial animation)
+                    if rowHighlight && showNewBadge && !hasShownNewBadge {
+                        LinearGradient(
+                            colors: [
+                                Color(hex: "FFE082").opacity(0.15),
+                                Color(hex: "FFD54F").opacity(0.1),
+                                Color.clear
+                            ],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                        .cornerRadius(8)
+                    }
+                }
+            )
+            .cornerRadius(8)
+            .overlay(
+                // Highlight border for new items (only during initial animation)
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(
+                        rowHighlight && showNewBadge && !hasShownNewBadge ?
+                        Color(hex: "FFB300").opacity(0.4) : Color.clear,
+                        lineWidth: rowHighlight && showNewBadge && !hasShownNewBadge ? 1.5 : 0
+                    )
+            )
         }
         .opacity(rowOpacity)
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: cart.isShopping)
-        .padding(.vertical, 12)
-        .padding(.leading, cart.isShopping ? 16 : 16)
-        .padding(.trailing, 16)
-        .background(Color(hex: "F7F2ED").darker(by: 0.02))
         .contentShape(Rectangle())
         .onTapGesture {
             if !isFulfilling {
@@ -186,16 +260,28 @@ private struct MainRowContent: View {
             // Initialize derived values
             updateDerivedValues()
             
-            if isNewlyAdded {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    withAnimation(.easeIn(duration: 0.2)) {
-                        isNewlyAdded = false
-                    }
+            // Check if this item was recently added (within the last 3 seconds)
+            let timeSinceAdded = Date().timeIntervalSince(cartItem.addedAt)
+            if cart.isShopping && timeSinceAdded < 3.0 && cartItem.isShoppingOnlyItem {
+                // If we've never shown the badge before, show it with animation
+                if !hasShownNewBadge {
+                    showNewBadge = true
+                    startNewItemAnimation()
+                } else {
+                    // If we've shown it before, just show it without animation
+                    showNewBadge = true
                 }
+            } else if hasShownNewBadge {
+                // If badge was shown before, keep it visible
+                showNewBadge = true
             }
         }
         .onDisappear {
-            isNewlyAdded = true
+            // Don't hide the badge when view disappears if we've already shown it
+            if !hasShownNewBadge {
+                showNewBadge = false
+                rowHighlight = false
+            }
         }
         // Add observers for planned data changes
         .onChange(of: cartItem.plannedPrice) { oldValue, newValue in
@@ -304,6 +390,79 @@ private struct MainRowContent: View {
              displayUnit = newUnit
          }
      }
+    
+    private func startNewItemAnimation() {
+        // Sequence 1: Row highlight pulse
+        withAnimation(.easeInOut(duration: 0.3)) {
+            rowHighlight = true
+        }
+        
+        // Sequence 2: Badge appears with spring and slight initial rotation
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            withAnimation(.interpolatingSpring(mass: 0.5, stiffness: 100, damping: 10)) {
+                badgeScale = 1.0
+                badgeRotation = 3 // Small initial tilt
+            }
+            
+            withAnimation(.easeInOut(duration: 0.5)) {
+                sparkleOpacity = 0.25
+                sparkleScale = 1.0
+            }
+        }
+        
+        // Sequence 3: Single smooth rocking motion
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            // Gentle rocking motion
+            withAnimation(.interpolatingSpring(mass: 1.0, stiffness: 50, damping: 7)) {
+                badgeRotation = -2
+            }
+            
+            // Return to center
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                withAnimation(.interpolatingSpring(mass: 1.0, stiffness: 50, damping: 7)) {
+                    badgeRotation = 1
+                }
+                
+                // Final settle
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                    withAnimation(.interpolatingSpring(mass: 1.0, stiffness: 60, damping: 8)) {
+                        badgeRotation = 0
+                    }
+                }
+            }
+        }
+        
+        // Sequence 4: Row highlight pulses smoothly
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            withAnimation(.easeInOut(duration: 0.6).delay(0.1)) {
+                rowHighlight = false
+            }
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                withAnimation(.easeInOut(duration: 0.4)) {
+                    rowHighlight = true
+                }
+                
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    withAnimation(.easeOut(duration: 0.3)) {
+                        rowHighlight = false
+                    }
+                }
+            }
+        }
+        
+        // Sequence 5: Mark as shown and remove animations after 2.8 seconds
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.8) {
+            // Save that we've shown the badge
+            hasShownNewBadge = true
+            
+            withAnimation(.easeOut(duration: 0.3)) {
+                sparkleOpacity = 0
+                sparkleScale = 0.8
+                badgeRotation = 0
+            }
+        }
+    }
 }
 
 // MARK: - Fulfillment Button Component
@@ -370,5 +529,63 @@ private struct FulfillmentButton: View {
         .buttonStyle(.plain)
         .disabled(isFulfilling || cartItem.isFulfilled)
         .help(cartItem.isFulfilled ? "Already purchased" : "Tap to confirm purchase")
+    }
+}
+
+// MARK: - Sparkle Effect Component
+struct SparkleEffectView: View {
+    let opacity: Double
+    let scale: CGFloat
+    
+    @State private var sparkles: [Sparkle] = []
+    
+    struct Sparkle: Identifiable {
+        let id = UUID()
+        let x: CGFloat
+        let y: CGFloat
+        let size: CGFloat
+        let delay: Double
+    }
+    
+    init(opacity: Double, scale: CGFloat) {
+        self.opacity = opacity
+        self.scale = scale
+        
+        // Generate random sparkle positions
+        var sparkles: [Sparkle] = []
+        for _ in 0..<8 {
+            sparkles.append(Sparkle(
+                x: CGFloat.random(in: 0.1...0.9),
+                y: CGFloat.random(in: 0.1...0.9),
+                size: CGFloat.random(in: 0.5...1.5),
+                delay: Double.random(in: 0...0.5)
+            ))
+        }
+        _sparkles = State(initialValue: sparkles)
+    }
+    
+    var body: some View {
+        ZStack {
+            ForEach(sparkles) { sparkle in
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(0.8),
+                                Color(hex: "FFE082").opacity(0.6),
+                                Color.clear
+                            ],
+                            startPoint: .center,
+                            endPoint: .trailing
+                        )
+                    )
+                    .frame(width: sparkle.size * 15, height: sparkle.size * 15)
+                    .position(x: sparkle.x * UIScreen.main.bounds.width,
+                             y: sparkle.y * 60) // Limit to row height
+                    .opacity(opacity)
+                    .scaleEffect(scale)
+                    .blur(radius: 1)
+            }
+        }
     }
 }

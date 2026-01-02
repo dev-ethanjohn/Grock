@@ -54,7 +54,7 @@ struct StoreSectionListView: View {
                             index: index,
                             tuple: tuple,
                             cart: cart,
-                            displayItems: displayItems,
+                            displayItems: displayItems, // Pass displayItems for comparison
                             onFulfillItem: onFulfillItem,
                             onEditItem: onEditItem,
                             onDeleteItem: onDeleteItem,
@@ -134,6 +134,23 @@ private struct StoreSectionRow: View {
     
     @Environment(VaultService.self) private var vaultService
     
+    // Helper to determine item type
+    private var isShoppingOnlyItem: Bool {
+        tuple.cartItem.isShoppingOnlyItem
+    }
+    
+    private var isSkipped: Bool {
+        tuple.cartItem.isSkippedDuringShopping
+    }
+    
+    private var isFulfilled: Bool {
+        tuple.cartItem.isFulfilled
+    }
+    
+    private var hasQuantity: Bool {
+        tuple.cartItem.quantity > 0
+    }
+    
     var body: some View {
         VStack(spacing: 0) {
             CartItemRowListView(
@@ -162,7 +179,6 @@ private struct StoreSectionRow: View {
         .listRowInsets(EdgeInsets())
         .listRowSeparator(.hidden)
         .listRowBackground(Color(hex: "F7F2ED"))
-        // ADD THIS: Animate item removal
         .transition(.asymmetric(
             insertion: .scale.combined(with: .opacity),
             removal: .scale.combined(with: .opacity)
@@ -172,38 +188,84 @@ private struct StoreSectionRow: View {
     @ViewBuilder
     private var swipeActionsContent: some View {
         if cart.isShopping {
-            // Shopping mode: Skip action
-            Button(role: .destructive) {
-                handleSkipItem(tuple.cartItem)
-            } label: {
-                Label("Skip", systemImage: "minus.circle")
+            // SHOPPING MODE SWIPE ACTIONS
+            if isShoppingOnlyItem {
+                // SHOPPING-ONLY ITEMS (added during shopping)
+                Button(role: .destructive) {
+                    deleteShoppingOnlyItem()
+                } label: {
+                    Label("Delete", systemImage: "trash")
+                }
+                .tint(.red)
+            } else {
+                // VAULT ITEMS (originally planned)
+                if isSkipped {
+                    // Skipped vault item: "Add Back" action
+                    Button {
+                        addBackSkippedItem()
+                    } label: {
+                        Label("Add Back", systemImage: "plus.circle")
+                    }
+                    .tint(.green)
+                } else if isFulfilled {
+                    // Fulfilled vault item: "Mark Unfulfilled" action
+                    Button {
+                        markUnfulfilled()
+                    } label: {
+                        Label("Unfulfill", systemImage: "circle")
+                    }
+                    .tint(.orange)
+                } else {
+                    // Active unfulfilled vault item: "Skip" action
+                    Button {
+                        handleSkipItem(tuple.cartItem)
+                    } label: {
+                        Label("Skip", systemImage: "minus.circle")
+                    }
+                    .tint(.orange)
+                }
             }
-            .tint(.orange)
         } else {
-            // Planning mode: Delete action
+            // PLANNING MODE SWIPE ACTIONS
             Button(role: .destructive) {
                 onDeleteItem(tuple.cartItem)
             } label: {
                 Label("Delete", systemImage: "trash")
             }
+            .tint(.red)
         }
         
+        // EDIT ACTION (available for all item types in all modes)
         Button {
             onEditItem(tuple.cartItem)
         } label: {
             Label("Edit", systemImage: "pencil")
         }
+        .tint(.blue)
+    }
+    
+    // MARK: - Action Handlers
+    
+    private func deleteShoppingOnlyItem() {
+        print("🗑️ Deleting shopping-only item via swipe: \(tuple.cartItem.shoppingOnlyName ?? "Unknown")")
         
-        // Only show "Mark Unfulfilled" for already fulfilled items
-        if cart.isShopping && tuple.cartItem.isFulfilled {
-            Button {
-                // Direct toggle for unfulfilling (no popover needed)
-                tuple.cartItem.isFulfilled = false
-                vaultService.updateCartTotals(cart: cart)
-            } label: {
-                Label("Mark Unfulfilled", systemImage: "circle")
-            }
-            .tint(.orange)
+        // Simply call the standard delete handler
+        // The parent view will handle the refresh
+        onDeleteItem(tuple.cartItem)
+    }
+    
+    private func addBackSkippedItem() {
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+            tuple.cartItem.isSkippedDuringShopping = false
+            tuple.cartItem.quantity = max(1, tuple.cartItem.originalPlanningQuantity ?? 1)
+            vaultService.updateCartTotals(cart: cart)
+        }
+    }
+    
+    private func markUnfulfilled() {
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+            tuple.cartItem.isFulfilled = false
+            vaultService.updateCartTotals(cart: cart)
         }
     }
 }

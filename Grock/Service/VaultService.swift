@@ -911,13 +911,21 @@ extension VaultService {
         let itemName = findItemById(itemId)?.name ?? "Unknown Item"
         
         if cart.status == .shopping {
-            // Shopping mode: Mark as SKIPPED instead of removing
-            cartItem.isSkippedDuringShopping = true
-            cartItem.isFulfilled = false // ⚠️ IMPORTANT: NOT fulfilled!
-            
-            print("⏸️ Skipped \(itemName) during shopping - moved to skipped section")
+            // SHOPPING MODE: Handle differently based on item type
+            if cartItem.isShoppingOnlyItem {
+                // SHOPPING-ONLY ITEMS: Remove completely during shopping
+                if let index = cart.cartItems.firstIndex(where: { $0.itemId == itemId }) {
+                    cart.cartItems.remove(at: index)
+                    print("🗑️ Removed shopping-only item \(itemName) during shopping")
+                }
+            } else {
+                // VAULT ITEMS: Mark as skipped instead of removing
+                cartItem.isSkippedDuringShopping = true
+                cartItem.isFulfilled = false
+                print("⏸️ Skipped vault item \(itemName) during shopping")
+            }
         } else {
-            // Planning mode: Actually remove the item
+            // PLANNING MODE: Actually remove the item (both types)
             if let index = cart.cartItems.firstIndex(where: { $0.itemId == itemId }) {
                 cart.cartItems.remove(at: index)
                 print("🗑️ Removed \(itemName) from cart: \(cart.name)")
