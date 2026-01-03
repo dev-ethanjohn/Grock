@@ -55,3 +55,42 @@ extension View {
         }
     }
 }
+
+import SwiftUI
+import Observation
+
+// Create a global or shared alert state manager using Observation
+@Observable
+class AlertManager {
+    static let shared = AlertManager()
+    
+    var showAlert = false
+    var alertTitle = ""
+    var alertMessage = ""
+    var confirmAction: (() -> Void)?
+    
+     init() {}
+    
+    func showDeleteAlert(for itemName: String, confirmAction: @escaping () -> Void) {
+        alertTitle = "Remove Item"
+        alertMessage = "Remove '\(itemName)' from your shopping list?"
+        self.confirmAction = confirmAction
+        showAlert = true
+    }
+    
+    func confirm() {
+        confirmAction?()
+        reset()
+    }
+    
+    func cancel() {
+        reset()
+    }
+    
+    func reset() {
+        confirmAction = nil
+        showAlert = false
+        alertTitle = ""
+        alertMessage = ""
+    }
+}

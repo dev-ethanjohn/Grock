@@ -41,8 +41,7 @@ struct CartDetailScreen: View {
     @State private var showingEditCartName = false
     @State private var showingCartSheet = false
     
-    @State private var alertManager = AlertManager()
-    
+    @State private var alertManager = AlertManager()    
     // Computed properties
     private var cartInsights: CartInsights {
         vaultService.getCartInsights(cart: cart)

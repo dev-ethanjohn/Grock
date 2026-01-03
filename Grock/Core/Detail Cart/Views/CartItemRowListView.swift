@@ -627,24 +627,3 @@ struct SparkleEffectView: View {
         }
     }
 }
-
-
-
-import SwiftUI
-import Observation
-
-// Create a global or shared alert state manager using Observation
-@Observable
-class AlertManager {
-    var showAlert = false
-    var alertTitle = ""
-    var alertMessage = ""
-    var confirmAction: (() -> Void)?
-    
-    func showDeleteAlert(for itemName: String, confirmAction: @escaping () -> Void) {
-        alertTitle = "Remove Item"
-        alertMessage = "Remove '\(itemName)' from your shopping list?"
-        self.confirmAction = confirmAction
-        showAlert = true
-    }
-}
