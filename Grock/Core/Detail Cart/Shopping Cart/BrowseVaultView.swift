@@ -132,68 +132,19 @@ struct ItemManager {
         
         for category in vault.categories {
             for item in category.items {
-                // Check if this vault item is in the cart
-                let cartItemsForThisItem = cart.cartItems.filter {
-                    !$0.isShoppingOnlyItem && $0.itemId == item.id
-                }
-                
-                // If item is in cart, check its status
-                if !cartItemsForThisItem.isEmpty {
-                    // Check if ANY cart item for this vault item is active (quantity > 0)
-                    let hasActiveCartItem = cartItemsForThisItem.contains { $0.quantity > 0 }
-                    
-                    if hasActiveCartItem {
-                        // Item is active in cart - include it
-                        for priceOption in item.priceOptions {
-                            let combinationKey = "\(item.id)-\(priceOption.store)"
-                            if !seenItemStoreCombinations.contains(combinationKey) {
-                                let storeItem = StoreItem(
-                                    item: item,
-                                    categoryName: category.name,
-                                    priceOption: priceOption,
-                                    isShoppingOnlyItem: false
-                                )
-                                allStoreItems.append(storeItem)
-                                seenItemStoreCombinations.insert(combinationKey)
-                            }
-                        }
-                    } else {
-                        // All cart items for this vault item have quantity = 0 (effectively deleted)
-                        // Only include if NONE were added during shopping
-                        let allAddedDuringShopping = cartItemsForThisItem.allSatisfy { $0.addedDuringShopping }
-                        
-                        if !allAddedDuringShopping {
-                            // Some were planned items (not added during shopping) - include them
-                            for priceOption in item.priceOptions {
-                                let combinationKey = "\(item.id)-\(priceOption.store)"
-                                if !seenItemStoreCombinations.contains(combinationKey) {
-                                    let storeItem = StoreItem(
-                                        item: item,
-                                        categoryName: category.name,
-                                        priceOption: priceOption,
-                                        isShoppingOnlyItem: false
-                                    )
-                                    allStoreItems.append(storeItem)
-                                    seenItemStoreCombinations.insert(combinationKey)
-                                }
-                            }
-                        }
-                        // If all were added during shopping and quantity = 0, don't include
-                    }
-                } else {
-                    // Item not in cart at all - include it
-                    for priceOption in item.priceOptions {
-                        let combinationKey = "\(item.id)-\(priceOption.store)"
-                        if !seenItemStoreCombinations.contains(combinationKey) {
-                            let storeItem = StoreItem(
-                                item: item,
-                                categoryName: category.name,
-                                priceOption: priceOption,
-                                isShoppingOnlyItem: false
-                            )
-                            allStoreItems.append(storeItem)
-                            seenItemStoreCombinations.insert(combinationKey)
-                        }
+                // ALWAYS include vault items in the browse list
+                // The UI (BrowseVaultItemRow) will handle showing them as active/inactive
+                for priceOption in item.priceOptions {
+                    let combinationKey = "\(item.id)-\(priceOption.store)"
+                    if !seenItemStoreCombinations.contains(combinationKey) {
+                        let storeItem = StoreItem(
+                            item: item,
+                            categoryName: category.name,
+                            priceOption: priceOption,
+                            isShoppingOnlyItem: false
+                        )
+                        allStoreItems.append(storeItem)
+                        seenItemStoreCombinations.insert(combinationKey)
                     }
                 }
             }

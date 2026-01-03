@@ -191,13 +191,83 @@ private struct StoreSectionRow: View {
         ))
     }
     
+//    @ViewBuilder
+//    private var swipeActionsContent: some View {
+//        if cart.isShopping {
+//            // SHOPPING MODE SWIPE ACTIONS
+//            
+//            if isShoppingOnlyItem {
+//                // SHOPPING-ONLY ITEMS (added during shopping)
+//                Button(role: .destructive) {
+//                    deleteShoppingOnlyItem()
+//                } label: {
+//                    Label("Delete", systemImage: "trash")
+//                }
+//                .tint(.red)
+//                
+//            } else if tuple.cartItem.addedDuringShopping {
+//                // VAULT ITEMS ADDED DURING SHOPPING (treat like shopping-only items)
+//                Button(role: .destructive) {
+//                    deleteVaultItemAddedDuringShopping()
+//                } label: {
+//                    Label("Delete", systemImage: "trash")
+//                }
+//                .tint(.red)
+//                
+//            } else {
+//                // PLANNED VAULT ITEMS (in cart before shopping started)
+//                if isSkipped {
+//                    // Skipped planned item: "Add Back" action
+//                    Button {
+//                        addBackSkippedItem()
+//                    } label: {
+//                        Label("Add Back", systemImage: "plus.circle")
+//                    }
+//                    .tint(.green)
+//                } else if isFulfilled {
+//                    // Fulfilled planned item: "Mark Unfulfilled" action
+//                    Button {
+//                        markUnfulfilled()
+//                    } label: {
+//                        Label("Unfulfill", systemImage: "circle")
+//                    }
+//                    .tint(.orange)
+//                } else {
+//                    // Active unfulfilled planned item: "Skip" action
+//                    Button {
+//                        handleSkipItem(tuple.cartItem)
+//                    } label: {
+//                        Label("Skip", systemImage: "minus.circle")
+//                    }
+//                    .tint(.orange)
+//                }
+//            }
+//        } else {
+//            // PLANNING MODE SWIPE ACTIONS (same for all)
+//            Button(role: .destructive) {
+//                onDeleteItem(tuple.cartItem)
+//            } label: {
+//                Label("Delete", systemImage: "trash")
+//            }
+//            .tint(.red)
+//        }
+//        
+//        // EDIT ACTION (available for all item types in all modes)
+//        Button {
+//            onEditItem(tuple.cartItem)
+//        } label: {
+//            Label("Edit", systemImage: "pencil")
+//        }
+//        .tint(.blue)
+//    }
+    // In StoreSectionRow's swipeActionsContent:
     @ViewBuilder
     private var swipeActionsContent: some View {
         if cart.isShopping {
             // SHOPPING MODE SWIPE ACTIONS
             
             if isShoppingOnlyItem {
-                // SHOPPING-ONLY ITEMS (added during shopping)
+                // SHOPPING-ONLY ITEMS: Delete action
                 Button(role: .destructive) {
                     deleteShoppingOnlyItem()
                 } label: {
@@ -206,13 +276,13 @@ private struct StoreSectionRow: View {
                 .tint(.red)
                 
             } else if tuple.cartItem.addedDuringShopping {
-                // VAULT ITEMS ADDED DURING SHOPPING (treat like shopping-only items)
-                Button(role: .destructive) {
-                    deleteVaultItemAddedDuringShopping()
+                // VAULT ITEMS ADDED DURING SHOPPING: Deactivate action (not delete)
+                Button {
+                    deactivateVaultItemAddedDuringShopping()
                 } label: {
-                    Label("Delete", systemImage: "trash")
+                    Label("Remove", systemImage: "minus.circle")
                 }
-                .tint(.red)
+                .tint(.orange) // Orange instead of red to indicate deactivation, not deletion
                 
             } else {
                 // PLANNED VAULT ITEMS (in cart before shopping started)
@@ -261,29 +331,65 @@ private struct StoreSectionRow: View {
         .tint(.blue)
     }
 
-    private func deleteVaultItemAddedDuringShopping() {
-        print("🗑️ Deleting vault item added during shopping: \(tuple.item?.name ?? "Unknown")")
+    private func deactivateVaultItemAddedDuringShopping() {
+        print("🔄 Deactivating vault item added during shopping: \(tuple.item?.name ?? "Unknown")")
         
-        // Find the cart item
-        if let index = cart.cartItems.firstIndex(where: { $0.itemId == tuple.cartItem.itemId }) {
-            print("   Removing vault item from cart at index \(index)")
-            
-            // Remove it completely
-            cart.cartItems.remove(at: index)
+        // Set quantity to 0 instead of removing
+        tuple.cartItem.quantity = 0
+        tuple.cartItem.isSkippedDuringShopping = false // Not skipped, just deactivated
+        vaultService.updateCartTotals(cart: cart)
+        
+        // Send notification
+        NotificationCenter.default.post(
+            name: NSNotification.Name("ShoppingDataUpdated"),
+            object: nil,
+            userInfo: ["cartItemId": cart.id]
+        )
+    }
+
+//    private func deleteVaultItemAddedDuringShopping() {
+//        print("🗑️ Deleting vault item added during shopping: \(tuple.item?.name ?? "Unknown")")
+//        
+//        // Find the cart item
+//        if let index = cart.cartItems.firstIndex(where: { $0.itemId == tuple.cartItem.itemId }) {
+//            print("   Removing vault item from cart at index \(index)")
+//            
+//            // Remove it completely
+//            cart.cartItems.remove(at: index)
+//            vaultService.updateCartTotals(cart: cart)
+//            
+//            // Send notification to refresh BrowseVaultView
+//            NotificationCenter.default.post(
+//                name: NSNotification.Name("VaultItemDeletedFromCart"),
+//                object: nil,
+//                userInfo: [
+//                    "cartId": cart.id,
+//                    "itemId": tuple.cartItem.itemId,
+//                    "itemName": tuple.item?.name ?? "Unknown"
+//                ]
+//            )
+//            
+//            // Also send the shopping data updated notification
+//            NotificationCenter.default.post(
+//                name: NSNotification.Name("ShoppingDataUpdated"),
+//                object: nil,
+//                userInfo: ["cartItemId": cart.id]
+//            )
+//        }
+//    }
+    // In StoreSectionRow, update the delete action for vault items added during shopping:
+    private func deleteVaultItemAddedDuringShopping() {
+        print("🔄 Deactivating vault item added during shopping: \(tuple.item?.name ?? "Unknown")")
+        
+        // Instead of deleting, set quantity to 0
+        if let cartItem = cart.cartItems.first(where: { $0.itemId == tuple.cartItem.itemId }) {
+            cartItem.quantity = 0
+            cartItem.isSkippedDuringShopping = false // Not skipped, just deactivated
             vaultService.updateCartTotals(cart: cart)
             
-            // Send notification to refresh BrowseVaultView
-            NotificationCenter.default.post(
-                name: NSNotification.Name("VaultItemDeletedFromCart"),
-                object: nil,
-                userInfo: [
-                    "cartId": cart.id,
-                    "itemId": tuple.cartItem.itemId,
-                    "itemName": tuple.item?.name ?? "Unknown"
-                ]
-            )
+            print("   Deactivated vault item: quantity set to 0")
             
-            // Also send the shopping data updated notification
+            // Send notification to refresh UI
             NotificationCenter.default.post(
                 name: NSNotification.Name("ShoppingDataUpdated"),
                 object: nil,
