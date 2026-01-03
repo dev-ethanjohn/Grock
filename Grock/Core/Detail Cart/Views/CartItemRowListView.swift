@@ -353,9 +353,19 @@ private struct MainRowContent: View {
     }
     
     private var shouldDisplayBadge: Bool {
-        // Must be shopping-only item AND showNewBadge is true
-        // The badge will stay visible until hasShownNewBadge is set to true
-        return isShoppingOnlyItem && showNewBadge
+        // Shopping-only items: show badge if showNewBadge is true
+        // Vault items added during shopping: NEVER show badge
+        // Planned vault items: show badge if appropriate
+        
+        if isShoppingOnlyItem {
+            return showNewBadge
+        } else if cartItem.addedDuringShopping {
+            // Vault items added during shopping - never show badge
+            return false
+        } else {
+            // Planned vault items - show badge based on timestamp
+            return showNewBadge
+        }
     }
     
     // MARK: - Helper Methods

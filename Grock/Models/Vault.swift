@@ -228,6 +228,7 @@ class CartItem {
     
     // MARK: - NEW: Original planning quantity for restoration
     var originalPlanningQuantity: Double?
+    var addedDuringShopping: Bool = false
     
     init(
         itemId: String,
@@ -246,7 +247,8 @@ class CartItem {
         shoppingOnlyStore: String? = nil,
         shoppingOnlyPrice: Double? = nil,
         shoppingOnlyUnit: String? = nil,
-        originalPlanningQuantity: Double? = nil
+        originalPlanningQuantity: Double? = nil,
+        addedDuringShopping: Bool = false
     ) {
         self.itemId = itemId
         self.quantity = quantity
@@ -265,6 +267,7 @@ class CartItem {
         self.shoppingOnlyPrice = shoppingOnlyPrice
         self.shoppingOnlyUnit = shoppingOnlyUnit
         self.originalPlanningQuantity = originalPlanningQuantity
+        self.addedDuringShopping = addedDuringShopping
         // ⬇️ ADDED: This ensures all items get a proper timestamp
         self.addedAt = Date()
     }
@@ -276,8 +279,6 @@ class CartItem {
         unit: String,
         quantity: Double = 1
     ) -> CartItem {
-        print("🔧 Creating shopping-only item: \(name)")
-        
         return CartItem(
             itemId: UUID().uuidString,
             quantity: quantity,
@@ -293,8 +294,8 @@ class CartItem {
             shoppingOnlyStore: store,
             shoppingOnlyPrice: price,
             shoppingOnlyUnit: unit,
-            originalPlanningQuantity: nil
-            // ⬆️ The initializer will automatically set addedAt to Date()
+            originalPlanningQuantity: nil,
+            addedDuringShopping: true // Shopping-only items are always added during shopping
         )
     }
     

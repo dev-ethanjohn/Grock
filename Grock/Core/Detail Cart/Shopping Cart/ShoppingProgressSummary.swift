@@ -9,30 +9,50 @@ struct ShoppingProgressSummary: View {
     @State private var showCompletedItemsSheet = false
     
     // Total items includes ALL active items (vault items + shopping-only items with quantity > 0)
+    // Total items includes ONLY ACTIVE items (non-skipped, non-deleted)
     private var totalItems: Int {
-        // Count vault items + active shopping-only items
-        let vaultItemsCount = cart.cartItems.filter { !$0.isShoppingOnlyItem }.count
-        let activeShoppingItemsCount = cart.cartItems.filter {
-            $0.isShoppingOnlyItem && $0.quantity > 0
+        cart.cartItems.filter { cartItem in
+            // Exclude items that should not be counted:
+            // 1. Shopping-only items with quantity <= 0 (effectively deleted/removed)
+            // 2. Vault items that are skipped during shopping
+            // 3. Vault items with quantity <= 0 (effectively inactive)
+            
+            if cartItem.isShoppingOnlyItem {
+                // Shopping-only items: only count if quantity > 0
+                return cartItem.quantity > 0
+            } else {
+                // Vault items: only count if quantity > 0 AND not skipped
+                return cartItem.quantity > 0 && !cartItem.isSkippedDuringShopping
+            }
         }.count
-        
-        return vaultItemsCount + activeShoppingItemsCount
     }
 
     private var skippedItems: Int {
-        cart.cartItems.filter {
-            !$0.isShoppingOnlyItem &&
-            $0.isSkippedDuringShopping
+        cart.cartItems.filter { cartItem in
+            !cartItem.isShoppingOnlyItem &&           // Only vault items
+            cartItem.isSkippedDuringShopping &&       // Marked as skipped
+            cartItem.quantity > 0 &&                  // Still in cart (quantity > 0)
+            !cartItem.addedDuringShopping             // NOT added during shopping (these should be deleted, not skipped)
         }.count
     }
     
-    private var fulfilledItems: Int {
-        cart.cartItems.filter { $0.isFulfilled && !$0.isShoppingOnlyItem }.count
-    }
+    
+    // Fulfilled items: only vault items that are fulfilled
+     private var fulfilledItems: Int {
+         cart.cartItems.filter { cartItem in
+             !cartItem.isShoppingOnlyItem &&  // Only vault items
+             cartItem.isFulfilled &&          // Marked as fulfilled
+             cartItem.quantity > 0            // Still in cart
+         }.count
+     }
+     
     
     private var fulfilledItemsTotal: String {
         let fulfilledTotal = cart.cartItems
-            .filter { $0.isFulfilled }
+            .filter { cartItem in
+                // Only include items that are still in cart (quantity > 0)
+                cartItem.quantity > 0 && cartItem.isFulfilled
+            }
             .reduce(0.0) { total, cartItem in
                 if cartItem.isShoppingOnlyItem {
                     return total + (cartItem.shoppingOnlyPrice ?? 0)
@@ -44,6 +64,7 @@ struct ShoppingProgressSummary: View {
         
         return CurrencyFormatter.shared.format(amount: fulfilledTotal)
     }
+    
     
     @State private var pulseOpacity = 0.0
     
