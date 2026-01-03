@@ -1092,6 +1092,7 @@ struct ItemsListView: View {
      }
     
     // FIX: Sort stores by the newest item in each store
+    // In ItemsListView, add this method:
     private var sortedStoresByNewestItem: [String] {
         var storeTimestamps: [String: Date] = [:]
         
@@ -1166,28 +1167,28 @@ struct ItemsListView: View {
                         .offset(y: UIScreen.main.bounds.height * 0.4)
                 } else {
                     List {
+                        // Use sortedStoresByNewestItem instead of sortedStoresWithRefresh
                         ForEach(Array(sortedStoresByNewestItem.enumerated()), id: \.offset) { (index, store) in
-                                         let displayItems = getDisplayItems(for: store)
-                                         
-                                         if !displayItems.isEmpty {
-                                             StoreSectionListView(
-                                                 store: store,
-                                                 items: displayItems, // Pass the array directly
-                                                 cart: cart,
-                                                 onFulfillItem: { cartItem in
-                                                     onFulfillItem(cartItem)
-                                                 },
-                                                 onEditItem: onEditItem,
-                                                 onDeleteItem: onDeleteItem,
-                                                 isLastStore: index == sortedStoresByNewestItem.count - 1
-                                             )
-                                             .listRowInsets(EdgeInsets())
-                                             .listRowSeparator(.hidden)
-                                             .listRowBackground(Color(hex: "F7F2ED"))
-                                         }
-                                     }
-                    }
-                    .frame(height: min(calculatedHeight, maxAllowedHeight))
+                            let displayItems = getDisplayItems(for: store)
+                            
+                            if !displayItems.isEmpty {
+                                StoreSectionListView(
+                                    store: store,
+                                    items: displayItems,
+                                    cart: cart,
+                                    onFulfillItem: { cartItem in
+                                        onFulfillItem(cartItem)
+                                    },
+                                    onEditItem: onEditItem,
+                                    onDeleteItem: onDeleteItem,
+                                    isLastStore: index == sortedStoresByNewestItem.count - 1
+                                )
+                                .listRowInsets(EdgeInsets())
+                                .listRowSeparator(.hidden)
+                                .listRowBackground(Color(hex: "F7F2ED"))
+                            }
+                        }
+                    }                    .frame(height: min(calculatedHeight, maxAllowedHeight))
                     .listStyle(PlainListStyle())
                     .listSectionSpacing(0)
                     .background(Color(hex: "F7F2ED").darker(by: 0.02))

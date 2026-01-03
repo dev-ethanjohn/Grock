@@ -36,6 +36,13 @@ struct StoreSectionListView: View {
             }
         }
         
+        // DEBUG: Print timestamps to verify
+        #if DEBUG
+        for (cartItem, item) in filteredItems {
+            print("📅 Item: \(item?.name ?? cartItem.shoppingOnlyName ?? "Unknown"), addedAt: \(cartItem.addedAt)")
+        }
+        #endif
+        
         // FIX: Sort items by addedAt (newest first) for consistent display
         return filteredItems.sorted {
             // Sort by addedAt in descending order (newest first)

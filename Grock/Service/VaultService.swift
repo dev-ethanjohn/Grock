@@ -1238,6 +1238,10 @@ extension VaultService {
             // Already in cart as vault item
             existingCartItem.quantity += quantity
             existingCartItem.isSkippedDuringShopping = false
+            
+            // FIX: Update addedAt timestamp to mark as "recently added"
+            existingCartItem.addedAt = Date()
+            print("🔄 Updated timestamp for existing vault item: \(item.name)")
         } else {
             // Not in cart - add as vault item
             let cartItem = CartItem(
@@ -1263,7 +1267,7 @@ extension VaultService {
         
         updateCartTotals(cart: cart)
         saveContext()
-        print("📋 Added Vault item during shopping: \(item.name) ×\(quantity) (isShoppingOnlyItem: false)")
+        print("📋 Added Vault item during shopping: \(item.name) ×\(quantity)")
     }
     
 }
