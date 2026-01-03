@@ -41,6 +41,8 @@ struct CartDetailScreen: View {
     @State private var showingEditCartName = false
     @State private var showingCartSheet = false
     
+    @State private var alertManager = AlertManager()
+    
     // Computed properties
     private var cartInsights: CartInsights {
         vaultService.getCartInsights(cart: cart)
@@ -230,6 +232,21 @@ struct CartDetailScreen: View {
                 .zIndex(102)
             }
         }
+        .environment(alertManager) // Provide to environment
+              .alert(
+                  alertManager.alertTitle,
+                  isPresented: $alertManager.showAlert
+              ) {
+                  Button("Cancel", role: .cancel) {
+                      alertManager.confirmAction = nil
+                  }
+                  Button("Remove", role: .destructive) {
+                      alertManager.confirmAction?()
+                      alertManager.confirmAction = nil
+                  }
+              } message: {
+                  Text(alertManager.alertMessage)
+              }
         .editItemSheet(
             itemToEdit: $itemToEdit,
             cart: cart,
