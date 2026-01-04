@@ -37,34 +37,30 @@ struct ShoppingProgressSummary: View {
     }
     
     
-    // Fulfilled items: only vault items that are fulfilled
-     private var fulfilledItems: Int {
-         cart.cartItems.filter { cartItem in
-             !cartItem.isShoppingOnlyItem &&  // Only vault items
-             cartItem.isFulfilled &&          // Marked as fulfilled
-             cartItem.quantity > 0            // Still in cart
-         }.count
-     }
+    private var fulfilledItems: Int {
+        cart.cartItems.filter { cartItem in
+            // Include ALL items (both vault and shopping-only) that are fulfilled
+            cartItem.isFulfilled &&
+            cartItem.quantity > 0  // Still in cart
+        }.count
+    }
      
     
     private var fulfilledItemsTotal: String {
+        guard let vault = vaultService.vault else {
+            return CurrencyFormatter.shared.format(amount: 0)
+        }
+        
         let fulfilledTotal = cart.cartItems
             .filter { cartItem in
-                // Only include items that are still in cart (quantity > 0)
                 cartItem.quantity > 0 && cartItem.isFulfilled
             }
             .reduce(0.0) { total, cartItem in
-                if cartItem.isShoppingOnlyItem {
-                    return total + (cartItem.shoppingOnlyPrice ?? 0)
-                } else {
-                    let actualPrice = cartItem.actualPrice ?? 0
-                    return total + actualPrice
-                }
+                total + cartItem.getTotalPrice(from: vault, cart: cart)
             }
         
         return CurrencyFormatter.shared.format(amount: fulfilledTotal)
     }
-    
     
     @State private var pulseOpacity = 0.0
     

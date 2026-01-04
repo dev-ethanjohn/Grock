@@ -317,7 +317,7 @@ struct AddNewItemToCartSheet: View {
                 price: priceValue,
                 unit: formViewModel.unit,
                 cart: cart,
-                quantity: 1
+                quantity: formViewModel.portion ?? 1.0
             )
             print("🛍️ Added shopping-only item: \(formViewModel.itemName)")
             
