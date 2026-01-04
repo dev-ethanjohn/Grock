@@ -1,8 +1,6 @@
 import SwiftUI
 import SwiftData
 
-
-
 struct CartDetailScreen: View {
     let cart: Cart
     @Environment(VaultService.self) private var vaultService
@@ -41,10 +39,23 @@ struct CartDetailScreen: View {
     @State private var showingEditCartName = false
     @State private var showingCartSheet = false
     
-    @State private var alertManager = AlertManager()    
+    @State private var alertManager = AlertManager()
+    
     // Computed properties
     private var cartInsights: CartInsights {
         vaultService.getCartInsights(cart: cart)
+    }
+    
+    private var allItemsCompleted: Bool {
+        guard cart.isShopping else { return false }
+        
+        // Get all active items (not skipped)
+        let activeItems = cart.cartItems.filter { !$0.isSkippedDuringShopping }
+        
+        // Check if all active items are fulfilled
+        let allFulfilled = activeItems.allSatisfy { $0.isFulfilled }
+        
+        return allFulfilled && !activeItems.isEmpty
     }
     
     private func groupCartItemsByStore(_ cartItems: [CartItem]) -> [String: [(cartItem: CartItem, item: Item?)]] {
@@ -124,14 +135,11 @@ struct CartDetailScreen: View {
             cart: cart,
             cartInsights: cartInsights,
             itemsByStore: itemsByStore,
-            // REMOVED: itemsByStoreWithRefresh parameter
             sortedStores: sortedStores,
-            // REMOVED: sortedStoresWithRefresh parameter
             totalItemCount: totalItemCount,
             hasItems: hasItems,
             shouldAnimateTransition: shouldAnimateTransition,
             storeItems: storeItems(for:),
-            // REMOVED: storeItemsWithRefresh parameter
             showingDeleteAlert: $showingDeleteAlert,
             editingItem: $editingItem,
             showingCompleteAlert: $showingCompleteAlert,
@@ -232,20 +240,20 @@ struct CartDetailScreen: View {
             }
         }
         .environment(alertManager) // Provide to environment
-              .alert(
-                  alertManager.alertTitle,
-                  isPresented: $alertManager.showAlert
-              ) {
-                  Button("Cancel", role: .cancel) {
-                      alertManager.confirmAction = nil
-                  }
-                  Button("Remove", role: .destructive) {
-                      alertManager.confirmAction?()
-                      alertManager.confirmAction = nil
-                  }
-              } message: {
-                  Text(alertManager.alertMessage)
-              }
+        .alert(
+            alertManager.alertTitle,
+            isPresented: $alertManager.showAlert
+        ) {
+            Button("Cancel", role: .cancel) {
+                alertManager.confirmAction = nil
+            }
+            Button("Remove", role: .destructive) {
+                alertManager.confirmAction?()
+                alertManager.confirmAction = nil
+            }
+        } message: {
+            Text(alertManager.alertMessage)
+        }
         .editItemSheet(
             itemToEdit: $itemToEdit,
             cart: cart,
@@ -261,17 +269,34 @@ struct CartDetailScreen: View {
             cartViewModel: cartViewModel,
             refreshTrigger: $refreshTrigger
         )
-        .cartAlerts(
-            showingStartShoppingAlert: $showingStartShoppingAlert,
-            showingSwitchToPlanningAlert: $showingSwitchToPlanningAlert,
-            showingCompleteAlert: $showingCompleteAlert,
-            showingDeleteAlert: $showingDeleteAlert,
-            vaultService: vaultService,
-            cart: cart,
-            dismiss: dismiss,
-            refreshTrigger: $refreshTrigger,
-            showingCompletedSheet: $showingCompletedSheet
-        )
+        // Inline alerts to avoid .wrappedValue error
+        .alert("Start Shopping", isPresented: $showingStartShoppingAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Start Shopping") {
+                vaultService.startShopping(cart: cart)
+                refreshTrigger = UUID()
+            }
+        } message: {
+            Text("This will freeze your planned prices. You'll be able to update actual prices during shopping.")
+        }
+        .alert("Switch to Planning", isPresented: $showingSwitchToPlanningAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Switch to Planning") {
+                vaultService.returnToPlanning(cart: cart)
+                refreshTrigger = UUID()
+            }
+        } message: {
+            Text("Switching back to Planning will reset this trip to your original plan.")
+        }
+        .alert("Delete Cart", isPresented: $showingDeleteAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete", role: .destructive) {
+                vaultService.deleteCart(cart)
+                dismiss()
+            }
+        } message: {
+            Text("Are you sure you want to delete this cart? This action cannot be undone.")
+        }
         .cartLifecycle(
             cart: cart,
             hasItems: hasItems,
@@ -282,8 +307,8 @@ struct CartDetailScreen: View {
             checkAndShowCelebration: checkAndShowCelebration
         )
         .onReceive(NotificationCenter.default.publisher(for: .shoppingItemQuantityChanged)) { notification in
-                   handleShoppingItemQuantityChange(notification)
-               }
+            handleShoppingItemQuantityChange(notification)
+        }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ShoppingItemQuantityChanged"))) { notification in
             print("🔄 Received ShoppingItemQuantityChanged notification")
             
@@ -301,7 +326,7 @@ struct CartDetailScreen: View {
                         
                         // Update both quantity and actualQuantity
                         cartItem.quantity = newQuantity
-                        cartItem.syncQuantities(cart: cart) 
+                        cartItem.syncQuantities(cart: cart)
                         
                         // If in shopping mode, also update actualQuantity
                         if cart.isShopping {
@@ -319,66 +344,79 @@ struct CartDetailScreen: View {
                 }
             }
         }
-             // Keep the existing notification listener too
+        // Keep the existing notification listener too
         .onReceive(NotificationCenter.default.publisher(for: .shoppingDataUpdated)) { notification in
-                 print("🔄 Received ShoppingDataUpdated notification")
-                 
-                 DispatchQueue.main.async {
-                     refreshTrigger = UUID()
-                     vaultService.updateCartTotals(cart: cart)
-                     
-                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                         refreshTrigger = UUID()
-                     }
-                 }
-             }
-         
+            print("🔄 Received ShoppingDataUpdated notification")
+            
+            DispatchQueue.main.async {
+                refreshTrigger = UUID()
+                vaultService.updateCartTotals(cart: cart)
+                
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    refreshTrigger = UUID()
+                }
+            }
+        }
+        .finishTripSheet(
+            cart: cart,
+            showing: $showingCompleteAlert,
+            vaultService: vaultService
+        )
+        // Auto-trigger sheet when all items are completed
+        .onChange(of: allItemsCompleted) { oldValue, newValue in
+            if newValue && !showingCompleteAlert {
+                // Small delay to let the user see the checkmark animation
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    showingCompleteAlert = true
+                }
+            }
+        }
     }
     
     // MARK: - Helper Methods
     
     private func handleShoppingItemQuantityChange(_ notification: Notification) {
-         print("🔄 Received ShoppingItemQuantityChanged notification")
-         
-         guard let cartId = notification.userInfo?["cartId"] as? String,
-               cartId == cart.id else {
-             print("❌ Notification not for current cart")
-             return
-         }
-         
-         if let itemName = notification.userInfo?["itemName"] as? String,
-            let newQuantity = notification.userInfo?["newQuantity"] as? Double,
-            let itemType = notification.userInfo?["itemType"] as? String {
-             
-             print("✅ Quantity changed for: \(itemName)")
-             print("   New quantity: \(newQuantity)")
-             print("   Item type: \(itemType)")
-             
-             // Verify the actual cart item quantity
-             if let itemId = notification.userInfo?["itemId"] as? String {
-                 if let cartItem = cart.cartItems.first(where: { $0.itemId == itemId }) {
-                     print("   🔍 Verification - CartItem.quantity: \(cartItem.quantity)")
-                     
-                     // If there's a mismatch, update the cart item
-                     if cartItem.quantity != newQuantity {
-                         print("   ⚠️ Mismatch detected! Updating cartItem.quantity from \(cartItem.quantity) to \(newQuantity)")
-                         cartItem.quantity = newQuantity
-                     }
-                 }
-             }
-             
-             // Force UI refresh
-             DispatchQueue.main.async {
-                 vaultService.updateCartTotals(cart: cart)
-                 refreshTrigger = UUID()
-                 
-                 // Additional refresh to ensure UI is updated
-                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                     refreshTrigger = UUID()
-                 }
-             }
-         }
-     }
+        print("🔄 Received ShoppingItemQuantityChanged notification")
+        
+        guard let cartId = notification.userInfo?["cartId"] as? String,
+              cartId == cart.id else {
+            print("❌ Notification not for current cart")
+            return
+        }
+        
+        if let itemName = notification.userInfo?["itemName"] as? String,
+           let newQuantity = notification.userInfo?["newQuantity"] as? Double,
+           let itemType = notification.userInfo?["itemType"] as? String {
+            
+            print("✅ Quantity changed for: \(itemName)")
+            print("   New quantity: \(newQuantity)")
+            print("   Item type: \(itemType)")
+            
+            // Verify the actual cart item quantity
+            if let itemId = notification.userInfo?["itemId"] as? String {
+                if let cartItem = cart.cartItems.first(where: { $0.itemId == itemId }) {
+                    print("   🔍 Verification - CartItem.quantity: \(cartItem.quantity)")
+                    
+                    // If there's a mismatch, update the cart item
+                    if cartItem.quantity != newQuantity {
+                        print("   ⚠️ Mismatch detected! Updating cartItem.quantity from \(cartItem.quantity) to \(newQuantity)")
+                        cartItem.quantity = newQuantity
+                    }
+                }
+            }
+            
+            // Force UI refresh
+            DispatchQueue.main.async {
+                vaultService.updateCartTotals(cart: cart)
+                refreshTrigger = UUID()
+                
+                // Additional refresh to ensure UI is updated
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                    refreshTrigger = UUID()
+                }
+            }
+        }
+    }
     
     private func checkAndShowCelebration() {
         let hasSeenCelebration = UserDefaults.standard.bool(forKey: "hasSeenFirstShoppingCartCelebration")
@@ -455,6 +493,8 @@ struct CartDetailScreen: View {
     }
 }
 
+// ... rest of the file remains the same (enum PopoverMode, extensions, etc.) ...
+
 enum PopoverMode {
     case edit // For clicking item row - shows "Update" button
     case fulfill // For clicking checkmark - shows "Confirm Purchase" button
@@ -477,7 +517,6 @@ enum PopoverMode {
         }
     }
 }
-
 
 // MARK: - Helper Types
 enum FieldPrompt: Hashable {
@@ -539,7 +578,6 @@ extension UnifiedItemPopover {
         )
     }
 }
-
 
 extension View {
     func completedSheet(
@@ -622,14 +660,11 @@ struct CartDetailContent: View {
     let cart: Cart
     let cartInsights: CartInsights
     let itemsByStore: [String: [(cartItem: CartItem, item: Item?)]]
-    // REMOVED: let itemsByStoreWithRefresh: [String: [(cartItem: CartItem, item: Item?)]]
     let sortedStores: [String]
-    // REMOVED: let sortedStoresWithRefresh: [String]
     let totalItemCount: Int
     let hasItems: Bool
     let shouldAnimateTransition: Bool
     let storeItems: (String) -> [(cartItem: CartItem, item: Item?)]
-    // REMOVED: let storeItemsWithRefresh: (String) -> [(cartItem: CartItem, item: Item?)]
     
     @Binding var showingDeleteAlert: Bool
     @Binding var editingItem: CartItem?
@@ -719,25 +754,6 @@ struct CartDetailContent: View {
                             ZStack {
                                 if hasItems {
                                     VStack(spacing: 24) {
-//                                        ItemsListView(
-//                                            cart: cart,
-//                                            totalItemCount: totalItemCount,
-//                                            // CHANGED: Use sortedStores instead of sortedStoresWithRefresh
-//                                            sortedStoresWithRefresh: sortedStores,
-//                                            // CHANGED: Use storeItems instead of storeItemsWithRefresh
-//                                            storeItemsWithRefresh: storeItems,
-//                                            fulfilledCount: $fulfilledCount,
-//                                            onFulfillItem: { cartItem in
-//                                                // Handle fulfillment - show the popover
-//                                                handleFulfillItem(cartItem: cartItem)
-//                                            },
-//                                            onEditItem: { cartItem in
-//                                                handleEditItem(cartItem: cartItem)
-//                                            },
-//                                            onDeleteItem: { cartItem in
-//                                                handleDeleteItem(cartItem)
-//                                            }
-//                                        )
                                         ItemsListView(
                                             cart: cart,
                                             totalItemCount: totalItemCount,
@@ -755,7 +771,6 @@ struct CartDetailContent: View {
                                                 handleDeleteItem(cartItem)
                                             }
                                         )
-
                                         .transition(.scale)
                                     }
                                     
@@ -943,13 +958,6 @@ struct CartDetailContent: View {
         }
     }
     
-//    private func handleDeleteItem(_ cartItem: CartItem) {
-//        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-//            vaultService.removeItemFromCart(cart: cart, itemId: cartItem.itemId)
-//            vaultService.updateCartTotals(cart: cart)
-//            refreshTrigger = UUID()
-//        }
-//    }
     private func handleDeleteItem(_ cartItem: CartItem) {
         withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
             // This should remove the item from cart
@@ -970,7 +978,6 @@ struct CartDetailContent: View {
         }
     }
 }
-
 
 struct ItemsListView: View {
     let cart: Cart
@@ -1075,40 +1082,39 @@ struct ItemsListView: View {
     }
     
     // FIXED: Helper function to get display items
-     private func getDisplayItems(for store: String) -> [(cartItem: CartItem, item: Item?)] {
-         // Call the function with the store name
-         let allItems = storeItemsWithRefresh(store)
-         
-         let filteredItems = allItems.filter { cartItem, _ in
-             // Always exclude items with quantity <= 0
-             guard cartItem.quantity > 0 else {
-                 return false
-             }
-             
-             // Filter based on cart status
-             switch cart.status {
-             case .planning:
-                 // In planning mode: show all items with quantity > 0
-                 return true
-                 
-             case .shopping:
-                 // In shopping mode: show only unfulfilled, non-skipped items
-                 return !cartItem.isFulfilled && !cartItem.isSkippedDuringShopping
-                 
-             case .completed:
-                 // In completed mode: show all items
-                 return true
-             }
-         }
-         
-         // Sort items by addedAt (newest first)
-         return filteredItems.sorted {
-             $0.cartItem.addedAt > $1.cartItem.addedAt
-         }
-     }
+    private func getDisplayItems(for store: String) -> [(cartItem: CartItem, item: Item?)] {
+        // Call the function with the store name
+        let allItems = storeItemsWithRefresh(store)
+        
+        let filteredItems = allItems.filter { cartItem, _ in
+            // Always exclude items with quantity <= 0
+            guard cartItem.quantity > 0 else {
+                return false
+            }
+            
+            // Filter based on cart status
+            switch cart.status {
+            case .planning:
+                // In planning mode: show all items with quantity > 0
+                return true
+                
+            case .shopping:
+                // In shopping mode: show only unfulfilled, non-skipped items
+                return !cartItem.isFulfilled && !cartItem.isSkippedDuringShopping
+                
+            case .completed:
+                // In completed mode: show all items
+                return true
+            }
+        }
+        
+        // Sort items by addedAt (newest first)
+        return filteredItems.sorted {
+            $0.cartItem.addedAt > $1.cartItem.addedAt
+        }
+    }
     
     // FIX: Sort stores by the newest item in each store
-    // In ItemsListView, add this method:
     private var sortedStoresByNewestItem: [String] {
         var storeTimestamps: [String: Date] = [:]
         
@@ -1125,7 +1131,6 @@ struct ItemsListView: View {
         // Sort stores by newest item (descending)
         return storeTimestamps.sorted { $0.value > $1.value }.map { $0.key }
     }
-    
     
     var body: some View {
         GeometryReader { geometry in
@@ -1234,119 +1239,64 @@ struct ItemsListView: View {
     }
 }
 
-
 extension View {
     func cartSheets(
-          cart: Cart,
-          showingCartSheet: Binding<Bool>,
-          showingFilterSheet: Binding<Bool>,
-          selectedFilter: Binding<FilterOption>,
-          vaultService: VaultService,
-          cartViewModel: CartViewModel,
-          refreshTrigger: Binding<UUID>
-      ) -> some View {
-          self
-              .sheet(isPresented: showingCartSheet) {
-                  if cart.isPlanning {
-                      ManageCartSheet(cart: cart)
-                          .environment(vaultService)
-                          .environment(cartViewModel)
-                          .onDisappear {
-                              vaultService.updateCartTotals(cart: cart)
-                              refreshTrigger.wrappedValue = UUID()
-                          }
-                  } else {
-                      AddNewItemToCartSheet(
-                          isPresented: showingCartSheet,
-                          cart: cart,
-                          onItemAdded: {
-                              print("🎯 Shopping-only item added callback triggered")
-                              
-                              // Force multiple updates
-                              vaultService.updateCartTotals(cart: cart)
-                              
-                              // Send notification
-                              NotificationCenter.default.post(
-                                  name: NSNotification.Name("ShoppingDataUpdated"),
-                                  object: nil,
-                                  userInfo: ["cartItemId": cart.id]
-                              )
-                              
-                              // Update refresh trigger multiple times to ensure update
-                              refreshTrigger.wrappedValue = UUID()
-                              DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                                  refreshTrigger.wrappedValue = UUID()
-                                  DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                                      refreshTrigger.wrappedValue = UUID()
-                                  }
-                              }
-                          }
-                      )
-                      .environment(vaultService)
-                      .environment(cartViewModel)
-                      .onDisappear {
-                          print("🔄 Shopping sheet dismissed, forcing refresh")
-                          vaultService.updateCartTotals(cart: cart)
-                          refreshTrigger.wrappedValue = UUID()
-                      }
-                  }
-              }
-              .sheet(isPresented: showingFilterSheet) {
-                  FilterSheet(selectedFilter: selectedFilter)
-              }
-    }
-
-    
-    func cartAlerts(
-        showingStartShoppingAlert: Binding<Bool>,
-        showingSwitchToPlanningAlert: Binding<Bool>,
-        showingCompleteAlert: Binding<Bool>,
-        showingDeleteAlert: Binding<Bool>,
-        vaultService: VaultService,
         cart: Cart,
-        dismiss: DismissAction,
-        refreshTrigger: Binding<UUID>,
-        showingCompletedSheet: Binding<Bool>
+        showingCartSheet: Binding<Bool>,
+        showingFilterSheet: Binding<Bool>,
+        selectedFilter: Binding<FilterOption>,
+        vaultService: VaultService,
+        cartViewModel: CartViewModel,
+        refreshTrigger: Binding<UUID>
     ) -> some View {
         self
-            .alert("Start Shopping", isPresented: showingStartShoppingAlert) {
-                Button("Cancel", role: .cancel) { }
-                Button("Start Shopping") {
-                    vaultService.startShopping(cart: cart)
-                    refreshTrigger.wrappedValue = UUID()
-                }
-            } message: {
-                Text("This will freeze your planned prices. You'll be able to update actual prices during shopping.")
-            }
-            .alert("Switch to Planning", isPresented: showingSwitchToPlanningAlert) {
-                Button("Cancel", role: .cancel) { }
-                Button("Switch to Planning") {
-                    vaultService.returnToPlanning(cart: cart)
-                    refreshTrigger.wrappedValue = UUID()
-                }
-            } message: {
-                Text("Switching back to Planning will reset this trip to your original plan.")
-            }
-            .alert("Complete Shopping", isPresented: showingCompleteAlert) {
-                Button("Cancel", role: .cancel) { }
-                Button("Complete") {
-                    vaultService.completeShopping(cart: cart)
-                    refreshTrigger.wrappedValue = UUID()
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                        showingCompletedSheet.wrappedValue = false
+            .sheet(isPresented: showingCartSheet) {
+                if cart.isPlanning {
+                    ManageCartSheet(cart: cart)
+                        .environment(vaultService)
+                        .environment(cartViewModel)
+                        .onDisappear {
+                            vaultService.updateCartTotals(cart: cart)
+                            refreshTrigger.wrappedValue = UUID()
+                        }
+                } else {
+                    AddNewItemToCartSheet(
+                        isPresented: showingCartSheet,
+                        cart: cart,
+                        onItemAdded: {
+                            print("🎯 Shopping-only item added callback triggered")
+                            
+                            // Force multiple updates
+                            vaultService.updateCartTotals(cart: cart)
+                            
+                            // Send notification
+                            NotificationCenter.default.post(
+                                name: NSNotification.Name("ShoppingDataUpdated"),
+                                object: nil,
+                                userInfo: ["cartItemId": cart.id]
+                            )
+                            
+                            // Update refresh trigger multiple times to ensure update
+                            refreshTrigger.wrappedValue = UUID()
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                refreshTrigger.wrappedValue = UUID()
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                                    refreshTrigger.wrappedValue = UUID()
+                                }
+                            }
+                        }
+                    )
+                    .environment(vaultService)
+                    .environment(cartViewModel)
+                    .onDisappear {
+                        print("🔄 Shopping sheet dismissed, forcing refresh")
+                        vaultService.updateCartTotals(cart: cart)
+                        refreshTrigger.wrappedValue = UUID()
                     }
                 }
-            } message: {
-                Text("This will preserve your shopping data for review.")
             }
-            .alert("Delete Cart", isPresented: showingDeleteAlert) {
-                Button("Cancel", role: .cancel) { }
-                Button("Delete", role: .destructive) {
-                    vaultService.deleteCart(cart)
-                    dismiss()
-                }
-            } message: {
-                Text("Are you sure you want to delete this cart? This action cannot be undone.")
+            .sheet(isPresented: showingFilterSheet) {
+                FilterSheet(selectedFilter: selectedFilter)
             }
     }
     
@@ -1401,26 +1351,15 @@ extension View {
                 .environment(vaultService)
             }
     }
+    
+    func finishTripSheet(
+        cart: Cart,
+        showing: Binding<Bool>,
+        vaultService: VaultService
+    ) -> some View {
+        self.sheet(isPresented: showing) {
+            FinishTripSheet(cart: cart)
+                .environment(vaultService)
+        }
+    }
 }
-
-
-
-//// Add this extension somewhere in your project
-//extension Notification.Name {
-//    static let shoppingItemQuantityChanged = Notification.Name("ShoppingItemQuantityChanged")
-//}
-//
-//// Then in your BrowseVaultItemRow, use this instead:
-//private func sendShoppingUpdateNotification() {
-//    NotificationCenter.default.post(
-//        name: .shoppingItemQuantityChanged,
-//        object: nil,
-//        userInfo: [
-//            "cartId": cart.id,
-//            "itemId": storeItem.item.id,
-//            "itemName": itemName,
-//            "newQuantity": currentQuantity,
-//            "itemType": itemType
-//        ]
-//    )
-//}
