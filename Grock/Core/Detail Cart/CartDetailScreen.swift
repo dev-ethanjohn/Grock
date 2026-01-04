@@ -1358,7 +1358,7 @@ extension View {
         vaultService: VaultService
     ) -> some View {
         self.sheet(isPresented: showing) {
-            FinishTripSheet(cart: cart)
+            FinishTripSheet(cart: cart)  
                 .environment(vaultService)
         }
     }

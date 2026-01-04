@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct FinishTripSheet: View {
-    let cart: Cart
+    @Bindable var cart: Cart  // CHANGED: Make cart mutable
     @Environment(VaultService.self) private var vaultService
     @Environment(\.dismiss) private var dismiss
     @State private var detent: PresentationDetent = .medium
@@ -23,37 +23,54 @@ struct FinishTripSheet: View {
         cart.cartItems.filter { $0.addedDuringShopping || $0.isShoppingOnlyItem }.count
     }
     
+    // FIXED: Only count fulfilled items' total value
     private var totalSpent: Double {
-        cart.totalSpent
+        guard let vault = vaultService.vault else { return 0.0 }
+        
+        return cart.cartItems
+            .filter { cartItem in
+                // Only include fulfilled items with quantity > 0
+                cartItem.isFulfilled && cartItem.quantity > 0
+            }
+            .reduce(0.0) { total, cartItem in
+                total + cartItem.getTotalPrice(from: vault, cart: cart)
+            }
     }
     
-    // The cart's budget
+    // The cart's budget - now reacts to changes in cart.budget
     private var cartBudget: Double {
         cart.budget
     }
     
-    // Difference between actual spent and budget
+    // Difference between actual spent (fulfilled items only) and budget
     private var budgetDifference: Double {
         totalSpent - cartBudget
     }
     
     private var differenceText: String {
+        // Handle case where cart has no budget
+        if cartBudget <= 0 {
+            return "No budget set"
+        }
+        
         let difference = abs(budgetDifference)
         
         #if DEBUG
         print("🧮 FinishTripSheet Debug:")
-        print("   totalSpent: \(totalSpent)")
+        print("   totalSpent (fulfilled only): \(totalSpent)")
         print("   cartBudget: \(cartBudget)")
         print("   budgetDifference: \(budgetDifference)")
         print("   |budgetDifference|: \(difference)")
+        print("   Cart ID: \(cart.id)")
+        print("   Cart name: \(cart.name)")
         #endif
         
         if budgetDifference > 0.01 {
             // Over budget by more than 1 cent
-            return "₱\(String(format: "%.0f", difference)) over your budget"
+            return "₱\(String(format: "%.0f", difference)) over budget"
         } else if budgetDifference < -0.01 {
             // Under budget by more than 1 cent
-            return "₱\(String(format: "%.0f", difference)) under your budget"
+            return "₱\(String(format: "%.0f", difference)) under budget"
         } else {
             // Within 1 cent of budget - considered as on budget
             return "Exactly on budget"
@@ -61,6 +78,10 @@ struct FinishTripSheet: View {
     }
     
     private var differenceColor: Color {
+        if cartBudget <= 0 {
+            return Color(hex: "666") // Gray for no budget
+        }
+        
         if budgetDifference > 0.01 {
             return Color(hex: "FA003F") // Red for over budget
         } else if budgetDifference < -0.01 {
@@ -71,6 +92,10 @@ struct FinishTripSheet: View {
     }
     
     private var emojiForDifference: String {
+        if cartBudget <= 0 {
+            return "📊" // Chart for no budget
+        }
+        
         if budgetDifference < -0.01 {
             return "🎉" // Celebration for under budget
         } else if budgetDifference > 0.01 {
@@ -178,8 +203,13 @@ struct FinishTripSheet: View {
         .presentationCornerRadius(24)
         .interactiveDismissDisabled(false) // Allow dismissal
         .background(Color.white)
+        // Add this to observe cart changes
+        .onChange(of: cart.budget) { oldValue, newValue in
+            print("💰 Cart budget changed: \(oldValue) → \(newValue)")
+        }
     }
 }
+
 
 // MARK: - Stat Pill Component
 private struct StatPill: View {
