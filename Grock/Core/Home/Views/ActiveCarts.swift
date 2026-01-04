@@ -6,6 +6,8 @@ struct ActiveCarts: View {
     @Bindable var viewModel: HomeViewModel
     let refreshTrigger: UUID
     
+    @State private var colorChangeTrigger = UUID()
+    
     // Remove these state variables
     // @State private var showEditBudgetForCart: Cart? = nil
     // @State private var cartToDelete: Cart? = nil
@@ -30,6 +32,10 @@ struct ActiveCarts: View {
         .frame(maxWidth: .infinity, alignment: .center)
         .padding(.horizontal)
         .animation(.spring(response: 0.5, dampingFraction: 0.7), value: viewModel.hasCarts)
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("CartColorChanged"))) { _ in
+                 // Trigger refresh when any cart color changes
+                 colorChangeTrigger = UUID()
+             }
     }
     
     private var cartListView: some View {
@@ -108,5 +114,64 @@ struct ActiveCarts: View {
             Spacer()
         }
         .padding(.vertical, 40)
+    }
+}
+
+
+extension ColorOption {
+    static func getBackgroundColor(for cartId: String, isRow: Bool = false) -> Color {
+        if let savedHex = UserDefaults.standard.string(forKey: "cartBackgroundColor_\(cartId)"),
+           let colorOption = ColorOption.options.first(where: { $0.hex == savedHex }) {
+            if isRow {
+                // For rows: use the color directly (or white if clear)
+                return colorOption.hex == "FFFFFF" ? Color.white : colorOption.color
+            } else {
+                // For background: use darker version
+                return colorOption.hex == "FFFFFF" ? Color.clear.darker(by: 0.02) : colorOption.color.darker(by: 0.02)
+            }
+        }
+        // Default colors
+        return isRow ? Color.white : Color(hex: "F7F2ED").darker(by: 0.02)
+    }
+}
+
+
+
+import SwiftUI
+import Observation
+
+// MARK: - Cart Color Manager (using @Observable)
+@Observable
+final class CartColorManager {
+    static let shared = CartColorManager()
+    
+    private init() {}
+    
+    private var colorCache: [String: ColorOption] = [:]
+    
+    func getColor(for cartId: String) -> ColorOption {
+        if let cached = colorCache[cartId] {
+            return cached
+        }
+        
+        if let savedHex = UserDefaults.standard.string(forKey: "cartBackgroundColor_\(cartId)"),
+           let savedColor = ColorOption.options.first(where: { $0.hex == savedHex }) {
+            colorCache[cartId] = savedColor
+            return savedColor
+        }
+        
+        return .defaultColor
+    }
+    
+    func setColor(_ color: ColorOption, for cartId: String) {
+        colorCache[cartId] = color
+        UserDefaults.standard.set(color.hex, forKey: "cartBackgroundColor_\(cartId)")
+        
+        // Post notification for other parts of app
+        NotificationCenter.default.post(
+            name: Notification.Name("CartColorChanged"),
+            object: nil,
+            userInfo: ["cartId": cartId, "colorHex": color.hex]
+        )
     }
 }

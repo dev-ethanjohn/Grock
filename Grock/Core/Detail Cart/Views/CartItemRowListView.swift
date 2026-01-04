@@ -9,6 +9,7 @@ struct CartItemRowListView: View {
     let onEditItem: () -> Void
     let onDeleteItem: () -> Void
     let isLastItem: Bool
+    let backgroundColor: Color // let
     
     @Environment(VaultService.self) private var vaultService
     @State private var refreshTrigger = 0
@@ -21,7 +22,8 @@ struct CartItemRowListView: View {
             onFulfillItem: onFulfillItem,
             onEditItem: onEditItem,
             onDeleteItem: onDeleteItem,
-            isLastItem: isLastItem
+            isLastItem: isLastItem,
+            backgroundColor: backgroundColor
         )
         .onAppear {
             loadItem() // Load item when view appears
@@ -88,6 +90,7 @@ private struct MainRowContent: View {
     let onEditItem: () -> Void
     let onDeleteItem: () -> Void
     let isLastItem: Bool
+    let backgroundColor: Color // Add this
     
     @Environment(VaultService.self) private var vaultService
     
@@ -116,7 +119,7 @@ private struct MainRowContent: View {
     @State private var displayUnit: String = ""
     
     // Custom initializer with AppStorage key
-    init(cartItem: CartItem, item: Item?, cart: Cart, onFulfillItem: @escaping () -> Void, onEditItem: @escaping () -> Void, onDeleteItem: @escaping () -> Void, isLastItem: Bool) {
+    init(cartItem: CartItem, item: Item?, cart: Cart, onFulfillItem: @escaping () -> Void, onEditItem: @escaping () -> Void, onDeleteItem: @escaping () -> Void, isLastItem: Bool,  backgroundColor: Color) {
         self.cartItem = cartItem
         self.item = item
         self.cart = cart
@@ -124,6 +127,7 @@ private struct MainRowContent: View {
         self.onEditItem = onEditItem
         self.onDeleteItem = onDeleteItem
         self.isLastItem = isLastItem
+        self.backgroundColor = backgroundColor
         
         // Create unique storage key for each shopping-only item
         // Only create for shopping-only items, vault items don't need badge persistence
@@ -210,7 +214,7 @@ private struct MainRowContent: View {
             .padding(.trailing, 16)
             .background(
                 ZStack {
-                    Color(hex: "F7F2ED").darker(by: 0.02)
+                    backgroundColor.darker(by: 0.02)
                     
                     // Highlight only for shopping-only items with badge animation
                     if isShoppingOnlyItem && showNewBadge && !hasShownNewBadge && rowHighlight {

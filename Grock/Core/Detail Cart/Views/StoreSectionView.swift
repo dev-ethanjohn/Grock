@@ -9,6 +9,8 @@ struct StoreSectionListView: View {
     let onEditItem: (CartItem) -> Void
     let onDeleteItem: (CartItem) -> Void
     let isLastStore: Bool
+    let backgroundColor: Color // let
+    let rowBackgroundColor: Color // let
     
     @Environment(VaultService.self) private var vaultService
     
@@ -68,7 +70,8 @@ struct StoreSectionListView: View {
                             onFulfillItem: onFulfillItem,
                             onEditItem: onEditItem,
                             onDeleteItem: onDeleteItem,
-                            handleSkipItem: handleSkipItem
+                            handleSkipItem: handleSkipItem,
+                            rowBackgroundColor: rowBackgroundColor
                         )
                     }
                 }
@@ -137,6 +140,7 @@ private struct StoreSectionRow: View {
     let onEditItem: (CartItem) -> Void
     let onDeleteItem: (CartItem) -> Void
     let handleSkipItem: (CartItem) -> Void
+    let rowBackgroundColor: Color
     
     @Environment(VaultService.self) private var vaultService
     
@@ -165,7 +169,8 @@ private struct StoreSectionRow: View {
                 onFulfillItem: { onFulfillItem(tuple.cartItem) },
                 onEditItem: { onEditItem(tuple.cartItem) },
                 onDeleteItem: { onDeleteItem(tuple.cartItem) },
-                isLastItem: index == displayItems.count - 1
+                isLastItem: index == displayItems.count - 1,
+                backgroundColor: rowBackgroundColor
             )
             .id(tuple.cartItem.itemId + (tuple.cartItem.actualPrice?.description ?? ""))
             .listRowInsets(EdgeInsets())
@@ -184,7 +189,7 @@ private struct StoreSectionRow: View {
         }
         .listRowInsets(EdgeInsets())
         .listRowSeparator(.hidden)
-        .listRowBackground(Color(hex: "F7F2ED"))
+        .listRowBackground(rowBackgroundColor) 
         .transition(.asymmetric(
             insertion: .scale.combined(with: .opacity),
             removal: .scale.combined(with: .opacity)

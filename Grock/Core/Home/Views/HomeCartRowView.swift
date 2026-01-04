@@ -8,7 +8,7 @@ struct HomeCartRowView: View {
     @State private var viewModel: HomeCartRowViewModel
     @State private var appeared = false
     @State private var currentProgress: Double = 0
-
+    
     init(cart: Cart, vaultService: VaultService?) {
         self.cart = cart
         self.vaultService = vaultService
@@ -45,55 +45,53 @@ struct HomeCartRowView: View {
         return Array(uniqueCategories).sorted(by: { $0.title < $1.title })
     }
     
-     private var budgetProgressColor: Color {
-         let progress = currentProgress
-         if progress < 0.7 {
-             return Color(hex: "98F476")
-         } else if progress < 0.9 {
-             return .orange
-         } else {
-             return .red
-         }
-     }
+    private var budgetProgressColor: Color {
+        let progress = currentProgress
+        if progress < 0.7 {
+            return Color(hex: "98F476")
+        } else if progress < 0.9 {
+            return .orange
+        } else {
+            return .red
+        }
+    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-                  headerRow
-                  progressSection
-              }
-              .padding()
-              .background(Color.white)
-              .cornerRadius(24)
-              .overlay(
-                  RoundedRectangle(cornerRadius: 24)
-                      .stroke(Color(hex: "CACACA"), lineWidth: 1)
-              )
-              .padding(1)
-              .scaleEffect(appeared ? 1.0 : 0.95)
-              .opacity(appeared ? 1.0 : 0)
-              .onAppear {
-                  withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
-                      appeared = true
-                  }
-                  // Update progress cache
-                  currentProgress = cart.totalSpent / cart.budget
-              }
-              .onChange(of: cart.budget) { oldValue, newValue in
-                  guard oldValue != newValue else { return }
-                  viewModel.updateBudget(newValue, animated: true)
-                  
-                  // Update progress with animation
-                  withAnimation(.linear(duration: 0.3)) {
-                      currentProgress = cart.totalSpent / newValue
-                  }
-              }
-              .onChange(of: cart.totalSpent) { oldValue, newValue in
-                  // Update progress when total spent changes
-                  withAnimation(.linear(duration: 0.3)) {
-                      currentProgress = newValue / cart.budget
-                  }
-              }
-
+            headerRow
+            progressSection
+        }
+        .padding()
+        .background(ColorOption.getBackgroundColor(for: cart.id, isRow: true))// Use helper
+        .cornerRadius(24)
+        .overlay(
+            RoundedRectangle(cornerRadius: 24)
+                .stroke(Color(hex: "CACACA"), lineWidth: 1)
+        )
+        .padding(1)
+        .scaleEffect(appeared ? 1.0 : 0.95)
+        .opacity(appeared ? 1.0 : 0)
+        .onAppear {
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+                appeared = true
+            }
+            currentProgress = cart.totalSpent / cart.budget
+            // No need to load background color - helper handles it
+        }
+        .onChange(of: cart.budget) { oldValue, newValue in
+            guard oldValue != newValue else { return }
+            viewModel.updateBudget(newValue, animated: true)
+            
+            withAnimation(.linear(duration: 0.3)) {
+                currentProgress = cart.totalSpent / newValue
+            }
+        }
+        .onChange(of: cart.totalSpent) { oldValue, newValue in
+            withAnimation(.linear(duration: 0.3)) {
+                currentProgress = newValue / cart.budget
+            }
+        }
+        
     }
     
     private var headerRow: some View {
@@ -122,7 +120,7 @@ struct HomeCartRowView: View {
             categoriesView
         }
     }
-     
+    
     private var categoriesView: some View {
         HStack {
             if !categories.isEmpty {
@@ -151,7 +149,7 @@ struct HomeCartRowView: View {
 //        createdAt: Date(),
 //        status: .planning
 //    )
-//    
+//
 //    HomeCartRowView(cart: mockCart, vaultService: nil)
 //        .padding()
 //        .background(Color.gray.opacity(0.1))
