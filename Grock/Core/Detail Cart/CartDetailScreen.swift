@@ -425,18 +425,18 @@ struct CartDetailScreen: View {
         let hasSeenCelebration = UserDefaults.standard.bool(forKey: "hasSeenFirstShoppingCartCelebration")
         let isFirstCart = cartViewModel.carts.count == 1 || cartViewModel.isFirstCart(cart)
         
-        #if DEBUG
+#if DEBUG
         print("🎉 Cart Celebration Debug:")
         print("   - hasSeenCelebration: \(hasSeenCelebration)")
         print("   - Total carts: \(cartViewModel.carts.count)")
         print("   - Current cart: \(cart.name) (ID: \(cart.id))")
         print("   - Is first cart: \(isFirstCart)")
-        #endif
+#endif
         
         if !hasSeenCelebration && isFirstCart {
-            #if DEBUG
+#if DEBUG
             print("🎉 First cart celebration triggered!")
-            #endif
+#endif
             
             showCelebration = true
             UserDefaults.standard.set(true, forKey: "hasSeenFirstShoppingCartCelebration")
@@ -456,9 +456,9 @@ struct CartDetailScreen: View {
     }
     
     private func handleCartStatusChange(oldValue: CartStatus, newValue: CartStatus) {
-        #if DEBUG
+#if DEBUG
         print("🛒 Cart status changed: \(oldValue) -> \(newValue)")
-        #endif
+#endif
         
         if oldValue != newValue {
             withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
@@ -480,9 +480,9 @@ struct CartDetailScreen: View {
     }
     
     private func handleItemsChange(oldValue: Bool, newValue: Bool) {
-        #if DEBUG
+#if DEBUG
         print("📦 Items changed: \(oldValue) -> \(newValue)")
-        #endif
+#endif
         
         if oldValue != newValue {
             withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
@@ -669,7 +669,7 @@ struct CartDetailContent: View {
     let shouldAnimateTransition: Bool
     let storeItems: (String) -> [(cartItem: CartItem, item: Item?)]
     
-//    @State private var selectedColor: ColorOption = .defaultColor
+    //    @State private var selectedColor: ColorOption = .defaultColor
     
     @Binding var showingDeleteAlert: Bool
     @Binding var editingItem: CartItem?
@@ -716,6 +716,9 @@ struct CartDetailContent: View {
     @State private var animatedBudget: Double = 0
     @State private var showEditBudget = false
     
+    @State private var backgroundImage: UIImage? = nil
+    @State private var hasBackgroundImage = false
+    
     @Environment(VaultService.self) private var vaultService
     @Environment(CartViewModel.self) private var cartViewModel
     @Environment(\.dismiss) private var dismiss
@@ -743,21 +746,48 @@ struct CartDetailContent: View {
     @Bindable var colorManager = CartColorManager.shared
     
     private var selectedColor: ColorOption {
-         colorManager.getColor(for: cart.id)
-     }
+        colorManager.getColor(for: cart.id)
+    }
     
     private var backgroundColor: Color {
-         selectedColor.hex == "FFFFFF" ? Color.clear : selectedColor.color.darker(by: 0.02)
-     }
-     
-     private var rowBackgroundColor: Color {
-         selectedColor.hex == "FFFFFF" ? Color.clear : selectedColor.color
-     }
+        selectedColor.hex == "FFFFFF" ? Color.clear : selectedColor.color.darker(by: 0.02)
+    }
+    
+    private var rowBackgroundColor: Color {
+        selectedColor.hex == "FFFFFF" ? Color.clear : selectedColor.color
+    }
+    
+    
+    
+    private var effectiveBackgroundColor: Color {
+        if hasBackgroundImage {
+            // When there's a background image, List will show it directly
+            return Color.clear
+        } else {
+            return selectedColor.hex == "FFFFFF" ? Color.clear : selectedColor.color.darker(by: 0.02)
+        }
+    }
+    
+    private var effectiveRowBackgroundColor: Color {
+        if hasBackgroundImage {
+            // For rows with background image, make them slightly transparent
+            // so the background image shows through a bit
+            return .clear // ← Reduced opacity to show image through
+        } else {
+            return selectedColor.hex == "FFFFFF" ? Color.clear : selectedColor.color.darker(by: 0.02)
+        }
+    }
+    
+    
+    
+    
     
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                // Main content area
+                
+                
+                
                 if cartReady {
                     ZStack(alignment: .top) {
                         VStack(spacing: 8) {
@@ -785,9 +815,10 @@ struct CartDetailContent: View {
                                             sortedStoresWithRefresh: sortedStores,
                                             storeItemsWithRefresh: storeItems,
                                             fulfilledCount: $fulfilledCount,
-                                            // Remove selectedColor binding - pass computed colors instead
-                                            backgroundColor: backgroundColor,  // Pass computed backgroundColor
-                                            rowBackgroundColor: rowBackgroundColor,  // Pass computed rowBackgroundColor
+                                            backgroundColor: effectiveBackgroundColor, // Use effective color
+                                            rowBackgroundColor: effectiveRowBackgroundColor, // Use effective color
+                                            hasBackgroundImage: hasBackgroundImage, // Pass this flag
+                                            backgroundImage: backgroundImage, // Pass the image
                                             onFulfillItem: { cartItem in
                                                 handleFulfillItem(cartItem: cartItem)
                                             },
@@ -797,7 +828,7 @@ struct CartDetailContent: View {
                                             onDeleteItem: { cartItem in
                                                 handleDeleteItem(cartItem)
                                             }
-                                        )                                        .transition(.scale)
+                                        )                                     .transition(.scale)
                                     }
                                     
                                 } else {
@@ -901,15 +932,20 @@ struct CartDetailContent: View {
                 }
             }
         }
+        .onAppear {
+            // Load background image on appear
+            loadBackgroundImage()
+        }
+        
         .ignoresSafeArea(.keyboard)
         .onDisappear {
             // Save to actual cart ONLY when dismissing CartDetailScreen
             if localBudget != cart.budget {
                 cart.budget = localBudget
                 vaultService.updateCartTotals(cart: cart)
-                #if DEBUG
+#if DEBUG
                 print("💾 Saved budget update: \(cart.name) = \(localBudget)")
-                #endif
+#endif
             }
         }
         .onChange(of: cart.budget) { oldValue, newValue in
@@ -939,9 +975,9 @@ struct CartDetailContent: View {
             }
         }
         .onChange(of: cart.status) { oldValue, newValue in
-            #if DEBUG
+#if DEBUG
             print("🛒 Cart status changed: \(oldValue) -> \(newValue)")
-            #endif
+#endif
             
             // Show/hide bottom sheet based on shopping mode
             if newValue == .shopping && hasItems {
@@ -968,24 +1004,56 @@ struct CartDetailContent: View {
                 }
             }
         }
-//        .onAppear {
-//                // Load saved color
-//                if let savedHex = UserDefaults.standard.string(forKey: "cartBackgroundColor_\(cart.id)"),
-//                   let savedColor = ColorOption.options.first(where: { $0.hex == savedHex }) {
-//                    selectedColor = savedColor
-//                }
-//            }
-//        .onChange(of: selectedColor) { oldValue, newValue in
-//              // Save to UserDefaults when color changes
-//              UserDefaults.standard.set(newValue.hex, forKey: "cartBackgroundColor_\(cart.id)")
-//              
-//              // Post notification so HomeView can update
-//              NotificationCenter.default.post(
-//                  name: Notification.Name("CartColorChanged"),
-//                  object: nil,
-//                  userInfo: ["cartId": cart.id, "colorHex": newValue.hex]
-//              )
-//          }
+        .onChange(of: selectedColor) { oldValue, newValue in
+            // When color changes to white, check for background image
+            loadBackgroundImage()
+            
+            // Post notification for color change
+            NotificationCenter.default.post(
+                name: Notification.Name("CartColorChanged"),
+                object: nil,
+                userInfo: ["cartId": cart.id, "colorHex": newValue.hex]
+            )
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("CartBackgroundImageChanged"))) { notification in
+            // Reload image when notification is received
+            if let cartId = notification.userInfo?["cartId"] as? String,
+               cartId == cart.id {
+                loadBackgroundImage()
+            }
+        }
+        //        .onAppear {
+        //                // Load saved color
+        //                if let savedHex = UserDefaults.standard.string(forKey: "cartBackgroundColor_\(cart.id)"),
+        //                   let savedColor = ColorOption.options.first(where: { $0.hex == savedHex }) {
+        //                    selectedColor = savedColor
+        //                }
+        //            }
+        //        .onChange(of: selectedColor) { oldValue, newValue in
+        //              // Save to UserDefaults when color changes
+        //              UserDefaults.standard.set(newValue.hex, forKey: "cartBackgroundColor_\(cart.id)")
+        //
+        //              // Post notification so HomeView can update
+        //              NotificationCenter.default.post(
+        //                  name: Notification.Name("CartColorChanged"),
+        //                  object: nil,
+        //                  userInfo: ["cartId": cart.id, "colorHex": newValue.hex]
+        //              )
+        //          }
+    }
+    
+    private func loadBackgroundImage() {
+        // Check if we have a background image
+        hasBackgroundImage = CartBackgroundImageManager.shared.hasBackgroundImage(forCartId: cart.id)
+        
+        // If we have white background selected OR have an image, load it
+        if selectedColor.hex == "FFFFFF" || hasBackgroundImage {
+            backgroundImage = CartBackgroundImageManager.shared.loadImage(forCartId: cart.id)
+            hasBackgroundImage = backgroundImage != nil
+        } else {
+            backgroundImage = nil
+            hasBackgroundImage = false
+        }
     }
     
     private func handleEditItem(cartItem: CartItem) {
