@@ -713,12 +713,6 @@ struct StoreItem: Identifiable {
 }
 
 
-enum ItemType {
-    case vaultOnly      // Never been in any cart
-    case plannedCart    // Vault item added to cart during planning
-    case shoppingOnly   // Added via add form during shopping
-}
-
 enum ItemState {
     case active
     case skipped

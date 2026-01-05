@@ -219,22 +219,43 @@ struct ShoppingButton: View {
 }
 
 // MARK: - Color Picker Button Subview
+// MARK: - Color Picker Button Subview
 struct ColorPickerButton: View {
     @Binding var selectedColor: ColorOption
     @Binding var showingColorPicker: Bool
     let cart: Cart
     
+    @State private var hasBackgroundImage: Bool = false
+    
     var body: some View {
         Button(action: { showingColorPicker.toggle() }) {
             ZStack {
-                Circle()
-                    .fill(selectedColor.hex == "FFFFFF" ? Color.white : selectedColor.color)
-                    .frame(width: 20, height: 20)
-                
-                if selectedColor.hex == "FFFFFF" {
+                if hasBackgroundImage, let image = CartBackgroundImageManager.shared.loadImage(forCartId: cart.id) {
+                    // Show preview of the selected image
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 20, height: 20)
+                        .clipShape(Circle())
+                        .overlay(
+                            Circle()
+                                .stroke(Color.white, lineWidth: 1.5)
+                        )
+                        .overlay(
+                            Circle()
+                                .stroke(Color.black.opacity(0.7), lineWidth: 1)
+                        )
+                } else {
+                    // Show color circle
                     Circle()
-                        .stroke(Color.gray.opacity(0.3), lineWidth: 1)
-                        .frame(width: 18, height: 18)
+                        .fill(selectedColor.hex == "FFFFFF" ? Color.white : selectedColor.color)
+                        .frame(width: 20, height: 20)
+                    
+                    if selectedColor.hex == "FFFFFF" {
+                        Circle()
+                            .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                            .frame(width: 18, height: 18)
+                    }
                 }
             }
         }
@@ -243,9 +264,23 @@ struct ColorPickerButton: View {
         .background(.white)
         .clipShape(Circle())
         .shadow(color: Color.black.opacity(0.7), radius: 1, x: 0, y: 0.5)
+        .onAppear {
+            checkForBackgroundImage()
+        }
+        .onChange(of: showingColorPicker) { oldValue, newValue in
+            if !newValue {
+                // Refresh when popup is dismissed
+                checkForBackgroundImage()
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("CartBackgroundImageChanged"))) { notification in
+            if let cartId = notification.userInfo?["cartId"] as? String, cartId == cart.id {
+                checkForBackgroundImage()
+            }
+        }
         .popover(
             isPresented: $showingColorPicker,
-            attachmentAnchor: .point(.bottom),
+            attachmentAnchor: .point(.top),
             arrowEdge: .bottom
         ) {
             ColorPickerPopup(
@@ -257,8 +292,11 @@ struct ColorPickerButton: View {
             .presentationCornerRadius(16)
         }
     }
+    
+    private func checkForBackgroundImage() {
+        hasBackgroundImage = CartBackgroundImageManager.shared.hasBackgroundImage(forCartId: cart.id)
+    }
 }
-
 // MARK: - ColorPickerPopup
 struct ColorPickerPopup: View {
     @Binding var selectedColor: ColorOption
@@ -270,8 +308,13 @@ struct ColorPickerPopup: View {
     @State private var photosPickerItem: PhotosPickerItem? = nil
     @State private var isLoadingImage = false
     
+    // Computed property to check if image is selected
+    private var isImageSelected: Bool {
+        selectedImage != nil
+    }
+    
     var body: some View {
-        HStack(spacing: 16) {
+        HStack(spacing: 4) {
             ImagePickerCircle(
                 selectedImage: $selectedImage,
                 photosPickerItem: $photosPickerItem,
@@ -279,12 +322,18 @@ struct ColorPickerPopup: View {
                 cart: cart
             )
             
+            //
+            Text("|")
+                .foregroundStyle(Color(.systemGray6))
+                .padding(.leading, 8)
+            
             ColorScrollView(
                 selectedColor: $selectedColor,
                 selectedImage: $selectedImage,
                 photosPickerItem: $photosPickerItem,
                 isPresented: $isPresented,
-                cart: cart
+                cart: cart,
+                isImageSelected: isImageSelected
             )
         }
         .padding(.horizontal, 16)
@@ -298,7 +347,7 @@ struct ColorPickerPopup: View {
     }
 }
 
-// MARK: - ImagePickerCircle Subview
+
 struct ImagePickerCircle: View {
     @Binding var selectedImage: UIImage?
     @Binding var photosPickerItem: PhotosPickerItem?
@@ -320,6 +369,7 @@ struct ImagePickerCircle: View {
                     ProgressView()
                         .scaleEffect(0.7)
                 } else if let selectedImage = selectedImage {
+                    // Show blue outline when image is selected
                     Image(uiImage: selectedImage)
                         .resizable()
                         .scaledToFill()
@@ -327,7 +377,7 @@ struct ImagePickerCircle: View {
                         .clipShape(Circle())
                         .overlay(
                             Circle()
-                                .stroke(Color.black.opacity(0.2), lineWidth: 1)
+                                .stroke(Color.black, lineWidth: 2)
                         )
                 } else {
                     Circle()
@@ -343,13 +393,6 @@ struct ImagePickerCircle: View {
                         .foregroundColor(.black.opacity(0.6))
                 }
                 
-                if !isLoadingImage {
-                    Image(systemName: selectedImage == nil ? "plus.circle.fill" : "pencil.circle.fill")
-                        .font(.system(size: 10))
-                        .foregroundColor(.blue)
-                        .background(Circle().fill(Color.white).frame(width: 12, height: 12))
-                        .offset(x: 12, y: 12)
-                }
             }
         }
         .buttonStyle(PlainButtonStyle())
@@ -393,20 +436,22 @@ struct ColorScrollView: View {
     @Binding var photosPickerItem: PhotosPickerItem?
     @Binding var isPresented: Bool
     let cart: Cart
+    let isImageSelected: Bool // Add this parameter
     
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 12) {
+            HStack(spacing: 6) {
                 ForEach(ColorOption.options) { colorOption in
                     ColorCircleView(
                         colorOption: colorOption,
-                        isSelected: selectedColor == colorOption,
+                        isSelected: !isImageSelected && selectedColor == colorOption, // Only show checkmark if no image is selected
                         onSelect: {
                             handleColorSelection(colorOption)
                         }
                     )
                 }
             }
+            .padding(.vertical, 4)
             .padding(.horizontal, 8)
         }
         .frame(height: 40)
@@ -415,17 +460,16 @@ struct ColorScrollView: View {
     private func handleColorSelection(_ colorOption: ColorOption) {
         selectedColor = colorOption
         
-        if colorOption.hex != "FFFFFF" {
-            CartBackgroundImageManager.shared.deleteImage(forCartId: cart.id)
-            selectedImage = nil
-            photosPickerItem = nil
-            
-            NotificationCenter.default.post(
-                name: Notification.Name("CartBackgroundImageChanged"),
-                object: nil,
-                userInfo: ["cartId": cart.id]
-            )
-        }
+        // Clear any selected image when a color is chosen
+        CartBackgroundImageManager.shared.deleteImage(forCartId: cart.id)
+        selectedImage = nil
+        photosPickerItem = nil
+        
+        NotificationCenter.default.post(
+            name: Notification.Name("CartBackgroundImageChanged"),
+            object: nil,
+            userInfo: ["cartId": cart.id]
+        )
         
         isPresented = false
     }
@@ -441,7 +485,7 @@ struct ColorCircleView: View {
         Button(action: onSelect) {
             ZStack {
                 Circle()
-                    .fill(colorOption.color)
+                    .fill(colorOption.color.darker(by: 0.02))
                     .frame(width: 30, height: 30)
                     .overlay(
                         Circle()
@@ -482,6 +526,7 @@ extension UIImage {
 }
 
 // MARK: - Background Image Manager
+// MARK: - Background Image Manager (Updated)
 class CartBackgroundImageManager {
     static let shared = CartBackgroundImageManager()
     private let fileManager = FileManager.default
@@ -489,6 +534,10 @@ class CartBackgroundImageManager {
     private init() {}
     
     func saveImage(_ image: UIImage, forCartId cartId: String) {
+        // Save to cache FIRST (for immediate access)
+        ImageCacheManager.shared.saveImage(image, forCartId: cartId)
+        
+        // Then save to disk
         guard let data = image.jpegData(compressionQuality: 0.85) else { return }
         
         let filename = getDocumentsDirectory().appendingPathComponent("cart_background_\(cartId).jpg")
@@ -503,11 +552,19 @@ class CartBackgroundImageManager {
     }
     
     func loadImage(forCartId cartId: String) -> UIImage? {
+        // Try cache first
+        if let cached = ImageCacheManager.shared.getImage(forCartId: cartId) {
+            return cached
+        }
+        
+        // Fall back to disk
         let filename = getDocumentsDirectory().appendingPathComponent("cart_background_\(cartId).jpg")
         
         if fileManager.fileExists(atPath: filename.path),
            let data = try? Data(contentsOf: filename),
            let image = UIImage(data: data) {
+            // Cache it for next time
+            ImageCacheManager.shared.saveImage(image, forCartId: cartId)
             return image
         }
         return nil
@@ -518,6 +575,10 @@ class CartBackgroundImageManager {
     }
     
     func deleteImage(forCartId cartId: String) {
+        // Remove from cache
+        ImageCacheManager.shared.deleteImage(forCartId: cartId)
+        
+        // Remove from disk
         let filename = getDocumentsDirectory().appendingPathComponent("cart_background_\(cartId).jpg")
         
         do {

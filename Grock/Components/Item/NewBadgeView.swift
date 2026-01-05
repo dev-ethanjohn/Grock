@@ -24,7 +24,3 @@ struct NewBadgeView: View {
             .shadow(color: Color(hex: "FF6B6B").opacity(0.3), radius: 3, x: 0, y: 2)
     }
 }
-
-//#Preview {
-//    NewBadgeView()
-//}

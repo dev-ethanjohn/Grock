@@ -372,19 +372,19 @@ private struct ListBackgroundView: View {
                                    .scaledToFill()
                                    .frame(width: geometry.size.width, height: geometry.size.height)
                                    .clipped()
-                                   .blur(radius: 1.5)
+                                   .blur(radius: 1)
                                
                                // Dark overlay (2% opacity black)
-                               Color.black.opacity(0.2)
+                               Color.black.opacity(0.4)
                            }
                     .overlay(
                         VisibleNoiseView(
-                            grainSize: 0.5,
-                            density: 0.5,
-                            opacity: 0.25
+                            grainSize: 0.00001,
+                            density: 1,
+                            opacity: 0.1,
                         )
                     )
-                    .opacity(0.7)
+//                    .opacity()
                     .cornerRadius(16)
             } else {
                 backgroundColor

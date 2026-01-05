@@ -1,6 +1,30 @@
 import SwiftUI
 import SwiftData
 
+// MARK: - Image Cache Manager (Put this OUTSIDE CartDetailContent, at top level)
+class ImageCacheManager {
+    static let shared = ImageCacheManager()
+    private var cache: [String: UIImage] = [:]
+    
+    private init() {}
+    
+    func getImage(forCartId cartId: String) -> UIImage? {
+        return cache[cartId]
+    }
+    
+    func saveImage(_ image: UIImage, forCartId cartId: String) {
+        cache[cartId] = image
+    }
+    
+    func deleteImage(forCartId cartId: String) {
+        cache.removeValue(forKey: cartId)
+    }
+    
+    func clearCache() {
+        cache.removeAll()
+    }
+}
+
 struct CartDetailScreen: View {
     let cart: Cart
     @Environment(VaultService.self) private var vaultService
@@ -669,8 +693,6 @@ struct CartDetailContent: View {
     let shouldAnimateTransition: Bool
     let storeItems: (String) -> [(cartItem: CartItem, item: Item?)]
     
-    //    @State private var selectedColor: ColorOption = .defaultColor
-    
     @Binding var showingDeleteAlert: Bool
     @Binding var editingItem: CartItem?
     @Binding var showingCompleteAlert: Bool
@@ -680,7 +702,6 @@ struct CartDetailContent: View {
     
     @Binding var anticipationOffset: CGFloat
     
-    // filter
     @Binding var selectedFilter: FilterOption
     @Binding var showingFilterSheet: Bool
     
@@ -695,7 +716,6 @@ struct CartDetailContent: View {
     
     @Binding var previousHasItems: Bool
     
-    // Celebration state
     @Binding var showCelebration: Bool
     
     @Binding var manageCartButtonVisible: Bool
@@ -704,13 +724,9 @@ struct CartDetailContent: View {
     
     @Binding var showingFulfillPopover: Bool
     
-    // Loading state
     @Binding var cartReady: Bool
-    
-    // Refresh trigger for synchronization
     @Binding var refreshTrigger: UUID
     
-    // NEW: State for budget editing
     @State private var localBudget: Double = 0
     @State private var isSavingBudget = false
     @State private var animatedBudget: Double = 0
@@ -718,6 +734,7 @@ struct CartDetailContent: View {
     
     @State private var backgroundImage: UIImage? = nil
     @State private var hasBackgroundImage = false
+    @State private var isImageLoaded = false // NEW: Track image loading
     
     @Environment(VaultService.self) private var vaultService
     @Environment(CartViewModel.self) private var cartViewModel
@@ -735,12 +752,10 @@ struct CartDetailContent: View {
     @Binding var bottomSheetDetent: PresentationDetent
     @Binding var showingCompletedSheet: Bool
     
-    // Add these bindings
     @Binding var showingShoppingPopover: Bool
     @Binding var selectedItemForPopover: Item?
     @Binding var selectedCartItemForPopover: CartItem?
     
-    // ADD THIS: Binding for Edit Cart Name popover
     @Binding var showingEditCartName: Bool
     
     @Bindable var colorManager = CartColorManager.shared
@@ -757,11 +772,8 @@ struct CartDetailContent: View {
         selectedColor.hex == "FFFFFF" ? Color.clear : selectedColor.color
     }
     
-    
-    
     private var effectiveBackgroundColor: Color {
         if hasBackgroundImage {
-            // When there's a background image, List will show it directly
             return Color.clear
         } else {
             return selectedColor.hex == "FFFFFF" ? Color.clear : selectedColor.color.darker(by: 0.02)
@@ -770,25 +782,17 @@ struct CartDetailContent: View {
     
     private var effectiveRowBackgroundColor: Color {
         if hasBackgroundImage {
-            // For rows with background image, make them slightly transparent
-            // so the background image shows through a bit
-            return .clear // ← Reduced opacity to show image through
+            return .clear
         } else {
             return selectedColor.hex == "FFFFFF" ? Color.clear : selectedColor.color.darker(by: 0.02)
         }
     }
     
-    
-    
-    
-    
+    // MARK: - Body
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                
-                
-                
-                if cartReady {
+                if cartReady && isImageLoaded { // Check both flags
                     ZStack(alignment: .top) {
                         VStack(spacing: 8) {
                             ModeToggleView(
@@ -799,9 +803,9 @@ struct CartDetailContent: View {
                                 headerHeight: $headerHeight,
                                 refreshTrigger: $refreshTrigger,
                                 selectedColor: Binding(
-                                    get: { selectedColor },  // ✅ computed property
+                                    get: { selectedColor },
                                     set: { newColor in
-                                        colorManager.setColor(newColor, for: cart.id)  // ✅ calls manager
+                                        colorManager.setColor(newColor, for: cart.id)
                                     }
                                 )
                             )
@@ -815,10 +819,10 @@ struct CartDetailContent: View {
                                             sortedStoresWithRefresh: sortedStores,
                                             storeItemsWithRefresh: storeItems,
                                             fulfilledCount: $fulfilledCount,
-                                            backgroundColor: effectiveBackgroundColor, // Use effective color
-                                            rowBackgroundColor: effectiveRowBackgroundColor, // Use effective color
-                                            hasBackgroundImage: hasBackgroundImage, // Pass this flag
-                                            backgroundImage: backgroundImage, // Pass the image
+                                            backgroundColor: effectiveBackgroundColor,
+                                            rowBackgroundColor: effectiveRowBackgroundColor,
+                                            hasBackgroundImage: hasBackgroundImage,
+                                            backgroundImage: backgroundImage,
                                             onFulfillItem: { cartItem in
                                                 handleFulfillItem(cartItem: cartItem)
                                             },
@@ -828,9 +832,9 @@ struct CartDetailContent: View {
                                             onDeleteItem: { cartItem in
                                                 handleDeleteItem(cartItem)
                                             }
-                                        )                                     .transition(.scale)
+                                        )
+                                        .transition(.scale)
                                     }
-                                    
                                 } else {
                                     EmptyCartView()
                                         .transition(.scale)
@@ -860,10 +864,9 @@ struct CartDetailContent: View {
                                 showEditBudget = true
                             }
                         )
-                        
                     }
                     
-                    // Floating Action Bar (position it above everything)
+                    // Floating Action Bar
                     if cartReady && !showCelebration && manageCartButtonVisible {
                         VStack {
                             Spacer()
@@ -885,9 +888,10 @@ struct CartDetailContent: View {
                         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: showingCompletedSheet)
                     }
                 } else {
+                    // Only show progress view briefly if needed
                     ProgressView()
                         .onAppear {
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.0) {
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.01) {
                                 cartReady = true
                             }
                         }
@@ -932,12 +936,28 @@ struct CartDetailContent: View {
                 }
             }
         }
-        .onAppear {
-            // Load background image on appear
-            loadBackgroundImage()
-        }
-        
         .ignoresSafeArea(.keyboard)
+        .onAppear {
+            // Initialize budget and preload image
+            animatedBudget = cart.budget
+            localBudget = cart.budget
+            
+            // Set initial button state
+            if cart.isShopping && hasItems {
+                showFinishTripButton = true
+            }
+            
+            // Preload background image on appear
+            preloadBackgroundImage()
+            
+            if cart.isShopping {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        showingCompletedSheet = true
+                    }
+                }
+            }
+        }
         .onDisappear {
             // Save to actual cart ONLY when dismissing CartDetailScreen
             if localBudget != cart.budget {
@@ -953,24 +973,6 @@ struct CartDetailContent: View {
                 localBudget = newValue
                 withAnimation(.easeInOut(duration: 0.3)) {
                     animatedBudget = newValue
-                }
-            }
-        }
-        .onAppear {
-            // Initialize both with cart's budget
-            animatedBudget = cart.budget
-            localBudget = cart.budget
-            
-            // Set initial button state
-            if cart.isShopping && hasItems {
-                showFinishTripButton = true
-            }
-            
-            if cart.isShopping {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                        showingCompletedSheet = true
-                    }
                 }
             }
         }
@@ -1022,24 +1024,43 @@ struct CartDetailContent: View {
                 loadBackgroundImage()
             }
         }
-        //        .onAppear {
-        //                // Load saved color
-        //                if let savedHex = UserDefaults.standard.string(forKey: "cartBackgroundColor_\(cart.id)"),
-        //                   let savedColor = ColorOption.options.first(where: { $0.hex == savedHex }) {
-        //                    selectedColor = savedColor
-        //                }
-        //            }
-        //        .onChange(of: selectedColor) { oldValue, newValue in
-        //              // Save to UserDefaults when color changes
-        //              UserDefaults.standard.set(newValue.hex, forKey: "cartBackgroundColor_\(cart.id)")
-        //
-        //              // Post notification so HomeView can update
-        //              NotificationCenter.default.post(
-        //                  name: Notification.Name("CartColorChanged"),
-        //                  object: nil,
-        //                  userInfo: ["cartId": cart.id, "colorHex": newValue.hex]
-        //              )
-        //          }
+    }
+    
+    // MARK: - Background Image Loading
+    
+    private func preloadBackgroundImage() {
+        // Check cache first - this is instant
+        if let cachedImage = ImageCacheManager.shared.getImage(forCartId: cart.id) {
+            self.backgroundImage = cachedImage
+            self.hasBackgroundImage = true
+            self.isImageLoaded = true
+            return
+        }
+        
+        // Check if we should have an image
+        hasBackgroundImage = CartBackgroundImageManager.shared.hasBackgroundImage(forCartId: cart.id)
+        
+        if hasBackgroundImage {
+            // Load from disk once, then cache
+            DispatchQueue.global(qos: .userInitiated).async {
+                if let image = CartBackgroundImageManager.shared.loadImage(forCartId: cart.id) {
+                    ImageCacheManager.shared.saveImage(image, forCartId: cart.id)
+                    
+                    DispatchQueue.main.async {
+                        self.backgroundImage = image
+                        self.isImageLoaded = true
+                    }
+                } else {
+                    DispatchQueue.main.async {
+                        self.hasBackgroundImage = false
+                        self.isImageLoaded = true
+                    }
+                }
+            }
+        } else {
+            // No image needed, mark as loaded immediately
+            self.isImageLoaded = true
+        }
     }
     
     private func loadBackgroundImage() {
@@ -1048,13 +1069,22 @@ struct CartDetailContent: View {
         
         // If we have white background selected OR have an image, load it
         if selectedColor.hex == "FFFFFF" || hasBackgroundImage {
-            backgroundImage = CartBackgroundImageManager.shared.loadImage(forCartId: cart.id)
-            hasBackgroundImage = backgroundImage != nil
+            // Try cache first
+            if let cachedImage = ImageCacheManager.shared.getImage(forCartId: cart.id) {
+                backgroundImage = cachedImage
+                hasBackgroundImage = true
+            } else {
+                // Load from disk
+                backgroundImage = CartBackgroundImageManager.shared.loadImage(forCartId: cart.id)
+                hasBackgroundImage = backgroundImage != nil
+            }
         } else {
             backgroundImage = nil
             hasBackgroundImage = false
         }
     }
+    
+    // MARK: - Item Handlers
     
     private func handleEditItem(cartItem: CartItem) {
         if let found = vaultService.findItemById(cartItem.itemId) {
@@ -1090,6 +1120,7 @@ struct CartDetailContent: View {
         }
     }
 }
+
 
 extension View {
     func cartSheets(
@@ -1215,3 +1246,4 @@ extension View {
         }
     }
 }
+

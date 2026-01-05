@@ -153,7 +153,8 @@ private struct MainRowContent: View {
                 isFulfilling: $isFulfilling,
                 iconScale: $iconScale,
                 checkmarkScale: $checkmarkScale,
-                onFulfillItem: onFulfillItem
+                onFulfillItem: onFulfillItem,
+                hasBackgroundImage: hasBackgroundImage
             )
             .applyRowBackground(
                 hasBackgroundImage: hasBackgroundImage,
@@ -367,6 +368,7 @@ private struct CartRowMainContent: View {
     @Binding var iconScale: CGFloat
     @Binding var checkmarkScale: CGFloat
     let onFulfillItem: () -> Void
+    let hasBackgroundImage: Bool
     
     var body: some View {
         HStack(alignment: .top, spacing: 0) {
@@ -377,7 +379,8 @@ private struct CartRowMainContent: View {
                     iconScale: $iconScale,
                     checkmarkScale: $checkmarkScale,
                     buttonScale: buttonScale,
-                    onFulfillItem: onFulfillItem
+                    onFulfillItem: onFulfillItem,
+                    hasBackgroundImage: hasBackgroundImage
                 )
             }
             
@@ -391,7 +394,8 @@ private struct CartRowMainContent: View {
                 displayUnit: displayUnit,
                 shouldDisplayBadge: shouldDisplayBadge,
                 badgeScale: badgeScale,
-                badgeRotation: badgeRotation
+                badgeRotation: badgeRotation,
+                hasBackgroundImage: hasBackgroundImage
             )
         }
         .padding(.vertical, 12)
@@ -413,6 +417,7 @@ private struct ItemDetailsSection: View {
     let shouldDisplayBadge: Bool
     let badgeScale: CGFloat
     let badgeRotation: Double
+    let hasBackgroundImage: Bool
     
     private var isItemFulfilled: Bool {
         cart.isShopping && (cartItem.isFulfilled || cartItem.isSkippedDuringShopping)
@@ -428,14 +433,16 @@ private struct ItemDetailsSection: View {
                 shouldDisplayBadge: shouldDisplayBadge,
                 badgeScale: badgeScale,
                 badgeRotation: badgeRotation,
-                isItemFulfilled: isItemFulfilled
+                isItemFulfilled: isItemFulfilled,
+                hasBackgroundImage: hasBackgroundImage
             )
             
             ItemPriceRow(
                 currentPrice: currentPrice,
                 displayUnit: displayUnit,
                 currentTotalPrice: currentTotalPrice,
-                isItemFulfilled: isItemFulfilled
+                isItemFulfilled: isItemFulfilled,
+                hasBackgroundImage: hasBackgroundImage
             )
         }
         .opacity(isItemFulfilled ? 0.5 : 1.0)
@@ -452,27 +459,30 @@ private struct ItemNameRow: View {
     let badgeScale: CGFloat
     let badgeRotation: Double
     let isItemFulfilled: Bool
+    let hasBackgroundImage: Bool
     
     var body: some View {
         HStack(spacing: 4) {
             Text(currentQuantity.formattedQuantity)
-                .lexendFont(16, weight: .regular)
+                .lexendFont(17, weight: .regular)
                 .contentTransition(.numericText())
                 .animation(.spring(response: 0.5, dampingFraction: 0.7), value: currentQuantity)
+                .foregroundColor(hasBackgroundImage ? .white : .primary)
             
             Text(item?.name ?? cartItem.shoppingOnlyName ?? "Unknown Item")
-                .lexendFont(16, weight: .regular)
+                .lexendFont(17, weight: .regular)
                 .lineLimit(3)
                 .fixedSize(horizontal: false, vertical: true)
                 .strikethrough(isItemFulfilled)
                 .id(item?.name ?? cartItem.shoppingOnlyName ?? "Unknown")
+                .foregroundColor(hasBackgroundImage ? .white : .primary)
             
             Spacer()
             
             if shouldDisplayBadge {
                 NewBadgeView(
                     scale: badgeScale,
-                    rotation: badgeRotation
+                    rotation: badgeRotation,
                 )
                 .transition(.scale.combined(with: .opacity))
             }
@@ -486,6 +496,7 @@ private struct ItemPriceRow: View {
     let displayUnit: String
     let currentTotalPrice: Double
     let isItemFulfilled: Bool
+    let hasBackgroundImage: Bool
     
     var body: some View {
         HStack(spacing: 4) {
@@ -494,6 +505,7 @@ private struct ItemPriceRow: View {
                 .lineLimit(1)
                 .contentTransition(.numericText())
                 .animation(.spring(response: 0.5, dampingFraction: 0.7), value: currentPrice)
+                .foregroundColor(hasBackgroundImage ? .white.opacity(0.9) : Color(hex: "231F30"))
             
             Spacer()
             
@@ -502,8 +514,9 @@ private struct ItemPriceRow: View {
                 .lineLimit(1)
                 .contentTransition(.numericText())
                 .animation(.spring(response: 0.5, dampingFraction: 0.7), value: currentTotalPrice)
+                .foregroundColor(hasBackgroundImage ? .white : Color(hex: "231F30"))
         }
-        .foregroundColor(Color(hex: "231F30"))
+//        .foregroundColor(Color(hex: "231F30"))
         .opacity(isItemFulfilled ? 0.5 : 1.0)
     }
 }
@@ -635,6 +648,47 @@ private struct RowBackgroundView: View {
     }
 }
 
+// MARK: - Fulfillment Button Content
+private struct FulfillmentButtonContent: View {
+    let cartItem: CartItem
+    let iconScale: CGFloat
+    let checkmarkScale: CGFloat
+    let buttonScale: CGFloat
+    let hasBackgroundImage: Bool // Add this parameter
+    
+    var body: some View {
+        ZStack {
+            Circle()
+                .strokeBorder(
+                    cartItem.isFulfilled ?
+                        (hasBackgroundImage ? Color.white : Color.green) : // White checkmark on image
+                        (hasBackgroundImage ? Color.white.opacity(0.7) : Color(hex: "666")), // White circle on image
+                    lineWidth: cartItem.isFulfilled ? 0 : 1.5
+                )
+                .frame(width: 18, height: 18)
+                .scaleEffect(iconScale)
+                .animation(.spring(response: 0.3, dampingFraction: 0.6), value: iconScale)
+            
+            if cartItem.isFulfilled {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 22))
+                    .foregroundColor(hasBackgroundImage ? .white : .green) // White on image
+                    .scaleEffect(checkmarkScale)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.6), value: checkmarkScale)
+            } else {
+                Circle()
+                    .fill(Color.clear)
+                    .frame(width: 18, height: 18)
+            }
+        }
+        .frame(width: 18, height: 18)
+        .padding(.trailing, 8)
+        .padding(.vertical, 4)
+        .contentShape(Rectangle())
+        .scaleEffect(buttonScale)
+    }
+}
+
 // MARK: - Fulfillment Button Component
 private struct FulfillmentButton: View {
     let cartItem: CartItem
@@ -643,6 +697,7 @@ private struct FulfillmentButton: View {
     @Binding var checkmarkScale: CGFloat
     let buttonScale: CGFloat
     let onFulfillItem: () -> Void
+    let hasBackgroundImage: Bool // Add this parameter
     
     var body: some View {
         Button(action: handleButtonTap) {
@@ -650,7 +705,8 @@ private struct FulfillmentButton: View {
                 cartItem: cartItem,
                 iconScale: iconScale,
                 checkmarkScale: checkmarkScale,
-                buttonScale: buttonScale
+                buttonScale: buttonScale,
+                hasBackgroundImage: hasBackgroundImage // Pass this
             )
         }
         .buttonStyle(.plain)
@@ -675,44 +731,6 @@ private struct FulfillmentButton: View {
                 }
             }
         }
-    }
-}
-
-// MARK: - Fulfillment Button Content
-private struct FulfillmentButtonContent: View {
-    let cartItem: CartItem
-    let iconScale: CGFloat
-    let checkmarkScale: CGFloat
-    let buttonScale: CGFloat
-    
-    var body: some View {
-        ZStack {
-            Circle()
-                .strokeBorder(
-                    cartItem.isFulfilled ? Color.green : Color(hex: "666"),
-                    lineWidth: cartItem.isFulfilled ? 0 : 1.5
-                )
-                .frame(width: 18, height: 18)
-                .scaleEffect(iconScale)
-                .animation(.spring(response: 0.3, dampingFraction: 0.6), value: iconScale)
-            
-            if cartItem.isFulfilled {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 22))
-                    .foregroundColor(.green)
-                    .scaleEffect(checkmarkScale)
-                    .animation(.spring(response: 0.3, dampingFraction: 0.6), value: checkmarkScale)
-            } else {
-                Circle()
-                    .fill(Color.clear)
-                    .frame(width: 18, height: 18)
-            }
-        }
-        .frame(width: 18, height: 18)
-        .padding(.trailing, 8)
-        .padding(.vertical, 4)
-        .contentShape(Rectangle())
-        .scaleEffect(buttonScale)
     }
 }
 
