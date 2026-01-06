@@ -9,11 +9,9 @@ struct StoreSectionListView: View {
     let onEditItem: (CartItem) -> Void
     let onDeleteItem: (CartItem) -> Void
     let isLastStore: Bool
-    let backgroundColor: Color // let
-    let rowBackgroundColor: Color // let
-    let hasBackgroundImage: Bool // Add this parameter
     
     @Environment(VaultService.self) private var vaultService
+    @Environment(CartStateManager.self) private var stateManager
     
     // FIXED: Proper filtering and sorting for items
     private var displayItems: [(cartItem: CartItem, item: Item?)] {
@@ -71,9 +69,7 @@ struct StoreSectionListView: View {
                             onFulfillItem: onFulfillItem,
                             onEditItem: onEditItem,
                             onDeleteItem: onDeleteItem,
-                            handleSkipItem: handleSkipItem,
-                            rowBackgroundColor: rowBackgroundColor,
-                            hasBackgroundImage: hasBackgroundImage // Pass this through
+                            handleSkipItem: handleSkipItem
                         )
                     }
                 }
@@ -142,10 +138,9 @@ private struct StoreSectionRow: View {
     let onEditItem: (CartItem) -> Void
     let onDeleteItem: (CartItem) -> Void
     let handleSkipItem: (CartItem) -> Void
-    let rowBackgroundColor: Color
-    let hasBackgroundImage: Bool // Add this parameter
     
     @Environment(VaultService.self) private var vaultService
+    @Environment(CartStateManager.self) private var stateManager
     
     // Helper to determine item type
     private var isShoppingOnlyItem: Bool {
@@ -172,9 +167,7 @@ private struct StoreSectionRow: View {
                 onFulfillItem: { onFulfillItem(tuple.cartItem) },
                 onEditItem: { onEditItem(tuple.cartItem) },
                 onDeleteItem: { onDeleteItem(tuple.cartItem) },
-                isLastItem: index == displayItems.count - 1,
-                backgroundColor: rowBackgroundColor,
-                hasBackgroundImage: hasBackgroundImage // Pass this through
+                isLastItem: index == displayItems.count - 1
             )
             .id(tuple.cartItem.itemId + (tuple.cartItem.actualPrice?.description ?? ""))
             .listRowInsets(EdgeInsets())
@@ -193,7 +186,7 @@ private struct StoreSectionRow: View {
         }
         .listRowInsets(EdgeInsets())
         .listRowSeparator(.hidden)
-//        .listRowBackground(rowBackgroundColor)
+        .listRowBackground(stateManager.effectiveRowBackgroundColor)
         .transition(.asymmetric(
             insertion: .scale.combined(with: .opacity),
             removal: .scale.combined(with: .opacity)
@@ -332,12 +325,3 @@ private struct StoreSectionRow: View {
         }
     }
 }
-
-// MARK: - Helper Extension for Notification Names
-//extension Notification.Name {
-//    static let shoppingItemQuantityChanged = Notification.Name("ShoppingItemQuantityChanged")
-//    static let shoppingDataUpdated = Notification.Name("ShoppingDataUpdated")
-//    static let vaultItemUpdated = Notification.Name("VaultItemUpdated")
-//    static let cartItemUpdated = Notification.Name("CartItemUpdated")
-//}
-//

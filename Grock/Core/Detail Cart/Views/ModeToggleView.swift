@@ -23,70 +23,61 @@ struct ColorOption: Identifiable, Equatable {
     }
 }
 
-// MARK: - Main View
 struct ModeToggleView: View {
     let cart: Cart
-    @Binding var anticipationOffset: CGFloat
-    @Binding var showingStartShoppingAlert: Bool
-    @Binding var showingSwitchToPlanningAlert: Bool
-    @Binding var headerHeight: CGFloat
-    @Binding var refreshTrigger: UUID
-    @Binding var selectedColor: ColorOption
     
-    @State private var showingColorPicker = false
+    @Environment(CartStateManager.self) private var stateManager
     @Environment(VaultService.self) private var vaultService
-    
-    private var backgroundColor: Color {
-        selectedColor.hex == "FFFFFF" ? Color.clear : selectedColor.color.darker(by: 0.02)
-    }
     
     var body: some View {
         HStack(alignment: .bottom, spacing: 0) {
-            ToggleSwitchView(
-                cart: cart,
-                anticipationOffset: $anticipationOffset,
-                showingStartShoppingAlert: $showingStartShoppingAlert,
-                showingSwitchToPlanningAlert: $showingSwitchToPlanningAlert
-            )
+            ToggleSwitchView(cart: cart)
             
             Spacer()
             
+            // Use Bindable(stateManager) to create bindings
             ColorPickerButton(
-                selectedColor: $selectedColor,
-                showingColorPicker: $showingColorPicker,
+                selectedColor: Binding(
+                    get: { stateManager.selectedColor },
+                    set: { stateManager.selectedColor = $0 }
+                ),
+                showingColorPicker: Binding(
+                    get: { stateManager.showingColorPicker },
+                    set: { stateManager.showingColorPicker = $0 }
+                ),
                 cart: cart
             )
         }
-        .padding(.top, headerHeight)
+        .padding(.top, stateManager.headerHeight)
         .background(Color.white)
         .zIndex(100)
         .allowsHitTesting(true)
         .onChange(of: cart.status) { oldValue, newValue in
             withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
-                anticipationOffset = 0
+                stateManager.anticipationOffset = 0
             }
         }
-        .onChange(of: showingStartShoppingAlert) { oldValue, newValue in
+        .onChange(of: stateManager.showingStartShoppingAlert) { oldValue, newValue in
             if !newValue && cart.status == .planning {
                 withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
-                    anticipationOffset = 0
+                    stateManager.anticipationOffset = 0
                 }
             }
         }
-        .onChange(of: showingSwitchToPlanningAlert) { oldValue, newValue in
+        .onChange(of: stateManager.showingSwitchToPlanningAlert) { oldValue, newValue in
             if !newValue && cart.status == .shopping {
                 withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
-                    anticipationOffset = 0
+                    stateManager.anticipationOffset = 0
                 }
             }
         }
         .onAppear {
             if let savedHex = UserDefaults.standard.string(forKey: "cartBackgroundColor_\(cart.id)"),
                let savedColor = ColorOption.options.first(where: { $0.hex == savedHex }) {
-                selectedColor = savedColor
+                stateManager.selectedColor = savedColor
             }
         }
-        .onChange(of: selectedColor) { oldValue, newValue in
+        .onChange(of: stateManager.selectedColor) { oldValue, newValue in
             UserDefaults.standard.set(newValue.hex, forKey: "cartBackgroundColor_\(cart.id)")
         }
     }
@@ -95,9 +86,8 @@ struct ModeToggleView: View {
 // MARK: - Toggle Switch Subview
 struct ToggleSwitchView: View {
     let cart: Cart
-    @Binding var anticipationOffset: CGFloat
-    @Binding var showingStartShoppingAlert: Bool
-    @Binding var showingSwitchToPlanningAlert: Bool
+    
+    @Environment(CartStateManager.self) private var stateManager
     
     var body: some View {
         ZStack {
@@ -114,8 +104,8 @@ struct ToggleSwitchView: View {
                     .frame(width: 88, height: 30)
                     .cornerRadius(20)
                     .shadow(color: Color.black.opacity(0.25), radius: 2, x: 0.5, y: 1)
-                    .offset(x: anticipationOffset)
-                    .animation(.spring(response: 0.3, dampingFraction: 0.7), value: anticipationOffset)
+                    .offset(x: stateManager.anticipationOffset)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.7), value: stateManager.anticipationOffset)
                 
                 if cart.isPlanning {
                     Spacer()
@@ -124,12 +114,7 @@ struct ToggleSwitchView: View {
             .frame(width: 176)
             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: cart.status)
             
-            ToggleButtons(
-                cart: cart,
-                anticipationOffset: $anticipationOffset,
-                showingStartShoppingAlert: $showingStartShoppingAlert,
-                showingSwitchToPlanningAlert: $showingSwitchToPlanningAlert
-            )
+            ToggleButtons(cart: cart)
         }
         .frame(width: 176, height: 30)
     }
@@ -138,23 +123,14 @@ struct ToggleSwitchView: View {
 // MARK: - Toggle Buttons Subview
 struct ToggleButtons: View {
     let cart: Cart
-    @Binding var anticipationOffset: CGFloat
-    @Binding var showingStartShoppingAlert: Bool
-    @Binding var showingSwitchToPlanningAlert: Bool
+    
+    @Environment(CartStateManager.self) private var stateManager
     
     var body: some View {
         HStack(spacing: 0) {
-            PlanningButton(
-                cart: cart,
-                anticipationOffset: $anticipationOffset,
-                showingSwitchToPlanningAlert: $showingSwitchToPlanningAlert
-            )
+            PlanningButton(cart: cart)
             
-            ShoppingButton(
-                cart: cart,
-                anticipationOffset: $anticipationOffset,
-                showingStartShoppingAlert: $showingStartShoppingAlert
-            )
+            ShoppingButton(cart: cart)
         }
     }
 }
@@ -162,17 +138,17 @@ struct ToggleButtons: View {
 // MARK: - Individual Button Views
 struct PlanningButton: View {
     let cart: Cart
-    @Binding var anticipationOffset: CGFloat
-    @Binding var showingSwitchToPlanningAlert: Bool
+    
+    @Environment(CartStateManager.self) private var stateManager
     
     var body: some View {
         Button(action: handlePlanningTap) {
             Text("Planning")
-                .shantellSansFont(13)
+                .lexendFont(13, weight: .medium)
                 .foregroundColor(cart.isPlanning ? .black : Color(hex: "999999"))
                 .frame(width: 88, height: 26)
-                .offset(x: cart.isPlanning ? anticipationOffset : 0)
-                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: anticipationOffset)
+                .offset(x: cart.isPlanning ? stateManager.anticipationOffset : 0)
+                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: stateManager.anticipationOffset)
                 .animation(.easeInOut(duration: 0.2), value: cart.isPlanning)
         }
         .disabled(cart.isCompleted)
@@ -182,26 +158,26 @@ struct PlanningButton: View {
     private func handlePlanningTap() {
         if cart.status == .shopping {
             withAnimation(.easeInOut(duration: 0.1)) {
-                anticipationOffset = -14
+                stateManager.anticipationOffset = -14
             }
-            showingSwitchToPlanningAlert = true
+            stateManager.showingSwitchToPlanningAlert = true
         }
     }
 }
 
 struct ShoppingButton: View {
     let cart: Cart
-    @Binding var anticipationOffset: CGFloat
-    @Binding var showingStartShoppingAlert: Bool
+    
+    @Environment(CartStateManager.self) private var stateManager
     
     var body: some View {
         Button(action: handleShoppingTap) {
             Text("Shopping")
-                .shantellSansFont(13)
+                .lexendFont(13, weight: .medium)
                 .foregroundColor(cart.isShopping ? .black : Color(hex: "999999"))
                 .frame(width: 88, height: 26)
-                .offset(x: cart.isShopping ? anticipationOffset : 0)
-                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: anticipationOffset)
+                .offset(x: cart.isShopping ? stateManager.anticipationOffset : 0)
+                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: stateManager.anticipationOffset)
                 .animation(.easeInOut(duration: 0.2), value: cart.isShopping)
         }
         .disabled(cart.isCompleted)
@@ -211,13 +187,12 @@ struct ShoppingButton: View {
     private func handleShoppingTap() {
         if cart.status == .planning {
             withAnimation(.easeInOut(duration: 0.1)) {
-                anticipationOffset = 14
+                stateManager.anticipationOffset = 14
             }
-            showingStartShoppingAlert = true
+            stateManager.showingStartShoppingAlert = true
         }
     }
 }
-
 // MARK: - Color Picker Button Subview
 // MARK: - Color Picker Button Subview
 struct ColorPickerButton: View {
@@ -348,6 +323,7 @@ struct ColorPickerPopup: View {
 }
 
 
+// MARK: - Fast and Simple ImagePickerCircle
 struct ImagePickerCircle: View {
     @Binding var selectedImage: UIImage?
     @Binding var photosPickerItem: PhotosPickerItem?
@@ -369,7 +345,6 @@ struct ImagePickerCircle: View {
                     ProgressView()
                         .scaleEffect(0.7)
                 } else if let selectedImage = selectedImage {
-                    // Show blue outline when image is selected
                     Image(uiImage: selectedImage)
                         .resizable()
                         .scaledToFill()
@@ -392,42 +367,65 @@ struct ImagePickerCircle: View {
                         .font(.system(size: 16))
                         .foregroundColor(.black.opacity(0.6))
                 }
-                
             }
         }
         .buttonStyle(PlainButtonStyle())
         .frame(width: 40, height: 40)
         .onChange(of: photosPickerItem) { oldItem, newItem in
+            guard let newItem = newItem else { return }
+            
             Task {
                 isLoadingImage = true
                 
-                if let data = try? await newItem?.loadTransferable(type: Data.self),
-                   let image = UIImage(data: data) {
-                    
-                    let maxSize: CGFloat = 1000
-                    let resizedImage = image.resized(to: maxSize)
+                if let data = try? await newItem.loadTransferable(type: Data.self) {
+                    // Fast image processing on background thread
+                    let processedImage = await Task.detached(priority: .userInitiated) { () -> UIImage? in
+                        guard let image = UIImage(data: data) else { return nil }
+                        
+                        // Quick resize for performance
+                        let maxDimension: CGFloat = 1200
+                        let scale = min(maxDimension / image.size.width, maxDimension / image.size.height, 1.0)
+                        
+                        if scale < 1.0 {
+                            let newSize = CGSize(width: image.size.width * scale, height: image.size.height * scale)
+                            
+                            UIGraphicsBeginImageContextWithOptions(newSize, false, 1.0)
+                            image.draw(in: CGRect(origin: .zero, size: newSize))
+                            let resizedImage = UIGraphicsGetImageFromCurrentImageContext()
+                            UIGraphicsEndImageContext()
+                            
+                            return resizedImage
+                        }
+                        
+                        return image
+                    }.value
                     
                     await MainActor.run {
-                        selectedImage = resizedImage
+                        if let processedImage = processedImage {
+                            selectedImage = processedImage
+                            CartBackgroundImageManager.shared.saveImage(processedImage, forCartId: cart.id)
+                            
+                            NotificationCenter.default.post(
+                                name: Notification.Name("CartBackgroundImageChanged"),
+                                object: nil,
+                                userInfo: ["cartId": cart.id]
+                            )
+                        }
+                        
                         isLoadingImage = false
+                        photosPickerItem = nil
                     }
-                    
-                    CartBackgroundImageManager.shared.saveImage(resizedImage, forCartId: cart.id)
-                    
-                    NotificationCenter.default.post(
-                        name: Notification.Name("CartBackgroundImageChanged"),
-                        object: nil,
-                        userInfo: ["cartId": cart.id]
-                    )
                 } else {
                     await MainActor.run {
                         isLoadingImage = false
+                        photosPickerItem = nil
                     }
                 }
             }
         }
     }
 }
+
 
 // MARK: - ColorScrollView Subview
 struct ColorScrollView: View {
@@ -525,8 +523,6 @@ extension UIImage {
     }
 }
 
-// MARK: - Background Image Manager
-// MARK: - Background Image Manager (Updated)
 class CartBackgroundImageManager {
     static let shared = CartBackgroundImageManager()
     private let fileManager = FileManager.default

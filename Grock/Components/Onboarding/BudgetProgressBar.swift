@@ -43,7 +43,7 @@ struct FluidBudgetPillView: View {
                 ZStack(alignment: .leading) {
                     // Background track
                     Capsule()
-                        .fill(Color.white)
+                        .fill(Color.white.opacity(0.5))
                         .frame(height: 20)
                         .overlay(
                             Capsule()

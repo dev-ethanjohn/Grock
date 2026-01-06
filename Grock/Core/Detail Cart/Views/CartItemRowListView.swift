@@ -9,10 +9,9 @@ struct CartItemRowListView: View {
     let onEditItem: () -> Void
     let onDeleteItem: () -> Void
     let isLastItem: Bool
-    let backgroundColor: Color
-    let hasBackgroundImage: Bool
     
     @Environment(VaultService.self) private var vaultService
+    @Environment(CartStateManager.self) private var stateManager
     @State private var refreshTrigger = 0
     
     var body: some View {
@@ -23,9 +22,7 @@ struct CartItemRowListView: View {
             onFulfillItem: onFulfillItem,
             onEditItem: onEditItem,
             onDeleteItem: onDeleteItem,
-            isLastItem: isLastItem,
-            backgroundColor: backgroundColor,
-            hasBackgroundImage: hasBackgroundImage
+            isLastItem: isLastItem
         )
         .onAppear {
             loadItem()
@@ -74,7 +71,7 @@ struct CartItemRowListView: View {
     }
 }
 
-// MARK: - Main Row Content
+// MARK: - Main Row Content (Updated)
 private struct MainRowContent: View {
     @Bindable var cartItem: CartItem
     let item: Item?
@@ -83,10 +80,9 @@ private struct MainRowContent: View {
     let onEditItem: () -> Void
     let onDeleteItem: () -> Void
     let isLastItem: Bool
-    let backgroundColor: Color
-    let hasBackgroundImage: Bool
     
     @Environment(VaultService.self) private var vaultService
+    @Environment(CartStateManager.self) private var stateManager
     
     @AppStorage private var hasShownNewBadge: Bool
     @State private var showNewBadge: Bool = false
@@ -110,7 +106,7 @@ private struct MainRowContent: View {
     @State private var currentTotalPrice: Double = 0
     @State private var displayUnit: String = ""
     
-    init(cartItem: CartItem, item: Item?, cart: Cart, onFulfillItem: @escaping () -> Void, onEditItem: @escaping () -> Void, onDeleteItem: @escaping () -> Void, isLastItem: Bool, backgroundColor: Color, hasBackgroundImage: Bool) {
+    init(cartItem: CartItem, item: Item?, cart: Cart, onFulfillItem: @escaping () -> Void, onEditItem: @escaping () -> Void, onDeleteItem: @escaping () -> Void, isLastItem: Bool) {
         self.cartItem = cartItem
         self.item = item
         self.cart = cart
@@ -118,8 +114,6 @@ private struct MainRowContent: View {
         self.onEditItem = onEditItem
         self.onDeleteItem = onDeleteItem
         self.isLastItem = isLastItem
-        self.backgroundColor = backgroundColor
-        self.hasBackgroundImage = hasBackgroundImage
         
         if cartItem.isShoppingOnlyItem, let shoppingName = cartItem.shoppingOnlyName {
             let storageKey = "hasShownNewBadge_\(cart.id)_\(shoppingName)"
@@ -153,12 +147,9 @@ private struct MainRowContent: View {
                 isFulfilling: $isFulfilling,
                 iconScale: $iconScale,
                 checkmarkScale: $checkmarkScale,
-                onFulfillItem: onFulfillItem,
-                hasBackgroundImage: hasBackgroundImage
+                onFulfillItem: onFulfillItem
             )
             .applyRowBackground(
-                hasBackgroundImage: hasBackgroundImage,
-                backgroundColor: backgroundColor,
                 isShoppingOnlyItem: isShoppingOnlyItem,
                 showNewBadge: showNewBadge,
                 hasShownNewBadge: hasShownNewBadge,
@@ -351,7 +342,7 @@ private struct MainRowContent: View {
     }
 }
 
-// MARK: - Cart Row Main Content (Separated for type-checking)
+// MARK: - Cart Row Main Content (Updated)
 private struct CartRowMainContent: View {
     let cartItem: CartItem
     let item: Item?
@@ -368,7 +359,8 @@ private struct CartRowMainContent: View {
     @Binding var iconScale: CGFloat
     @Binding var checkmarkScale: CGFloat
     let onFulfillItem: () -> Void
-    let hasBackgroundImage: Bool
+    
+    @Environment(CartStateManager.self) private var stateManager
     
     var body: some View {
         HStack(alignment: .top, spacing: 0) {
@@ -379,8 +371,7 @@ private struct CartRowMainContent: View {
                     iconScale: $iconScale,
                     checkmarkScale: $checkmarkScale,
                     buttonScale: buttonScale,
-                    onFulfillItem: onFulfillItem,
-                    hasBackgroundImage: hasBackgroundImage
+                    onFulfillItem: onFulfillItem
                 )
             }
             
@@ -394,8 +385,7 @@ private struct CartRowMainContent: View {
                 displayUnit: displayUnit,
                 shouldDisplayBadge: shouldDisplayBadge,
                 badgeScale: badgeScale,
-                badgeRotation: badgeRotation,
-                hasBackgroundImage: hasBackgroundImage
+                badgeRotation: badgeRotation
             )
         }
         .padding(.vertical, 12)
@@ -405,7 +395,7 @@ private struct CartRowMainContent: View {
     }
 }
 
-// MARK: - Item Details Section
+// MARK: - Item Details Section (Updated)
 private struct ItemDetailsSection: View {
     let cartItem: CartItem
     let item: Item?
@@ -417,7 +407,8 @@ private struct ItemDetailsSection: View {
     let shouldDisplayBadge: Bool
     let badgeScale: CGFloat
     let badgeRotation: Double
-    let hasBackgroundImage: Bool
+    
+    @Environment(CartStateManager.self) private var stateManager
     
     private var isItemFulfilled: Bool {
         cart.isShopping && (cartItem.isFulfilled || cartItem.isSkippedDuringShopping)
@@ -433,23 +424,21 @@ private struct ItemDetailsSection: View {
                 shouldDisplayBadge: shouldDisplayBadge,
                 badgeScale: badgeScale,
                 badgeRotation: badgeRotation,
-                isItemFulfilled: isItemFulfilled,
-                hasBackgroundImage: hasBackgroundImage
+                isItemFulfilled: isItemFulfilled
             )
             
             ItemPriceRow(
                 currentPrice: currentPrice,
                 displayUnit: displayUnit,
                 currentTotalPrice: currentTotalPrice,
-                isItemFulfilled: isItemFulfilled,
-                hasBackgroundImage: hasBackgroundImage
+                isItemFulfilled: isItemFulfilled
             )
         }
         .opacity(isItemFulfilled ? 0.5 : 1.0)
     }
 }
 
-// MARK: - Item Name Row
+// MARK: - Item Name Row (Updated)
 private struct ItemNameRow: View {
     let cartItem: CartItem
     let item: Item?
@@ -459,7 +448,8 @@ private struct ItemNameRow: View {
     let badgeScale: CGFloat
     let badgeRotation: Double
     let isItemFulfilled: Bool
-    let hasBackgroundImage: Bool
+    
+    @Environment(CartStateManager.self) private var stateManager
     
     var body: some View {
         HStack(spacing: 4) {
@@ -467,7 +457,7 @@ private struct ItemNameRow: View {
                 .lexendFont(17, weight: .regular)
                 .contentTransition(.numericText())
                 .animation(.spring(response: 0.5, dampingFraction: 0.7), value: currentQuantity)
-                .foregroundColor(hasBackgroundImage ? .white : .primary)
+                .foregroundColor(stateManager.hasBackgroundImage ? .white.opacity(0.8) : .primary)
             
             Text(item?.name ?? cartItem.shoppingOnlyName ?? "Unknown Item")
                 .lexendFont(17, weight: .regular)
@@ -475,7 +465,7 @@ private struct ItemNameRow: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .strikethrough(isItemFulfilled)
                 .id(item?.name ?? cartItem.shoppingOnlyName ?? "Unknown")
-                .foregroundColor(hasBackgroundImage ? .white : .primary)
+                .foregroundColor(stateManager.hasBackgroundImage ? .white.opacity(0.8) : .primary)
             
             Spacer()
             
@@ -490,13 +480,14 @@ private struct ItemNameRow: View {
     }
 }
 
-// MARK: - Item Price Row
+// MARK: - Item Price Row (Updated)
 private struct ItemPriceRow: View {
     let currentPrice: Double
     let displayUnit: String
     let currentTotalPrice: Double
     let isItemFulfilled: Bool
-    let hasBackgroundImage: Bool
+    
+    @Environment(CartStateManager.self) private var stateManager
     
     var body: some View {
         HStack(spacing: 4) {
@@ -505,7 +496,7 @@ private struct ItemPriceRow: View {
                 .lineLimit(1)
                 .contentTransition(.numericText())
                 .animation(.spring(response: 0.5, dampingFraction: 0.7), value: currentPrice)
-                .foregroundColor(hasBackgroundImage ? .white.opacity(0.9) : Color(hex: "231F30"))
+                .foregroundColor(stateManager.hasBackgroundImage ? .white.opacity(0.9) : Color(hex: "231F30"))
             
             Spacer()
             
@@ -514,52 +505,37 @@ private struct ItemPriceRow: View {
                 .lineLimit(1)
                 .contentTransition(.numericText())
                 .animation(.spring(response: 0.5, dampingFraction: 0.7), value: currentTotalPrice)
-                .foregroundColor(hasBackgroundImage ? .white : Color(hex: "231F30"))
+                .foregroundColor(stateManager.hasBackgroundImage ? .white : Color(hex: "231F30"))
         }
-//        .foregroundColor(Color(hex: "231F30"))
         .opacity(isItemFulfilled ? 0.5 : 1.0)
     }
 }
 
-// MARK: - View Modifiers
+// MARK: - View Modifiers (Updated)
 private extension View {
     @ViewBuilder
     func applyRowBackground(
-        hasBackgroundImage: Bool,
-        backgroundColor: Color,
         isShoppingOnlyItem: Bool,
         showNewBadge: Bool,
         hasShownNewBadge: Bool,
         rowHighlight: Bool
     ) -> some View {
-        if !hasBackgroundImage {
-            self.background(
-                RowBackgroundView(
-                    backgroundColor: backgroundColor,
-                    isShoppingOnlyItem: isShoppingOnlyItem,
-                    showNewBadge: showNewBadge,
-                    hasShownNewBadge: hasShownNewBadge,
-                    rowHighlight: rowHighlight
+        self.background(
+            RowBackgroundView(
+                isShoppingOnlyItem: isShoppingOnlyItem,
+                showNewBadge: showNewBadge,
+                hasShownNewBadge: hasShownNewBadge,
+                rowHighlight: rowHighlight
+            )
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(
+                    isShoppingOnlyItem && showNewBadge && !hasShownNewBadge && rowHighlight ?
+                    Color(hex: "FFB300").opacity(0.4) : Color.clear,
+                    lineWidth: isShoppingOnlyItem && showNewBadge && !hasShownNewBadge && rowHighlight ? 1.5 : 0
                 )
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(
-                        isShoppingOnlyItem && showNewBadge && !hasShownNewBadge && rowHighlight ?
-                        Color(hex: "FFB300").opacity(0.4) : Color.clear,
-                        lineWidth: isShoppingOnlyItem && showNewBadge && !hasShownNewBadge && rowHighlight ? 1.5 : 0
-                    )
-            )
-        } else {
-            self.overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(
-                        isShoppingOnlyItem && showNewBadge && !hasShownNewBadge && rowHighlight ?
-                        Color(hex: "FFB300").opacity(0.4) : Color.clear,
-                        lineWidth: isShoppingOnlyItem && showNewBadge && !hasShownNewBadge && rowHighlight ? 1.5 : 0
-                    )
-            )
-        }
+        )
     }
     
     func applyDataChangeObservers(
@@ -619,17 +595,19 @@ private extension View {
     }
 }
 
-// MARK: - Row Background View
+
+// MARK: - Row Background View (Updated)
 private struct RowBackgroundView: View {
-    let backgroundColor: Color
     let isShoppingOnlyItem: Bool
     let showNewBadge: Bool
     let hasShownNewBadge: Bool
     let rowHighlight: Bool
     
+    @Environment(CartStateManager.self) private var stateManager
+    
     var body: some View {
         ZStack {
-            backgroundColor
+            stateManager.effectiveRowBackgroundColor
             
             // Highlight only for shopping-only items with badge animation
             if isShoppingOnlyItem && showNewBadge && !hasShownNewBadge && rowHighlight {
@@ -648,21 +626,22 @@ private struct RowBackgroundView: View {
     }
 }
 
-// MARK: - Fulfillment Button Content
+// MARK: - Fulfillment Button Content (Updated)
 private struct FulfillmentButtonContent: View {
     let cartItem: CartItem
     let iconScale: CGFloat
     let checkmarkScale: CGFloat
     let buttonScale: CGFloat
-    let hasBackgroundImage: Bool // Add this parameter
+    
+    @Environment(CartStateManager.self) private var stateManager
     
     var body: some View {
         ZStack {
             Circle()
                 .strokeBorder(
                     cartItem.isFulfilled ?
-                        (hasBackgroundImage ? Color.white : Color.green) : // White checkmark on image
-                        (hasBackgroundImage ? Color.white.opacity(0.7) : Color(hex: "666")), // White circle on image
+                        (stateManager.hasBackgroundImage ? Color.white : Color.green) :
+                        (stateManager.hasBackgroundImage ? Color.white.opacity(0.7) : Color(hex: "666")),
                     lineWidth: cartItem.isFulfilled ? 0 : 1.5
                 )
                 .frame(width: 18, height: 18)
@@ -672,7 +651,7 @@ private struct FulfillmentButtonContent: View {
             if cartItem.isFulfilled {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 22))
-                    .foregroundColor(hasBackgroundImage ? .white : .green) // White on image
+                    .foregroundColor(stateManager.hasBackgroundImage ? .white : .green)
                     .scaleEffect(checkmarkScale)
                     .animation(.spring(response: 0.3, dampingFraction: 0.6), value: checkmarkScale)
             } else {
@@ -689,7 +668,7 @@ private struct FulfillmentButtonContent: View {
     }
 }
 
-// MARK: - Fulfillment Button Component
+// MARK: - Fulfillment Button Component (Updated)
 private struct FulfillmentButton: View {
     let cartItem: CartItem
     @Binding var isFulfilling: Bool
@@ -697,7 +676,6 @@ private struct FulfillmentButton: View {
     @Binding var checkmarkScale: CGFloat
     let buttonScale: CGFloat
     let onFulfillItem: () -> Void
-    let hasBackgroundImage: Bool // Add this parameter
     
     var body: some View {
         Button(action: handleButtonTap) {
@@ -705,8 +683,7 @@ private struct FulfillmentButton: View {
                 cartItem: cartItem,
                 iconScale: iconScale,
                 checkmarkScale: checkmarkScale,
-                buttonScale: buttonScale,
-                hasBackgroundImage: hasBackgroundImage // Pass this
+                buttonScale: buttonScale
             )
         }
         .buttonStyle(.plain)
@@ -733,7 +710,6 @@ private struct FulfillmentButton: View {
         }
     }
 }
-
 // MARK: - Sparkle Effect Component
 struct SparkleEffectView: View {
     let opacity: Double

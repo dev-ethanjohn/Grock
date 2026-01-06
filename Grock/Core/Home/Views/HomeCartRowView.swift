@@ -8,6 +8,8 @@ struct HomeCartRowView: View {
     @State private var viewModel: HomeCartRowViewModel
     @State private var appeared = false
     @State private var currentProgress: Double = 0
+    @State private var backgroundImage: UIImage? = nil
+    @State private var hasBackgroundImage = false
     
     init(cart: Cart, vaultService: VaultService?) {
         self.cart = cart
@@ -56,13 +58,45 @@ struct HomeCartRowView: View {
         }
     }
     
+    private var backgroundColor: Color {
+        if hasBackgroundImage {
+            return Color.clear
+        } else {
+            return ColorOption.getBackgroundColor(for: cart.id, isRow: true)
+        }
+    }
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             headerRow
             progressSection
         }
         .padding()
-        .background(ColorOption.getBackgroundColor(for: cart.id, isRow: true))// Use helper
+        .background(
+            Group {
+                if hasBackgroundImage, let backgroundImage = backgroundImage {
+                    ZStack {
+                        // Background image with overlay
+                        Image(uiImage: backgroundImage)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .clipped()
+                            .blur(radius: 1)
+                            .overlay(Color.black.opacity(0.3))
+                        
+                        VisibleNoiseView(
+                            grainSize: 0.0001,      // Medium grain size
+                            density: 1,        // Visible but not overwhelming
+                            opacity: 0.15        // Subtle but noticeable
+                        )
+                    }
+                } else {
+                    // Solid color background
+                    backgroundColor
+                }
+            }
+        )
         .cornerRadius(24)
         .overlay(
             RoundedRectangle(cornerRadius: 24)
@@ -76,7 +110,9 @@ struct HomeCartRowView: View {
                 appeared = true
             }
             currentProgress = cart.totalSpent / cart.budget
-            // No need to load background color - helper handles it
+            
+            // Load background image
+            loadBackgroundImage()
         }
         .onChange(of: cart.budget) { oldValue, newValue in
             guard oldValue != newValue else { return }
@@ -91,7 +127,20 @@ struct HomeCartRowView: View {
                 currentProgress = newValue / cart.budget
             }
         }
-        
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("CartBackgroundImageChanged"))) { notification in
+            // Reload image when notification is received
+            if let cartId = notification.userInfo?["cartId"] as? String,
+               cartId == cart.id {
+                loadBackgroundImage()
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("CartColorChanged"))) { notification in
+            // Also reload when color changes (in case image is removed)
+            if let cartId = notification.userInfo?["cartId"] as? String,
+               cartId == cart.id {
+                loadBackgroundImage()
+            }
+        }
     }
     
     private var headerRow: some View {
@@ -129,9 +178,8 @@ struct HomeCartRowView: View {
                         Text(category.emoji)
                             .font(.system(size: 11))
                             .frame(width: 20, height: 20)
-                            .background(category.pastelColor)
+                            .background(category.pastelColor.opacity(0.6))
                             .cornerRadius(8)
-                            .opacity(0.3)
                     }
                 }
             }
@@ -139,20 +187,29 @@ struct HomeCartRowView: View {
             Spacer()
         }
     }
+    
+    // MARK: - Background Image Loading
+    
+    private func loadBackgroundImage() {
+        // Check if we have a background image
+        hasBackgroundImage = CartBackgroundImageManager.shared.hasBackgroundImage(forCartId: cart.id)
+        
+        if hasBackgroundImage {
+            // Try cache first
+            if let cachedImage = ImageCacheManager.shared.getImage(forCartId: cart.id) {
+                backgroundImage = cachedImage
+            } else {
+                // Load from disk
+                backgroundImage = CartBackgroundImageManager.shared.loadImage(forCartId: cart.id)
+                hasBackgroundImage = backgroundImage != nil
+                
+                // Cache it for next time
+                if let image = backgroundImage {
+                    ImageCacheManager.shared.saveImage(image, forCartId: cart.id)
+                }
+            }
+        } else {
+            backgroundImage = nil
+        }
+    }
 }
-
-//#Preview {
-//    let mockCart = Cart(
-//        name: "Tues Brunch",
-//        budget: 2000.0,
-//        fulfillmentStatus: 0.8144,
-//        createdAt: Date(),
-//        status: .planning
-//    )
-//
-//    HomeCartRowView(cart: mockCart, vaultService: nil)
-//        .padding()
-//        .background(Color.gray.opacity(0.1))
-//}
-
-

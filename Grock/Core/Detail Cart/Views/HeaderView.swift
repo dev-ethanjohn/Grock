@@ -2,24 +2,19 @@ import SwiftUI
 
 struct HeaderView: View {
     let cart: Cart
-       let animatedBudget: Double
-       let localBudget: Double
-       @Binding var showingDeleteAlert: Bool
-       @Binding var showingCompleteAlert: Bool
-       @Binding var showingStartShoppingAlert: Bool
-       @Binding var headerHeight: CGFloat
-       let dismiss: DismissAction
-       @Binding var showingEditCartName: Bool 
-       @Binding var refreshTrigger: UUID
-       var onBudgetTap: (() -> Void)?
-    
-    private var progress: Double {
-        guard localBudget > 0 else { return 0 }
-        let spent = cart.totalSpent
-        return min(spent / localBudget, 1.0)
-    }
+    let dismiss: DismissAction
+    var onBudgetTap: (() -> Void)?
     
     @Environment(VaultService.self) private var vaultService
+    @Environment(CartStateManager.self) private var stateManager
+    
+    private var progress: Double {
+        guard stateManager.localBudget > 0 else { return 0 }
+        let spent = cart.totalSpent
+        return min(spent / stateManager.localBudget, 1.0)
+    }
+    
+    @State private var headerHeight: CGFloat = 0
     
     private var budgetProgressColor: Color {
         let progress = self.progress
@@ -30,10 +25,6 @@ struct HeaderView: View {
         } else {
             return .red
         }
-    }
-    
-    private func progressWidth(for totalWidth: CGFloat) -> CGFloat {
-        return CGFloat(progress) * totalWidth
     }
     
     var body: some View {
@@ -53,20 +44,20 @@ struct HeaderView: View {
                 Spacer()
                 
                 Menu {
-                    // ADD THIS: Edit Cart Name button as the first option
+                    // Edit Cart Name button
                     Button("Edit Cart Name", systemImage: "pencil") {
-                        showingEditCartName = true
+                        stateManager.showingEditCartName = true
                     }
                     
                     Divider()
                     
                     if cart.isPlanning {
                         Button("Start Shopping", systemImage: "cart") {
-                            showingStartShoppingAlert = true
+                            stateManager.showingStartShoppingAlert = true
                         }
                     } else if cart.isShopping {
                         Button("Complete Shopping", systemImage: "checkmark.circle") {
-                            showingCompleteAlert = true
+                            // This will be handled via the Floating Action Bar
                         }
                     } else if cart.isCompleted {
                         Button("Reactivate Cart", systemImage: "arrow.clockwise") {
@@ -76,7 +67,7 @@ struct HeaderView: View {
                     Divider()
                     
                     Button("Delete Cart", systemImage: "trash", role: .destructive) {
-                        showingDeleteAlert = true
+                        // This binding will come from CartDetailContent
                     }
                 } label: {
                     Image(systemName: "ellipsis")
@@ -92,11 +83,11 @@ struct HeaderView: View {
                     .foregroundColor(.black)
                 
                 VStack(spacing: 8) {
-                        FluidBudgetPillView(
-                            cart: cart,
-                            animatedBudget: animatedBudget,
-                            onBudgetTap: onBudgetTap
-                        )
+                    FluidBudgetPillView(
+                        cart: cart,
+                        animatedBudget: stateManager.animatedBudget,
+                        onBudgetTap: onBudgetTap
+                    )
                     .frame(height: 22)
                 }
             }
@@ -105,18 +96,20 @@ struct HeaderView: View {
         .padding(.horizontal)
         .padding(.bottom, 12)
         .background(
-            GeometryReader { geometry in
-                Color.white
-                    .ignoresSafeArea(edges: .top)
-                    .shadow(color: Color.black.opacity(0.12), radius: 4, x: 0, y: 1)
-                    .onAppear {
-                        headerHeight = geometry.size.height
-                    }
-                    .onChange(of: geometry.size.height) {_, newValue in
-                        headerHeight = newValue
-                    }
-            }
-        )
+                  GeometryReader { geometry in
+                      Color.white
+                          .ignoresSafeArea(edges: .top)
+                          .shadow(color: Color.black.opacity(0.12), radius: 4, x: 0, y: 1)
+                          .onAppear {
+                              // 🔥 Update header height in state manager
+                              stateManager.headerHeight = geometry.size.height
+                          }
+                          .onChange(of: geometry.size.height) { _, newValue in
+                              // 🔥 Update header height in state manager when it changes
+                              stateManager.headerHeight = newValue
+                          }
+                  }
+              )
     }
     
     func tripDateLabel(cart: Cart) -> String {
@@ -125,14 +118,12 @@ struct HeaderView: View {
         
         switch cart.status {
         case .planning:
-            // Planning carts show creation → last edit timeline
             if calendar.isDate(cart.createdAt, equalTo: cart.updatedAt, toGranularity: .day) {
                 if calendar.isDate(cart.updatedAt, inSameDayAs: today) {
                     return "Planning • Today"
                 }
                 return "Planning • " + cart.createdAt.formatted(.dateTime.month(.abbreviated).day())
             } else {
-                // Show the planning period
                 let dateRange = formatDateRange(start: cart.createdAt, end: cart.updatedAt)
                 return "Planning • \(dateRange)"
             }
@@ -145,7 +136,6 @@ struct HeaderView: View {
             if calendar.isDate(startedAt, inSameDayAs: today) {
                 return "Shopping • Today"
             }
-            // Show shopping period
             let dateRange = formatDateRange(start: startedAt, end: today)
             return "Shopping • \(dateRange)"
             
@@ -158,7 +148,6 @@ struct HeaderView: View {
             if calendar.isDate(startedAt, equalTo: completedAt, toGranularity: .day) {
                 return "Completed • " + startedAt.formatted(.dateTime.month(.abbreviated).day())
             }
-            // Show completed shopping period
             let dateRange = formatDateRange(start: startedAt, end: completedAt)
             return "Completed • \(dateRange)"
         }
@@ -186,4 +175,3 @@ struct HeaderView: View {
         return "\(start.formatted(.dateTime.month(.abbreviated).day().year())) – \(end.formatted(.dateTime.month(.abbreviated).day().year()))"
     }
 }
-

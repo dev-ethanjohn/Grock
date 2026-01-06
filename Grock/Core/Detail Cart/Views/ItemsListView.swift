@@ -6,15 +6,12 @@ struct ItemsListView: View {
     let sortedStoresWithRefresh: [String]
     let storeItemsWithRefresh: (String) -> [(cartItem: CartItem, item: Item?)]
     @Binding var fulfilledCount: Int
-    let backgroundColor: Color
-    let rowBackgroundColor: Color
-    let hasBackgroundImage: Bool
-    let backgroundImage: UIImage?
     let onFulfillItem: (CartItem) -> Void
     let onEditItem: (CartItem) -> Void
     let onDeleteItem: (CartItem) -> Void
     
     @Environment(VaultService.self) private var vaultService
+    @Environment(CartStateManager.self) private var stateManager
     
     var body: some View {
         MainContentView(
@@ -23,10 +20,6 @@ struct ItemsListView: View {
             sortedStoresWithRefresh: sortedStoresWithRefresh,
             storeItemsWithRefresh: storeItemsWithRefresh,
             fulfilledCount: $fulfilledCount,
-            backgroundColor: backgroundColor,
-            rowBackgroundColor: rowBackgroundColor,
-            hasBackgroundImage: hasBackgroundImage,
-            backgroundImage: backgroundImage,
             onFulfillItem: onFulfillItem,
             onEditItem: onEditItem,
             onDeleteItem: onDeleteItem,
@@ -53,14 +46,12 @@ private struct MainContentView: View {
     let sortedStoresWithRefresh: [String]
     let storeItemsWithRefresh: (String) -> [(cartItem: CartItem, item: Item?)]
     @Binding var fulfilledCount: Int
-    let backgroundColor: Color
-    let rowBackgroundColor: Color
-    let hasBackgroundImage: Bool
-    let backgroundImage: UIImage?
     let onFulfillItem: (CartItem) -> Void
     let onEditItem: (CartItem) -> Void
     let onDeleteItem: (CartItem) -> Void
     let vaultService: VaultService
+    
+    @Environment(CartStateManager.self) private var stateManager
     
     // Computed properties
     private var allItemsCompleted: Bool {
@@ -90,8 +81,8 @@ private struct MainContentView: View {
             VStack(spacing: 0) {
                 if cart.isShopping && allItemsCompleted {
                     ShoppingCompleteCelebrationView(
-                        backgroundColor: backgroundColor,
-                        rowBackgroundColor: rowBackgroundColor,
+                        backgroundColor: stateManager.effectiveBackgroundColor,
+                        rowBackgroundColor: stateManager.effectiveRowBackgroundColor,
                         maxAllowedHeight: maxAllowedHeight
                     )
                 } else if !hasDisplayItems && cart.isPlanning {
@@ -103,10 +94,6 @@ private struct MainContentView: View {
                         cart: cart,
                         sortedStoresWithRefresh: sortedStoresWithRefresh,
                         storeItemsWithRefresh: storeItemsWithRefresh,
-                        backgroundColor: backgroundColor,
-                        rowBackgroundColor: rowBackgroundColor,
-                        hasBackgroundImage: hasBackgroundImage,
-                        backgroundImage: backgroundImage,
                         onFulfillItem: onFulfillItem,
                         onEditItem: onEditItem,
                         onDeleteItem: onDeleteItem,
@@ -263,10 +250,6 @@ private struct ItemsListContent: View {
     let cart: Cart
     let sortedStoresWithRefresh: [String]
     let storeItemsWithRefresh: (String) -> [(cartItem: CartItem, item: Item?)]
-    let backgroundColor: Color
-    let rowBackgroundColor: Color
-    let hasBackgroundImage: Bool
-    let backgroundImage: UIImage?
     let onFulfillItem: (CartItem) -> Void
     let onEditItem: (CartItem) -> Void
     let onDeleteItem: (CartItem) -> Void
@@ -275,6 +258,7 @@ private struct ItemsListContent: View {
     let maxAllowedHeight: CGFloat
     
     @Environment(VaultService.self) private var vaultService
+    @Environment(CartStateManager.self) private var stateManager
     
     // Helper methods
     private func getDisplayItems(for store: String) -> [(cartItem: CartItem, item: Item?)] {
@@ -308,9 +292,74 @@ private struct ItemsListContent: View {
     }
     
     var body: some View {
+        VStack(spacing: 0) {
+            // Main content with conditional offset and shadow
+            StoreItemsList(
+                sortedStoresByNewestItem: sortedStoresByNewestItem,
+                getDisplayItems: getDisplayItems,
+                cart: cart,
+                onFulfillItem: onFulfillItem,
+                onEditItem: onEditItem,
+                onDeleteItem: onDeleteItem,
+                calculatedHeight: calculatedHeight,
+                maxAllowedHeight: maxAllowedHeight,
+                geometry: geometry
+            )
+            
+            if cart.isShopping {
+                ShoppingProgressSummary(cart: cart)
+                    .presentationCornerRadius(24)
+                    .environment(vaultService)
+                    .transition(
+                        .asymmetric(
+                            insertion: .opacity
+                                .combined(with: .move(edge: .bottom))
+                                .combined(with: .scale(scale: 0.95, anchor: .bottom)),
+                            removal: .opacity
+                                .combined(with: .move(edge: .bottom))
+                        )
+                    )
+                    .offset(y: stateManager.hasBackgroundImage ? 0 : 4)
+                    .animation(.spring(response: 0.45, dampingFraction: 0.75), value: cart.isShopping)
+            }
+        }
+        .animation(.spring(response: 0.45, dampingFraction: 0.75), value: cart.isShopping)
+    }
+}
+
+// MARK: - Store Items List
+private struct StoreItemsList: View {
+    let sortedStoresByNewestItem: [String]
+    let getDisplayItems: (String) -> [(cartItem: CartItem, item: Item?)]
+    let cart: Cart
+    let onFulfillItem: (CartItem) -> Void
+    let onEditItem: (CartItem) -> Void
+    let onDeleteItem: (CartItem) -> Void
+    let calculatedHeight: CGFloat
+    let maxAllowedHeight: CGFloat
+    let geometry: GeometryProxy
+    
+    @Environment(CartStateManager.self) private var stateManager
+    
+    var body: some View {
+        listContent
+            .frame(height: min(calculatedHeight, maxAllowedHeight))
+            .applyListStyling()
+            .applyBackground(
+                hasBackgroundImage: stateManager.hasBackgroundImage,
+                backgroundImage: stateManager.backgroundImage,
+                backgroundColor: stateManager.effectiveBackgroundColor,
+                geometry: geometry
+            )
+            .applyBorderAndCorners(hasBackgroundImage: stateManager.hasBackgroundImage)
+            .applyAnimations(calculatedHeight: calculatedHeight, isShopping: cart.isShopping)
+            .applyShoppingElevation(isShopping: cart.isShopping, hasBackgroundImage: stateManager.hasBackgroundImage)
+    }
+    
+    private var listContent: some View {
         List {
             ForEach(Array(sortedStoresByNewestItem.enumerated()), id: \.offset) { (index, store) in
-                let displayItems = getDisplayItems(for: store)
+                let displayItems = getDisplayItems(store)
                 
                 if !displayItems.isEmpty {
                     StoreSectionListView(
@@ -322,41 +371,88 @@ private struct ItemsListContent: View {
                         },
                         onEditItem: onEditItem,
                         onDeleteItem: onDeleteItem,
-                        isLastStore: index == sortedStoresByNewestItem.count - 1,
-                        backgroundColor: backgroundColor,
-                        rowBackgroundColor: rowBackgroundColor,
-                        hasBackgroundImage: hasBackgroundImage
+                        isLastStore: index == sortedStoresByNewestItem.count - 1
                     )
                     .listRowInsets(EdgeInsets())
                     .listRowSeparator(.hidden)
-                    .listRowBackground(rowBackgroundColor)
+                    .listRowBackground(stateManager.effectiveRowBackgroundColor)
                 }
             }
-        }
-        .frame(height: min(calculatedHeight, maxAllowedHeight))
-        .listStyle(PlainListStyle())
-        .listSectionSpacing(0)
-        .background(
-            ListBackgroundView(
-                hasBackgroundImage: hasBackgroundImage,
-                backgroundImage: backgroundImage,
-                backgroundColor: backgroundColor,
-                geometry: geometry
-            )
-        )
-        .cornerRadius(16)
-        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: calculatedHeight)
-        
-        if cart.isShopping {
-            ShoppingProgressSummary(cart: cart)
-                .presentationCornerRadius(24)
-                .environment(vaultService)
-                .transition(.opacity.combined(with: .move(edge: .bottom)))
         }
     }
 }
 
-// MARK: - List Background View
+// MARK: - View Modifiers for StoreItemsList
+private extension View {
+    func applyListStyling() -> some View {
+        self
+            .listStyle(PlainListStyle())
+            .listSectionSpacing(0)
+    }
+    
+    func applyBackground(
+        hasBackgroundImage: Bool,
+        backgroundImage: UIImage?,
+        backgroundColor: Color,
+        geometry: GeometryProxy
+    ) -> some View {
+        self
+            .background(
+                ListBackgroundView(
+                    hasBackgroundImage: hasBackgroundImage,
+                    backgroundImage: backgroundImage,
+                    backgroundColor: backgroundColor,
+                    geometry: geometry
+                )
+            )
+    }
+    
+    func applyBorderAndCorners(hasBackgroundImage: Bool) -> some View {
+        self
+            .cornerRadius(16)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(hasBackgroundImage ? Color.white.opacity(0.95) : Color.clear)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(Color.black, lineWidth: 0.3)
+            )
+    }
+    
+    func applyAnimations(calculatedHeight: CGFloat, isShopping: Bool) -> some View {
+        self
+            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: calculatedHeight)
+            .animation(.spring(response: 0.45, dampingFraction: 0.75), value: isShopping)
+    }
+    
+    func applyShoppingElevation(isShopping: Bool, hasBackgroundImage: Bool) -> some View {
+        self
+            .offset(y: isShopping ? -4 : 0)
+            // Large, soft shadow for depth - only applied to bottom
+            .shadow(
+                color: isShopping ? Color.black.opacity(hasBackgroundImage ? 0.1 : 0.05) : Color.clear,
+                radius: isShopping ? (hasBackgroundImage ? 10 : 8) : 0,
+                x: 0,
+                y: isShopping ? (hasBackgroundImage ? 10 : 8) : 0
+            )
+            // Medium shadow for definition - only applied to bottom
+            .shadow(
+                color: isShopping ? Color.black.opacity(hasBackgroundImage ? 0.18 : 0.1) : Color.clear,
+                radius: isShopping ? (hasBackgroundImage ? 7 : 6) : 0,
+                x: 0,
+                y: isShopping ? (hasBackgroundImage ? 5 : 4) : 0
+            )
+            // Tight inner shadow effect on bottom edge - only applied to bottom
+            .shadow(
+                color: isShopping ? Color.black.opacity(hasBackgroundImage ? 0.25 : 0.1) : Color.clear,
+                radius: isShopping ? (hasBackgroundImage ? 4 : 3) : 0,
+                x: 0,
+                y: isShopping ? (hasBackgroundImage ? 4 : 2) : 0
+            )
+    }
+}
+
 private struct ListBackgroundView: View {
     let hasBackgroundImage: Bool
     let backgroundImage: UIImage?
@@ -366,26 +462,28 @@ private struct ListBackgroundView: View {
     var body: some View {
         ZStack {
             if hasBackgroundImage, let backgroundImage = backgroundImage {
+                // Show image when loaded with noise overlay
                 ZStack {
-                               Image(uiImage: backgroundImage)
-                                   .resizable()
-                                   .scaledToFill()
-                                   .frame(width: geometry.size.width, height: geometry.size.height)
-                                   .clipped()
-                                   .blur(radius: 1)
-                               
-                               // Dark overlay (2% opacity black)
-                               Color.black.opacity(0.4)
-                           }
-                    .overlay(
-                        VisibleNoiseView(
-                            grainSize: 0.00001,
-                            density: 1,
-                            opacity: 0.1,
-                        )
+                    Image(uiImage: backgroundImage)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: geometry.size.width, height: geometry.size.height)
+                        .clipped()
+                        .blur(radius: 0.5)
+                        .overlay(Color.black.opacity(0.4))
+                    
+                    VisibleNoiseView(
+                        grainSize: 0.0001,
+                        density: 1,
+                        opacity: 0.15
                     )
-//                    .opacity()
-                    .cornerRadius(16)
+                }
+            } else if hasBackgroundImage {
+                LinearGradient(
+                    colors: [Color.gray.opacity(0.1), Color.gray.opacity(0.2)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
             } else {
                 backgroundColor
             }
@@ -528,32 +626,5 @@ struct NoiseDemoView: View {
             
             Spacer()
         }
-    }
-}
-
-// MARK: - Alternative: Simple Canvas Noise (Easier to see)
-struct SimpleCanvasNoise: View {
-    let opacity: CGFloat
-    
-    var body: some View {
-        Canvas { context, size in
-            // Draw more points to be visible
-            let pointCount = Int(size.width * size.height * 0.001) // 0.1% density
-            
-            for _ in 0..<pointCount {
-                let x = CGFloat.random(in: 0..<size.width)
-                let y = CGFloat.random(in: 0..<size.height)
-                // Use more contrast
-                let gray = Double.random(in: 0.3...0.7)
-                
-                context.fill(
-                    Path(ellipseIn: CGRect(x: x, y: y, width: 1.5, height: 1.5)),
-                    with: .color(Color(white: gray))
-                )
-            }
-        }
-        .blendMode(.overlay)
-        .opacity(opacity)
-        .allowsHitTesting(false)
     }
 }

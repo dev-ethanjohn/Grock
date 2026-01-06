@@ -40,7 +40,6 @@ struct ActiveCarts: View {
     
     private var cartListView: some View {
         List {
-            // Add header space
             Color.clear
                 .frame(height: viewModel.headerHeight)
                 .listRowSeparator(.hidden)
@@ -59,7 +58,12 @@ struct ActiveCarts: View {
                 .buttonStyle(.plain)
                 .listRowSeparator(.hidden)
                 .listRowBackground(Color.clear)
-                .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
+                .listRowInsets(EdgeInsets(
+                            top: 0,
+                            leading: 0,
+                            bottom: index == viewModel.displayedCarts.count - 1 ? 0 : 8,
+                            trailing: 0
+                        ))
                 .transition(.asymmetric(
                     insertion: .scale(scale: 0.8).combined(with: .opacity),
                     removal: .scale(scale: 0.9).combined(with: .opacity)

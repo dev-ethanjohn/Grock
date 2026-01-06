@@ -5,6 +5,7 @@ struct HomeView: View {
     @Environment(VaultService.self) private var vaultService
     @Environment(CartViewModel.self) private var cartViewModel
     @State private var viewModel: HomeViewModel
+    @State private var cartStateManager: CartStateManager
     
     @State private var tabs: [CartTabsModel] = [
         .init(id: CartTabsModel.Tab.active),
@@ -36,6 +37,7 @@ struct HomeView: View {
     
     init(viewModel: HomeViewModel) {
         self._viewModel = State(initialValue: viewModel)
+        self._cartStateManager = State(initialValue: CartStateManager())
     }
     
     var body: some View {
@@ -119,6 +121,9 @@ struct HomeView: View {
             // In HomeView.swift
             .fullScreenCover(item: $viewModel.selectedCart) { cart in
                 CartDetailScreen(cart: cart)
+                    .environment(vaultService)
+                    .environment(cartViewModel)
+                    .environment(cartStateManager) // ADD THIS LINE - Pass CartStateManager
                     .onDisappear {
                         viewModel.loadCarts()
                         cartRefreshTrigger = UUID()
