@@ -698,36 +698,36 @@ struct CartDetailScreen: View {
             }
             
             // EditBudgetPopover with manual binding
-            if stateManager.showingEditBudget {
-                EditBudgetPopover(
-                    isPresented: Binding(
-                        get: { stateManager.showingEditBudget },
-                        set: { stateManager.showingEditBudget = $0 }
-                    ),
-                    currentBudget: stateManager.localBudget,
-                    onSave: { newBudget in
-                        stateManager.isSavingBudget = true
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                            stateManager.localBudget = newBudget
-                            
-                            withAnimation(.spring(duration: 0.3)) {
-                                stateManager.animatedBudget = newBudget
-                            }
-                            
-                            stateManager.isSavingBudget = false
-                        }
-                    },
-                    onDismiss: {
-                        if !stateManager.isSavingBudget {
-                            withAnimation(.easeInOut(duration: 0.3)) {
-                                stateManager.animatedBudget = stateManager.localBudget
-                            }
-                        }
-                    }
-                )
-                .environment(vaultService)
-                .zIndex(1000)
-            }
+//            if stateManager.showingEditBudget {
+//                EditBudgetPopover(
+//                    isPresented: Binding(
+//                        get: { stateManager.showingEditBudget },
+//                        set: { stateManager.showingEditBudget = $0 }
+//                    ),
+//                    currentBudget: stateManager.localBudget,
+//                    onSave: { newBudget in
+//                        stateManager.isSavingBudget = true
+//                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+//                            stateManager.localBudget = newBudget
+//                            
+//                            withAnimation(.spring(duration: 0.3)) {
+//                                stateManager.animatedBudget = newBudget
+//                            }
+//                            
+//                            stateManager.isSavingBudget = false
+//                        }
+//                    },
+//                    onDismiss: {
+//                        if !stateManager.isSavingBudget {
+//                            withAnimation(.easeInOut(duration: 0.3)) {
+//                                stateManager.animatedBudget = stateManager.localBudget
+//                            }
+//                        }
+//                    }
+//                )
+//                .environment(vaultService)
+//                .zIndex(1000)
+//            }
         }
         .environment(stateManager)
         .environment(alertManager)
@@ -1642,6 +1642,8 @@ struct CartDetailContent: View {
         GeometryReader { geometry in
             ZStack {
                 ZStack(alignment: .top) {
+                    Color(hex: "#f7f7f7").ignoresSafeArea()
+                    
                     VStack(spacing: 12) {
                         // CORRECTED: Just pass cart, no bindings needed
                         ModeToggleView(cart: cart)
@@ -1707,7 +1709,7 @@ struct CartDetailContent: View {
                     .animation(.spring(response: 0.3, dampingFraction: 0.7), value: stateManager.showingCompletedSheet)
                 }
             }
-            
+//            
             if stateManager.showingEditBudget {
                 EditBudgetPopover(
                     isPresented: Binding(

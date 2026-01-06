@@ -1,4 +1,5 @@
 import SwiftUI
+import Lottie
 
 struct HeaderView: View {
     let cart: Cart
@@ -21,14 +22,14 @@ struct HeaderView: View {
         if progress < 0.7 {
             return Color(hex: "98F476")
         } else if progress < 0.9 {
-            return .orange
+            return Color(hex: "F4B576")
         } else {
-            return .red
+            return Color(hex: "F47676")
         }
     }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 20) {
             HStack {
                 Button(action: { dismiss() }) {
                     Image("back_arrow")
@@ -77,10 +78,33 @@ struct HeaderView: View {
             }
             .padding(.top, 8)
             
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 0) {
                 Text(cart.name)
                     .shantellSansFont(24)
                     .foregroundColor(.black)
+                    .padding(.bottom, 8)
+                
+                HStack {
+                    HStack(spacing: 0) {
+                        Text("Cart Value")
+                            .lexendFont(13, weight: .light)
+                        
+                        LottieView(animation: .named("Arrow"))
+                            .playing(.fromProgress(0, toProgress: 0.5, loopMode: .playOnce))
+                            .frame(width: 32, height: 26)
+                            .rotationEffect(.degrees(120))
+                            .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
+                            .scaleEffect(0.8)
+                            .offset(y: 4)
+                            .allowsHitTesting(false)
+                    }
+                    
+                    Spacer()
+                    Text("Budget")
+                        .lexendFont(13, weight: .light)
+                }
+                .padding(.bottom, 4)
+                
                 
                 VStack(spacing: 8) {
                     FluidBudgetPillView(

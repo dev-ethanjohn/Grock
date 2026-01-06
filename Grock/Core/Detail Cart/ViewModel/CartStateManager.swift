@@ -53,7 +53,7 @@ final class CartStateManager {
     }
     
     var rowBackgroundColor: Color {
-        selectedColor.hex == "FFFFFF" ? Color.clear : selectedColor.color
+        selectedColor.hex == "FFFFFF" ? Color.clear : selectedColor.color.darker(by: 0.02)
     }
     
     var effectiveBackgroundColor: Color {

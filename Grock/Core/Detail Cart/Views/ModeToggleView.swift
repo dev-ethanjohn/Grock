@@ -6,15 +6,29 @@ struct ColorOption: Identifiable, Equatable {
     let hex: String
     let name: String
     
-    static let defaultColor = ColorOption(hex: "F7F2ED", name: "Beige")
+    static let defaultColor = ColorOption(hex: "F5E9D9", name: "Warm Beige")
     
     static let options: [ColorOption] = [
-        ColorOption(hex: "F7F2ED", name: "Beige"),
-        ColorOption(hex: "E8F4FD", name: "Light Blue"),
-        ColorOption(hex: "F0F7E6", name: "Light Green"),
-        ColorOption(hex: "FFF2F2", name: "Light Pink"),
-        ColorOption(hex: "F5F0FF", name: "Light Purple"),
-        ColorOption(hex: "FFF8E1", name: "Light Yellow"),
+        // Warm tones
+        ColorOption(hex: "F5E9D9", name: "Warm Beige"),
+        ColorOption(hex: "FFE6E6", name: "Blush Pink"),
+        ColorOption(hex: "FFE8CC", name: "Peach"),
+        ColorOption(hex: "FFF5CC", name: "Butter Yellow"),
+        ColorOption(hex: "FFEB99", name: "Lemon"),
+        ColorOption(hex: "FFD8B8", name: "Apricot"),
+        
+        // Cool tones
+        ColorOption(hex: "D6EDFF", name: "Sky Blue"),
+        ColorOption(hex: "EDE6FF", name: "Lavender"),
+        ColorOption(hex: "E3F7CD", name: "Mint Green"),
+        ColorOption(hex: "E0F7FA", name: "Ice Blue"),
+        ColorOption(hex: "F0E6FF", name: "Lilac"),
+        ColorOption(hex: "D4F0C1", name: "Pear Green"),
+        
+        // Neutral/Soft tones
+        ColorOption(hex: "F5F0E6", name: "Oatmeal"),
+        ColorOption(hex: "E8F4F8", name: "Morning Mist"),
+        ColorOption(hex: "F0F0F0", name: "Cloud Gray"),
         ColorOption(hex: "FFFFFF", name: "White"),
     ]
     
@@ -49,7 +63,7 @@ struct ModeToggleView: View {
             )
         }
         .padding(.top, stateManager.headerHeight)
-        .background(Color.white)
+        .background(Color(hex: "#f7f7f7"))
         .zIndex(100)
         .allowsHitTesting(true)
         .onChange(of: cart.status) { oldValue, newValue in
@@ -206,11 +220,11 @@ struct ColorPickerButton: View {
         Button(action: { showingColorPicker.toggle() }) {
             ZStack {
                 if hasBackgroundImage, let image = CartBackgroundImageManager.shared.loadImage(forCartId: cart.id) {
-                    // Show preview of the selected image
                     Image(uiImage: image)
                         .resizable()
                         .scaledToFill()
                         .frame(width: 20, height: 20)
+                        .brightness(-0.02)
                         .clipShape(Circle())
                         .overlay(
                             Circle()
@@ -223,7 +237,7 @@ struct ColorPickerButton: View {
                 } else {
                     // Show color circle
                     Circle()
-                        .fill(selectedColor.hex == "FFFFFF" ? Color.white : selectedColor.color)
+                        .fill(selectedColor.hex == "FFFFFF" ? Color.white : selectedColor.color.darker(by: 0.02))
                         .frame(width: 20, height: 20)
                     
                     if selectedColor.hex == "FFFFFF" {
@@ -299,7 +313,7 @@ struct ColorPickerPopup: View {
             
             //
             Text("|")
-                .foregroundStyle(Color(.systemGray6))
+                .foregroundStyle(Color(.systemGray))
                 .padding(.leading, 8)
             
             ColorScrollView(

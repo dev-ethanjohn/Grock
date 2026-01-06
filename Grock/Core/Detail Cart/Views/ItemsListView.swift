@@ -323,7 +323,7 @@ private struct ItemsListContent: View {
                     .animation(.spring(response: 0.45, dampingFraction: 0.75), value: cart.isShopping)
             }
         }
-        .animation(.spring(response: 0.45, dampingFraction: 0.75), value: cart.isShopping)
+        .animation(cart.isShopping ? .spring(response: 0.45, dampingFraction: 0.75) : .none, value: cart.isShopping)
     }
 }
 
@@ -428,27 +428,24 @@ private extension View {
     
     func applyShoppingElevation(isShopping: Bool, hasBackgroundImage: Bool) -> some View {
         self
-            .offset(y: isShopping ? -4 : 0)
-            // Large, soft shadow for depth - only applied to bottom
+            .offset(y: (isShopping && hasBackgroundImage) ? -4 : 0)
             .shadow(
-                color: isShopping ? Color.black.opacity(hasBackgroundImage ? 0.1 : 0.05) : Color.clear,
-                radius: isShopping ? (hasBackgroundImage ? 10 : 8) : 0,
+                color: isShopping && hasBackgroundImage ? Color.black.opacity(0.1) : Color.clear,
+                radius: isShopping && hasBackgroundImage ? 10 : 0,
                 x: 0,
-                y: isShopping ? (hasBackgroundImage ? 10 : 8) : 0
+                y: isShopping && hasBackgroundImage ? 10 : 0
             )
-            // Medium shadow for definition - only applied to bottom
             .shadow(
-                color: isShopping ? Color.black.opacity(hasBackgroundImage ? 0.18 : 0.1) : Color.clear,
-                radius: isShopping ? (hasBackgroundImage ? 7 : 6) : 0,
+                color: isShopping && hasBackgroundImage ? Color.black.opacity(0.18) : Color.clear,
+                radius: isShopping && hasBackgroundImage ? 7 : 0,
                 x: 0,
-                y: isShopping ? (hasBackgroundImage ? 5 : 4) : 0
+                y: isShopping && hasBackgroundImage ? 5 : 0
             )
-            // Tight inner shadow effect on bottom edge - only applied to bottom
             .shadow(
-                color: isShopping ? Color.black.opacity(hasBackgroundImage ? 0.25 : 0.1) : Color.clear,
-                radius: isShopping ? (hasBackgroundImage ? 4 : 3) : 0,
+                color: isShopping && hasBackgroundImage ? Color.black.opacity(0.25) : Color.clear,
+                radius: isShopping && hasBackgroundImage ? 4 : 0,
                 x: 0,
-                y: isShopping ? (hasBackgroundImage ? 4 : 2) : 0
+                y: isShopping && hasBackgroundImage ? 4 : 0
             )
     }
 }
@@ -469,7 +466,7 @@ private struct ListBackgroundView: View {
                         .scaledToFill()
                         .frame(width: geometry.size.width, height: geometry.size.height)
                         .clipped()
-                        .blur(radius: 0.5)
+                        .blur(radius: 1)
                         .overlay(Color.black.opacity(0.4))
                     
                     VisibleNoiseView(

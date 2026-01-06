@@ -451,21 +451,38 @@ private struct ItemNameRow: View {
     
     @Environment(CartStateManager.self) private var stateManager
     
-    var body: some View {
-        HStack(spacing: 4) {
+    @ViewBuilder
+    private var itemNameView: some View {
+        let textColor = stateManager.hasBackgroundImage ? Color.white.opacity(0.95) : Color.primary
+        
+        HStack(spacing: 0) {
             Text(currentQuantity.formattedQuantity)
-                .lexendFont(17, weight: .regular)
+                .lexendFont(17, weight: stateManager.hasBackgroundImage ? .semibold : .regular)
                 .contentTransition(.numericText())
                 .animation(.spring(response: 0.5, dampingFraction: 0.7), value: currentQuantity)
-                .foregroundColor(stateManager.hasBackgroundImage ? .white.opacity(0.8) : .primary)
+                .foregroundColor(textColor)
             
-            Text(item?.name ?? cartItem.shoppingOnlyName ?? "Unknown Item")
-                .lexendFont(17, weight: .regular)
+            Text(" \(item?.name ?? cartItem.shoppingOnlyName ?? "Unknown Item")")
+                .lexendFont(17, weight: stateManager.hasBackgroundImage ? .semibold : .regular)
                 .lineLimit(3)
                 .fixedSize(horizontal: false, vertical: true)
                 .strikethrough(isItemFulfilled)
                 .id(item?.name ?? cartItem.shoppingOnlyName ?? "Unknown")
-                .foregroundColor(stateManager.hasBackgroundImage ? .white.opacity(0.8) : .primary)
+                .foregroundColor(textColor)
+        }
+    }
+    
+    var body: some View {
+        HStack(spacing: 4) {
+            Text("\(currentQuantity.formattedQuantity) \(item?.name ?? cartItem.shoppingOnlyName ?? "Unknown Item")")
+                .lexendFont(17, weight: stateManager.hasBackgroundImage ? .semibold : .regular)
+                .lineLimit(3)
+                .fixedSize(horizontal: false, vertical: true)
+                .strikethrough(isItemFulfilled)
+                .id(item?.name ?? cartItem.shoppingOnlyName ?? "Unknown")
+                .foregroundColor(stateManager.hasBackgroundImage ? .white.opacity(0.95) : .primary)
+                .contentTransition(.numericText())
+                .animation(.spring(response: 0.5, dampingFraction: 0.7), value: currentQuantity)
             
             Spacer()
             
