@@ -19,6 +19,8 @@ struct AddStoreSheet: View {
                     .font(.subheadline)
                     .bold()
                     .normalizedText($storeName)
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.never)
                     .padding(12)
                     .background(Color(.systemGray6))
                     .cornerRadius(8)

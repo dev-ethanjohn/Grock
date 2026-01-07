@@ -770,6 +770,7 @@ private struct QuantityTextField: View {
                 .font(.system(size: 15, weight: .bold))
                 .foregroundColor(.clear)
                 .multilineTextAlignment(.center)
+                .autocorrectionDisabled()
                 .focused(focusBinding)
                 .normalizedNumber($textValue, allowDecimal: true, maxDecimalPlaces: 2)
                 .onChange(of: textValue) { _, newText in

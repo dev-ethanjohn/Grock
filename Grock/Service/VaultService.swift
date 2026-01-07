@@ -259,6 +259,7 @@ extension VaultService {
             targetCategory = existingCategory
         } else {
             targetCategory = Category(name: category.title)
+            modelContext.insert(targetCategory)
             vault.categories.append(targetCategory)
         }
        
@@ -268,6 +269,8 @@ extension VaultService {
         newItem.priceOptions = [priceOption]
         // createdAt is automatically set to Date() in init
        
+        // Explicitly insert into model context to ensure relationships are established
+        modelContext.insert(newItem)
         targetCategory.items.append(newItem) // ✅ Just append, sorting handles order
         saveContext()
         return true
@@ -872,7 +875,7 @@ extension VaultService {
                 shoppingOnlyPrice: nil,
                 shoppingOnlyUnit: nil,
                 originalPlanningQuantity: nil,
-                addedDuringShopping: false // NOT added during shopping (planned item)
+                addedDuringShopping: cart.isShopping // Set to true if added during shopping mode
             )
             
             cart.cartItems.append(cartItem)
@@ -890,7 +893,8 @@ extension VaultService {
         price: Double,
         unit: String,
         cart: Cart,
-        quantity: Double = 1
+        quantity: Double = 1,
+        category: GroceryCategory? = nil
     ) {
         print("🛍️ Adding shopping-only item: \(name)")
         
@@ -900,7 +904,8 @@ extension VaultService {
             store: store,
             price: price,
             unit: unit,
-            quantity: quantity
+            quantity: quantity,
+            category: category
         )
         
         cart.cartItems.append(cartItem)

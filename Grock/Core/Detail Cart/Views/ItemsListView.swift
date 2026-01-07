@@ -466,12 +466,12 @@ private struct ListBackgroundView: View {
                         .scaledToFill()
                         .frame(width: geometry.size.width, height: geometry.size.height)
                         .clipped()
-                        .blur(radius: 1)
                         .overlay(Color.black.opacity(0.4))
+                        .blur(radius: 2)
                     
                     VisibleNoiseView(
                         grainSize: 0.0001,
-                        density: 1,
+                        density: 0.7,
                         opacity: 0.15
                     )
                 }

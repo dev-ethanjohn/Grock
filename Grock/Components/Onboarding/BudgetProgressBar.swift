@@ -4,6 +4,8 @@ struct FluidBudgetPillView: View {
     let cart: Cart
     let animatedBudget: Double
     let onBudgetTap: (() -> Void)?
+    let hasBackgroundImage: Bool
+    let isHeader: Bool // 👈 New parameter to identify if it's in header
     
     @Environment(VaultService.self) private var vaultService
     @Namespace private var animationNamespace
@@ -20,14 +22,38 @@ struct FluidBudgetPillView: View {
         if progress < 0.7 {
             return Color(hex: "98F476")
         } else if progress < 0.9 {
-            return .orange
+            return Color(hex: "F4B576")
         } else {
-            return .red
+            return Color(hex: "F47676")
         }
     }
     
-    private var textColor: Color {
-        budgetProgressColor.darker(by: 0.5).saturated(by: 0.4)
+    // Text color for text INSIDE the pill
+    private var insidePillTextColor: Color {
+        // Text inside the green pill should be black (or dark) for contrast
+        return budgetProgressColor.darker(by: 0.5).saturated(by: 0.4)
+    }
+    
+    // Text color for text OUTSIDE the pill
+    private var outsidePillTextColor: Color {
+        if isHeader {
+            return Color(hex: "007B02") // Header always uses dark green (on white background)
+        } else if hasBackgroundImage {
+            return .white // White on background images (HomeCartRowView)
+        } else {
+            return Color(hex: "007B02") // Dark green on solid color backgrounds
+        }
+    }
+    
+    // Budget button text color
+    private var budgetButtonTextColor: Color {
+        if isHeader {
+            return .black // Header has white background, so black text
+        } else if hasBackgroundImage {
+            return .white // White on background images
+        } else {
+            return .black // Black on solid color backgrounds
+        }
     }
     
     private var shouldShowTextInside: Bool {
@@ -43,16 +69,15 @@ struct FluidBudgetPillView: View {
                 ZStack(alignment: .leading) {
                     // Background track
                     Capsule()
-                        .fill(Color.white.opacity(0.5))
+                        .fill(Color.white.opacity(0.3))
                         .frame(height: 20)
                         .overlay(
                             Capsule()
-                                .stroke(Color(hex: "cacaca"), lineWidth: 1)
+                                .stroke(Color(hex: "cacaca"), lineWidth: 0.3)
                         )
                     
-                    // Animated progress fill with gradient - ONLY this one has matchedGeometryEffect
+                    // Animated progress fill with gradient
                     if shouldShowTextInside && pillWidth > 30 {
-                        // Main pill (for when text is inside)
                         Capsule()
                             .fill(
                                 LinearGradient(
@@ -72,13 +97,12 @@ struct FluidBudgetPillView: View {
                             .matchedGeometryEffect(id: "pillFill", in: animationNamespace)
                     }
                     
-                    // Text with coordinated animations
                     HStack(spacing: 8) {
                         if shouldShowTextInside && pillWidth > 30 {
-                            // Text inside the pill with smooth entrance/exit
+                            // Text INSIDE the pill
                             Text(cart.totalSpent.formattedCurrency)
                                 .lexendFont(14, weight: .bold)
-                                .foregroundColor(textColor)
+                                .foregroundColor(insidePillTextColor)
                                 .matchedGeometryEffect(id: "amount", in: animationNamespace)
                                 .transition(.asymmetric(
                                     insertion: .move(edge: .leading)
@@ -93,7 +117,7 @@ struct FluidBudgetPillView: View {
                         }
                         
                         if !shouldShowTextInside || pillWidth < 40 {
-                            // Mini pill when too narrow - NO matchedGeometryEffect here
+                            // Mini pill when too narrow
                             Capsule()
                                 .fill(budgetProgressColor)
                                 .frame(width: max(20, pillWidth), height: 22)
@@ -101,12 +125,11 @@ struct FluidBudgetPillView: View {
                                     Capsule()
                                         .stroke(.black, lineWidth: 1)
                                 )
-                                // REMOVED: .matchedGeometryEffect(id: "pillFill", in: animationNamespace)
                             
-                            // Text outside the pill
+                            // Text OUTSIDE the pill
                             Text(cart.totalSpent.formattedCurrency)
                                 .lexendFont(14, weight: .bold)
-                                .foregroundColor(Color(hex: "007B02"))
+                                .foregroundColor(outsidePillTextColor)
                                 .matchedGeometryEffect(id: "amount", in: animationNamespace)
                                 .transition(.asymmetric(
                                     insertion: .move(edge: .trailing)
@@ -138,7 +161,7 @@ struct FluidBudgetPillView: View {
             }) {
                 Text(animatedBudget.formattedCurrency)
                     .lexendFont(14, weight: .bold)
-                    .foregroundColor(Color(hex: "333"))
+                    .foregroundColor(budgetButtonTextColor) // 👈 Use computed color
                     .contentTransition(.numericText())
                     .animation(.easeInOut(duration: 0.3), value: animatedBudget)
             }

@@ -265,6 +265,8 @@ private struct SearchBarView: View {
                 .foregroundColor(.gray)
             TextField("Looking for something in your Vault", text: $searchText)
                 .textFieldStyle(.plain)
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.never)
             if !searchText.isEmpty {
                 Button(action: { searchText = "" }) {
                     Image(systemName: "xmark.circle.fill")

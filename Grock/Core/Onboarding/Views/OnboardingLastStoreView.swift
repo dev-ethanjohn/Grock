@@ -52,7 +52,7 @@ struct OnboardingLastStoreView: View {
             .normalizedText($viewModel.formViewModel.storeName)
             .multilineTextAlignment(.center)
             .autocorrectionDisabled()
-            .textInputAutocapitalization(.words)
+            .textInputAutocapitalization(.never)
             .padding(.vertical, 8)
             .overlay(
                 VStack {

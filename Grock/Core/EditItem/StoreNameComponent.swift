@@ -46,6 +46,8 @@ struct StoreNameComponent: View {
                 // Text field (stores = 0)
                 TextField("Enter store name", text: $storeName)
                     .normalizedText($storeName)
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.never)
                     .font(.subheadline)
                     .bold()
                     .foregroundColor(.black)

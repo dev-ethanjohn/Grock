@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		4C76BFED2ED6B13400F98D86 /* SwiftUIIntrospect in Frameworks */ = {isa = PBXBuildFile; productRef = 4C76BFEC2ED6B13400F98D86 /* SwiftUIIntrospect */; };
+		4CA5D81E2F0DF5BA00917E22 /* Glur in Frameworks */ = {isa = PBXBuildFile; productRef = 4CA5D81D2F0DF5BA00917E22 /* Glur */; };
 		4CA669322EB55D3F00769F3F /* Lottie in Frameworks */ = {isa = PBXBuildFile; productRef = 4CA669312EB55D3F00769F3F /* Lottie */; };
 /* End PBXBuildFile section */
 
@@ -50,6 +51,7 @@
 			files = (
 				4CA669322EB55D3F00769F3F /* Lottie in Frameworks */,
 				4C76BFED2ED6B13400F98D86 /* SwiftUIIntrospect in Frameworks */,
+				4CA5D81E2F0DF5BA00917E22 /* Glur in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -94,6 +96,7 @@
 			packageProductDependencies = (
 				4CA669312EB55D3F00769F3F /* Lottie */,
 				4C76BFEC2ED6B13400F98D86 /* SwiftUIIntrospect */,
+				4CA5D81D2F0DF5BA00917E22 /* Glur */,
 			);
 			productName = Grock;
 			productReference = 4C07F7B82E88245000B46866 /* Grock.app */;
@@ -126,6 +129,7 @@
 			packageReferences = (
 				4CA669302EB55D3F00769F3F /* XCRemoteSwiftPackageReference "lottie-ios" */,
 				4C76BFEB2ED6B13400F98D86 /* XCRemoteSwiftPackageReference "swiftui-introspect" */,
+				4CA5D81C2F0DF5BA00917E22 /* XCRemoteSwiftPackageReference "Glur" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 4C07F7B92E88245000B46866 /* Products */;
@@ -375,6 +379,14 @@
 				minimumVersion = 26.0.0;
 			};
 		};
+		4CA5D81C2F0DF5BA00917E22 /* XCRemoteSwiftPackageReference "Glur" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/joogps/Glur?tab=readme-ov-file";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.1.0;
+			};
+		};
 		4CA669302EB55D3F00769F3F /* XCRemoteSwiftPackageReference "lottie-ios" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/airbnb/lottie-ios.git";
@@ -390,6 +402,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 4C76BFEB2ED6B13400F98D86 /* XCRemoteSwiftPackageReference "swiftui-introspect" */;
 			productName = SwiftUIIntrospect;
+		};
+		4CA5D81D2F0DF5BA00917E22 /* Glur */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 4CA5D81C2F0DF5BA00917E22 /* XCRemoteSwiftPackageReference "Glur" */;
+			productName = Glur;
 		};
 		4CA669312EB55D3F00769F3F /* Lottie */ = {
 			isa = XCSwiftPackageProductDependency;

@@ -1,6 +1,15 @@
 {
-  "originHash" : "367ef0aafd2cbb7cd855eea594c271837bbe6adf3c8e39f5551c635399ef2281",
+  "originHash" : "8258b2e17916be6404c6a13e476932e32399cbabed2aa273e482a87ae6d6ef5a",
   "pins" : [
+    {
+      "identity" : "glur?tab=readme-ov-file",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/joogps/Glur?tab=readme-ov-file",
+      "state" : {
+        "revision" : "178af6499ed7957c7f91187fdee2b09d322f5b87",
+        "version" : "1.1.0"
+      }
+    },
     {
       "identity" : "lottie-ios",
       "kind" : "remoteSourceControl",

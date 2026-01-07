@@ -22,7 +22,7 @@ struct HeaderView: View {
         if progress < 0.7 {
             return Color(hex: "98F476")
         } else if progress < 0.9 {
-            return Color(hex: "F4B576")
+            return Color(hex: "FFB166")
         } else {
             return Color(hex: "F47676")
         }
@@ -33,6 +33,7 @@ struct HeaderView: View {
             HStack {
                 Button(action: { dismiss() }) {
                     Image("back_arrow")
+                        .padding(.vertical, 4)
                 }
                 .offset(x: -2)
                 
@@ -72,17 +73,19 @@ struct HeaderView: View {
                     }
                 } label: {
                     Image(systemName: "ellipsis")
-                        .font(.system(size: 18, weight: .medium))
-                        .foregroundColor(.black)
+                                         .font(.system(size: 20, weight: .medium)) // Slightly larger
+                                         .foregroundColor(.black)
+                                         .frame(width: 28, height: 28) // 👈 Minimum 44x44 tap target
+                                         .contentShape(Rectangle())
                 }
             }
             .padding(.top, 8)
             
             VStack(alignment: .leading, spacing: 0) {
                 Text(cart.name)
-                    .shantellSansFont(24)
+                    .shantellSansFont(22)
                     .foregroundColor(.black)
-                    .padding(.bottom, 8)
+                    .padding(.bottom, 6)
                 
                 HStack {
                     HStack(spacing: 0) {
@@ -110,7 +113,9 @@ struct HeaderView: View {
                     FluidBudgetPillView(
                         cart: cart,
                         animatedBudget: stateManager.animatedBudget,
-                        onBudgetTap: onBudgetTap
+                        onBudgetTap: onBudgetTap,
+                        hasBackgroundImage: stateManager.hasBackgroundImage,
+                        isHeader: true // 👈 Mark as header
                     )
                     .frame(height: 22)
                 }
@@ -125,11 +130,9 @@ struct HeaderView: View {
                           .ignoresSafeArea(edges: .top)
                           .shadow(color: Color.black.opacity(0.12), radius: 4, x: 0, y: 1)
                           .onAppear {
-                              // 🔥 Update header height in state manager
                               stateManager.headerHeight = geometry.size.height
                           }
                           .onChange(of: geometry.size.height) { _, newValue in
-                              // 🔥 Update header height in state manager when it changes
                               stateManager.headerHeight = newValue
                           }
                   }

@@ -167,7 +167,8 @@ private struct StoreSectionRow: View {
                 onFulfillItem: { onFulfillItem(tuple.cartItem) },
                 onEditItem: { onEditItem(tuple.cartItem) },
                 onDeleteItem: { onDeleteItem(tuple.cartItem) },
-                isLastItem: index == displayItems.count - 1
+                isLastItem: index == displayItems.count - 1,
+                isFirstItem: index == 0
             )
             .id(tuple.cartItem.itemId + (tuple.cartItem.actualPrice?.description ?? ""))
             .listRowInsets(EdgeInsets())

@@ -225,6 +225,7 @@ class CartItem {
     var shoppingOnlyStore: String?
     var shoppingOnlyPrice: Double?
     var shoppingOnlyUnit: String?
+    var shoppingOnlyCategory: String? // Store category as String (GroceryCategory rawValue) for later vault saving
     
     // MARK: - NEW: Original planning quantity for restoration
     var originalPlanningQuantity: Double?
@@ -247,6 +248,7 @@ class CartItem {
         shoppingOnlyStore: String? = nil,
         shoppingOnlyPrice: Double? = nil,
         shoppingOnlyUnit: String? = nil,
+        shoppingOnlyCategory: String? = nil,
         originalPlanningQuantity: Double? = nil,
         addedDuringShopping: Bool = false
     ) {
@@ -266,6 +268,7 @@ class CartItem {
         self.shoppingOnlyStore = shoppingOnlyStore
         self.shoppingOnlyPrice = shoppingOnlyPrice
         self.shoppingOnlyUnit = shoppingOnlyUnit
+        self.shoppingOnlyCategory = shoppingOnlyCategory
         self.originalPlanningQuantity = originalPlanningQuantity
         self.addedDuringShopping = addedDuringShopping
         // ⬇️ ADDED: This ensures all items get a proper timestamp
@@ -277,7 +280,8 @@ class CartItem {
         store: String,
         price: Double,
         unit: String,
-        quantity: Double = 1
+        quantity: Double = 1,
+        category: GroceryCategory? = nil
     ) -> CartItem {
         return CartItem(
             itemId: UUID().uuidString,
@@ -294,6 +298,7 @@ class CartItem {
             shoppingOnlyStore: store,
             shoppingOnlyPrice: price,
             shoppingOnlyUnit: unit,
+            shoppingOnlyCategory: category?.rawValue,
             originalPlanningQuantity: nil,
             addedDuringShopping: true // Shopping-only items are always added during shopping
         )

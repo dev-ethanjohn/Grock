@@ -9,6 +9,7 @@ struct CartItemRowListView: View {
     let onEditItem: () -> Void
     let onDeleteItem: () -> Void
     let isLastItem: Bool
+    let isFirstItem: Bool
     
     @Environment(VaultService.self) private var vaultService
     @Environment(CartStateManager.self) private var stateManager
@@ -22,7 +23,8 @@ struct CartItemRowListView: View {
             onFulfillItem: onFulfillItem,
             onEditItem: onEditItem,
             onDeleteItem: onDeleteItem,
-            isLastItem: isLastItem
+            isLastItem: isLastItem,
+            isFirstItem: isFirstItem
         )
         .onAppear {
             loadItem()
@@ -80,6 +82,7 @@ private struct MainRowContent: View {
     let onEditItem: () -> Void
     let onDeleteItem: () -> Void
     let isLastItem: Bool
+    let isFirstItem: Bool
     
     @Environment(VaultService.self) private var vaultService
     @Environment(CartStateManager.self) private var stateManager
@@ -88,8 +91,6 @@ private struct MainRowContent: View {
     @State private var showNewBadge: Bool = false
     
     // Animation states
-    @State private var sparkleOpacity: Double = 0.0
-    @State private var sparkleScale: CGFloat = 0.8
     @State private var badgeScale: CGFloat = 0.1
     @State private var badgeRotation: Double = 0
     @State private var rowHighlight: Bool = false
@@ -106,7 +107,7 @@ private struct MainRowContent: View {
     @State private var currentTotalPrice: Double = 0
     @State private var displayUnit: String = ""
     
-    init(cartItem: CartItem, item: Item?, cart: Cart, onFulfillItem: @escaping () -> Void, onEditItem: @escaping () -> Void, onDeleteItem: @escaping () -> Void, isLastItem: Bool) {
+    init(cartItem: CartItem, item: Item?, cart: Cart, onFulfillItem: @escaping () -> Void, onEditItem: @escaping () -> Void, onDeleteItem: @escaping () -> Void, isLastItem: Bool, isFirstItem: Bool) {
         self.cartItem = cartItem
         self.item = item
         self.cart = cart
@@ -114,6 +115,7 @@ private struct MainRowContent: View {
         self.onEditItem = onEditItem
         self.onDeleteItem = onDeleteItem
         self.isLastItem = isLastItem
+        self.isFirstItem = isFirstItem
         
         if cartItem.isShoppingOnlyItem, let shoppingName = cartItem.shoppingOnlyName {
             let storageKey = "hasShownNewBadge_\(cart.id)_\(shoppingName)"
@@ -125,13 +127,6 @@ private struct MainRowContent: View {
     
     var body: some View {
         ZStack {
-            // Background sparkle effect
-            if isShoppingOnlyItem && showNewBadge && !hasShownNewBadge {
-                SparkleEffectView(opacity: sparkleOpacity, scale: sparkleScale)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .allowsHitTesting(false)
-            }
-            
             CartRowMainContent(
                 cartItem: cartItem,
                 item: item,
@@ -147,7 +142,8 @@ private struct MainRowContent: View {
                 isFulfilling: $isFulfilling,
                 iconScale: $iconScale,
                 checkmarkScale: $checkmarkScale,
-                onFulfillItem: onFulfillItem
+                onFulfillItem: onFulfillItem,
+                isFirstItem: isFirstItem
             )
             .applyRowBackground(
                 isShoppingOnlyItem: isShoppingOnlyItem,
@@ -283,11 +279,6 @@ private struct MainRowContent: View {
                 badgeScale = 1.0
                 badgeRotation = 3
             }
-            
-            withAnimation(.easeInOut(duration: 0.5)) {
-                sparkleOpacity = 0.25
-                sparkleScale = 1.0
-            }
         }
         
         // Single smooth rocking motion
@@ -333,8 +324,6 @@ private struct MainRowContent: View {
             hasShownNewBadge = true
             
             withAnimation(.easeOut(duration: 0.3)) {
-                sparkleOpacity = 0
-                sparkleScale = 0.8
                 badgeRotation = 0
                 rowHighlight = false
             }
@@ -359,6 +348,7 @@ private struct CartRowMainContent: View {
     @Binding var iconScale: CGFloat
     @Binding var checkmarkScale: CGFloat
     let onFulfillItem: () -> Void
+    let isFirstItem: Bool
     
     @Environment(CartStateManager.self) private var stateManager
     
@@ -385,7 +375,8 @@ private struct CartRowMainContent: View {
                 displayUnit: displayUnit,
                 shouldDisplayBadge: shouldDisplayBadge,
                 badgeScale: badgeScale,
-                badgeRotation: badgeRotation
+                badgeRotation: badgeRotation,
+                isFirstItem: isFirstItem
             )
         }
         .padding(.vertical, 12)
@@ -407,6 +398,7 @@ private struct ItemDetailsSection: View {
     let shouldDisplayBadge: Bool
     let badgeScale: CGFloat
     let badgeRotation: Double
+    let isFirstItem: Bool
     
     @Environment(CartStateManager.self) private var stateManager
     
@@ -424,10 +416,13 @@ private struct ItemDetailsSection: View {
                 shouldDisplayBadge: shouldDisplayBadge,
                 badgeScale: badgeScale,
                 badgeRotation: badgeRotation,
-                isItemFulfilled: isItemFulfilled
+                isItemFulfilled: isItemFulfilled,
+                isFirstItem: isFirstItem
             )
             
             ItemPriceRow(
+                cartItem: cartItem,
+                item: item,
                 currentPrice: currentPrice,
                 displayUnit: displayUnit,
                 currentTotalPrice: currentTotalPrice,
@@ -448,67 +443,58 @@ private struct ItemNameRow: View {
     let badgeScale: CGFloat
     let badgeRotation: Double
     let isItemFulfilled: Bool
+    let isFirstItem: Bool
     
     @Environment(CartStateManager.self) private var stateManager
     
-    @ViewBuilder
-    private var itemNameView: some View {
-        let textColor = stateManager.hasBackgroundImage ? Color.white.opacity(0.95) : Color.primary
-        
-        HStack(spacing: 0) {
-            Text(currentQuantity.formattedQuantity)
-                .lexendFont(17, weight: stateManager.hasBackgroundImage ? .semibold : .regular)
-                .contentTransition(.numericText())
-                .animation(.spring(response: 0.5, dampingFraction: 0.7), value: currentQuantity)
-                .foregroundColor(textColor)
-            
-            Text(" \(item?.name ?? cartItem.shoppingOnlyName ?? "Unknown Item")")
-                .lexendFont(17, weight: stateManager.hasBackgroundImage ? .semibold : .regular)
-                .lineLimit(3)
-                .fixedSize(horizontal: false, vertical: true)
-                .strikethrough(isItemFulfilled)
-                .id(item?.name ?? cartItem.shoppingOnlyName ?? "Unknown")
-                .foregroundColor(textColor)
-        }
-    }
-    
     var body: some View {
         HStack(spacing: 4) {
-            Text("\(currentQuantity.formattedQuantity) \(item?.name ?? cartItem.shoppingOnlyName ?? "Unknown Item")")
-                .lexendFont(17, weight: stateManager.hasBackgroundImage ? .semibold : .regular)
-                .lineLimit(3)
-                .fixedSize(horizontal: false, vertical: true)
-                .strikethrough(isItemFulfilled)
-                .id(item?.name ?? cartItem.shoppingOnlyName ?? "Unknown")
-                .foregroundColor(stateManager.hasBackgroundImage ? .white.opacity(0.95) : .primary)
-                .contentTransition(.numericText())
-                .animation(.spring(response: 0.5, dampingFraction: 0.7), value: currentQuantity)
+            itemNameText
             
             Spacer()
             
             if shouldDisplayBadge {
                 NewBadgeView(
                     scale: badgeScale,
-                    rotation: badgeRotation,
+                    rotation: badgeRotation
                 )
                 .transition(.scale.combined(with: .opacity))
             }
         }
     }
+    
+    @ViewBuilder
+    private var itemNameText: some View {
+        let baseText = Text("\(currentQuantity.formattedQuantity) \(item?.name ?? cartItem.shoppingOnlyName ?? "Unknown Item")")
+            .lexendFont(17, weight: stateManager.hasBackgroundImage ? .semibold : .regular)
+            .lineLimit(3)
+            .fixedSize(horizontal: false, vertical: true)
+            .strikethrough(isItemFulfilled)
+            .id(item?.name ?? cartItem.shoppingOnlyName ?? "Unknown")
+            .foregroundColor(stateManager.hasBackgroundImage ? .white.opacity(0.95) : .primary)
+            .contentTransition(.numericText())
+            .animation(.spring(response: 0.5, dampingFraction: 0.7), value: currentQuantity)
+        
+        baseText
+    }
 }
 
 // MARK: - Item Price Row (Updated)
 private struct ItemPriceRow: View {
+    let cartItem: CartItem
+    let item: Item?
     let currentPrice: Double
     let displayUnit: String
     let currentTotalPrice: Double
     let isItemFulfilled: Bool
     
+    @Environment(VaultService.self) private var vaultService
     @Environment(CartStateManager.self) private var stateManager
     
     var body: some View {
         HStack(spacing: 4) {
-            Text("\(currentPrice.formattedCurrency) / \(displayUnit)")
+            // Changed from emoji to category title
+            Text("\(currentPrice.formattedCurrency) / \(displayUnit) • \(categoryTitle)")
                 .lexendFont(12)
                 .lineLimit(1)
                 .contentTransition(.numericText())
@@ -525,6 +511,25 @@ private struct ItemPriceRow: View {
                 .foregroundColor(stateManager.hasBackgroundImage ? .white : Color(hex: "231F30"))
         }
         .opacity(isItemFulfilled ? 0.5 : 1.0)
+    }
+    
+    private var categoryTitle: String {
+        // Check if it's a shopping-only item with stored category
+        if cartItem.isShoppingOnlyItem, let categoryRawValue = cartItem.shoppingOnlyCategory,
+           let groceryCategory = GroceryCategory(rawValue: categoryRawValue) {
+            return groceryCategory.title
+        }
+        
+        // For vault items, look up category from vault
+        guard let item = item,
+              let category = vaultService.getCategory(for: item.id) else {
+            return "Uncategorized"
+        }
+        // Find the matching GroceryCategory by title
+        if let groceryCategory = GroceryCategory.allCases.first(where: { $0.title == category.name }) {
+            return groceryCategory.title
+        }
+        return category.name
     }
 }
 
@@ -611,7 +616,6 @@ private extension View {
             }
     }
 }
-
 
 // MARK: - Row Background View (Updated)
 private struct RowBackgroundView: View {
@@ -727,59 +731,4 @@ private struct FulfillmentButton: View {
         }
     }
 }
-// MARK: - Sparkle Effect Component
-struct SparkleEffectView: View {
-    let opacity: Double
-    let scale: CGFloat
-    
-    @State private var sparkles: [Sparkle] = []
-    
-    struct Sparkle: Identifiable {
-        let id = UUID()
-        let x: CGFloat
-        let y: CGFloat
-        let size: CGFloat
-        let delay: Double
-    }
-    
-    init(opacity: Double, scale: CGFloat) {
-        self.opacity = opacity
-        self.scale = scale
-        
-        var sparkles: [Sparkle] = []
-        for _ in 0..<8 {
-            sparkles.append(Sparkle(
-                x: CGFloat.random(in: 0.1...0.9),
-                y: CGFloat.random(in: 0.1...0.9),
-                size: CGFloat.random(in: 0.5...1.5),
-                delay: Double.random(in: 0...0.5)
-            ))
-        }
-        _sparkles = State(initialValue: sparkles)
-    }
-    
-    var body: some View {
-        ZStack {
-            ForEach(sparkles) { sparkle in
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color.white.opacity(0.8),
-                                Color(hex: "FFE082").opacity(0.6),
-                                Color.clear
-                            ],
-                            startPoint: .center,
-                            endPoint: .trailing
-                        )
-                    )
-                    .frame(width: sparkle.size * 15, height: sparkle.size * 15)
-                    .position(x: sparkle.x * UIScreen.main.bounds.width,
-                             y: sparkle.y * 60)
-                    .opacity(opacity)
-                    .scaleEffect(scale)
-                    .blur(radius: 1)
-            }
-        }
-    }
-}
+

@@ -974,6 +974,7 @@ struct ManageCartItemRow: View {
                 .font(.system(size: 15, weight: .bold))
                 .foregroundColor(.clear)
                 .multilineTextAlignment(.center)
+                .autocorrectionDisabled()
                 .focused($isFocused)
                 .normalizedNumber($textValue, allowDecimal: true, maxDecimalPlaces: 2)
                 .onChange(of: isFocused) { oldValue, focused in

@@ -251,6 +251,8 @@ struct CartConfirmationPopover: View {
         VStack(spacing: 0) {
             TextField("Shopping List", text: $cartTitle)
                 .normalizedText($cartTitle)
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.never)
                 .lexendFont(20, weight: .semibold)
                 .foregroundColor(.black)
                 .multilineTextAlignment(.leading)

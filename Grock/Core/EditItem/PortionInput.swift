@@ -16,6 +16,7 @@ struct PortionInput: View {
             TextField("0.0", text: $portionString)
                 .multilineTextAlignment(.trailing)
                 .keyboardType(.decimalPad)
+                .autocorrectionDisabled()
                 .normalizedNumber($portionString, allowDecimal: true, maxDecimalPlaces: 2)
                 .font(.subheadline)
                 .bold()

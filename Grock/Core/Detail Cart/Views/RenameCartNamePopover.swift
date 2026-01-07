@@ -59,7 +59,7 @@ struct RenameCartNamePopover: View {
                         .shantellSansFont(20)
                         .foregroundColor(.black)
                         .autocorrectionDisabled(true)
-                        .textInputAutocapitalization(.words)
+                        .textInputAutocapitalization(.never)
                         .focused($nameFieldIsFocused)
                         .onChange(of: cartName) {_, newValue in
                             validateName(newValue)

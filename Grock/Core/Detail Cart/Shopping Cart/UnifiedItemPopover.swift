@@ -627,6 +627,7 @@ private struct PriceField: View {
             
             TextField("0.00", text: $price)
                 .keyboardType(.decimalPad)
+                .autocorrectionDisabled()
                 .focused($focusedField, equals: .price)
                 .lexendFont(14, weight: .semibold)
                 .foregroundColor(.primary)
@@ -667,6 +668,7 @@ private struct PortionField: View {
         HStack {
             TextField("0", text: $portion)
                 .keyboardType(.decimalPad)
+                .autocorrectionDisabled()
                 .focused($focusedField, equals: .portion)
                 .lexendFont(14, weight: .semibold)
                 .onChange(of: portion) { _, _ in

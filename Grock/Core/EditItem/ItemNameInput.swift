@@ -74,6 +74,8 @@ struct ItemNameInput: View {
                 HStack {
                     TextField("e.g. canned tuna", text: $itemName)
                         .normalizedText($itemName)
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
                         .font(.subheadline)
                         .bold()
                         .padding(12)

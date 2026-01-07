@@ -201,7 +201,8 @@ struct AddNewItemToCartSheet: View {
                                 price: price,
                                 unit: unit,
                                 cart: cart,
-                                quantity: 1
+                                quantity: 1,
+                                category: category
                             )
                             hasUnsavedChanges = true
                             onItemAdded?()
@@ -311,13 +312,16 @@ struct AddNewItemToCartSheet: View {
         }
         
         if cart.isShopping {
+            // Shopping mode: Create shopping-only item (temporary, not in vault yet)
+            // Store category so it can be saved to vault later
             vaultService.addShoppingItemToCart(
                 name: formViewModel.itemName,
                 store: formViewModel.storeName,
                 price: priceValue,
                 unit: formViewModel.unit,
                 cart: cart,
-                quantity: formViewModel.portion ?? 1.0
+                quantity: formViewModel.portion ?? 1.0,
+                category: category
             )
             print("🛍️ Added shopping-only item: \(formViewModel.itemName)")
             
@@ -330,6 +334,7 @@ struct AddNewItemToCartSheet: View {
             )
             
         } else {
+            // Planning mode: Add to vault and cart
             let success = addNewItemToVaultAndCart(
                 name: formViewModel.itemName,
                 category: category,
@@ -378,13 +383,15 @@ struct AddNewItemToCartSheet: View {
                 vaultService.updateCartTotals(cart: cart)
             } else {
                 // This shouldn't happen, but fallback
+                // Note: Temporary shopping items may not have category info
                 vaultService.addShoppingItemToCart(
                     name: item.name,
                     store: store,
                     price: price,
                     unit: unit,
                     cart: cart,
-                    quantity: 1
+                    quantity: 1,
+                    category: nil
                 )
             }
             

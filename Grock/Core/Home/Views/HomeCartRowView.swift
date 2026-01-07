@@ -52,10 +52,11 @@ struct HomeCartRowView: View {
         if progress < 0.7 {
             return Color(hex: "98F476")
         } else if progress < 0.9 {
-            return .orange
+            return Color(hex: "FFB166")
         } else {
-            return .red
+            return Color(hex: "F47676")
         }
+
     }
     
     private var backgroundColor: Color {
@@ -83,12 +84,12 @@ struct HomeCartRowView: View {
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                             .clipped()
                             .blur(radius: 1)
-                            .overlay(Color.black.opacity(0.3))
+                            .overlay(Color.black.opacity(0.4))
                         
                         VisibleNoiseView(
                             grainSize: 0.0001,      // Medium grain size
                             density: 1,        // Visible but not overwhelming
-                            opacity: 0.15        // Subtle but noticeable
+                            opacity: 0.20       // Subtle but noticeable
                         )
                     }
                 } else {
@@ -147,23 +148,24 @@ struct HomeCartRowView: View {
         HStack {
             Text(cart.name)
                 .shantellSansFont(18)
-                .foregroundColor(.black)
+                .foregroundColor(hasBackgroundImage ? .white : .black)
             
             Spacer()
             
             Image(systemName: "chevron.right")
                 .lexendFont(14, weight: .semibold)
-                .foregroundStyle(Color(hex: "BABABA"))
+                .foregroundColor(hasBackgroundImage ? .white : .black)
         }
     }
     
     private var progressSection: some View {
         VStack(spacing: 8) {
-            // Using the original FluidBudgetPillView with budget shown inside it
             FluidBudgetPillView(
                 cart: cart,
                 animatedBudget: viewModel.animatedBudget,
-                onBudgetTap: nil // No tap action needed for home screen
+                onBudgetTap: nil,
+                hasBackgroundImage: hasBackgroundImage,
+                isHeader: false
             )
             
             categoriesView
