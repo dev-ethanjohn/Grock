@@ -35,6 +35,9 @@ struct HomeView: View {
     @State private var cartToDelete: Cart? = nil
     @State private var showingDeleteAlert = false
     
+    // Name entry sheet state
+    @State private var currentUserName: String? = UserDefaults.standard.userName
+    
     init(viewModel: HomeViewModel) {
         self._viewModel = State(initialValue: viewModel)
         self._cartStateManager = State(initialValue: CartStateManager())
@@ -131,28 +134,13 @@ struct HomeView: View {
                         if viewModel.pendingCartToShow != nil {
                             viewModel.completePendingCartDisplay()
                         }
+                        
                         viewModel.selectedCart = nil
                     }
-                    .presentationCornerRadius(24)
-            }
-            .onAppear {
-                viewModel.loadCarts()
-                print("🏠 HomeView appeared - carts: \(viewModel.carts.count)")
-                viewModel.checkPendingCart()
             }
             .onChange(of: viewModel.showVault) { oldValue, newValue in
                 if !newValue {
                     viewModel.transferPendingCart()
-                }
-            }
-            .onChange(of: viewModel.selectedCart) { oldValue, newValue in
-                print(
-                    "🔄 HomeView: selectedCart changed to \(newValue?.name ?? "nil")"
-                )
-            }
-            .onChange(of: viewModel.showVault) { oldValue, newValue in
-                withAnimation(.easeInOut(duration: 0.15)) {
-                    vaultButtonScale = newValue ? 0.9 : 1.0
                 }
             }
         }
@@ -440,10 +428,16 @@ struct HomeView: View {
     }
     
     private var greetingText: some View {
-        Text("Hi Ethan,")
+        let userName = currentUserName ?? UserDefaults.standard.userName ?? "there"
+        return Text("Hi \(userName),")
             .lexendFont(36, weight: .bold)
             .frame(maxWidth: .infinity, alignment: .leading)
+            .onAppear {
+                // Sync with UserDefaults on appear
+                currentUserName = UserDefaults.standard.userName
+            }
     }
+    
     
     private var createCartButton: some View {
         Button(action: {

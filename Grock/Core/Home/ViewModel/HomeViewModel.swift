@@ -225,6 +225,11 @@ final class HomeViewModel {
         UserDefaults.standard.set(false, forKey: "hasSeenFirstShoppingCartCelebration")
         UserDefaults.standard.set(false, forKey: "hasSeenVaultCelebration")
         UserDefaults.standard.hasCompletedOnboarding = false
+        
+        // Reset name-related flags
+        UserDefaults.standard.userName = nil
+        UserDefaults.standard.hasPromptedForNameAfterOnboarding = false
+        UserDefaults.standard.hasPromptedForNameAfterVaultCelebration = false
 
         // Clear hidden cart state
         hiddenCartIds.removeAll()
@@ -237,6 +242,9 @@ final class HomeViewModel {
         print("   - hasSeenFirstShoppingCartCelebration: false")
         print("   - hasSeenVaultCelebration: false")
         print("   - hasCompletedOnboarding: false")
+        print("   - userName: cleared")
+        print("   - hasPromptedForNameAfterOnboarding: false")
+        print("   - hasPromptedForNameAfterVaultCelebration: false")
     }
     
     // MARK: - UI Helpers

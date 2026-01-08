@@ -60,6 +60,9 @@ struct VaultView: View {
     @State private var showFirstItemTooltip = false
     @State private var firstItemId: String? = nil
     
+    // Name entry popover
+    @State private var showNameEntryPopover = false
+    
     // Track keyboard state for immediate dismissal
     @FocusState private var isAnyFieldFocused: Bool
     
@@ -86,72 +89,132 @@ struct VaultView: View {
     }
     
     var body: some View {
+        baseContent
+            .applyLifecycleModifiers(
+                onAppear: handleOnAppear,
+                onDisappear: handleOnDisappear,
+                vaultService: vaultService,
+                selectedCategory: $selectedCategory,
+                showAddItemPopover: $showAddItemPopover,
+                updateChevronVisibility: updateChevronVisibility
+            )
+            .applyTooltipModifiers(
+                showFirstItemTooltip: $showFirstItemTooltip,
+                firstItemId: firstItemId,
+                showNameEntryPopover: $showNameEntryPopover
+            )
+    }
+    
+    private var baseContent: some View {
+        mainZStack
+            .applyBaseModifiers(
+                isKeyboardVisible: isKeyboardVisible,
+                focusedItemId: $focusedItemId
+            )
+            .applyOverlayModifiers(
+                showCartConfirmation: $showCartConfirmation,
+                showDismissConfirmation: $showDismissConfirmation,
+                cartViewModel: cartViewModel,
+                dismiss: dismiss
+            )
+            .applySheetModifiers(
+                showCelebration: $showCelebration,
+                showCartConfirmation: $showCartConfirmation,
+                cartViewModel: cartViewModel,
+                vaultService: vaultService,
+                onCreateCart: onCreateCart,
+                onCelebrationDismiss: handleCelebrationDismiss
+            )
+    }
+    
+    // MARK: - Main Content
+    
+    private var mainZStack: some View {
         ZStack(alignment: .bottom) {
             if vaultReady {
-                VStack(spacing: 0) {
-                    VaultToolbarView(
-                        toolbarAppeared: $toolbarAppeared,
-                        onAddTapped: {
-                            dismissKeyboard()
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                showAddItemPopover = true
-                                createCartButtonVisible = false
-                            }
-                        },
-                        onDismissTapped: {
-                            if hasActiveItems {
-                                showDismissConfirmation = true
-                            } else {
-                                dismiss()
-                            }
-                        },
-                        onClearTapped: {
-                            cartViewModel.activeCartItems.removeAll()
-                        },
-                        showClearButton: hasActiveItems
-                    )
-                    
-                    
-                    if let vault = vaultService.vault, !vault.categories.isEmpty {
-                        ZStack(alignment: .top) {
-                            categoryContentScrollView
-                                .frame(maxHeight: .infinity)
-                                .padding(.top, categorySectionHeight)
-                                .zIndex(0)
-                            
-                            VaultCategorySectionView(selectedCategory: selectedCategory) {
-                                categoryScrollView
-                            }
-                            .onTapGesture {
-                                dismissKeyboard()
-                            }
-                            .background(
-                                GeometryReader { geo in
-                                    Color.clear
-                                        .onAppear {
-                                            categorySectionHeight = geo.size.height
-                                        }
-                                        .onChange(of: geo.size.height) { _, newValue in
-                                            categorySectionHeight = newValue
-                                        }
-                                }
-                            )
-                            .zIndex(1)
-                        }
-                    }
-                }
-                .frame(maxHeight: .infinity)
+                mainContentStack
             } else {
-                ProgressView()
-                    .onAppear {
-                        vaultReady = true
-                    }
+                loadingView
             }
             
             if vaultService.vault != nil && !showCelebration && vaultReady {
-                content
+                bottomContent
             }
             
+            popoversOverlay
+            
+            keyboardDoneButtonOverlay
+        }
+    }
+    
+    private var mainContentStack: some View {
+        VStack(spacing: 0) {
+            VaultToolbarView(
+                toolbarAppeared: $toolbarAppeared,
+                onAddTapped: {
+                    dismissKeyboard()
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        showAddItemPopover = true
+                        createCartButtonVisible = false
+                    }
+                },
+                onDismissTapped: {
+                    if hasActiveItems {
+                        showDismissConfirmation = true
+                    } else {
+                        dismiss()
+                    }
+                },
+                onClearTapped: {
+                    cartViewModel.activeCartItems.removeAll()
+                },
+                showClearButton: hasActiveItems
+            )
+            
+            if let vault = vaultService.vault, !vault.categories.isEmpty {
+                categoryContentWithSection
+            }
+        }
+        .frame(maxHeight: .infinity)
+    }
+    
+    private var categoryContentWithSection: some View {
+        ZStack(alignment: .top) {
+            categoryContentScrollView
+                .frame(maxHeight: .infinity)
+                .padding(.top, categorySectionHeight)
+                .zIndex(0)
+            
+            VaultCategorySectionView(selectedCategory: selectedCategory) {
+                categoryScrollView
+            }
+            .onTapGesture {
+                dismissKeyboard()
+            }
+            .background(
+                GeometryReader { geo in
+                    Color.clear
+                        .onAppear {
+                            categorySectionHeight = geo.size.height
+                        }
+                        .onChange(of: geo.size.height) { _, newValue in
+                            categorySectionHeight = newValue
+                        }
+                }
+            )
+            .zIndex(1)
+        }
+    }
+    
+    private var loadingView: some View {
+        ProgressView()
+            .onAppear {
+                vaultReady = true
+            }
+    }
+    
+    private var popoversOverlay: some View {
+        Group {
             if showAddItemPopover {
                 AddItemPopover(
                     isPresented: $showAddItemPopover,
@@ -183,278 +246,206 @@ struct VaultView: View {
                     createCartButtonVisible = false
                 }
             }
-
-            ZStack {
-                if keyboardResponder.isVisible && focusedItemId != nil {
-                    KeyboardDoneButton(
-                        keyboardHeight: keyboardResponder.currentHeight,
-                        onDone: {
-                            UIApplication.shared.endEditing()
+            
+            if showNameEntryPopover {
+                NameEntryPopover(
+                    isPresented: $showNameEntryPopover,
+                    createCartButtonVisible: $createCartButtonVisible,
+                    onSave: { name in
+                        print("✅ Name saved: \(name)")
+                    },
+                    onDismiss: {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                            createCartButtonVisible = true
                         }
-                    )
-                    .transition(.identity)
-                    .zIndex(10)
-                }
-            }
-            .frame(maxHeight: .infinity)
-        }
-        .onPreferenceChange(TextFieldFocusPreferenceKey.self) { itemId in
-            focusedItemId = itemId
-        }
-        .frame(maxHeight: .infinity)
-        .ignoresSafeArea(.keyboard)
-        .toolbar(.hidden)
-        .interactiveDismissDisabled(isKeyboardVisible)
-        .overlay {
-            if showCartConfirmation {
-                Color.black.opacity(0.4)
-                    .ignoresSafeArea()
-                    .transition(.opacity)
-            }
-        }
-        .customActionSheet(
-                isPresented: $showDismissConfirmation,
-                title: "Leave Vault?",
-                message: "You have \(cartViewModel.activeCartItems.count) selected item(s) that will be lost if you leave.",
-                primaryAction: {
-                    cartViewModel.activeCartItems.removeAll()
-                    dismiss()
-                },
-                secondaryAction: {
-                }
-            )
-        .animation(.easeInOut(duration: 0.3), value: showCartConfirmation)
-        .fullScreenCover(isPresented: $showCelebration) {
-            CelebrationView(
-                isPresented: $showCelebration,
-                title: "Welcome to Your Vault!",
-                subtitle: nil
-            )
-            .presentationBackground(.clear)
-        }
-        .onChange(of: showCelebration) { oldValue, newValue in
-            if newValue {
-                withAnimation(.easeOut(duration: 0.2)) {
+                    }
+                )
+                .transition(.opacity)
+                .zIndex(2)
+                .onAppear {
+                    print("🔍 NameEntryPopover ON APPEAR")
                     createCartButtonVisible = false
                 }
-            } else {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                    createCartButtonVisible = true
-                }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    if hasActiveItems {
-                        startButtonBounce()
-                    }
-                }
-                
-                findAndHighlightFirstItem()
             }
         }
-        .fullScreenCover(isPresented: $showCartConfirmation) {
-            CartConfirmationPopover(
-                isPresented: $showCartConfirmation,
-                activeCartItems: cartViewModel.activeCartItems,
-                vaultService: vaultService,
-                onConfirm: { title, budget in
-                    print("🛒 Creating cart...")
-                    
-                    if let newCart = cartViewModel.createCartWithActiveItems(name: title, budget: budget) {
-                        print("✅ Cart created: \(newCart.name)")
-                        cartViewModel.activeCartItems.removeAll()
-                        onCreateCart?(newCart)
-                    } else {
-                        print("❌ Failed to create cart")
-                        showCreateCartButton()
+    }
+    
+    private var keyboardDoneButtonOverlay: some View {
+        ZStack {
+            if keyboardResponder.isVisible && focusedItemId != nil {
+                KeyboardDoneButton(
+                    keyboardHeight: keyboardResponder.currentHeight,
+                    onDone: {
+                        UIApplication.shared.endEditing()
                     }
-                },
-                onCancel: {
-                    showCartConfirmation = false
-                    showCreateCartButton()
-                }
-            )
-            .presentationBackground(.clear)
+                )
+                .transition(.identity)
+                .zIndex(10)
+            }
+        }
+        .frame(maxHeight: .infinity)
+    }
+    
+    private var bottomContent: some View {
+        VaultBottomContent(
+            totalVaultItemsCount: totalVaultItemsCount,
+            hasActiveItems: hasActiveItems,
+            existingCart: existingCart,
+            showLeftChevron: showLeftChevron,
+            showRightChevron: showRightChevron,
+            createCartButtonVisible: createCartButtonVisible,
+            buttonScale: buttonScale,
+            fillAnimation: fillAnimation,
+            showCartConfirmation: $showCartConfirmation,
+            navigationDirection: navigationDirection,
+            onNavigatePrevious: navigateToPreviousCategory,
+            onNavigateNext: navigateToNextCategory,
+            onAddItemsToCart: onAddItemsToCart,
+            dismissKeyboard: dismissKeyboard
+        )
+        .onChange(of: hasActiveItems) { oldValue, newValue in
+            handleActiveItemsChange(oldValue: oldValue, newValue: newValue)
         }
         .onAppear {
-            initializeActiveItemsFromExistingCart()
-            
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                if selectedCategory == nil {
-                    selectedCategory = firstCategoryWithItems ?? GroceryCategory.allCases.first
-                }
-                updateChevronVisibility()
-            }
-            
-            print("🎉 VaultView onAppear - Checking celebration conditions:")
-            print("🎉 shouldTriggerCelebration parameter: \(shouldTriggerCelebration)")
-            
-            let hasSeenCelebration = UserDefaults.standard.bool(forKey: "hasSeenVaultCelebration")
-            print("🎉 hasSeenCelebration: \(hasSeenCelebration)")
-            
-            if let vault = vaultService.vault {
-                let totalItems = vault.categories.reduce(0) { $0 + $1.items.count }
-                print("🎉 Total items in vault: \(totalItems)")
-                print("🎉 Categories with items: \(vault.categories.filter { !$0.items.isEmpty }.count)")
-            }
-            
-            if shouldTriggerCelebration {
-                print("🎉 Celebration triggered by parent view!")
-                showCelebration = true
-                UserDefaults.standard.set(true, forKey: "hasSeenVaultCelebration")
+            if hasActiveItems {
+                fillAnimation = 1.0
+                buttonScale = 1.0
             } else {
-                checkAndStartCelebration()
+                buttonScale = 0
             }
-            
+        }
+    }
+    
+    // MARK: - Helper Methods
+    
+    private func handleActiveItemsChange(oldValue: Bool, newValue: Bool) {
+        if newValue {
+            if !oldValue {
+                withAnimation(.spring(duration: 0.4)) {
+                    fillAnimation = 1.0
+                }
+                startButtonBounce()
+            }
+        } else {
+            withAnimation(.easeInOut(duration: 0.3)) {
+                fillAnimation = 0.0
+                buttonScale = 0
+            }
+        }
+    }
+    
+    private func handleCelebrationDismiss() {
+        print("🔍 handleCelebrationDismiss called. showCelebration: \(showCelebration)")
+        if showCelebration {
+            withAnimation(.easeOut(duration: 0.2)) {
+                createCartButtonVisible = false
+            }
+        } else {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                createCartButtonVisible = true
+            }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                toolbarAppeared = true
-            }
-            
-            NotificationCenter.default.addObserver(
-                forName: NSNotification.Name("ItemCategoryChanged"),
-                object: nil,
-                queue: .main
-            ) { notification in
-                if let newCategory = notification.userInfo?["newCategory"] as? GroceryCategory {
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                        selectedCategory = newCategory
-                    }
-                    print("🔄 Auto-switched to category: \(newCategory.title)")
-                    updateChevronVisibility()
+                if hasActiveItems {
+                    startButtonBounce()
                 }
             }
             
-            // Track keyboard visibility to prevent sheet dismissal
-            NotificationCenter.default.addObserver(
-                forName: UIResponder.keyboardWillShowNotification,
-                object: nil,
-                queue: .main
-            ) { _ in
-                isKeyboardVisible = true
-            }
+            findAndHighlightFirstItem()
+            print("🔍 findAndHighlightFirstItem returned. showFirstItemTooltip: \(showFirstItemTooltip)")
             
-            NotificationCenter.default.addObserver(
-                forName: UIResponder.keyboardWillHideNotification,
-                object: nil,
-                queue: .main
-            ) { _ in
-                isKeyboardVisible = false
+            // Fallback: If tooltip doesn't show (no first item), show name entry after celebration
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                print("🔍 Fallback check running...")
+                if !showFirstItemTooltip &&
+                   !UserDefaults.standard.hasEnteredName &&
+                   !UserDefaults.standard.hasPromptedForNameAfterVaultCelebration {
+                    print("🔍 Fallback conditions met! Scheduling NameEntryPopover in 1.0s")
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                        print("🔍 Executing Fallback NameEntryPopover show")
+                        showNameEntryPopover = true
+                        UserDefaults.standard.hasPromptedForNameAfterVaultCelebration = true
+                    }
+                }
             }
         }
-        .onDisappear {
-            NotificationCenter.default.removeObserver(self)
-            dismissKeyboard()
-        }
-        .onChange(of: vaultService.vault) { oldValue, newValue in
-            // Only set if we truly don't have a selection
+    }
+    
+    private func handleOnAppear() {
+        initializeActiveItemsFromExistingCart()
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
             if selectedCategory == nil {
                 selectedCategory = firstCategoryWithItems ?? GroceryCategory.allCases.first
             }
             updateChevronVisibility()
         }
-        .onChange(of: showAddItemPopover) { oldValue, newValue in
-            if !newValue {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    print("📝 After adding item - updated vault structure:")
-                }
-            }
-        }
-        .onChange(of: selectedCategory) { oldValue, newValue in
-            updateChevronVisibility()
-        }
-        .overlay {
-            if showFirstItemTooltip, let firstItemId = firstItemId {
-                FirstItemTooltip(itemId: firstItemId, isPresented: $showFirstItemTooltip)
-            }
-        }
-    }
-    
-    // MARK: - Chevron Navigation Methods
-    
-    private func updateChevronVisibility() {
-        guard let currentCategory = selectedCategory,
-              let currentIndex = GroceryCategory.allCases.firstIndex(of: currentCategory) else {
-            showLeftChevron = false
-            showRightChevron = false
-            return
-        }
         
-        showLeftChevron = currentIndex > 0
-        showRightChevron = currentIndex < GroceryCategory.allCases.count - 1
-    }
-    
-    private func navigateToPreviousCategory() {
-        // Dismiss keyboard immediately
-        dismissKeyboard()
+        print("🎉 VaultView onAppear - Checking celebration conditions:")
+        print("🎉 shouldTriggerCelebration parameter: \(shouldTriggerCelebration)")
         
-        guard let currentCategory = selectedCategory,
-              let currentIndex = GroceryCategory.allCases.firstIndex(of: currentCategory),
-              currentIndex > 0 else { return }
-        
-        let previousCategory = GroceryCategory.allCases[currentIndex - 1]
-        navigationDirection = .left
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-            selectedCategory = previousCategory
-        }
-    }
-    
-    private func navigateToNextCategory() {
-        // Dismiss keyboard immediately
-        dismissKeyboard()
-        
-        guard let currentCategory = selectedCategory,
-              let currentIndex = GroceryCategory.allCases.firstIndex(of: currentCategory),
-              currentIndex < GroceryCategory.allCases.count - 1 else { return }
-        
-        let nextCategory = GroceryCategory.allCases[currentIndex + 1]
-        navigationDirection = .right
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-            selectedCategory = nextCategory
-        }
-    }
-    
-    private func checkAndStartCelebration() {
         let hasSeenCelebration = UserDefaults.standard.bool(forKey: "hasSeenVaultCelebration")
+        print("🎉 hasSeenCelebration: \(hasSeenCelebration)")
+        print("🎉 hasPromptedForNameAfterVaultCelebration: \(UserDefaults.standard.hasPromptedForNameAfterVaultCelebration)")
         
-        guard !hasSeenCelebration else {
-            print("⏭️ Skipping celebration - already seen")
-            return
+        if let vault = vaultService.vault {
+            let totalItems = vault.categories.reduce(0) { $0 + $1.items.count }
+            print("🎉 Total items in vault: \(totalItems)")
+            print("🎉 Categories with items: \(vault.categories.filter { !$0.items.isEmpty }.count)")
         }
         
-        guard let vault = vaultService.vault else {
-            print("⏭️ Skipping celebration - no vault")
-            return
+        if shouldTriggerCelebration {
+            print("🎉 Celebration triggered by parent view!")
+            showCelebration = true
+            UserDefaults.standard.set(true, forKey: "hasSeenVaultCelebration")
+        } else {
+            checkAndStartCelebration()
         }
         
-        let totalItems = vault.categories.reduce(0) { $0 + $1.items.count }
-        print("🎉 Total items in vault: \(totalItems)")
-        
-        guard totalItems > 0 else {
-            print("⏭️ Skipping celebration - vault is empty")
-            return
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            toolbarAppeared = true
         }
         
-        print("🎉 ✅ CONDITIONS MET - Starting celebration!")
-        showCelebration = true
-        UserDefaults.standard.set(true, forKey: "hasSeenVaultCelebration")
+        setupNotificationObservers()
     }
     
-    private func initializeActiveItemsFromExistingCart() {
-        guard let existingCart = existingCart, !hasInitializedFromExistingCart else { return }
-        
-        print("🔄 VaultView: Initializing active items from existing cart '\(existingCart.name)'")
-        
-        cartViewModel.activeCartItems.removeAll()
-        
-        for cartItem in existingCart.cartItems {
-            cartViewModel.activeCartItems[cartItem.itemId] = cartItem.quantity
-            if let item = vaultService.findItemById(cartItem.itemId) {
-                print("   - Activated: \(item.name) × \(cartItem.quantity)")
+    private func handleOnDisappear() {
+        NotificationCenter.default.removeObserver(self)
+        dismissKeyboard()
+    }
+    
+    private func setupNotificationObservers() {
+        NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("ItemCategoryChanged"),
+            object: nil,
+            queue: .main
+        ) { notification in
+            if let newCategory = notification.userInfo?["newCategory"] as? GroceryCategory {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                    selectedCategory = newCategory
+                }
+                print("🔄 Auto-switched to category: \(newCategory.title)")
+                updateChevronVisibility()
             }
         }
         
-        print("   Total active items: \(cartViewModel.activeCartItems.count)")
-        hasInitializedFromExistingCart = true
+        NotificationCenter.default.addObserver(
+            forName: UIResponder.keyboardWillShowNotification,
+            object: nil,
+            queue: .main
+        ) { _ in
+            isKeyboardVisible = true
+        }
+        
+        NotificationCenter.default.addObserver(
+            forName: UIResponder.keyboardWillHideNotification,
+            object: nil,
+            queue: .main
+        ) { _ in
+            isKeyboardVisible = false
+        }
     }
     
+    // MARK: - Category Views
     
     private var categoryScrollView: some View {
         ScrollViewReader { proxy in
@@ -477,7 +468,6 @@ struct VaultView: View {
                                 itemCount: getActiveItemCount(for: category),
                                 hasItems: hasItems(in: category),
                                 action: {
-                                    // Dismiss keyboard immediately when tapping category
                                     dismissKeyboard()
                                     
                                     if let current = selectedCategory,
@@ -586,176 +576,52 @@ struct VaultView: View {
         }
     }
     
-    private var content: some View {
-        VStack {
-            Spacer()
-            ZStack(alignment: .bottom) {
-                
-                if totalVaultItemsCount >= 2 {
-                    ZStack {
-                        LinearGradient(
-                            gradient: Gradient(stops: [
-                                .init(color: Color.white.opacity(0.0), location: 0.0),
-                                .init(color: Color.white.opacity(0.6), location: 0.25),
-                                .init(color: Color.white.opacity(0.95), location: 0.55),
-                                .init(color: Color.white.opacity(1.0), location: 1.0),
-                            ]),
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    }
-                    .frame(height: 150)
-                    .allowsHitTesting(false)
-                }
-                
-                HStack {
-                    if showLeftChevron {
-                        Button(action: navigateToPreviousCategory) {
-                            Image(systemName: "chevron.left")
-                                .font(.system(size: 16, weight: .bold))
-                                .foregroundColor(.black)
-                                .frame(width: 44, height: 44)
-                                .background(
-                                    Circle()
-                                        .fill(Material.thin)
-                                        .shadow(color: .black.opacity(0.25), radius: 2, x: 0, y: 2)
-                                )
-                        }
-                        .transition(.scale.combined(with: .opacity))
-                        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: showLeftChevron)
-                    } else {
-                        Circle()
-                            .fill(Color.clear)
-                            .frame(width: 44, height: 44)
-                    }
-                    
-                    Spacer()
-                    
-                    Button(action: {
-                        // Dismiss keyboard immediately
-                        dismissKeyboard()
-                        
-                        if existingCart != nil {
-                            onAddItemsToCart?(cartViewModel.activeCartItems)
-                            dismiss()
-                        } else {
-                            withAnimation {
-                                showCartConfirmation = true
-                            }
-                        }
-                    }) {
-                        Text(existingCart != nil ? "Add to Cart" : "Create cart")
-                            .fuzzyBubblesFont(16, weight: .bold)
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 24)
-                            .padding(.vertical, 12)
-                            .background(
-                                Capsule()
-                                    .fill(
-                                        hasActiveItems
-                                        ? RadialGradient(
-                                            colors: [Color.black, Color.gray.opacity(0.3)],
-                                            center: .center,
-                                            startRadius: 0,
-                                            endRadius: fillAnimation * 300
-                                        )
-                                        : RadialGradient(
-                                            colors: [Color.gray.opacity(0.3), Color.gray.opacity(0.3)],
-                                            center: .center,
-                                            startRadius: 0,
-                                            endRadius: 0
-                                        )
-                                    )
-                            )
-                            .cornerRadius(25)
-                    }
-                    .overlay(alignment: .topLeading, content: {
-                        if hasActiveItems {
-                            Text("\(cartViewModel.activeCartItems.count)")
-                                .fuzzyBubblesFont(16, weight: .bold)
-                                .contentTransition(.numericText())
-                                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: cartViewModel.activeCartItems.count)
-                                .foregroundColor(.black)
-                                .frame(width: 25, height: 25)
-                                .background(Color.white)
-                                .clipShape(Circle())
-                                .overlay(
-                                    Circle()
-                                        .stroke(Color.black, lineWidth: 2)
-                                )
-                                .offset(x: -8, y: -4)
-                                .scaleEffect(createCartButtonVisible ? 1 : 0)
-                                .animation(
-                                    .spring(response: 0.3, dampingFraction: 0.6),
-                                    value: createCartButtonVisible
-                                )
-                        }
-                    })
-                    .buttonStyle(.solid)
-                    .scaleEffect(createCartButtonVisible ? buttonScale : 0)
-                    .animation(.spring(response: 0.3, dampingFraction: 0.6), value: createCartButtonVisible)
-                    .animation(.spring(response: 0.3, dampingFraction: 0.6), value: buttonScale)
-                    .disabled(!hasActiveItems)
-                    
-                    Spacer()
-                    
-                    if showRightChevron {
-                        Button(action: navigateToNextCategory) {
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 16, weight: .bold))
-                                .foregroundColor(.black)
-                                .frame(width: 44, height: 44)
-                                .background(
-                                    Circle()
-                                        .fill(Material.thin)
-                                        .shadow(color: .black.opacity(0.25), radius: 2, x: 0, y: 2)
-                                )
-                        }
-                        .transition(.scale.combined(with: .opacity))
-                        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: showRightChevron)
-                    } else {
-                        Circle()
-                            .fill(Color.clear)
-                            .frame(width: 44, height: 44)
-                    }
-                }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 40)
-                .onChange(of: hasActiveItems) { oldValue, newValue in
-                    if newValue {
-                        if !oldValue {
-                            withAnimation(.spring(duration: 0.4)) {
-                                fillAnimation = 1.0
-                            }
-                            startButtonBounce()
-                        }
-                    } else {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            fillAnimation = 0.0
-                            buttonScale = 0
-                        }
-                    }
-                }
-                .onAppear {
-                    if hasActiveItems {
-                        fillAnimation = 1.0
-                        buttonScale = 1.0
-                    } else {
-                        buttonScale = 0
-                    }
-                }
-            }
-            .frame(maxWidth: .infinity)
+    // MARK: - Navigation Methods
+    
+    private func updateChevronVisibility() {
+        guard let currentCategory = selectedCategory,
+              let currentIndex = GroceryCategory.allCases.firstIndex(of: currentCategory) else {
+            showLeftChevron = false
+            showRightChevron = false
+            return
         }
-        .ignoresSafeArea(.all, edges: .bottom)
+        
+        showLeftChevron = currentIndex > 0
+        showRightChevron = currentIndex < GroceryCategory.allCases.count - 1
+    }
+    
+    private func navigateToPreviousCategory() {
+        dismissKeyboard()
+        
+        guard let currentCategory = selectedCategory,
+              let currentIndex = GroceryCategory.allCases.firstIndex(of: currentCategory),
+              currentIndex > 0 else { return }
+        
+        let previousCategory = GroceryCategory.allCases[currentIndex - 1]
+        navigationDirection = .left
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+            selectedCategory = previousCategory
+        }
+    }
+    
+    private func navigateToNextCategory() {
+        dismissKeyboard()
+        
+        guard let currentCategory = selectedCategory,
+              let currentIndex = GroceryCategory.allCases.firstIndex(of: currentCategory),
+              currentIndex < GroceryCategory.allCases.count - 1 else { return }
+        
+        let nextCategory = GroceryCategory.allCases[currentIndex + 1]
+        navigationDirection = .right
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+            selectedCategory = nextCategory
+        }
     }
     
     private func selectCategory(_ category: GroceryCategory, proxy: ScrollViewProxy) {
         withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
             selectedCategory = category
         }
-
-        
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
             withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
@@ -764,16 +630,55 @@ struct VaultView: View {
         }
     }
     
-    private func showCreateCartButton() {
-        withAnimation(.spring(response: 0.4, dampingFraction: 0.7, blendDuration: 0)) {
-            createCartButtonVisible = true
+    // MARK: - Data Methods
+    
+    private func checkAndStartCelebration() {
+        let hasSeenCelebration = UserDefaults.standard.bool(forKey: "hasSeenVaultCelebration")
+        
+        guard !hasSeenCelebration else {
+            print("⏭️ Skipping celebration - already seen")
+            return
         }
+        
+        guard let vault = vaultService.vault else {
+            print("⏭️ Skipping celebration - no vault")
+            return
+        }
+        
+        let totalItems = vault.categories.reduce(0) { $0 + $1.items.count }
+        print("🎉 Total items in vault: \(totalItems)")
+        
+        guard totalItems > 0 else {
+            print("⏭️ Skipping celebration - vault is empty")
+            return
+        }
+        
+        print("🎉 ✅ CONDITIONS MET - Starting celebration!")
+        showCelebration = true
+        UserDefaults.standard.set(true, forKey: "hasSeenVaultCelebration")
+    }
+    
+    private func initializeActiveItemsFromExistingCart() {
+        guard let existingCart = existingCart, !hasInitializedFromExistingCart else { return }
+        
+        print("🔄 VaultView: Initializing active items from existing cart '\(existingCart.name)'")
+        
+        cartViewModel.activeCartItems.removeAll()
+        
+        for cartItem in existingCart.cartItems {
+            cartViewModel.activeCartItems[cartItem.itemId] = cartItem.quantity
+            if let item = vaultService.findItemById(cartItem.itemId) {
+                print("   - Activated: \(item.name) × \(cartItem.quantity)")
+            }
+        }
+        
+        print("   Total active items: \(cartViewModel.activeCartItems.count)")
+        hasInitializedFromExistingCart = true
     }
     
     private var firstCategoryWithItems: GroceryCategory? {
         guard let vault = vaultService.vault else { return nil }
         
-        // Always check in GroceryCategory.allCases order, not vault.categories order
         for groceryCategory in GroceryCategory.allCases {
             if let vaultCategory = vault.categories.first(where: { $0.name == groceryCategory.title }),
                !vaultCategory.items.isEmpty {
@@ -782,6 +687,7 @@ struct VaultView: View {
         }
         return nil
     }
+    
     private func getActiveItemCount(for category: GroceryCategory) -> Int {
         guard let vault = vaultService.vault else { return 0 }
         guard let foundCategory = vault.categories.first(where: { $0.name == category.title }) else { return 0 }
@@ -836,14 +742,183 @@ struct VaultView: View {
     }
     
     private func findAndHighlightFirstItem() {
-        guard let vault = vaultService.vault else { return }
+        print("🔍 findAndHighlightFirstItem called")
+        guard let vault = vaultService.vault else {
+            print("🔍 No vault found")
+            return
+        }
         
         for category in vault.categories {
             if let firstItem = category.items.first {
+                print("🔍 Found first item: \(firstItem.name) (ID: \(firstItem.id))")
                 firstItemId = firstItem.id
                 showFirstItemTooltip = true
                 break
             }
         }
+        if !showFirstItemTooltip {
+            print("🔍 No items found in any category")
+        }
+    }
+}
+
+// MARK: - View Modifier Extensions
+
+extension View {
+    func applyBaseModifiers(
+        isKeyboardVisible: Bool,
+        focusedItemId: Binding<String?>
+    ) -> some View {
+        self
+            .onPreferenceChange(TextFieldFocusPreferenceKey.self) { itemId in
+                focusedItemId.wrappedValue = itemId
+            }
+            .frame(maxHeight: .infinity)
+            .ignoresSafeArea(.keyboard)
+            .toolbar(.hidden)
+            .interactiveDismissDisabled(isKeyboardVisible)
+    }
+    
+    func applyOverlayModifiers(
+        showCartConfirmation: Binding<Bool>,
+        showDismissConfirmation: Binding<Bool>,
+        cartViewModel: CartViewModel,
+        dismiss: DismissAction
+    ) -> some View {
+        self
+            .overlay {
+                if showCartConfirmation.wrappedValue {
+                    Color.black.opacity(0.4)
+                        .ignoresSafeArea()
+                        .transition(.opacity)
+                }
+            }
+            .customActionSheet(
+                isPresented: showDismissConfirmation,
+                title: "Leave Vault?",
+                message: "You have \(cartViewModel.activeCartItems.count) selected item(s) that will be lost if you leave.",
+                primaryAction: {
+                    cartViewModel.activeCartItems.removeAll()
+                    dismiss()
+                },
+                secondaryAction: {}
+            )
+            .animation(.easeInOut(duration: 0.3), value: showCartConfirmation.wrappedValue)
+    }
+    
+    func applySheetModifiers(
+        showCelebration: Binding<Bool>,
+        showCartConfirmation: Binding<Bool>,
+        cartViewModel: CartViewModel,
+        vaultService: VaultService,
+        onCreateCart: ((Cart) -> Void)?,
+        onCelebrationDismiss: @escaping () -> Void
+    ) -> some View {
+        self
+            .fullScreenCover(isPresented: showCelebration) {
+                CelebrationView(
+                    isPresented: showCelebration,
+                    title: "Welcome to Your Vault!",
+                    subtitle: nil
+                )
+                .presentationBackground(.clear)
+            }
+            .fullScreenCover(isPresented: showCartConfirmation) {
+                CartConfirmationPopover(
+                    isPresented: showCartConfirmation,
+                    activeCartItems: cartViewModel.activeCartItems,
+                    vaultService: vaultService,
+                    onConfirm: { title, budget in
+                        print("🛒 Creating cart...")
+                        
+                        if let newCart = cartViewModel.createCartWithActiveItems(name: title, budget: budget) {
+                            print("✅ Cart created: \(newCart.name)")
+                            cartViewModel.activeCartItems.removeAll()
+                            onCreateCart?(newCart)
+                        } else {
+                            print("❌ Failed to create cart")
+                        }
+                    },
+                    onCancel: {
+                        showCartConfirmation.wrappedValue = false
+                    }
+                )
+                .presentationBackground(.clear)
+            }
+            .onChange(of: showCelebration.wrappedValue) { oldValue, newValue in
+                onCelebrationDismiss()
+            }
+    }
+    
+    func applyLifecycleModifiers(
+        onAppear: @escaping () -> Void,
+        onDisappear: @escaping () -> Void,
+        vaultService: VaultService,
+        selectedCategory: Binding<GroceryCategory?>,
+        showAddItemPopover: Binding<Bool>,
+        updateChevronVisibility: @escaping () -> Void
+    ) -> some View {
+        self
+            .onAppear(perform: onAppear)
+            .onDisappear(perform: onDisappear)
+            .onChange(of: vaultService.vault) { oldValue, newValue in
+                if selectedCategory.wrappedValue == nil {
+                    // Find first category with items
+                    if let vault = newValue {
+                        for groceryCategory in GroceryCategory.allCases {
+                            if let vaultCategory = vault.categories.first(where: { $0.name == groceryCategory.title }),
+                               !vaultCategory.items.isEmpty {
+                                selectedCategory.wrappedValue = groceryCategory
+                                break
+                            }
+                        }
+                    }
+                }
+                updateChevronVisibility()
+            }
+            .onChange(of: showAddItemPopover.wrappedValue) { oldValue, newValue in
+                if !newValue {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        print("📝 After adding item - updated vault structure:")
+                    }
+                }
+            }
+            .onChange(of: selectedCategory.wrappedValue) { oldValue, newValue in
+                updateChevronVisibility()
+            }
+    }
+    
+    func applyTooltipModifiers(
+        showFirstItemTooltip: Binding<Bool>,
+        firstItemId: String?,
+        showNameEntryPopover: Binding<Bool>
+    ) -> some View {
+        self
+            .overlay {
+                if showFirstItemTooltip.wrappedValue, let firstItemId = firstItemId {
+                    FirstItemTooltip(itemId: firstItemId, isPresented: showFirstItemTooltip)
+                }
+            }
+            .onChange(of: showFirstItemTooltip.wrappedValue) {_, newValue in
+                print("🔍 showFirstItemTooltip changed to: \(newValue)")
+                if !newValue {
+                    let hasEnteredName = UserDefaults.standard.hasEnteredName
+                    let hasPrompted = UserDefaults.standard.hasPromptedForNameAfterVaultCelebration
+                    print("🔍 Tooltip dismissed. Checking conditions:")
+                    print("   - hasEnteredName: \(hasEnteredName)")
+                    print("   - hasPromptedForNameAfterVaultCelebration: \(hasPrompted)")
+                    
+                    if !hasEnteredName && !hasPrompted {
+                        print("🔍 Conditions met! Scheduling NameEntryPopover in 0.5s")
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            print("🔍 Executing scheduled NameEntryPopover show")
+                            showNameEntryPopover.wrappedValue = true
+                            UserDefaults.standard.hasPromptedForNameAfterVaultCelebration = true
+                        }
+                    } else {
+                        print("🔍 Conditions NOT met. Skipping NameEntryPopover.")
+                    }
+                }
+            }
     }
 }

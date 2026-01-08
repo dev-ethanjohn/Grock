@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import Lottie
 
 struct HomeCartRowView: View {
     let cart: Cart
@@ -26,27 +27,6 @@ struct HomeCartRowView: View {
         cart.totalSpent > cart.budget
     }
     
-    private var categories: [GroceryCategory] {
-        /// NOTE: for PREVIEW ONLY!
-        if vaultService == nil {
-            // Return mock categories for preview
-            return [.freshProduce, .meatsSeafood, .dairyEggs, .bakeryBread]
-        }
-        
-        // Real implementation when vaultService is available
-        var uniqueCategories: Set<GroceryCategory> = []
-        
-        for cartItem in cart.cartItems {
-            if let item = vaultService?.findItemById(cartItem.itemId),
-               let itemCategory = vaultService?.getCategory(for: item.id),
-               let groceryCategory = GroceryCategory.allCases.first(where: { $0.title == itemCategory.name }) {
-                uniqueCategories.insert(groceryCategory)
-            }
-        }
-        
-        return Array(uniqueCategories).sorted(by: { $0.title < $1.title })
-    }
-    
     private var budgetProgressColor: Color {
         let progress = currentProgress
         if progress < 0.7 {
@@ -56,7 +36,7 @@ struct HomeCartRowView: View {
         } else {
             return Color(hex: "F47676")
         }
-
+        
     }
     
     private var backgroundColor: Color {
@@ -67,8 +47,50 @@ struct HomeCartRowView: View {
         }
     }
     
+    // Total items includes ONLY ACTIVE items (non-skipped, non-deleted)
+    private var totalItems: Int {
+        cart.cartItems.filter { cartItem in
+            // Exclude items that should not be counted:
+            // 1. Shopping-only items with quantity <= 0 (effectively deleted/removed)
+            // 2. Vault items that are skipped during shopping
+            // 3. Vault items with quantity <= 0 (effectively inactive)
+            
+            if cartItem.isShoppingOnlyItem {
+                // Shopping-only items: only count if quantity > 0
+                return cartItem.quantity > 0
+            } else {
+                // Vault items: only count if quantity > 0 AND not skipped
+                return cartItem.quantity > 0 && !cartItem.isSkippedDuringShopping
+            }
+        }.count
+    }
+    
+    private var fulfilledItems: Int {
+        cart.cartItems.filter { cartItem in
+            // Include ALL items (both vault and shopping-only) that are fulfilled
+            cartItem.isFulfilled &&
+            cartItem.quantity > 0  // Still in cart
+        }.count
+    }
+    
+    private var fulfilledItemsTotal: String {
+        guard let vault = vaultService?.vault else {
+            return CurrencyFormatter.shared.format(amount: 0)
+        }
+        
+        let fulfilledTotal = cart.cartItems
+            .filter { cartItem in
+                cartItem.quantity > 0 && cartItem.isFulfilled
+            }
+            .reduce(0.0) { total, cartItem in
+                total + cartItem.getTotalPrice(from: vault, cart: cart)
+            }
+        
+        return CurrencyFormatter.shared.format(amount: fulfilledTotal)
+    }
+    
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 16) {
             headerRow
             progressSection
         }
@@ -83,18 +105,26 @@ struct HomeCartRowView: View {
                             .scaledToFill()
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                             .clipped()
-                            .blur(radius: 1)
+                            .blur(radius: 2)
                             .overlay(Color.black.opacity(0.4))
                         
                         VisibleNoiseView(
                             grainSize: 0.0001,      // Medium grain size
-                            density: 1,        // Visible but not overwhelming
+                            density: 0.5,        // Visible but not overwhelming
                             opacity: 0.20       // Subtle but noticeable
                         )
                     }
                 } else {
-                    // Solid color background
-                    backgroundColor
+                    ZStack {
+                        backgroundColor
+                            .overlay {
+                                NoiseOverlayView(
+                                    grainSize: 0.3,
+                                    density: 1.0,
+                                    opacity: 0.90
+                                )
+                            }
+                    }
                 }
             }
         )
@@ -158,21 +188,45 @@ struct HomeCartRowView: View {
     }
     
     private var headerRow: some View {
-        HStack {
+        HStack(alignment: .top) {
             Text(cart.name)
                 .shantellSansFont(18)
                 .foregroundColor(hasBackgroundImage ? .white : .black)
+                .offset(y: -4)
             
             Spacer()
             
-            Image(systemName: "chevron.right")
-                .lexendFont(14, weight: .semibold)
-                .foregroundColor(hasBackgroundImage ? .white : .black)
+            HStack(alignment: .center, spacing: 2) {
+                if cart.isShopping {
+                    
+                    LottieView(animation: .named("Shopping"))
+                        .playing(.fromProgress(0, toProgress: 0.5, loopMode: .loop))
+                        .frame(width: 18, height: 18)
+                    
+                    
+                }
+                
+                Image(systemName: "chevron.right")
+                    .lexendFont(13, weight: .semibold)
+                    .foregroundColor(hasBackgroundImage ? .white : .black)
+            }
+            
         }
     }
     
     private var progressSection: some View {
-        VStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: 4) {
+            
+            if cart.isShopping {
+                CharacterRevealViewWithoutUnderline(
+                    text: "\(fulfilledItems)/\(totalItems) items fulfilled, totalling \(fulfilledItemsTotal)",
+                    delay: 0.15
+                )
+                .fuzzyBubblesFont(12, weight: .bold)
+                .padding(.leading, 4)
+                .foregroundColor(hasBackgroundImage ? .white : .black)
+            }
+            
             FluidBudgetPillView(
                 cart: cart,
                 animatedBudget: viewModel.animatedBudget,
@@ -181,25 +235,6 @@ struct HomeCartRowView: View {
                 isHeader: false
             )
             
-            categoriesView
-        }
-    }
-    
-    private var categoriesView: some View {
-        HStack {
-            if !categories.isEmpty {
-                HStack(spacing: 3) {
-                    ForEach(categories, id: \.self) { category in
-                        Text(category.emoji)
-                            .font(.system(size: 11))
-                            .frame(width: 20, height: 20)
-                            .background(category.pastelColor.opacity(0.6))
-                            .cornerRadius(8)
-                    }
-                }
-            }
-            
-            Spacer()
         }
     }
     
@@ -226,5 +261,121 @@ struct HomeCartRowView: View {
         } else {
             backgroundImage = nil
         }
+    }
+}
+
+// MARK: - Noise Overlay View for Solid Colors
+struct NoiseOverlayView: View {
+    let grainSize: CGFloat
+    let density: CGFloat
+    let opacity: CGFloat
+    
+    @State private var noiseImage: UIImage?
+    private let cacheSize = CGSize(width: 300, height: 300)
+    
+    var body: some View {
+        Group {
+            if let noiseImage = noiseImage {
+                Image(uiImage: noiseImage)
+                    .resizable()
+                    .interpolation(.none)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .blendMode(.softLight) // More visible on solid colors than .overlay
+                    .opacity(opacity)
+            }
+        }
+        .onAppear {
+            generateNoise()
+        }
+    }
+    
+    private func generateNoise() {
+        let renderer = UIGraphicsImageRenderer(size: cacheSize)
+        
+        let image = renderer.image { context in
+            let cgContext = context.cgContext
+            
+            let pixelSize = max(1, Int(grainSize))
+            let cols = Int(cacheSize.width) / pixelSize
+            let rows = Int(cacheSize.height) / pixelSize
+            
+            for row in 0..<rows {
+                for col in 0..<cols {
+                    if CGFloat.random(in: 0...1) < density {
+                        let gray = CGFloat.random(in: 0.2...0.8)
+                        UIColor(white: gray, alpha: 1.0).setFill()
+                        
+                        let rect = CGRect(
+                            x: col * pixelSize,
+                            y: row * pixelSize,
+                            width: pixelSize,
+                            height: pixelSize
+                        )
+                        cgContext.fill(rect)
+                    }
+                }
+            }
+        }
+        
+        noiseImage = image
+    }
+}
+
+// MARK: - Character Reveal View Without Underline (Local to HomeCartRowView)
+struct CharacterRevealViewWithoutUnderline: View {
+    let text: String
+    let delay: Double
+    @State private var revealedCharacters: Int = 0
+    @State private var isAnimating = false
+    
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(Array(text.enumerated()), id: \.offset) { index, character in
+                Text(String(character))
+                    .opacity(index < revealedCharacters ? 1 : 0)
+                    .offset(y: index < revealedCharacters ? 0 : 4)
+                    .animation(
+                        .interpolatingSpring(
+                            stiffness: 240,
+                            damping: 14
+                        )
+                        .delay(Double(index) * 0.01 + delay),
+                        value: revealedCharacters
+                    )
+            }
+        }
+        .onAppear {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                withAnimation(
+                    .easeOut(duration: 0.32)
+                ) {
+                    revealedCharacters = text.count
+                }
+            }
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay + 0.25) {
+                withAnimation(
+                    .spring(
+                        response: 0.2,
+                        dampingFraction: 0.8,
+                        blendDuration: 0.1
+                    )
+                ) {
+                    isAnimating = true
+                }
+            }
+            
+            // Ensure all characters are revealed after animation completes
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay + (Double(text.count) * 0.01) + 0.5) {
+                revealedCharacters = text.count
+            }
+        }
+        .scaleEffect(isAnimating ? 1.007 : 1.0)
+        .animation(
+            .easeInOut(duration: 0.15)
+            .repeatCount(1, autoreverses: true)
+            .delay(delay + 0.5),
+            value: isAnimating
+        )
     }
 }
