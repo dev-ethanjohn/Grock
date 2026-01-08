@@ -98,12 +98,19 @@ struct HomeCartRowView: View {
                 }
             }
         )
-        .cornerRadius(24)
+        .clipShape(RoundedRectangle(cornerRadius: 24))
         .overlay(
+            // Shopping mode: animated titanium glowing border (behind the border)
+            ShoppingModeGradientView(cornerRadius: 24, hasBackgroundImage: hasBackgroundImage)
+                .opacity(cart.isShopping ? 1 : 0)
+                .allowsHitTesting(false)
+                .animation(.easeInOut(duration: 0.3), value: cart.isShopping)
+        )
+        .overlay(
+            // Border always visible (on top)
             RoundedRectangle(cornerRadius: 24)
                 .stroke(Color(hex: "CACACA"), lineWidth: 1)
         )
-        .padding(1)
         .scaleEffect(appeared ? 1.0 : 0.95)
         .opacity(appeared ? 1.0 : 0)
         .onAppear {
@@ -140,6 +147,12 @@ struct HomeCartRowView: View {
             if let cartId = notification.userInfo?["cartId"] as? String,
                cartId == cart.id {
                 loadBackgroundImage()
+            }
+        }
+        .onChange(of: cart.status) { oldValue, newValue in
+            // Smooth transition when cart status changes
+            withAnimation(.easeInOut(duration: 0.5)) {
+                // Gradient will automatically appear/disappear based on cart.isShopping
             }
         }
     }

@@ -29,8 +29,8 @@ struct ActiveCarts: View {
             }
             Spacer()
         }
+//        .padding(.horizontal)
         .frame(maxWidth: .infinity, alignment: .center)
-        .padding(.horizontal)
         .animation(.spring(response: 0.5, dampingFraction: 0.7), value: viewModel.hasCarts)
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("CartColorChanged"))) { _ in
                  // Trigger refresh when any cart color changes
@@ -61,7 +61,7 @@ struct ActiveCarts: View {
                 .listRowInsets(EdgeInsets(
                             top: 0,
                             leading: 0,
-                            bottom: index == viewModel.displayedCarts.count - 1 ? 0 : 8,
+                            bottom: index == viewModel.displayedCarts.count - 1 ? 0 : 16,
                             trailing: 0
                         ))
                 .transition(.asymmetric(
@@ -91,6 +91,7 @@ struct ActiveCarts: View {
                     let generator = UIImpactFeedbackGenerator(style: .medium)
                     generator.impactOccurred()
                 }
+                .padding(.horizontal)
             }
         }
         .listStyle(PlainListStyle())

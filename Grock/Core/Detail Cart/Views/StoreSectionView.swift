@@ -13,6 +13,8 @@ struct StoreSectionListView: View {
     @Environment(VaultService.self) private var vaultService
     @Environment(CartStateManager.self) private var stateManager
     
+    @State private var animatingOutSkippedItems: Set<String> = []
+    
     // FIXED: Proper filtering and sorting for items
     private var displayItems: [(cartItem: CartItem, item: Item?)] {
         let filteredItems = items.filter { cartItem, _ in
@@ -29,7 +31,8 @@ struct StoreSectionListView: View {
                 
             case .shopping:
                 // In shopping mode: show only unfulfilled, non-skipped items
-                return !cartItem.isFulfilled && !cartItem.isSkippedDuringShopping
+                return !cartItem.isFulfilled &&
+                       (!cartItem.isSkippedDuringShopping || animatingOutSkippedItems.contains(cartItem.itemId))
                 
             case .completed:
                 // In completed mode: show all items
@@ -57,46 +60,45 @@ struct StoreSectionListView: View {
     var body: some View {
         // Only show section if there are items to display
         if !displayItems.isEmpty {
-            Section(
-                header: StoreSectionHeader(store: store),
-                content: {
-                    ForEach(Array(displayItems.enumerated()), id: \.element.cartItem.itemId) { index, tuple in
-                        StoreSectionRow(
-                            index: index,
-                            tuple: tuple,
-                            cart: cart,
-                            displayItems: displayItems, // Pass displayItems for comparison
-                            onFulfillItem: onFulfillItem,
-                            onEditItem: onEditItem,
-                            onDeleteItem: onDeleteItem,
-                            handleSkipItem: handleSkipItem
-                        )
-                    }
-                }
-            )
-            .listSectionSpacing(isLastStore ? 0 : 20)
-            // ADD THIS: Animate section changes
-            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: displayItems.count)
-            .onAppear {
-                previousDisplayCount = displayItems.count
-            }
-            .onChange(of: displayItems.count) { oldCount, newCount in
-                // Trigger animation when count changes
-                if oldCount != newCount {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                        // Force UI update
-                    }
-                }
-                previousDisplayCount = newCount
-            }
+              Section(
+                  header: StoreSectionHeader(store: store),
+                  content: {
+                      ForEach(Array(displayItems.enumerated()), id: \.element.cartItem.itemId) { index, tuple in
+                          StoreSectionRow(
+                              index: index,
+                              tuple: tuple,
+                              cart: cart,
+                              displayItems: displayItems,
+                              onFulfillItem: onFulfillItem,
+                              onEditItem: onEditItem,
+                              onDeleteItem: onDeleteItem,
+                              handleSkipItem: handleSkipItem
+                          )
+                      }
+                  }
+              )
+              .listSectionSpacing(isLastStore ? 0 : 20)
+              // FIX: Use displayItems.count instead of displayItems
+              .animation(.spring(response: 0.3, dampingFraction: 0.7), value: displayItems.count)
+              .onAppear {
+                  previousDisplayCount = displayItems.count
+              }
         }
     }
     
     private func handleSkipItem(_ cartItem: CartItem) {
+        // Add to animating set
+        animatingOutSkippedItems.insert(cartItem.itemId)
+        
         withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
             cartItem.isSkippedDuringShopping = true
             cartItem.isFulfilled = false
             vaultService.updateCartTotals(cart: cart)
+        }
+        
+        // Remove from animating set after animation completes
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            animatingOutSkippedItems.remove(cartItem.itemId)
         }
     }
 }
@@ -170,7 +172,7 @@ private struct StoreSectionRow: View {
                 isLastItem: index == displayItems.count - 1,
                 isFirstItem: index == 0
             )
-            .id(tuple.cartItem.itemId + (tuple.cartItem.actualPrice?.description ?? ""))
+            .id(tuple.cartItem.itemId + (tuple.cartItem.actualPrice?.description ?? "") + "\(isSkipped)")
             .listRowInsets(EdgeInsets())
             .listRowSeparator(.hidden)
             .swipeActions(edge: .trailing, allowsFullSwipe: true) {
@@ -189,9 +191,12 @@ private struct StoreSectionRow: View {
         .listRowSeparator(.hidden)
         .listRowBackground(stateManager.effectiveRowBackgroundColor)
         .transition(.asymmetric(
-            insertion: .scale.combined(with: .opacity),
-            removal: .scale.combined(with: .opacity)
+            insertion: .opacity.combined(with: .move(edge: .top)),
+            removal: .opacity
+                .combined(with: .scale(scale: 0.9, anchor: .center))
+                .combined(with: .offset(x: -50, y: 0)) // ⬅️ Slide left while shrinking
         ))
+        .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.7), value: isSkipped)
     }
     
     // In StoreSectionRow's swipeActionsContent:
