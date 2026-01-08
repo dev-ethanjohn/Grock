@@ -4,7 +4,6 @@ struct VaultPopoversOverlay: View {
     @Environment(VaultService.self) private var vaultService
     
     @Binding var showAddItemPopover: Bool
-    @Binding var showNameEntryPopover: Bool
     @Binding var createCartButtonVisible: Bool
     
     var body: some View {
@@ -36,26 +35,6 @@ struct VaultPopoversOverlay: View {
                 )
                 .transition(.opacity)
                 .zIndex(1)
-                .onAppear {
-                    createCartButtonVisible = false
-                }
-            }
-            
-            if showNameEntryPopover {
-                NameEntryPopover(
-                    isPresented: $showNameEntryPopover,
-                    createCartButtonVisible: $createCartButtonVisible,
-                    onSave: { name in
-                        print("✅ Name saved: \(name)")
-                    },
-                    onDismiss: {
-                        withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-                            createCartButtonVisible = true
-                        }
-                    }
-                )
-                .transition(.opacity)
-                .zIndex(2)
                 .onAppear {
                     createCartButtonVisible = false
                 }

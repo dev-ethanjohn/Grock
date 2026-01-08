@@ -430,7 +430,7 @@ struct HomeView: View {
     private var greetingText: some View {
         let userName = currentUserName ?? UserDefaults.standard.userName ?? "there"
         return Text("Hi \(userName),")
-            .lexendFont(36, weight: .bold)
+            .fuzzyBubblesFont(40, weight: .bold)
             .frame(maxWidth: .infinity, alignment: .leading)
             .onAppear {
                 // Sync with UserDefaults on appear

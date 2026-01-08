@@ -61,7 +61,7 @@ struct VaultView: View {
     @State private var firstItemId: String? = nil
     
     // Name entry popover
-    @State private var showNameEntryPopover = false
+    @State private var showNameEntrySheet = false
     
     // Track keyboard state for immediate dismissal
     @FocusState private var isAnyFieldFocused: Bool
@@ -101,7 +101,7 @@ struct VaultView: View {
             .applyTooltipModifiers(
                 showFirstItemTooltip: $showFirstItemTooltip,
                 firstItemId: firstItemId,
-                showNameEntryPopover: $showNameEntryPopover
+                showNameEntrySheet: $showNameEntrySheet
             )
     }
     
@@ -120,6 +120,8 @@ struct VaultView: View {
             .applySheetModifiers(
                 showCelebration: $showCelebration,
                 showCartConfirmation: $showCartConfirmation,
+                showNameEntrySheet: $showNameEntrySheet,
+                createCartButtonVisible: $createCartButtonVisible,
                 cartViewModel: cartViewModel,
                 vaultService: vaultService,
                 onCreateCart: onCreateCart,
@@ -246,27 +248,6 @@ struct VaultView: View {
                     createCartButtonVisible = false
                 }
             }
-            
-            if showNameEntryPopover {
-                NameEntryPopover(
-                    isPresented: $showNameEntryPopover,
-                    createCartButtonVisible: $createCartButtonVisible,
-                    onSave: { name in
-                        print("✅ Name saved: \(name)")
-                    },
-                    onDismiss: {
-                        withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-                            createCartButtonVisible = true
-                        }
-                    }
-                )
-                .transition(.opacity)
-                .zIndex(2)
-                .onAppear {
-                    print("🔍 NameEntryPopover ON APPEAR")
-                    createCartButtonVisible = false
-                }
-            }
         }
     }
     
@@ -362,7 +343,7 @@ struct VaultView: View {
                     print("🔍 Fallback conditions met! Scheduling NameEntryPopover in 1.0s")
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                         print("🔍 Executing Fallback NameEntryPopover show")
-                        showNameEntryPopover = true
+                        showNameEntrySheet = true
                         UserDefaults.standard.hasPromptedForNameAfterVaultCelebration = true
                     }
                 }
@@ -809,12 +790,31 @@ extension View {
     func applySheetModifiers(
         showCelebration: Binding<Bool>,
         showCartConfirmation: Binding<Bool>,
+        showNameEntrySheet: Binding<Bool>,
+        createCartButtonVisible: Binding<Bool>,
         cartViewModel: CartViewModel,
         vaultService: VaultService,
         onCreateCart: ((Cart) -> Void)?,
         onCelebrationDismiss: @escaping () -> Void
     ) -> some View {
         self
+            .sheet(isPresented: showNameEntrySheet) {
+                NameEntrySheet(
+                    isPresented: showNameEntrySheet,
+                    createCartButtonVisible: createCartButtonVisible,
+                    onSave: { name in
+                        print("✅ Name saved: \(name)")
+                    },
+                    onDismiss: {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                            createCartButtonVisible.wrappedValue = true
+                        }
+                    }
+                )
+                .presentationDetents([.height(100)])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(24)
+            }
             .fullScreenCover(isPresented: showCelebration) {
                 CelebrationView(
                     isPresented: showCelebration,
@@ -891,7 +891,7 @@ extension View {
     func applyTooltipModifiers(
         showFirstItemTooltip: Binding<Bool>,
         firstItemId: String?,
-        showNameEntryPopover: Binding<Bool>
+        showNameEntrySheet: Binding<Bool>
     ) -> some View {
         self
             .overlay {
@@ -912,7 +912,7 @@ extension View {
                         print("🔍 Conditions met! Scheduling NameEntryPopover in 0.5s")
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                             print("🔍 Executing scheduled NameEntryPopover show")
-                            showNameEntryPopover.wrappedValue = true
+                            showNameEntrySheet.wrappedValue = true
                             UserDefaults.standard.hasPromptedForNameAfterVaultCelebration = true
                         }
                     } else {
