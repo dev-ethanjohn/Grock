@@ -14,9 +14,11 @@ struct PricePerUnitField: View {
             Spacer()
             
             HStack(spacing: 4) {
-                Text("₱")
+                Text(CurrencyManager.shared.selectedCurrency.symbol)
                     .font(.system(size: 16))
                     .foregroundStyle(price.isEmpty ? .gray : .black)
+                    .contentTransition(.numericText())
+                    .animation(.snappy, value: CurrencyManager.shared.selectedCurrency.symbol)
                 
                 Text(price.isEmpty ? "0" : price)
                     .normalizedNumber($price)

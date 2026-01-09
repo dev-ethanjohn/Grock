@@ -6,7 +6,7 @@ struct ColorOption: Identifiable, Equatable {
     let hex: String
     let name: String
     
-    static let defaultColor = ColorOption(hex: "F5E9D9", name: "Warm Beige")
+    static let defaultColor =  ColorOption(hex: "F0F0F0", name: "Cloud Gray")
     
     static let options: [ColorOption] = [
         // Warm tones

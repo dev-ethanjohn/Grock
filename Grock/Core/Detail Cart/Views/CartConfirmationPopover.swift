@@ -334,6 +334,8 @@ struct CartConfirmationPopover: View {
                 Spacer()
                 Text(formatCurrency(totalCartValue))
                     .lexendFont(16, weight: .medium)
+                    .contentTransition(.numericText())
+                    .animation(.snappy, value: CurrencyManager.shared.selectedCurrency)
             }
             
             Divider()
@@ -416,9 +418,11 @@ struct CartConfirmationPopover: View {
                 
             
             HStack(spacing: 4) {
-                Text("₱")
+                Text(CurrencyManager.shared.selectedCurrency.symbol)
                     .lexendFont(18, weight: .medium)
                     .foregroundStyle(budget.isEmpty ? .gray : .black)
+                    .contentTransition(.symbolEffect(.replace))
+                    .animation(.snappy, value: CurrencyManager.shared.selectedCurrency.symbol)
                 
                 Text(budget.isEmpty ? "0" : budget)
                     .foregroundStyle(budget.isEmpty ? .gray : .black)
@@ -480,15 +484,16 @@ struct CartConfirmationPopover: View {
     // MARK: - Helper Methods
     
     private func formatCurrency(_ value: Double) -> String {
+        let symbol = CurrencyManager.shared.selectedCurrency.symbol
         if value == Double(Int(value)) {
             // Whole number - remove decimals
-            return "₱\(Int(value))"
+            return "\(symbol)\(Int(value))"
         } else if value * 10 == Double(Int(value * 10)) {
             // Single decimal place (like 12.50 becomes 12.5)
-            return String(format: "₱%.1f", value)
+            return String(format: "\(symbol)%.1f", value)
         } else {
             // Two decimal places
-            return String(format: "₱%.2f", value)
+            return String(format: "\(symbol)%.2f", value)
         }
     }
     

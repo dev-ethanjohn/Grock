@@ -63,7 +63,7 @@ struct EditBudgetPopover: View {
                             .foregroundColor(Color(hex: "777"))
                         
                         HStack(spacing: 4) {
-                            Text("₱")
+                            Text(CurrencyManager.shared.selectedCurrency.symbol)
                                 .lexendFont(16, weight: .semibold)
                                 .foregroundStyle(budgetString.isEmpty ? .gray : .black)
                             

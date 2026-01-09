@@ -59,7 +59,8 @@ struct ShoppingProgressSummary: View {
                 total + cartItem.getTotalPrice(from: vault, cart: cart)
             }
         
-        return CurrencyFormatter.shared.format(amount: fulfilledTotal)
+        // Use current locale and symbol from CurrencyManager
+        return CurrencyFormatter.shared.format(amount: fulfilledTotal, locale: .current)
     }
     
     @State private var pulseOpacity = 0.0
@@ -80,6 +81,7 @@ struct ShoppingProgressSummary: View {
                     text: "\(fulfilledItems)/\(totalItems) items fulfilled, totalling \(fulfilledItemsTotal)",
                     delay: 0.15
                 )
+                .id("reveal-\(fulfilledItems)-\(totalItems)-\(fulfilledItemsTotal)")
                 .fuzzyBubblesFont(13, weight: .bold)
                 .foregroundColor(Color(hex: "717171"))
                 
@@ -132,7 +134,8 @@ class CurrencyFormatter {
     
     func format(amount: Double, locale: Locale = .current) -> String {
         formatter.locale = locale
-        return formatter.string(from: NSNumber(value: amount)) ?? "\(locale.currencySymbol ?? "$")\(String(format: "%.2f", amount))"
+        let symbol = CurrencyManager.shared.selectedCurrency.symbol
+        return formatter.string(from: NSNumber(value: amount)) ?? "\(symbol)\(String(format: "%.2f", amount))"
     }
     
     func format(amount: Double, currencyCode: String) -> String {

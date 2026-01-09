@@ -14,7 +14,7 @@ struct VaultToolbarView: View {
     var body: some View {
         ZStack(alignment: .top) {
             Text("vault")
-                .shantellSansFont(18)
+                .lexendFont(16, weight: .bold)
                 .opacity(toolbarAppeared ? 1 : 0)
                 .offset(y: toolbarAppeared ? 0 : -10)
                 .animation(.spring(response: 0.4, dampingFraction: 0.7, blendDuration: 0).delay(0.1), value: toolbarAppeared)

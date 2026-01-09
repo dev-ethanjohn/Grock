@@ -257,7 +257,7 @@ struct HomeView: View {
                 .lexendFont(13)
                 .foregroundStyle(Color(.systemGray))
                 .frame(maxWidth: .infinity, alignment: .center)
-                .padding(.bottom)
+                .padding(.bottom, 10)
         }
         .frame(maxWidth: .infinity)
         .background(headerBackground)
@@ -283,11 +283,13 @@ struct HomeView: View {
             }
             
             Menu {
-                Button(role: .destructive, action: viewModel.resetApp) {
-                    Label(
-                        "Reset App (Testing)",
-                        systemImage: "arrow.counterclockwise"
-                    )
+                Section {
+                    Button(role: .destructive, action: viewModel.resetApp) {
+                        Label(
+                            "Reset App (Testing)",
+                            systemImage: "arrow.counterclockwise"
+                        )
+                    }
                 }
             } label: {
                 Image(systemName: "arrow.counterclockwise")
@@ -360,6 +362,7 @@ struct HomeView: View {
                     .playing(.fromProgress(0, toProgress: 0.5, loopMode: .loop))
                     .allowsHitTesting(false)
                     .frame(width: 30, height: 36)
+                    .offset(x: 4)
             }
             .fixedSize()
         }
@@ -367,16 +370,35 @@ struct HomeView: View {
     }
     
     private var createCartButton: some View {
-        Button(action: {
-            showCreateCartPopover = true
-        }) {
-            Text("Create Cart")
-                .fuzzyBubblesFont(18, weight: .bold)
-                .padding(.vertical, 12)
-                .padding(.horizontal, 24)
-                .background(.black)
-                .foregroundColor(.white)
-                .clipShape(Capsule())
+        ZStack {
+            Button(action: {
+                showCreateCartPopover = true
+            }) {
+                Text("Create Cart")
+                    .fuzzyBubblesFont(18, weight: .bold)
+                    .padding(.vertical, 12)
+                    .padding(.horizontal, 24)
+                    .background(.black)
+                    .foregroundColor(.white)
+                    .clipShape(Capsule())
+            }
+            
+//            HStack {
+//                Spacer()
+//                
+//                Button(action: {
+//                    // Action for insights
+//                }) {
+//                    Image(systemName: "chart.bar.xaxis")
+//                        .font(.system(size: 20, weight: .semibold))
+//                        .foregroundColor(.black)
+//                        .padding(12)
+//                        .background(Color.white)
+//                        .clipShape(Circle())
+//                        .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
+//                }
+//                .padding(.trailing, 24)
+//            }
         }
         .padding(.bottom)
         .padding(.bottom)
@@ -523,7 +545,7 @@ struct HomeView: View {
         }
         
         animationTask = task
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2, execute: task)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: task)
     }
     
     private func cancelVaultButtonAnimation() {

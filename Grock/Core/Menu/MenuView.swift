@@ -31,10 +31,33 @@ struct MenuView: View {
                 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
-                        ForEach(MenuItem.userSettingsMenuItems) { item in
-                            MenuRow(item: item)
-//                            Divider()
+                        
+                        // Currency Selection Section
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Currency")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(Color(hex: "999"))
+                                .padding(.horizontal, 4)
+                            
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 8) {
+                                    ForEach(CurrencyManager.shared.availableCurrencies, id: \.code) { currency in
+                                        CurrencySelectionPill(
+                                            currency: currency,
+                                            isSelected: CurrencyManager.shared.selectedCurrency.code == currency.code,
+                                            action: {
+                                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                                    CurrencyManager.shared.setCurrency(currency)
+                                                }
+                                            }
+                                        )
+                                    }
+                                }
+                                .padding(.horizontal, 4)
+                                .padding(.vertical, 4) // Add space for shadow
+                            }
                         }
+                        .padding(.bottom, 8)
                         
                         Spacer()
                             .frame(height: 8)
@@ -59,6 +82,34 @@ struct MenuView: View {
             .frame(width: 300, alignment: .leading)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+struct CurrencySelectionPill: View {
+    let currency: Currency
+    let isSelected: Bool
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Text(currency.symbol)
+                    .font(.system(size: 16, weight: .bold))
+                Text(currency.code)
+                    .font(.system(size: 14, weight: .medium))
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(isSelected ? Color.black : Color.white)
+            .foregroundColor(isSelected ? .white : .black)
+            .clipShape(Capsule())
+            .overlay(
+                Capsule()
+                    .stroke(Color.black.opacity(0.1), lineWidth: 1)
+            )
+            .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
+        }
+        .buttonStyle(.plain)
     }
 }
 

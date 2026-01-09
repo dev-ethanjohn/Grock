@@ -590,9 +590,11 @@ private struct ItemDetails: View {
                 let price = storeItem.priceOption.pricePerUnit.priceValue
                 let isValidPrice = !price.isNaN && price.isFinite
                 
-                Text("₱\(isValidPrice ? price : 0, specifier: "%g")")
+                Text("\(CurrencyManager.shared.selectedCurrency.symbol)\(isValidPrice ? price : 0, specifier: "%g")")
                     .foregroundColor(priceColor)
                     .opacity(contentOpacity)
+                    .contentTransition(.numericText())
+                    .animation(.snappy, value: CurrencyManager.shared.selectedCurrency.symbol)
                 
                 Text("/\(storeItem.priceOption.pricePerUnit.unit)")
                     .foregroundColor(priceColor)

@@ -106,7 +106,8 @@ struct UnifiedItemPopover: View {
     
     private var totalCostDeltaText: String {
         let delta = abs(totalCostDelta)
-        return String(format: "₱%.2f", delta)
+        let symbol = CurrencyManager.shared.selectedCurrency.symbol
+        return String(format: "\(symbol)%.2f", delta)
     }
     
     var body: some View {
@@ -266,6 +267,7 @@ struct UnifiedItemPopover: View {
                         .lexendFont(18, weight: .bold)
                         .foregroundColor(.primary)
                         .contentTransition(.numericText())
+                        .animation(.snappy, value: CurrencyManager.shared.selectedCurrency)
                     
                     if abs(totalCostDelta) > 0.01 {
                         HStack(spacing: 2) {
@@ -277,6 +279,7 @@ struct UnifiedItemPopover: View {
                                 .lexendFont(12, weight: .semibold)
                                 .foregroundColor(totalCostDeltaColor)
                                 .contentTransition(.numericText())
+                                .animation(.snappy, value: CurrencyManager.shared.selectedCurrency)
                             
                             Text("from plan")
                                 .lexendFont(12)
@@ -509,7 +512,8 @@ private struct ItemDescriptionText: View {
     
     private var deltaAmountText: String {
         let delta = abs(livePriceDelta)
-        return String(format: "₱%.2f", delta)
+        let symbol = CurrencyManager.shared.selectedCurrency.symbol
+        return String(format: "\(symbol)%.2f", delta)
     }
     
     var body: some View {
@@ -556,9 +560,11 @@ private struct ItemDescriptionText: View {
                 .lexendFont(18)
             
             // Price
-            Text("₱")
+            Text(CurrencyManager.shared.selectedCurrency.symbol)
                 .foregroundColor(.primary)
                 .lexendFont(18, weight: .semibold)
+                .contentTransition(.numericText())
+                .animation(.snappy, value: CurrencyManager.shared.selectedCurrency.symbol)
             
             animatedPriceText
             
@@ -621,9 +627,11 @@ private struct PriceField: View {
     
     var body: some View {
         HStack(spacing: 4) {
-            Text("₱")
+            Text(CurrencyManager.shared.selectedCurrency.symbol)
                 .lexendFont(14, weight: .semibold)
                 .foregroundColor(.secondary)
+                .contentTransition(.numericText())
+                .animation(.snappy, value: CurrencyManager.shared.selectedCurrency.symbol)
             
             TextField("0.00", text: $price)
                 .keyboardType(.decimalPad)

@@ -144,7 +144,7 @@ struct HomeCartRowView: View {
         .scaleEffect(appeared ? 1.0 : 0.95)
         .opacity(appeared ? 1.0 : 0)
         .onAppear {
-            withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
                 appeared = true
             }
             currentProgress = cart.totalSpent / cart.budget
@@ -223,6 +223,7 @@ struct HomeCartRowView: View {
                     text: "\(fulfilledItems)/\(totalItems) items fulfilled, totalling \(fulfilledItemsTotal)",
                     delay: 0.15
                 )
+                .id("reveal-\(fulfilledItems)-\(totalItems)-\(fulfilledItemsTotal)")
                 .fuzzyBubblesFont(12, weight: .bold)
                 .padding(.leading, 4)
                 .foregroundColor(hasBackgroundImage ? .white : .black)

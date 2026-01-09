@@ -65,12 +65,13 @@ struct FinishTripSheet: View {
         print("   Cart name: \(cart.name)")
         #endif
         
+        let symbol = CurrencyManager.shared.selectedCurrency.symbol
         if budgetDifference > 0.01 {
             // Over budget by more than 1 cent
-            return "₱\(String(format: "%.0f", difference)) over budget"
+            return "\(symbol)\(String(format: "%.0f", difference)) over budget"
         } else if budgetDifference < -0.01 {
             // Under budget by more than 1 cent
-            return "₱\(String(format: "%.0f", difference)) under budget"
+            return "\(symbol)\(String(format: "%.0f", difference)) under budget"
         } else {
             // Within 1 cent of budget - considered as on budget
             return "Exactly on budget"
@@ -119,6 +120,7 @@ struct FinishTripSheet: View {
                     .foregroundColor(Color(hex: "231F30"))
                     .contentTransition(.numericText())
                     .animation(.spring(response: 0.5, dampingFraction: 0.7), value: totalSpent)
+                    .animation(.spring(response: 0.5, dampingFraction: 0.7), value: CurrencyManager.shared.selectedCurrency)
                 
                 HStack(spacing: 4) {
                     Text(emojiForDifference)
@@ -127,6 +129,8 @@ struct FinishTripSheet: View {
                     Text(differenceText)
                         .lexendFont(16)
                         .foregroundColor(differenceColor)
+                        .contentTransition(.numericText())
+                        .animation(.snappy, value: CurrencyManager.shared.selectedCurrency)
                 }
                 .padding(.bottom, 32)
             }

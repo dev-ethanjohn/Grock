@@ -22,6 +22,16 @@ final class HomeViewModel {
     var pendingCartToShow: Cart? = nil
     private var hiddenCartIds: Set<String> = []
     
+    // Currency selection
+    var selectedCurrency: Currency {
+        get { CurrencyManager.shared.selectedCurrency }
+        set {
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                CurrencyManager.shared.setCurrency(newValue)
+            }
+        }
+    }
+    
     // MARK: - Animation States
     var showMenu = false
     var isDismissed = false
@@ -105,9 +115,11 @@ final class HomeViewModel {
         
         print("🎯 HomeViewModel: Showing cart in list - \(cart.name)")
         
-        withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
-            hiddenCartIds.remove(cart.id)
-            pendingCartToShow = nil
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+                self.hiddenCartIds.remove(cart.id)
+                self.pendingCartToShow = nil
+            }
         }
     }
     
@@ -226,6 +238,9 @@ final class HomeViewModel {
         
         // Reset vault animation flag
         UserDefaults.standard.set(false, forKey: "hasShownVaultAnimation")
+
+        // Reset currency
+        CurrencyManager.shared.resetCurrency()
 
         // Clear hidden cart state
         hiddenCartIds.removeAll()

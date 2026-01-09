@@ -240,9 +240,11 @@ struct CreateCartPopover: View {
             Spacer()
             
             HStack(spacing: 4) {
-                Text("₱")
+                Text(CurrencyManager.shared.selectedCurrency.symbol)
                     .lexendFont(18, weight: .medium)
                     .foregroundStyle(budget.isEmpty ? .gray : .black)
+                    .contentTransition(.numericText())
+                    .animation(.snappy, value: CurrencyManager.shared.selectedCurrency.symbol)
                 
                 Text(budget.isEmpty ? "0" : budget)
                     .foregroundStyle(budget.isEmpty ? .gray : .black)
