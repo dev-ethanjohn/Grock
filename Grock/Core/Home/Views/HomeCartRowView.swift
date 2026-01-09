@@ -12,6 +12,9 @@ struct HomeCartRowView: View {
     @State private var backgroundImage: UIImage? = nil
     @State private var hasBackgroundImage = false
     
+    // Add this to observe currency changes
+    @State private var currencyManager = CurrencyManager.shared
+    
     init(cart: Cart, vaultService: VaultService?) {
         self.cart = cart
         self.vaultService = vaultService
@@ -75,7 +78,8 @@ struct HomeCartRowView: View {
     
     private var fulfilledItemsTotal: String {
         guard let vault = vaultService?.vault else {
-            return CurrencyFormatter.shared.format(amount: 0)
+            let selectedCurrency = CurrencyManager.shared.selectedCurrency
+            return "\(selectedCurrency.symbol)0.00"
         }
         
         let fulfilledTotal = cart.cartItems
@@ -86,7 +90,14 @@ struct HomeCartRowView: View {
                 total + cartItem.getTotalPrice(from: vault, cart: cart)
             }
         
-        return CurrencyFormatter.shared.format(amount: fulfilledTotal)
+        let selectedCurrency = CurrencyManager.shared.selectedCurrency
+        let numberFormatter = NumberFormatter()
+        numberFormatter.numberStyle = .decimal
+        numberFormatter.minimumFractionDigits = 2
+        numberFormatter.maximumFractionDigits = 2
+        
+        let formattedAmount = numberFormatter.string(from: NSNumber(value: fulfilledTotal)) ?? String(format: "%.2f", fulfilledTotal)
+        return "\(selectedCurrency.symbol)\(formattedAmount)"
     }
     
     var body: some View {
@@ -165,6 +176,10 @@ struct HomeCartRowView: View {
                 currentProgress = newValue / cart.budget
             }
         }
+        .onChange(of: CurrencyManager.shared.selectedCurrency) { oldValue, newValue in
+            // When currency changes, update the local state to trigger view refresh
+            currencyManager = CurrencyManager.shared
+        }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("CartBackgroundImageChanged"))) { notification in
             // Reload image when notification is received
             if let cartId = notification.userInfo?["cartId"] as? String,
@@ -223,7 +238,8 @@ struct HomeCartRowView: View {
                     text: "\(fulfilledItems)/\(totalItems) items fulfilled, totalling \(fulfilledItemsTotal)",
                     delay: 0.15
                 )
-                .id("reveal-\(fulfilledItems)-\(totalItems)-\(fulfilledItemsTotal)")
+                // Add currency code to ID to trigger re-creation when currency changes
+                .id("reveal-\(fulfilledItems)-\(totalItems)-\(fulfilledItemsTotal)-\(currencyManager.selectedCurrency.code)")
                 .fuzzyBubblesFont(12, weight: .bold)
                 .padding(.leading, 4)
                 .foregroundColor(hasBackgroundImage ? .white : .black)

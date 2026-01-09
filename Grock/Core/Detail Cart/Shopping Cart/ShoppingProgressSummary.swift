@@ -6,6 +6,9 @@ struct ShoppingProgressSummary: View {
     let cart: Cart
     @Environment(VaultService.self) private var vaultService
     
+    // Add this to observe currency changes
+    @State private var currencyManager = CurrencyManager.shared
+    
     @State private var showCompletedItemsSheet = false
     
     // Total items includes ALL active items (vault items + shopping-only items with quantity > 0)
@@ -36,7 +39,6 @@ struct ShoppingProgressSummary: View {
         }.count
     }
     
-    
     private var fulfilledItems: Int {
         cart.cartItems.filter { cartItem in
             // Include ALL items (both vault and shopping-only) that are fulfilled
@@ -44,11 +46,11 @@ struct ShoppingProgressSummary: View {
             cartItem.quantity > 0  // Still in cart
         }.count
     }
-     
     
     private var fulfilledItemsTotal: String {
         guard let vault = vaultService.vault else {
-            return CurrencyFormatter.shared.format(amount: 0)
+            let selectedCurrency = CurrencyManager.shared.selectedCurrency
+            return "\(selectedCurrency.symbol)0.00"
         }
         
         let fulfilledTotal = cart.cartItems
@@ -59,8 +61,14 @@ struct ShoppingProgressSummary: View {
                 total + cartItem.getTotalPrice(from: vault, cart: cart)
             }
         
-        // Use current locale and symbol from CurrencyManager
-        return CurrencyFormatter.shared.format(amount: fulfilledTotal, locale: .current)
+        let selectedCurrency = CurrencyManager.shared.selectedCurrency
+        let numberFormatter = NumberFormatter()
+        numberFormatter.numberStyle = .decimal
+        numberFormatter.minimumFractionDigits = 2
+        numberFormatter.maximumFractionDigits = 2
+        
+        let formattedAmount = numberFormatter.string(from: NSNumber(value: fulfilledTotal)) ?? String(format: "%.2f", fulfilledTotal)
+        return "\(selectedCurrency.symbol)\(formattedAmount)"
     }
     
     @State private var pulseOpacity = 0.0
@@ -81,7 +89,8 @@ struct ShoppingProgressSummary: View {
                     text: "\(fulfilledItems)/\(totalItems) items fulfilled, totalling \(fulfilledItemsTotal)",
                     delay: 0.15
                 )
-                .id("reveal-\(fulfilledItems)-\(totalItems)-\(fulfilledItemsTotal)")
+                // Add currency code to ID to trigger re-creation when currency changes
+                .id("reveal-\(fulfilledItems)-\(totalItems)-\(fulfilledItemsTotal)-\(currencyManager.selectedCurrency.code)")
                 .fuzzyBubblesFont(13, weight: .bold)
                 .foregroundColor(Color(hex: "717171"))
                 
@@ -106,6 +115,11 @@ struct ShoppingProgressSummary: View {
         }
         .padding(.vertical, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
+        // Listen for currency changes
+        .onChange(of: CurrencyManager.shared.selectedCurrency) { oldValue, newValue in
+            // When currency changes, update the local state to trigger view refresh
+            currencyManager = CurrencyManager.shared
+        }
         .sheet(isPresented: $showCompletedItemsSheet) {
             CompletedItemsSheet(cart: cart) { cartItem in
                 onUnfulfillItem(cartItem)
@@ -118,29 +132,6 @@ struct ShoppingProgressSummary: View {
     
     private func onUnfulfillItem(_ cartItem: CartItem) {
         // Your existing logic for unfulfilling items
-    }
-}
-
-class CurrencyFormatter {
-    static let shared = CurrencyFormatter()
-    
-    private let formatter: NumberFormatter
-    
-    private init() {
-        formatter = NumberFormatter()
-        formatter.numberStyle = .currency
-        formatter.locale = Locale.current
-    }
-    
-    func format(amount: Double, locale: Locale = .current) -> String {
-        formatter.locale = locale
-        let symbol = CurrencyManager.shared.selectedCurrency.symbol
-        return formatter.string(from: NSNumber(value: amount)) ?? "\(symbol)\(String(format: "%.2f", amount))"
-    }
-    
-    func format(amount: Double, currencyCode: String) -> String {
-        let locale = Locale(identifier: Locale.identifier(fromComponents: [NSLocale.Key.currencyCode.rawValue: currencyCode]))
-        return format(amount: amount, locale: locale)
     }
 }
 

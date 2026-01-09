@@ -351,7 +351,7 @@ private struct StoreItemsList: View {
                 backgroundColor: stateManager.effectiveBackgroundColor,
                 geometry: geometry
             )
-            .applyBorderAndCorners(hasBackgroundImage: stateManager.hasBackgroundImage)
+            .applyBorderAndCorners(hasBackgroundImage: stateManager.hasBackgroundImage, isShopping: cart.isShopping)
             .applyAnimations(calculatedHeight: calculatedHeight, isShopping: cart.isShopping)
             .applyShoppingElevation(isShopping: cart.isShopping, hasBackgroundImage: stateManager.hasBackgroundImage)
     }
@@ -407,12 +407,18 @@ private extension View {
             )
     }
     
-    func applyBorderAndCorners(hasBackgroundImage: Bool) -> some View {
+    func applyBorderAndCorners(hasBackgroundImage: Bool, isShopping: Bool) -> some View {
         self
             .cornerRadius(16)
             .background(
                 RoundedRectangle(cornerRadius: 16)
                     .fill(hasBackgroundImage ? Color.white.opacity(0.95) : Color.clear)
+            )
+            .overlay(
+                ShoppingModeGradientView(cornerRadius: 16, hasBackgroundImage: hasBackgroundImage)
+                    .opacity(isShopping ? 1 : 0)
+                    .allowsHitTesting(false)
+                    .animation(.easeInOut(duration: 0.3), value: isShopping)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 16)
@@ -431,21 +437,21 @@ private extension View {
             .offset(y: (isShopping && hasBackgroundImage) ? -4 : 0)
             .shadow(
                 color: isShopping && hasBackgroundImage ? Color.black.opacity(0.1) : Color.clear,
-                radius: isShopping && hasBackgroundImage ? 10 : 0,
+                radius: isShopping && hasBackgroundImage ? 7 : 0,
                 x: 0,
-                y: isShopping && hasBackgroundImage ? 10 : 0
+                y: isShopping && hasBackgroundImage ? 7 : 0
+            )
+            .shadow(
+                color: isShopping && hasBackgroundImage ? Color.black.opacity(0.12) : Color.clear,
+                radius: isShopping && hasBackgroundImage ? 4 : 0,
+                x: 0,
+                y: isShopping && hasBackgroundImage ? 3 : 0
             )
             .shadow(
                 color: isShopping && hasBackgroundImage ? Color.black.opacity(0.18) : Color.clear,
-                radius: isShopping && hasBackgroundImage ? 7 : 0,
+                radius: isShopping && hasBackgroundImage ? 2 : 0,
                 x: 0,
-                y: isShopping && hasBackgroundImage ? 5 : 0
-            )
-            .shadow(
-                color: isShopping && hasBackgroundImage ? Color.black.opacity(0.25) : Color.clear,
-                radius: isShopping && hasBackgroundImage ? 4 : 0,
-                x: 0,
-                y: isShopping && hasBackgroundImage ? 4 : 0
+                y: isShopping && hasBackgroundImage ? 2: 0
             )
     }
 }

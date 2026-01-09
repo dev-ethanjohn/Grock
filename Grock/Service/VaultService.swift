@@ -663,6 +663,54 @@ extension VaultService {
     func ensureStoreExists(_ storeName: String) {
         addStore(storeName)
     }
+    
+    /// Renames a store across the entire vault (Items, PriceOptions, CartItems)
+    func renameStore(oldName: String, newName: String) {
+        guard let vault = vault else { return }
+        let trimmedOld = oldName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedNew = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        guard !trimmedNew.isEmpty,
+              !trimmedOld.isEmpty,
+              trimmedOld.lowercased() != trimmedNew.lowercased() else { return }
+        
+        print("🏪 Renaming store from '\(trimmedOld)' to '\(trimmedNew)'")
+        
+        // 1. Update Store model
+        if let store = vault.stores.first(where: { $0.name.lowercased() == trimmedOld.lowercased() }) {
+            store.name = trimmedNew
+        } else {
+            // If it was an implicit store (only in items), create a formal record for the new name
+            addStore(trimmedNew)
+        }
+        
+        // 2. Update PriceOptions in Items
+        for category in vault.categories {
+            for item in category.items {
+                for priceOption in item.priceOptions where priceOption.store == trimmedOld {
+                    priceOption.store = trimmedNew
+                }
+            }
+        }
+        
+        // 3. Update CartItems
+        for cart in vault.carts {
+            for cartItem in cart.cartItems {
+                if cartItem.plannedStore == trimmedOld {
+                    cartItem.plannedStore = trimmedNew
+                }
+                if cartItem.actualStore == trimmedOld {
+                    cartItem.actualStore = trimmedNew
+                }
+                if cartItem.shoppingOnlyStore == trimmedOld {
+                    cartItem.shoppingOnlyStore = trimmedNew
+                }
+            }
+        }
+        
+        saveContext()
+        print("✅ Store renamed successfully")
+    }
 }
 
 // MARK: - Cart Management

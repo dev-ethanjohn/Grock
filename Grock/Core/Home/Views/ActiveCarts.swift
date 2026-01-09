@@ -40,7 +40,7 @@ struct ActiveCarts: View {
     
     private var cartListView: some View {
         ScrollView {
-            VStack(spacing: 12) {
+            VStack(spacing: 4) {
                 Color.clear
                     .frame(height: viewModel.headerHeight)
                 
