@@ -415,12 +415,6 @@ private extension View {
                     .fill(hasBackgroundImage ? Color.white.opacity(0.95) : Color.clear)
             )
             .overlay(
-                ShoppingModeGradientView(cornerRadius: 16, hasBackgroundImage: hasBackgroundImage)
-                    .opacity(isShopping ? 1 : 0)
-                    .allowsHitTesting(false)
-                    .animation(.easeInOut(duration: 0.3), value: isShopping)
-            )
-            .overlay(
                 RoundedRectangle(cornerRadius: 16)
                     .stroke(Color.black, lineWidth: 0.3)
             )
@@ -436,19 +430,19 @@ private extension View {
         self
             .offset(y: (isShopping && hasBackgroundImage) ? -4 : 0)
             .shadow(
-                color: isShopping && hasBackgroundImage ? Color.black.opacity(0.1) : Color.clear,
+                color: isShopping && hasBackgroundImage ? Color.black.opacity(0.115) : Color.clear,
                 radius: isShopping && hasBackgroundImage ? 7 : 0,
                 x: 0,
                 y: isShopping && hasBackgroundImage ? 7 : 0
             )
             .shadow(
-                color: isShopping && hasBackgroundImage ? Color.black.opacity(0.12) : Color.clear,
+                color: isShopping && hasBackgroundImage ? Color.black.opacity(0.18) : Color.clear,
                 radius: isShopping && hasBackgroundImage ? 4 : 0,
                 x: 0,
                 y: isShopping && hasBackgroundImage ? 3 : 0
             )
             .shadow(
-                color: isShopping && hasBackgroundImage ? Color.black.opacity(0.18) : Color.clear,
+                color: isShopping && hasBackgroundImage ? Color.black.opacity(0.25) : Color.clear,
                 radius: isShopping && hasBackgroundImage ? 2 : 0,
                 x: 0,
                 y: isShopping && hasBackgroundImage ? 2: 0
