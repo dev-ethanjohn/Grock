@@ -1,11 +1,15 @@
 import SwiftData
 import SwiftUI
+import Lottie
 
 struct HomeView: View {
+    @AppStorage("hasShownVaultAnimation") private var hasShownVaultAnimation = false
+    
     @Environment(VaultService.self) private var vaultService
     @Environment(CartViewModel.self) private var cartViewModel
     @State private var viewModel: HomeViewModel
     @State private var cartStateManager: CartStateManager
+    @Namespace private var vaultButtonNamespace
     
     @State private var tabs: [CartTabsModel] = [
         .init(id: CartTabsModel.Tab.active),
@@ -27,6 +31,8 @@ struct HomeView: View {
     @State private var isScalingDown = false
     
     @State private var vaultButtonScale: CGFloat = 1.0
+    @State private var isVaultButtonExpanded: Bool
+    @State private var animationTask: DispatchWorkItem?
     
     @State private var cartRefreshTrigger = UUID()
     
@@ -36,11 +42,13 @@ struct HomeView: View {
     @State private var showingDeleteAlert = false
     
     // Name entry sheet state
-    @State private var currentUserName: String? = UserDefaults.standard.userName
+    @AppStorage("userName") private var currentUserName: String?
+    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding: Bool = false
     
     init(viewModel: HomeViewModel) {
         self._viewModel = State(initialValue: viewModel)
         self._cartStateManager = State(initialValue: CartStateManager())
+        _isVaultButtonExpanded = State(initialValue: !UserDefaults.standard.bool(forKey: "hasShownVaultAnimation"))
     }
     
     var body: some View {
@@ -141,7 +149,26 @@ struct HomeView: View {
             .onChange(of: viewModel.showVault) { oldValue, newValue in
                 if !newValue {
                     viewModel.transferPendingCart()
+                    scheduleVaultButtonAnimation()
+                } else {
+                    cancelVaultButtonAnimation()
                 }
+            }
+            .onChange(of: viewModel.selectedCart) { oldValue, newValue in
+                if newValue == nil {
+                    scheduleVaultButtonAnimation()
+                } else {
+                    cancelVaultButtonAnimation()
+                }
+            }
+            .onAppear {
+                scheduleVaultButtonAnimation()
+            }
+            .onChange(of: currentUserName) { _, _ in
+                scheduleVaultButtonAnimation()
+            }
+            .onChange(of: hasCompletedOnboarding) { _, _ in
+                scheduleVaultButtonAnimation()
             }
         }
     }
@@ -150,7 +177,17 @@ struct HomeView: View {
         ZStack(alignment: .topLeading) {
             Color(hex: "#f7f7f7").ignoresSafeArea()
             
-            tabsOnly()
+            ActiveCarts(
+                viewModel: viewModel,
+                refreshTrigger: cartRefreshTrigger,
+                onDeleteCart: { cart in
+                    cartToDelete = cart
+                    showingDeleteAlert = true
+                },
+                onRenameCart: { cart in
+                    cartToRename = cart
+                }
+            )
             
             headerView
             
@@ -179,157 +216,6 @@ struct HomeView: View {
         .shadow(color: Color.black.opacity(0.12), radius: 10, x: 2, y: 0)
     }
     
-    @ViewBuilder
-    private func tabsOnly() -> some View {
-        GeometryReader {
-            let size = $0.size
-            
-            TabView(selection: $activeTab) {
-                // Update ActiveCarts to pass callbacks
-                ActiveCarts(
-                    viewModel: viewModel,
-                    refreshTrigger: cartRefreshTrigger,
-                    onDeleteCart: { cart in
-                        cartToDelete = cart
-                        showingDeleteAlert = true
-                    },
-                    onRenameCart: { cart in
-                        cartToRename = cart
-                    }
-                )
-                .tag(CartTabsModel.Tab.active)
-                .frame(width: size.width, height: size.height)
-                .rect { tabProgress(.active, rect: $0, size: size) }
-                
-                Text("Completed")
-                    .tag(CartTabsModel.Tab.completed)
-                    .frame(width: size.width, height: size.height)
-                    .rect { tabProgress(.completed, rect: $0, size: size) }
-                
-                Text("Statistics")
-                    .tag(CartTabsModel.Tab.statistics)
-                    .frame(width: size.width, height: size.height)
-                    .rect { tabProgress(.statistics, rect: $0, size: size) }
-                
-            }
-            .tabViewStyle(.page(indexDisplayMode: .never))
-            .allowsHitTesting(!isDragging)
-            .onChange(of: activeTab) { oldValue, newValue in
-                guard tabBarScrollState != newValue else { return }
-                withAnimation(.snappy) {
-                    tabBarScrollState = newValue
-                }
-            }
-        }
-    }
-    
-    @ViewBuilder
-    func exploreTabBar() -> some View {
-        HStack(spacing: 20) {
-            ScrollView(.horizontal) {
-                HStack(spacing: 20) {
-                    tabsCart()
-                }
-                .scrollTargetLayout()
-                .padding(.leading, 2)
-            }
-            .scrollPosition(
-                id: .init(
-                    get: {
-                        return tabBarScrollState
-                    },
-                    set: { _ in
-                        
-                    }
-                ),
-                anchor: .center
-            )
-            .overlay(alignment: .bottom) {
-                ZStack(alignment: .leading) {
-                    Rectangle()
-                        .fill(.clear)
-                        .frame(height: 0.5)
-                    
-                    let inputRange = tabs.indices.compactMap {
-                        return CGFloat($0)
-                    }
-                    let ouputRange = tabs.compactMap { return $0.size.width }
-                    let outputPositionRange = tabs.compactMap { return $0.minX }
-                    let indicatorWidth = progress.interpolate(
-                        inputRange: inputRange,
-                        outputRange: ouputRange
-                    )
-                    let indicatorPosition = progress.interpolate(
-                        inputRange: inputRange,
-                        outputRange: outputPositionRange
-                    )
-                    
-                    Capsule()
-                        .fill(Color.black)
-                        .frame(width: indicatorWidth, height: 2)
-                        .offset(x: indicatorPosition)
-                }
-            }
-            .scrollIndicators(.hidden)
-        }
-    }
-    
-    private func tabsCart() -> some View {
-        ForEach($tabs) { $tab in
-            Button(action: {
-                delayTask?.cancel()
-                delayTask = nil
-                
-                isDragging = true
-                
-                withAnimation(.easeInOut(duration: 0.3)) {
-                    activeTab = tab.id
-                    tabBarScrollState = tab.id
-                    progress = CGFloat(
-                        tabs.firstIndex(where: { $0.id == tab.id }) ?? 0
-                    )
-                }
-                
-                delayTask = .init { isDragging = false }
-                
-                if let delayTask {
-                    DispatchQueue.main.asyncAfter(
-                        deadline: .now() + 0.3,
-                        execute: delayTask
-                    )
-                }
-            }) {
-                Text(tab.id.rawValue)
-                    .lexendFont(14, weight: .medium)
-                    .padding(.top, 8)
-                    .padding(.bottom, 10)
-                    .foregroundStyle(
-                        activeTab == tab.id ? Color.black : Color(.systemGray)
-                    )
-                    .contentShape(.rect)
-                    .scaleEffect(activeTab == tab.id ? 1.05 : 1.0)
-                    .animation(
-                        .spring(response: 0.4, dampingFraction: 0.4),
-                        value: activeTab
-                    )
-            }
-            .buttonStyle(.plain)
-            .rect { rect in
-                tab.size = rect.size
-                tab.minX = rect.minX
-            }
-        }
-    }
-    
-    func tabProgress(_ tab: CartTabsModel.Tab, rect: CGRect, size: CGSize) {
-        if let index = tabs.firstIndex(where: { $0.id == activeTab }),
-            activeTab == tab, !isDragging
-        {
-            let offsetX = rect.minX - (size.width * CGFloat(index))
-            progress = -offsetX / size.width
-        }
-    }
-    
     private var menuIcon: some View {
         MenuIcon {
             withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
@@ -347,19 +233,31 @@ struct HomeView: View {
     
     private var headerView: some View {
         VStack(spacing: 0) {
-            HStack {
-                Spacer()
-                trailingToolbarButton
+            // This container will have total height of 92px (60 + 32)
+            // and center its content vertically
+            ZStack {
+                if !isVaultButtonExpanded {
+                    greetingText
+                        .transition(.scale.combined(with: .opacity))
+                }
+                
+                HStack {
+                    Spacer()
+                    trailingToolbarButton
+                        .padding(.trailing)
+                }
             }
-            .padding(.trailing)
             .padding(.top, 60)
+            .padding(.bottom, 32)
+            .frame(maxWidth: .infinity)
+            .frame(height: 122)
+            .animation(.spring(response: 0.4, dampingFraction: 0.65), value: isVaultButtonExpanded)
             
-            VStack(spacing: 12) {
-                greetingText
-                exploreTabBar()
-            }
-            .padding(.horizontal)
-            .padding(.bottom, 4)
+            Text("Your Trip")
+                .lexendFont(13)
+                .foregroundStyle(Color(.systemGray))
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.bottom)
         }
         .frame(maxWidth: .infinity)
         .background(headerBackground)
@@ -398,7 +296,7 @@ struct HomeView: View {
                     .frame(width: 24, height: 20)
             }
         }
-        .padding(.top, 60)
+        .padding(.top, 62)
         .padding(.leading)
         .offset(x: viewModel.showMenu ? 40 : 0, y: viewModel.showMenu ? 40 : 0)
         .opacity(viewModel.showMenu ? 0 : 1)
@@ -428,16 +326,45 @@ struct HomeView: View {
     }
     
     private var greetingText: some View {
-        let userName = currentUserName ?? UserDefaults.standard.userName ?? "there"
-        return Text("Hi \(userName),")
-            .fuzzyBubblesFont(40, weight: .bold)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .onAppear {
-                // Sync with UserDefaults on appear
-                currentUserName = UserDefaults.standard.userName
+        let userName = currentUserName ?? "there"
+        let nameCount = userName.count
+        let minScaleFactor: CGFloat = {
+            if nameCount >= 17 { return 0.8 }
+            if nameCount >= 12 { return 0.9 }
+            return 1.0
+        }()
+        
+        return ZStack(alignment: .center) {
+            Text("\(userName) ")
+                .foregroundColor(.black)
+                .shantellSansFont(18)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: UIScreen.main.bounds.width * 0.65, alignment: .center)
+                .minimumScaleFactor(minScaleFactor)
+                .lineLimit(1)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .center)
+            
+            HStack(spacing: 16) {
+                Text("\(userName) ")
+                    .shantellSansFont(18)
+                    .hidden()
+                    .multilineTextAlignment(.center)
+                    .minimumScaleFactor(minScaleFactor)
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: true)
+                    .frame(maxWidth: UIScreen.main.bounds.width * 0.65)
+                
+
+                LottieView(animation: .named("Hi"))
+                    .playing(.fromProgress(0, toProgress: 0.5, loopMode: .loop))
+                    .allowsHitTesting(false)
+                    .frame(width: 30, height: 36)
             }
+            .fixedSize()
+        }
+        .frame(maxWidth: .infinity)
     }
-    
     
     private var createCartButton: some View {
         Button(action: {
@@ -452,6 +379,7 @@ struct HomeView: View {
                 .clipShape(Capsule())
         }
         .padding(.bottom)
+        .padding(.bottom)
         .padding(.bottom, 20)
     }
     
@@ -461,44 +389,72 @@ struct HomeView: View {
                 viewModel.handleVaultButton()
             }
         }) {
-            HStack(spacing: 8) {
-                Text("vault")
-                    .fuzzyBubblesFont(13, weight: .bold)
-                Image(systemName: "shippingbox")
-                    .resizable()
-                    .frame(width: 15, height: 15)
-                    .symbolRenderingMode(.monochrome)
-                    .fontWeight(.medium)
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .foregroundColor(.black)
-            .background(
-                ZStack {
-                    Color(.systemGray6)
-                    LinearGradient(
-                        colors: [
-                            .white.opacity(0.2),
-                            .clear,
-                            .black.opacity(0.1),
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
+            ZStack {
+                if isVaultButtonExpanded {
+                    // Expanded state: Full button with background
+                    HStack(spacing: 8) {
+                        Text("vault")
+                            .shantellSansFont(12)
+                            .foregroundColor(.black)
+                            .matchedGeometryEffect(id: "vaultText", in: vaultButtonNamespace)
+                        
+                        Image(systemName: "shippingbox")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 16, height: 16)
+                            .matchedGeometryEffect(id: "vaultIcon", in: vaultButtonNamespace)
+                    }
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 4)
+                    .background(
+                        Capsule()
+                            .fill(Color(.systemGray6))
+                            .overlay(
+                                LinearGradient(
+                                    colors: [
+                                        .white.opacity(0.2),
+                                        .clear,
+                                        .black.opacity(0.1),
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                                .clipShape(Capsule())
+                            )
+                            .shadow(
+                                color: .black.opacity(0.4),
+                                radius: 1,
+                                x: 0,
+                                y: 0.5
+                            )
+                            .matchedGeometryEffect(id: "vaultBackground", in: vaultButtonNamespace)
                     )
+                    .padding(.vertical, 4)
+                    .transition(.scale.combined(with: .opacity))
+                } else {
+                    // Collapsed state: Just the icon
+                    Image(systemName: "shippingbox")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 22, height: 22)
+                        .matchedGeometryEffect(id: "vaultIcon", in: vaultButtonNamespace)
+                        .transition(.scale.combined(with: .opacity))
+                }
             }
-            )
-            .clipShape(Capsule())
-            .shadow(
-                color: .black.opacity(0.4),
-                radius: 1,
-                x: 0,
-                y: 0.5
-            )
-            .scaleEffect(viewModel.showVault ? 0 : 1.0)
+            .animation(.spring(response: 0.4, dampingFraction: 0.65), value: isVaultButtonExpanded)
         }
         .buttonStyle(
             VaultCoordinatedButtonStyle(showVault: viewModel.showVault)
         )
+    }
+
+    private func vaultShippingboxIcon(size: CGFloat) -> some View {
+        Image(systemName: "shippingbox")
+            .resizable()
+            .scaledToFit()
+            .frame(width: size, height: size)
+            .symbolRenderingMode(.monochrome)
+            .matchedGeometryEffect(id: "vaultShippingbox", in: vaultButtonNamespace)
     }
     
     private var vaultSheet: some View {
@@ -532,6 +488,51 @@ struct HomeView: View {
             cartRefreshTrigger = UUID()
         }
     }
+    
+    // MARK: - Vault Button Animation Logic
+    private func scheduleVaultButtonAnimation() {
+        print("DEBUG: Checking vault animation conditions")
+        print("DEBUG: hasShownVaultAnimation: \(hasShownVaultAnimation)")
+        print("DEBUG: showVault: \(viewModel.showVault)")
+        print("DEBUG: selectedCart: \(String(describing: viewModel.selectedCart))")
+        print("DEBUG: hasCompletedOnboarding: \(hasCompletedOnboarding)")
+        print("DEBUG: currentUserName: \(currentUserName ?? "nil")")
+
+        // Only schedule if we haven't shown it, vault is closed, and no cart is selected
+        // AND user has completed onboarding and entered their name
+        guard !hasShownVaultAnimation,
+              !viewModel.showVault,
+              viewModel.selectedCart == nil,
+              hasCompletedOnboarding,
+              let name = currentUserName, !name.isEmpty else { 
+            print("DEBUG: Conditions not met for vault animation")
+            return 
+        }
+        
+        print("DEBUG: Scheduling vault animation for 20 seconds from now")
+
+        // Cancel any existing task
+        cancelVaultButtonAnimation()
+        
+        let task = DispatchWorkItem {
+            print("DEBUG: Executing vault animation - collapsing button")
+            withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
+                isVaultButtonExpanded = false
+            }
+            self.hasShownVaultAnimation = true
+        }
+        
+        animationTask = task
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2, execute: task)
+    }
+    
+    private func cancelVaultButtonAnimation() {
+        if let task = animationTask {
+            print("DEBUG: Cancelling vault animation")
+            task.cancel()
+            animationTask = nil
+        }
+    }
 }
 
 struct VaultCoordinatedButtonStyle: ButtonStyle {
@@ -553,20 +554,3 @@ struct VaultCoordinatedButtonStyle: ButtonStyle {
             .brightness(configuration.isPressed ? -0.2 : 0)
     }
 }
-
-// Helper View extension for getting CGRect (if not already defined)
-extension View {
-    func rect(coordinateSpace: CoordinateSpace = .global, completion: @escaping (CGRect) -> ()) -> some View {
-        self
-            .overlay {
-                GeometryReader { proxy in
-                    let rect = proxy.frame(in: coordinateSpace)
-                    
-                    Color.clear
-                        .preference(key: RectKey.self, value: rect)
-                        .onPreferenceChange(RectKey.self, perform: completion)
-                }
-            }
-    }
-}
-

@@ -26,6 +26,12 @@ struct VaultCategoryIcon: View {
                             endRadius: fillAnimation * 30
                         )
                     )
+                    .shadow(
+                        color: .black.opacity(hasItems ? 0.10 : 0.0),
+                        radius: 2,
+                        x: 0,
+                        y: 1
+                    )
                     .frame(width: 42, height: 42)
                     .scaleEffect(iconScale)
                 

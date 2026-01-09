@@ -34,15 +34,8 @@ final class HomeViewModel {
     }
 
     var displayedCarts: [Cart] {
-        let baseCarts: [Cart]
-        switch selectedTab {
-        case 0:
-            baseCarts = cartViewModel.activeCarts.sorted { $0.createdAt > $1.createdAt }
-        case 1:
-            baseCarts = cartViewModel.completedCarts.sorted { $0.createdAt > $1.createdAt }
-        default:
-            baseCarts = []
-        }
+        // Always show active carts since we removed tabs
+        let baseCarts = cartViewModel.activeCarts.sorted { $0.createdAt > $1.createdAt }
         
         // Filter out hidden carts
         return baseCarts.filter { cart in
@@ -230,6 +223,9 @@ final class HomeViewModel {
         UserDefaults.standard.userName = nil
         UserDefaults.standard.hasPromptedForNameAfterOnboarding = false
         UserDefaults.standard.hasPromptedForNameAfterVaultCelebration = false
+        
+        // Reset vault animation flag
+        UserDefaults.standard.set(false, forKey: "hasShownVaultAnimation")
 
         // Clear hidden cart state
         hiddenCartIds.removeAll()

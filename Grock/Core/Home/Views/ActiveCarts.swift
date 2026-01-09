@@ -125,7 +125,9 @@ struct ActiveCarts: View {
 
 extension ColorOption {
     static func getBackgroundColor(for cartId: String, isRow: Bool = false) -> Color {
-        if let savedHex = UserDefaults.standard.string(forKey: "cartBackgroundColor_\(cartId)"),
+        let key = "cartBackgroundColor_\(cartId)"
+        
+        if let savedHex = UserDefaults.standard.string(forKey: key),
            let colorOption = ColorOption.options.first(where: { $0.hex == savedHex }) {
             if isRow {
                 // For rows: use the color directly (or white if clear)
@@ -135,8 +137,15 @@ extension ColorOption {
                 return colorOption.hex == "FFFFFF" ? Color.clear.darker(by: 0.02) : colorOption.color.darker(by: 0.02)
             }
         }
-        // Default colors
-        return isRow ? Color.white : Color(hex: "F7F2ED").darker(by: 0.02)
+        
+        UserDefaults.standard.set(ColorOption.defaultColor.hex, forKey: key)
+        let defaultOption = ColorOption.defaultColor
+        
+        if isRow {
+            return defaultOption.hex == "FFFFFF" ? Color.white : defaultOption.color
+        } else {
+            return defaultOption.hex == "FFFFFF" ? Color.clear.darker(by: 0.02) : defaultOption.color.darker(by: 0.02)
+        }
     }
 }
 

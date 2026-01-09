@@ -119,9 +119,9 @@ struct HomeCartRowView: View {
                         backgroundColor
                             .overlay {
                                 NoiseOverlayView(
-                                    grainSize: 0.3,
-                                    density: 1.0,
-                                    opacity: 0.90
+                                    grainSize: 0.1,
+                                    density: 0.7,
+                                    opacity: 0.70
                                 )
                             }
                     }
@@ -201,6 +201,7 @@ struct HomeCartRowView: View {
                     
                     LottieView(animation: .named("Shopping"))
                         .playing(.fromProgress(0, toProgress: 0.5, loopMode: .loop))
+                        .colorMultiply(hasBackgroundImage ? .white : .black)
                         .frame(width: 18, height: 18)
                     
                     

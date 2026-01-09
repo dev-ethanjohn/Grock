@@ -13,6 +13,11 @@ struct NameEntrySheet: View {
     @State private var validationError: String?
     @State private var shakeOffset: CGFloat = 0
     
+    private let maxNameLength = 20
+    
+    private var currentCharacterCount: Int { userName.count }
+    private var remainingCharacterCount: Int { max(0, maxNameLength - userName.count) }
+    
     private var canSave: Bool {
         !userName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
@@ -45,12 +50,17 @@ struct NameEntrySheet: View {
                     }
                     .normalizedText($userName)
                     .onChange(of: userName) { _, newValue in
-                        if hasAttemptedSubmission { validateName(newValue) }
+                        if newValue.count > maxNameLength {
+                            userName = String(newValue.prefix(maxNameLength))
+                        }
+                        
+                        if hasAttemptedSubmission { validateName(userName) }
                         if !newValue.isEmpty { validationError = nil }
                     }
                     .autocorrectionDisabled(true)
                     .textInputAutocapitalization(.words)
                     .padding(.vertical, 8)
+                    .padding(.trailing, 64)
                     .overlay(
                         VStack {
                             Spacer()
@@ -59,6 +69,19 @@ struct NameEntrySheet: View {
                                 .foregroundColor(.gray.opacity(0.5))
                         }
                     )
+                    .overlay(alignment: .trailing) {
+                        HStack(spacing: 2) {
+                            Text("\(currentCharacterCount)")
+                                .contentTransition(.numericText())
+                                .animation(.spring(response: 0.25, dampingFraction: 0.85), value: currentCharacterCount)
+                            
+                            Text(" / \(remainingCharacterCount)")
+                        }
+                        .font(.caption2)
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                        .padding(.trailing, 8)
+                    }
                     .offset(x: shakeOffset)
                     .padding(.horizontal, 40)
                 
