@@ -434,7 +434,8 @@ private struct ItemDetailsSection: View {
                 badgeScale: badgeScale,
                 badgeRotation: badgeRotation,
                 isItemFulfilled: isItemFulfilled,
-                isFirstItem: isFirstItem
+                isFirstItem: isFirstItem,
+                displayUnit: displayUnit
             )
             
             ItemPriceRow(
@@ -461,6 +462,7 @@ private struct ItemNameRow: View {
     let badgeRotation: Double
     let isItemFulfilled: Bool
     let isFirstItem: Bool
+    let displayUnit: String
     
     @Environment(CartStateManager.self) private var stateManager
     
@@ -482,17 +484,15 @@ private struct ItemNameRow: View {
     
     @ViewBuilder
     private var itemNameText: some View {
-        let baseText = Text("\(currentQuantity.formattedQuantity) \(item?.name ?? cartItem.shoppingOnlyName ?? "Unknown Item")")
-            .lexendFont(17, weight: stateManager.hasBackgroundImage ? .semibold : .regular)
+        Text("\(currentQuantity.formattedQuantity) \(displayUnit) \(item?.name ?? cartItem.shoppingOnlyName ?? "Unknown Item") ")
+            .lexendFont(16, weight: stateManager.hasBackgroundImage ? .semibold : .regular)
+            .foregroundColor(stateManager.hasBackgroundImage ? .white.opacity(0.95) : .primary)
             .lineLimit(3)
             .fixedSize(horizontal: false, vertical: true)
             .strikethrough(isItemFulfilled)
             .id(item?.name ?? cartItem.shoppingOnlyName ?? "Unknown")
-            .foregroundColor(stateManager.hasBackgroundImage ? .white.opacity(0.95) : .primary)
             .contentTransition(.numericText())
             .animation(nil, value: currentQuantity)
-        
-        baseText
     }
 }
 
@@ -521,7 +521,7 @@ private struct ItemPriceRow: View {
             Spacer()
             
             Text(currentTotalPrice.formattedCurrency)
-                .lexendFont(14, weight: .bold)
+                .lexendFont(13, weight: .semibold)
                 .lineLimit(1)
                 .contentTransition(.numericText())
                 .animation(nil, value: currentTotalPrice)

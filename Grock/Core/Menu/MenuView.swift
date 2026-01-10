@@ -8,7 +8,11 @@
 import SwiftUI
 
 struct MenuView: View {
+    @Environment(VaultService.self) private var vaultService
     @State private var currencyManager = CurrencyManager.shared
+    
+    @State private var isEditingName = false
+    @State private var editingName = ""
     
     var body: some View {
         NavigationStack {
@@ -32,6 +36,33 @@ struct MenuView: View {
                 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
+                        
+                        // User Profile
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Hello,")
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                                
+                                Text(vaultService.currentUser?.name ?? "User")
+                                    .font(.title3)
+                                    .bold()
+                            }
+                            
+                            Spacer()
+                            
+                            Button {
+                                editingName = vaultService.currentUser?.name ?? ""
+                                isEditingName = true
+                            } label: {
+                                Image(systemName: "pencil")
+                                    .foregroundColor(.gray)
+                                    .padding(8)
+                                    .background(Color.gray.opacity(0.1))
+                                    .clipShape(Circle())
+                            }
+                        }
+                        .padding(.vertical, 8)
                         
                         // Currency Selector
                         Menu {
@@ -67,6 +98,30 @@ struct MenuView: View {
                             .padding(.vertical, 4)
                         }
                         
+                        // Store Manager
+                        NavigationLink {
+                            StoreManagerView()
+                        } label: {
+                            HStack(spacing: 16) {
+                                Image(systemName: "storefront")
+                                    .foregroundColor(Color(hex: "999"))
+                                    .frame(width: 24, height: 24, alignment: .leading)
+                                
+                                Text("Manage Stores")
+                                    .font(.system(size: 16))
+                                    .fontWeight(.medium)
+                                    .foregroundColor(Color.black)
+                                
+                                Spacer()
+                                
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.gray)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.vertical, 4)
+                        }
+                        
                         ForEach(MenuItem.userSettingsMenuItems) { item in
                             MenuRow(item: item)
                         }
@@ -94,6 +149,17 @@ struct MenuView: View {
             .frame(width: 300, alignment: .leading)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .alert("Change Name", isPresented: $isEditingName) {
+            TextField("Name", text: $editingName)
+            Button("Cancel", role: .cancel) { }
+            Button("Save") {
+                if !editingName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    vaultService.updateUserName(editingName)
+                }
+            }
+        } message: {
+            Text("Enter your new username")
+        }
     }
 }
 

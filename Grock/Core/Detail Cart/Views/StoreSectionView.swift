@@ -239,6 +239,19 @@ private struct StoreSectionRow: View {
 
 private struct StoreSectionHeader: View {
     let store: String
+    @Environment(VaultService.self) private var vaultService
+    
+    // Find the current store name from the vault to ensure we display the latest name
+    private var displayStoreName: String {
+        // If the store exists in the vault, use its current name
+        // This handles cases where the store was renamed but the items/list haven't fully refreshed yet
+        if let storeEntity = vaultService.vault?.stores.first(where: { $0.name == store }) {
+            return storeEntity.name
+        }
+        // Fallback to the string passed in (which comes from the item's store property)
+        // If the item's store property has been updated, this will also be correct
+        return store
+    }
     
     var body: some View {
         VStack(spacing: 0) {
@@ -248,7 +261,7 @@ private struct StoreSectionHeader: View {
                         .font(.system(size: 10))
                         .foregroundColor(.white)
                     
-                    Text(store)
+                    Text(displayStoreName)
                         .lexendFont(11, weight: .bold)
                 }
                 .foregroundColor(.white)

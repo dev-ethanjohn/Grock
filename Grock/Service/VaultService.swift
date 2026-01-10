@@ -663,6 +663,45 @@ extension VaultService {
     func ensureStoreExists(_ storeName: String) {
         addStore(storeName)
     }
+    
+    /// Renames a store and updates all items using it
+    func renameStore(oldName: String, newName: String) {
+        guard let vault = vault else { return }
+        let trimmedNewName = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedNewName.isEmpty else { return }
+        
+        // 1. Update the Store entity
+        if let store = vault.stores.first(where: { $0.name == oldName }) {
+            store.name = trimmedNewName
+        }
+        
+        // 2. Update all items that use this store
+        for category in vault.categories {
+            for item in category.items {
+                for priceOption in item.priceOptions {
+                    if priceOption.store == oldName {
+                        priceOption.store = trimmedNewName
+                    }
+                }
+            }
+        }
+        
+        saveContext()
+        print("✏️ Store renamed from '\(oldName)' to '\(trimmedNewName)'")
+    }
+    
+    /// Deletes a store from the vault
+    /// Note: This only removes the Store entity. Items using this store will keep the store name
+    /// but it will be treated as a "legacy" or "item-only" store until those items are updated.
+    func deleteStore(_ storeName: String) {
+        guard let vault = vault else { return }
+        
+        if let index = vault.stores.firstIndex(where: { $0.name == storeName }) {
+            vault.stores.remove(at: index)
+            saveContext()
+            print("🗑️ Store deleted: \(storeName)")
+        }
+    }
 }
 
 // MARK: - Cart Management

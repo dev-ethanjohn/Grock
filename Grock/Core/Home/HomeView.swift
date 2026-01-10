@@ -336,7 +336,7 @@ struct HomeView: View {
     }
     
     private var greetingText: some View {
-        let userName = currentUserName ?? "there"
+        let userName = vaultService.currentUser?.name ?? "there"
         let nameCount = userName.count
         let minScaleFactor: CGFloat = {
             if nameCount >= 17 { return 0.8 }

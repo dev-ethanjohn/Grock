@@ -57,7 +57,7 @@ final class CurrencyManager {
     
     private func loadSelectedCurrency() {
         if let savedCode = UserDefaults.standard.string(forKey: "selectedCurrencyCode"),
-           let savedSymbol = UserDefaults.standard.string(forKey: "selectedCurrencySymbol"),
+           let _ = UserDefaults.standard.string(forKey: "selectedCurrencySymbol"),
            let currency = availableCurrencies.first(where: { $0.code == savedCode }) {
             selectedCurrency = currency
         } else {

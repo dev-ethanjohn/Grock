@@ -7,6 +7,7 @@ struct ShoppingProgressSummary: View {
     @Environment(VaultService.self) private var vaultService
     
     @State private var showCompletedItemsSheet = false
+    @State private var currencyManager = CurrencyManager.shared
     
     // Total items includes ALL active items (vault items + shopping-only items with quantity > 0)
     // Total items includes ONLY ACTIVE items (non-skipped, non-deleted)
@@ -48,7 +49,14 @@ struct ShoppingProgressSummary: View {
     
     private var fulfilledItemsTotal: String {
         guard let vault = vaultService.vault else {
-            return CurrencyFormatter.shared.format(amount: 0)
+            let selectedCurrency = currencyManager.selectedCurrency
+            let numberFormatter = NumberFormatter()
+            numberFormatter.numberStyle = .decimal
+            numberFormatter.minimumFractionDigits = 2
+            numberFormatter.maximumFractionDigits = 2
+            
+            let formattedAmount = numberFormatter.string(from: NSNumber(value: 0)) ?? "0.00"
+            return "\(selectedCurrency.symbol)\(formattedAmount)"
         }
         
         let fulfilledTotal = cart.cartItems
@@ -59,7 +67,14 @@ struct ShoppingProgressSummary: View {
                 total + cartItem.getTotalPrice(from: vault, cart: cart)
             }
         
-        return CurrencyFormatter.shared.format(amount: fulfilledTotal)
+        let selectedCurrency = currencyManager.selectedCurrency
+        let numberFormatter = NumberFormatter()
+        numberFormatter.numberStyle = .decimal
+        numberFormatter.minimumFractionDigits = 2
+        numberFormatter.maximumFractionDigits = 2
+        
+        let formattedAmount = numberFormatter.string(from: NSNumber(value: fulfilledTotal)) ?? String(format: "%.2f", fulfilledTotal)
+        return "\(selectedCurrency.symbol)\(formattedAmount)"
     }
     
     @State private var pulseOpacity = 0.0
@@ -80,6 +95,8 @@ struct ShoppingProgressSummary: View {
                     text: "\(fulfilledItems)/\(totalItems) items fulfilled, totalling \(fulfilledItemsTotal)",
                     delay: 0.15
                 )
+                // Add currency code to ID to trigger re-creation when currency changes
+                .id("reveal-\(fulfilledItems)-\(totalItems)-\(fulfilledItemsTotal)-\(currencyManager.selectedCurrency.code)")
                 .fuzzyBubblesFont(13, weight: .bold)
                 .foregroundColor(Color(hex: "717171"))
                 
@@ -112,6 +129,10 @@ struct ShoppingProgressSummary: View {
             .presentationDragIndicator(.visible)
             .presentationCornerRadius(24)
         }
+        .onChange(of: CurrencyManager.shared.selectedCurrency) { oldValue, newValue in
+            // When currency changes, update the local state to trigger view refresh
+            currencyManager = CurrencyManager.shared
+        }
     }
     
     private func onUnfulfillItem(_ cartItem: CartItem) {
@@ -119,109 +140,83 @@ struct ShoppingProgressSummary: View {
     }
 }
 
-class CurrencyFormatter {
-    static let shared = CurrencyFormatter()
-    
-    private let formatter: NumberFormatter
-    
-    private init() {
-        formatter = NumberFormatter()
-        formatter.numberStyle = .currency
-        formatter.locale = Locale.current
-    }
-    
-    func format(amount: Double, locale: Locale = .current) -> String {
-        formatter.locale = locale
-        let symbol = CurrencyManager.shared.selectedCurrency.symbol
-        return formatter.string(from: NSNumber(value: amount)) ?? "\(symbol)\(String(format: "%.2f", amount))"
-    }
-    
-    func format(amount: Double, currencyCode: String) -> String {
-        let locale = Locale(identifier: Locale.identifier(fromComponents: [NSLocale.Key.currencyCode.rawValue: currencyCode]))
-        return format(amount: amount, locale: locale)
-    }
-}
-
 struct CharacterRevealView: View {
     let text: String
     let delay: Double
     @State private var revealedCharacters: Int = 0
+    @State private var isAnimating = false
     @State private var underlineWidth: CGFloat = 0
     @State private var textWidth: CGFloat = 0
-    @State private var didInitialReveal = false
-    @State private var displayedText: String = ""
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            if didInitialReveal {
-                // After initial reveal, show text with numeric content transition for smooth number updates
-                Text(displayedText)
-                    .contentTransition(.numericText())
-                    .background(
-                        GeometryReader { geometry in
-                            Color.clear
-                                .onAppear {
-                                    textWidth = geometry.size.width
-                                    underlineWidth = geometry.size.width
-                                }
-                                .onChange(of: geometry.size.width) { _, newWidth in
-                                    underlineWidth = newWidth
-                                }
-                        }
-                    )
-                
-                Rectangle()
-                    .fill(Color(hex: "717171"))
-                    .frame(width: underlineWidth, height: 1)
-                    .offset(y: -0.5)
-            } else {
-                // Character-by-character reveal animation
-                HStack(spacing: 0) {
-                    ForEach(Array(text.enumerated()), id: \.offset) { index, character in
-                        Text(String(character))
-                            .opacity(index < revealedCharacters ? 1 : 0)
-                            .offset(y: index < revealedCharacters ? 0 : 4)
-                            .animation(
-                                .interpolatingSpring(stiffness: 240, damping: 14)
-                                    .delay(Double(index) * 0.01 + delay),
-                                value: revealedCharacters
+            HStack(spacing: 0) {
+                ForEach(Array(text.enumerated()), id: \.offset) { index, character in
+                    Text(String(character))
+                        .opacity(index < revealedCharacters ? 1 : 0)
+                        .offset(y: index < revealedCharacters ? 0 : 4)
+                        .animation(
+                            .interpolatingSpring(
+                                stiffness: 240,
+                                damping: 14
                             )
+                            .delay(Double(index) * 0.01 + delay),
+                            value: revealedCharacters
+                        )
+                }
+            }
+            .background(
+                GeometryReader { geometry in
+                    Color.clear.onAppear {
+                        textWidth = geometry.size.width
                     }
                 }
-                .background(
-                    GeometryReader { geometry in
-                        Color.clear.onAppear {
-                            textWidth = geometry.size.width
-                        }
-                    }
-                )
-                
-                Rectangle()
-                    .fill(Color(hex: "717171"))
-                    .frame(width: underlineWidth, height: 1)
-                    .offset(y: -0.5)
-            }
-        }
-        .onAppear {
-            displayedText = text
-            guard !didInitialReveal else { return }
-            
-            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-                withAnimation(.easeOut(duration: 0.32)) {
+            )
+            .onAppear {
+                // Ensure all characters are revealed after animation completes
+                DispatchQueue.main.asyncAfter(deadline: .now() + delay + (Double(text.count) * 0.01) + 0.5) {
                     revealedCharacters = text.count
                 }
-                withAnimation(.easeOut(duration: Double(text.count) * 0.01 + 0.32)) {
+            }
+            
+            Rectangle()
+                .fill(Color(hex: "717171"))
+                .frame(width: underlineWidth, height: 1)
+                .offset(y: -0.5)
+        }
+        .onAppear {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                withAnimation(
+                    .easeOut(duration: 0.32)
+                ) {
+                    revealedCharacters = text.count
+                }
+                
+                withAnimation(
+                    .easeOut(duration: Double(text.count) * 0.01 + 0.32)
+                ) {
                     underlineWidth = textWidth
                 }
             }
             
-            DispatchQueue.main.asyncAfter(deadline: .now() + delay + (Double(text.count) * 0.01) + 0.6) {
-                didInitialReveal = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay + 0.25) {
+                withAnimation(
+                    .spring(
+                        response: 0.2,
+                        dampingFraction: 0.8,
+                        blendDuration: 0.1
+                    )
+                ) {
+                    isAnimating = true
+                }
             }
         }
-        .onChange(of: text) { _, newValue in
-            // Update text without re-running the reveal animation
-            displayedText = newValue
-        }
+//        .scaleEffect(isAnimating ? 1.007 : 1.0)
+        .animation(
+            .easeInOut(duration: 0.15)
+            .repeatCount(1, autoreverses: true)
+            .delay(delay + 0.5),
+            value: isAnimating
+        )
     }
 }
