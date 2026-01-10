@@ -78,8 +78,8 @@ struct StoreSectionListView: View {
                   }
               )
               .listSectionSpacing(isLastStore ? 0 : 20)
-              // FIX: Use displayItems.count instead of displayItems
-              .animation(.spring(response: 0.3, dampingFraction: 0.7), value: displayItems.count)
+              // Smoother animation aligned with list height animation
+              .animation(.spring(response: 0.5, dampingFraction: 0.88), value: displayItems.count)
               .onAppear {
                   previousDisplayCount = displayItems.count
               }
@@ -90,14 +90,15 @@ struct StoreSectionListView: View {
         // Add to animating set
         animatingOutSkippedItems.insert(cartItem.itemId)
         
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+        // Use smoother animation aligned with list height animation
+        withAnimation(.spring(response: 0.5, dampingFraction: 0.88)) {
             cartItem.isSkippedDuringShopping = true
             cartItem.isFulfilled = false
             vaultService.updateCartTotals(cart: cart)
         }
         
         // Remove from animating set after animation completes
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             animatingOutSkippedItems.remove(cartItem.itemId)
         }
     }
@@ -196,7 +197,8 @@ private struct StoreSectionRow: View {
                 .combined(with: .scale(scale: 0.9, anchor: .center))
                 .combined(with: .offset(x: -50, y: 0)) // ⬅️ Slide left while shrinking
         ))
-        .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.7), value: isSkipped)
+        // Smoother animation aligned with list height animation
+        .animation(.spring(response: 0.5, dampingFraction: 0.88), value: isSkipped)
     }
     
     // In StoreSectionRow's swipeActionsContent:
@@ -317,7 +319,8 @@ private struct StoreSectionRow: View {
     }
     
     private func addBackSkippedItem() {
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+        // Use smoother animation aligned with list height animation
+        withAnimation(.spring(response: 0.5, dampingFraction: 0.88)) {
             tuple.cartItem.isSkippedDuringShopping = false
             tuple.cartItem.quantity = max(1, tuple.cartItem.originalPlanningQuantity ?? 1)
             vaultService.updateCartTotals(cart: cart)
@@ -325,7 +328,8 @@ private struct StoreSectionRow: View {
     }
     
     private func markUnfulfilled() {
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+        // Use smoother animation aligned with list height animation
+        withAnimation(.spring(response: 0.5, dampingFraction: 0.88)) {
             tuple.cartItem.isFulfilled = false
             vaultService.updateCartTotals(cart: cart)
         }

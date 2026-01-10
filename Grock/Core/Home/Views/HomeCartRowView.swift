@@ -144,7 +144,6 @@ struct HomeCartRowView: View {
             // Shopping mode: animated titanium glowing border (behind the border)
             ShoppingModeGradientView(cornerRadius: 24, hasBackgroundImage: hasBackgroundImage)
                 .opacity(cart.isShopping ? 1 : 0)
-                .allowsHitTesting(false)
                 .animation(.easeInOut(duration: 0.3), value: cart.isShopping)
         )
         .overlay(
@@ -257,7 +256,6 @@ struct HomeCartRowView: View {
     }
     
     // MARK: - Background Image Loading
-    
     private func loadBackgroundImage() {
         // Check if we have a background image
         hasBackgroundImage = CartBackgroundImageManager.shared.hasBackgroundImage(forCartId: cart.id)

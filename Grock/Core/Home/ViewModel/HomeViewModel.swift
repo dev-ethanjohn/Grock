@@ -115,11 +115,9 @@ final class HomeViewModel {
         
         print("🎯 HomeViewModel: Showing cart in list - \(cart.name)")
         
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
-                self.hiddenCartIds.remove(cart.id)
-                self.pendingCartToShow = nil
-            }
+        withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+            hiddenCartIds.remove(cart.id)
+            pendingCartToShow = nil
         }
     }
     
@@ -238,9 +236,6 @@ final class HomeViewModel {
         
         // Reset vault animation flag
         UserDefaults.standard.set(false, forKey: "hasShownVaultAnimation")
-
-        // Reset currency
-        CurrencyManager.shared.resetCurrency()
 
         // Clear hidden cart state
         hiddenCartIds.removeAll()

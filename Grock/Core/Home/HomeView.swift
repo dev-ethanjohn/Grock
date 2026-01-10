@@ -257,7 +257,7 @@ struct HomeView: View {
                 .lexendFont(13)
                 .foregroundStyle(Color(.systemGray))
                 .frame(maxWidth: .infinity, alignment: .center)
-                .padding(.bottom, 10)
+                .padding(.bottom)
         }
         .frame(maxWidth: .infinity)
         .background(headerBackground)
@@ -274,6 +274,14 @@ struct HomeView: View {
         )
     }
     
+    private var currencyPicker: some View {
+        Picker("Currency", selection: $viewModel.selectedCurrency) {
+            ForEach(CurrencyManager.shared.availableCurrencies, id: \.self) { currency in
+                Text(currency.symbol + " " + currency.code).tag(currency)
+            }
+        }
+    }
+    
     private var homeMenu: some View {
         HStack {
             MenuIcon {
@@ -283,6 +291,10 @@ struct HomeView: View {
             }
             
             Menu {
+                Section("Currency") {
+                    currencyPicker
+                }
+                
                 Section {
                     Button(role: .destructive, action: viewModel.resetApp) {
                         Label(
@@ -370,35 +382,16 @@ struct HomeView: View {
     }
     
     private var createCartButton: some View {
-        ZStack {
-            Button(action: {
-                showCreateCartPopover = true
-            }) {
-                Text("Create Cart")
-                    .fuzzyBubblesFont(18, weight: .bold)
-                    .padding(.vertical, 12)
-                    .padding(.horizontal, 24)
-                    .background(.black)
-                    .foregroundColor(.white)
-                    .clipShape(Capsule())
-            }
-            
-//            HStack {
-//                Spacer()
-//                
-//                Button(action: {
-//                    // Action for insights
-//                }) {
-//                    Image(systemName: "chart.bar.xaxis")
-//                        .font(.system(size: 20, weight: .semibold))
-//                        .foregroundColor(.black)
-//                        .padding(12)
-//                        .background(Color.white)
-//                        .clipShape(Circle())
-//                        .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
-//                }
-//                .padding(.trailing, 24)
-//            }
+        Button(action: {
+            showCreateCartPopover = true
+        }) {
+            Text("Create Cart")
+                .fuzzyBubblesFont(18, weight: .bold)
+                .padding(.vertical, 12)
+                .padding(.horizontal, 24)
+                .background(.black)
+                .foregroundColor(.white)
+                .clipShape(Capsule())
         }
         .padding(.bottom)
         .padding(.bottom)
@@ -544,7 +537,7 @@ struct HomeView: View {
             self.hasShownVaultAnimation = true
         }
         
-        animationTask = task
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2, execute: task)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: task)
     }
     

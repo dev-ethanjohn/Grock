@@ -39,40 +39,63 @@ struct ActiveCarts: View {
     }
     
     private var cartListView: some View {
-        ScrollView {
-            VStack(spacing: 4) {
-                Color.clear
-                    .frame(height: viewModel.headerHeight)
-                
-                ForEach(Array(viewModel.displayedCarts.enumerated()), id: \.element.id) { index, cart in
-                    Button(action: {
-                        viewModel.selectCart(cart)
-                    }) {
-                        HomeCartRowView(
-                            cart: cart,
-                            vaultService: viewModel.getVaultService(for: cart)
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                    .contextMenu {
-                        Button {
-                            onRenameCart(cart) // Use callback
-                        } label: {
-                            Label("Rename Cart", systemImage: "pencil")
-                        }
-                        
-                        Button(role: .destructive) {
-                            onDeleteCart(cart) // Use callback
-                        } label: {
-                            Label("Delete Cart", systemImage: "trash")
-                        }
-                    }
-                    .padding(.horizontal)
+        List {
+            Color.clear
+                .frame(height: viewModel.headerHeight)
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets())
+            
+            ForEach(Array(viewModel.displayedCarts.enumerated()), id: \.element.id) { index, cart in
+                Button(action: {
+                    viewModel.selectCart(cart)
+                }) {
+                    HomeCartRowView(
+                        cart: cart,
+                        vaultService: viewModel.getVaultService(for: cart)
+                    )
                 }
+                .buttonStyle(.plain)
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets(
+                            top: 0,
+                            leading: 0,
+                            bottom: index == viewModel.displayedCarts.count - 1 ? 0 : 12,
+                            trailing: 0
+                        ))
+                .transition(.asymmetric(
+                    insertion: .scale(scale: 0.8).combined(with: .opacity),
+                    removal: .scale(scale: 0.9).combined(with: .opacity)
+                ))
+                .animation(
+                    .spring(response: 0.5, dampingFraction: 0.7)
+                        .delay(Double(index) * 0.05),
+                    value: viewModel.displayedCarts.count
+                )
+                .contextMenu {
+                    Button {
+                        onRenameCart(cart) // Use callback
+                    } label: {
+                        Label("Rename Cart", systemImage: "pencil")
+                    }
+                    
+                    Button(role: .destructive) {
+                        onDeleteCart(cart) // Use callback
+                    } label: {
+                        Label("Delete Cart", systemImage: "trash")
+                    }
+                }
+                .onLongPressGesture {
+                    // Optional: Provide haptic feedback on long press
+                    let generator = UIImpactFeedbackGenerator(style: .medium)
+                    generator.impactOccurred()
+                }
+                .padding(.horizontal)
             }
-            .animation(.spring(response: 0.5, dampingFraction: 0.8), value: viewModel.displayedCarts)
         }
+        .listStyle(PlainListStyle())
+        .scrollContentBackground(.hidden)
         .scrollIndicators(.hidden)
     }
     

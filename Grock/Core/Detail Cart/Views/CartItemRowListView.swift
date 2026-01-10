@@ -153,7 +153,8 @@ private struct MainRowContent: View {
             )
         }
         .opacity(rowOpacity)
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: cart.isShopping)
+        // Smoother animation aligned with list height animation
+        .animation(.spring(response: 0.5, dampingFraction: 0.88), value: cart.isShopping)
         .contentShape(Rectangle())
         .onTapGesture {
             if !isFulfilling {
@@ -211,12 +212,13 @@ private struct MainRowContent: View {
     private func handleShoppingModeChange(oldValue: Bool, newValue: Bool) {
         guard oldValue != newValue else { return }
         
+        // Smoother animation aligned with list height animation
         if newValue {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.88)) {
                 buttonScale = 1.0
             }
         } else {
-            withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.88)) {
                 buttonScale = 0.1
             }
         }
@@ -233,7 +235,8 @@ private struct MainRowContent: View {
         cartItem.syncQuantities(cart: cart)
         
         if animated {
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+            // Smoother animation aligned with list height animation
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.88)) {
                 currentQuantity = newQuantity
                 currentPrice = newPrice
                 currentTotalPrice = newTotalPrice

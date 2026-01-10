@@ -320,10 +320,9 @@ private struct ItemsListContent: View {
                         )
                     )
                     .offset(y: stateManager.hasBackgroundImage ? 0 : 4)
-                    .animation(.spring(response: 0.45, dampingFraction: 0.75), value: cart.isShopping)
             }
         }
-        .animation(cart.isShopping ? .spring(response: 0.45, dampingFraction: 0.75) : .none, value: cart.isShopping)
+        .animation(.spring(response: 0.45, dampingFraction: 0.75), value: cart.isShopping)
     }
 }
 
@@ -353,7 +352,6 @@ private struct StoreItemsList: View {
             )
             .applyBorderAndCorners(hasBackgroundImage: stateManager.hasBackgroundImage, isShopping: cart.isShopping)
             .applyAnimations(calculatedHeight: calculatedHeight, isShopping: cart.isShopping)
-            .applyShoppingElevation(isShopping: cart.isShopping, hasBackgroundImage: stateManager.hasBackgroundImage)
     }
     
     private var listContent: some View {
@@ -404,6 +402,7 @@ private extension View {
                     backgroundColor: backgroundColor,
                     geometry: geometry
                 )
+                .clipShape(RoundedRectangle(cornerRadius: 16))
             )
     }
     
@@ -418,35 +417,14 @@ private extension View {
                 RoundedRectangle(cornerRadius: 16)
                     .stroke(Color.black, lineWidth: 0.3)
             )
+            .offset(y: (isShopping && hasBackgroundImage) ? -4 : 0)
     }
     
     func applyAnimations(calculatedHeight: CGFloat, isShopping: Bool) -> some View {
         self
-            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: calculatedHeight)
+            // Smoother spring for height changes - higher damping prevents bouncy/rocky feel
+            .animation(.spring(response: 0.5, dampingFraction: 0.88), value: calculatedHeight)
             .animation(.spring(response: 0.45, dampingFraction: 0.75), value: isShopping)
-    }
-    
-    func applyShoppingElevation(isShopping: Bool, hasBackgroundImage: Bool) -> some View {
-        self
-            .offset(y: (isShopping && hasBackgroundImage) ? -4 : 0)
-            .shadow(
-                color: isShopping && hasBackgroundImage ? Color.black.opacity(0.115) : Color.clear,
-                radius: isShopping && hasBackgroundImage ? 7 : 0,
-                x: 0,
-                y: isShopping && hasBackgroundImage ? 7 : 0
-            )
-            .shadow(
-                color: isShopping && hasBackgroundImage ? Color.black.opacity(0.18) : Color.clear,
-                radius: isShopping && hasBackgroundImage ? 4 : 0,
-                x: 0,
-                y: isShopping && hasBackgroundImage ? 3 : 0
-            )
-            .shadow(
-                color: isShopping && hasBackgroundImage ? Color.black.opacity(0.25) : Color.clear,
-                radius: isShopping && hasBackgroundImage ? 2 : 0,
-                x: 0,
-                y: isShopping && hasBackgroundImage ? 2: 0
-            )
     }
 }
 

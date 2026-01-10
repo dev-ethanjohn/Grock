@@ -6,7 +6,7 @@ struct TotalDisplay: View {
     var body: some View {
         HStack(spacing: 2) {
             //TODO: use locale currency
-            Text("Total: \(CurrencyManager.shared.selectedCurrency.symbol)")
+            Text("Total: ₱")
                 .lexendFont(14, weight: .semibold)
             
             Text(calculatedTotal, format: .number.precision(.fractionLength(2)))
