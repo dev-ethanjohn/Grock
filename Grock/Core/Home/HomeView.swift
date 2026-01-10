@@ -172,7 +172,7 @@ struct HomeView: View {
     
     private var mainContent: some View {
         ZStack(alignment: .topLeading) {
-            Color(hex: "#f7f7f7").ignoresSafeArea()
+            Color(hex: "#ffffff").ignoresSafeArea()
             
             ActiveCarts(
                 viewModel: viewModel,
@@ -316,20 +316,20 @@ struct HomeView: View {
         ZStack {
             LinearGradient(
                 gradient: Gradient(stops: [
-                    .init(color: Color(hex: "f7f7f7").opacity(0.85), location: 0),
-                    .init(color: Color(hex: "f7f7f7").opacity(0.95), location: 0.1),
-                    .init(color: Color(hex: "f7f7f7").opacity(1.0), location: 0.2),
+                    .init(color: Color(hex: "ffffff").opacity(0.85), location: 0),
+                    .init(color: Color(hex: "ffffff").opacity(0.95), location: 0.1),
+                    .init(color: Color(hex: "ffffff").opacity(1.0), location: 0.2),
                 ]),
                 startPoint: .bottom,
                 endPoint: .top
             )
             HStack {
                 Rectangle()
-                    .fill(Color(hex: "f7f7f7"))
+                    .fill(Color(hex: "ffffff"))
                     .frame(width: 14)
                 Spacer()
                 Rectangle()
-                    .fill(Color(hex: "f7f7f7"))
+                    .fill(Color(hex: "ffffff"))
                     .frame(width: 14)
             }
         }

@@ -83,7 +83,7 @@ struct HeaderView: View {
             
             VStack(alignment: .leading, spacing: 0) {
                 Text(cart.name)
-                    .shantellSansFont(22)
+                    .fuzzyBubblesFont(22, weight: .bold)
                     .foregroundColor(.black)
                     .padding(.bottom, 6)
                 

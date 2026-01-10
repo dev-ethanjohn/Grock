@@ -113,7 +113,7 @@ private struct MainRowContent: View {
     
     private func scheduleDebouncedUpdate(animated: Bool = false, delay: TimeInterval = 0.05) {
         pendingUpdateWorkItem?.cancel()
-        let work = DispatchWorkItem { [weak vaultService] in
+        let work = DispatchWorkItem {
             updateDerivedValues(animated: animated)
         }
         pendingUpdateWorkItem = work

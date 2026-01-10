@@ -53,6 +53,25 @@ struct ActiveCarts: View {
                         cart: cart,
                         vaultService: viewModel.getVaultService(for: cart)
                     )
+                    .contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: 24))
+                    .contextMenu {
+                        Button {
+                            onRenameCart(cart) // Use callback
+                        } label: {
+                            Label("Rename Cart", systemImage: "pencil")
+                        }
+                        
+                        Button(role: .destructive) {
+                            onDeleteCart(cart) // Use callback
+                        } label: {
+                            Label("Delete Cart", systemImage: "trash")
+                        }
+                    }
+                    .onLongPressGesture {
+                        // Optional: Provide haptic feedback on long press
+                        let generator = UIImpactFeedbackGenerator(style: .medium)
+                        generator.impactOccurred()
+                    }
                 }
                 .buttonStyle(.plain)
                 .listRowSeparator(.hidden)
@@ -72,24 +91,6 @@ struct ActiveCarts: View {
                         .delay(Double(index) * 0.05),
                     value: viewModel.displayedCarts.count
                 )
-                .contextMenu {
-                    Button {
-                        onRenameCart(cart) // Use callback
-                    } label: {
-                        Label("Rename Cart", systemImage: "pencil")
-                    }
-                    
-                    Button(role: .destructive) {
-                        onDeleteCart(cart) // Use callback
-                    } label: {
-                        Label("Delete Cart", systemImage: "trash")
-                    }
-                }
-                .onLongPressGesture {
-                    // Optional: Provide haptic feedback on long press
-                    let generator = UIImpactFeedbackGenerator(style: .medium)
-                    generator.impactOccurred()
-                }
                 .padding(.horizontal)
             }
         }

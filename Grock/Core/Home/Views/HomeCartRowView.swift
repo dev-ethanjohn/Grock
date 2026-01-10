@@ -101,7 +101,7 @@ struct HomeCartRowView: View {
     }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 20) {
             headerRow
             progressSection
         }
@@ -149,7 +149,8 @@ struct HomeCartRowView: View {
         .overlay(
             // Border always visible (on top)
             RoundedRectangle(cornerRadius: 24)
-                .stroke(Color(hex: "CACACA"), lineWidth: 1)
+//                .stroke(Color(hex: "CACACA"), lineWidth: 1)
+                .stroke(Color.black, lineWidth: 0.3)
         )
         .scaleEffect(appeared ? 1.0 : 0.95)
         .opacity(appeared ? 1.0 : 0)
@@ -204,7 +205,7 @@ struct HomeCartRowView: View {
     private var headerRow: some View {
         HStack(alignment: .top) {
             Text(cart.name)
-                .shantellSansFont(18)
+                .fuzzyBubblesFont(18, weight: .bold)
                 .foregroundColor(hasBackgroundImage ? .white : .black)
                 .offset(y: -4)
             
