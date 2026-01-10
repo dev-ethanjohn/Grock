@@ -3,7 +3,7 @@ import SwiftData
 
 struct StoreSectionListView: View {
     let store: String
-    let items: [(cartItem: CartItem, item: Item?)] // This is a constant, not a function
+    let items: [(cartItem: CartItem, item: Item?)]
     let cart: Cart
     let onFulfillItem: (CartItem) -> Void
     let onEditItem: (CartItem) -> Void
@@ -15,120 +15,70 @@ struct StoreSectionListView: View {
     
     @State private var animatingOutSkippedItems: Set<String> = []
     
-    // FIXED: Proper filtering and sorting for items
+    // FIXED: Remove the old parameters and use stateManager instead
+    
     private var displayItems: [(cartItem: CartItem, item: Item?)] {
         let filteredItems = items.filter { cartItem, _ in
-            // Always exclude items with quantity <= 0
-            guard cartItem.quantity > 0 else {
-                return false
-            }
+            guard cartItem.quantity > 0 else { return false }
             
-            // Filter based on cart status
             switch cart.status {
             case .planning:
-                // In planning mode: show all items with quantity > 0
                 return true
-                
             case .shopping:
-                // In shopping mode: show only unfulfilled, non-skipped items
                 return !cartItem.isFulfilled &&
                        (!cartItem.isSkippedDuringShopping || animatingOutSkippedItems.contains(cartItem.itemId))
-                
             case .completed:
-                // In completed mode: show all items
                 return true
             }
         }
         
-        // DEBUG: Print timestamps to verify
-        #if DEBUG
-        for (cartItem, item) in filteredItems {
-            print("📅 Item: \(item?.name ?? cartItem.shoppingOnlyName ?? "Unknown"), addedAt: \(cartItem.addedAt)")
-        }
-        #endif
-        
-        // FIX: Sort items by addedAt (newest first) for consistent display
-        return filteredItems.sorted {
-            // Sort by addedAt in descending order (newest first)
-            $0.cartItem.addedAt > $1.cartItem.addedAt
-        }
+        return filteredItems.sorted { $0.cartItem.addedAt > $1.cartItem.addedAt }
     }
     
-    // ADD THIS: Track item count changes for animation
-    @State private var previousDisplayCount: Int = 0
-    
     var body: some View {
-        // Only show section if there are items to display
         if !displayItems.isEmpty {
-              Section(
-                  header: StoreSectionHeader(store: store),
-                  content: {
-                      ForEach(Array(displayItems.enumerated()), id: \.element.cartItem.itemId) { index, tuple in
-                          StoreSectionRow(
-                              index: index,
-                              tuple: tuple,
-                              cart: cart,
-                              displayItems: displayItems,
-                              onFulfillItem: onFulfillItem,
-                              onEditItem: onEditItem,
-                              onDeleteItem: onDeleteItem,
-                              handleSkipItem: handleSkipItem
-                          )
-                      }
-                  }
-              )
-              .listSectionSpacing(isLastStore ? 0 : 20)
-              // Smoother animation aligned with list height animation
-              .animation(.spring(response: 0.5, dampingFraction: 0.88), value: displayItems.count)
-              .onAppear {
-                  previousDisplayCount = displayItems.count
-              }
+            Section(
+                header: StoreSectionHeader(store: store),
+                content: {
+                    ForEach(Array(displayItems.enumerated()), id: \.element.cartItem.itemId) { index, tuple in
+                        StoreSectionRow(
+                            index: index,
+                            tuple: tuple,
+                            cart: cart,
+                            displayItems: displayItems,
+                            onFulfillItem: onFulfillItem,
+                            onEditItem: onEditItem,
+                            onDeleteItem: onDeleteItem,
+                            handleSkipItem: handleSkipItem
+                        )
+                    }
+                }
+            )
+            .listSectionSpacing(isLastStore ? 0 : 20)
+            // Use simple animation to prevent lag
+            .animation(.easeInOut(duration: 0.25), value: displayItems.count)
         }
     }
     
     private func handleSkipItem(_ cartItem: CartItem) {
-        // Add to animating set
         animatingOutSkippedItems.insert(cartItem.itemId)
         
-        // Use smoother animation aligned with list height animation
-        withAnimation(.spring(response: 0.5, dampingFraction: 0.88)) {
+        withAnimation(.easeInOut(duration: 0.25)) {
             cartItem.isSkippedDuringShopping = true
             cartItem.isFulfilled = false
-            vaultService.updateCartTotals(cart: cart)
+            // DON'T update totals immediately during animation
         }
         
-        // Remove from animating set after animation completes
+        // Update totals AFTER animation completes
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+            measurePerformance(name: "SkipItem_UpdateTotals", context: "Item: \(cartItem.itemId)") {
+                vaultService.updateCartTotals(cart: cart)
+            }
+        }
+        
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             animatingOutSkippedItems.remove(cartItem.itemId)
         }
-    }
-}
-
-private struct StoreSectionHeader: View {
-    let store: String
-    
-    var body: some View {
-        VStack(spacing: 0) {
-            HStack {
-                HStack(spacing: 2) {
-                    Image(systemName: "storefront") // Using SF Symbol instead of custom image
-                        .font(.system(size: 10))
-                        .foregroundColor(.white)
-                    
-                    Text(store)
-                        .lexendFont(11, weight: .bold)
-                }
-                .foregroundColor(.white)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(Color.black)
-                .cornerRadius(6)
-                Spacer()
-            }
-            .padding(.leading)
-        }
-        .listRowInsets(EdgeInsets())
-        .textCase(nil)
     }
 }
 
@@ -145,22 +95,9 @@ private struct StoreSectionRow: View {
     @Environment(VaultService.self) private var vaultService
     @Environment(CartStateManager.self) private var stateManager
     
-    // Helper to determine item type
-    private var isShoppingOnlyItem: Bool {
-        tuple.cartItem.isShoppingOnlyItem
-    }
-    
-    private var isSkipped: Bool {
-        tuple.cartItem.isSkippedDuringShopping
-    }
-    
-    private var isFulfilled: Bool {
-        tuple.cartItem.isFulfilled
-    }
-    
-    private var hasQuantity: Bool {
-        tuple.cartItem.quantity > 0
-    }
+    private var isShoppingOnlyItem: Bool { tuple.cartItem.isShoppingOnlyItem }
+    private var isSkipped: Bool { tuple.cartItem.isSkippedDuringShopping }
+    private var isFulfilled: Bool { tuple.cartItem.isFulfilled }
     
     var body: some View {
         VStack(spacing: 0) {
@@ -191,44 +128,30 @@ private struct StoreSectionRow: View {
         .listRowInsets(EdgeInsets())
         .listRowSeparator(.hidden)
         .listRowBackground(stateManager.effectiveRowBackgroundColor)
-        .transition(.asymmetric(
-            insertion: .opacity.combined(with: .move(edge: .top)),
-            removal: .opacity
-                .combined(with: .scale(scale: 0.9, anchor: .center))
-                .combined(with: .offset(x: -50, y: 0)) // ⬅️ Slide left while shrinking
-        ))
-        // Smoother animation aligned with list height animation
-        .animation(.spring(response: 0.5, dampingFraction: 0.88), value: isSkipped)
+        // Disable animations during scroll for better performance
+        .transition(.opacity)
+        .animation(nil, value: isSkipped)
     }
     
-    // In StoreSectionRow's swipeActionsContent:
     @ViewBuilder
     private var swipeActionsContent: some View {
         if cart.isShopping {
-            // SHOPPING MODE SWIPE ACTIONS
-            
             if isShoppingOnlyItem {
-                // SHOPPING-ONLY ITEMS: Delete action
                 Button(role: .destructive) {
                     deleteShoppingOnlyItem()
                 } label: {
                     Label("Delete", systemImage: "trash")
                 }
                 .tint(.red)
-                
             } else if tuple.cartItem.addedDuringShopping {
-                // VAULT ITEMS ADDED DURING SHOPPING: Deactivate action (not delete)
                 Button {
                     deactivateVaultItemAddedDuringShopping()
                 } label: {
                     Label("Remove", systemImage: "minus.circle")
                 }
-                .tint(.orange) // Orange instead of red to indicate deactivation, not deletion
-                
+                .tint(.orange)
             } else {
-                // PLANNED VAULT ITEMS (in cart before shopping started)
                 if isSkipped {
-                    // Skipped planned item: "Add Back" action
                     Button {
                         addBackSkippedItem()
                     } label: {
@@ -236,7 +159,6 @@ private struct StoreSectionRow: View {
                     }
                     .tint(.green)
                 } else if isFulfilled {
-                    // Fulfilled planned item: "Mark Unfulfilled" action
                     Button {
                         markUnfulfilled()
                     } label: {
@@ -244,7 +166,6 @@ private struct StoreSectionRow: View {
                     }
                     .tint(.orange)
                 } else {
-                    // Active unfulfilled planned item: "Skip" action
                     Button {
                         handleSkipItem(tuple.cartItem)
                     } label: {
@@ -254,7 +175,6 @@ private struct StoreSectionRow: View {
                 }
             }
         } else {
-            // PLANNING MODE SWIPE ACTIONS (same for all)
             Button(role: .destructive) {
                 onDeleteItem(tuple.cartItem)
             } label: {
@@ -263,7 +183,6 @@ private struct StoreSectionRow: View {
             .tint(.red)
         }
         
-        // EDIT ACTION (available for all item types in all modes)
         Button {
             onEditItem(tuple.cartItem)
         } label: {
@@ -273,14 +192,10 @@ private struct StoreSectionRow: View {
     }
 
     private func deactivateVaultItemAddedDuringShopping() {
-        print("🔄 Deactivating vault item added during shopping: \(tuple.item?.name ?? "Unknown")")
-        
-        // Set quantity to 0 instead of removing
         tuple.cartItem.quantity = 0
-        tuple.cartItem.isSkippedDuringShopping = false // Not skipped, just deactivated
+        tuple.cartItem.isSkippedDuringShopping = false
         vaultService.updateCartTotals(cart: cart)
         
-        // Send notification
         NotificationCenter.default.post(
             name: NSNotification.Name("ShoppingDataUpdated"),
             object: nil,
@@ -288,50 +203,64 @@ private struct StoreSectionRow: View {
         )
     }
 
-    private func deleteVaultItemAddedDuringShopping() {
-        print("🔄 Deactivating vault item added during shopping: \(tuple.item?.name ?? "Unknown")")
-        
-        // Instead of deleting, set quantity to 0
-        if let cartItem = cart.cartItems.first(where: { $0.itemId == tuple.cartItem.itemId }) {
-            cartItem.quantity = 0
-            cartItem.isSkippedDuringShopping = false // Not skipped, just deactivated
-            vaultService.updateCartTotals(cart: cart)
-            
-            print("   Deactivated vault item: quantity set to 0")
-            
-            // Send notification to refresh UI
-            NotificationCenter.default.post(
-                name: NSNotification.Name("ShoppingDataUpdated"),
-                object: nil,
-                userInfo: ["cartItemId": cart.id]
-            )
-        }
-    }
-    
-    // MARK: - Action Handlers
-    
     private func deleteShoppingOnlyItem() {
-        print("🗑️ Deleting shopping-only item via swipe: \(tuple.cartItem.shoppingOnlyName ?? "Unknown")")
-        
-        // Simply call the standard delete handler
-        // The parent view will handle the refresh
         onDeleteItem(tuple.cartItem)
     }
     
     private func addBackSkippedItem() {
-        // Use smoother animation aligned with list height animation
-        withAnimation(.spring(response: 0.5, dampingFraction: 0.88)) {
+        withAnimation(.easeInOut(duration: 0.25)) {
             tuple.cartItem.isSkippedDuringShopping = false
             tuple.cartItem.quantity = max(1, tuple.cartItem.originalPlanningQuantity ?? 1)
-            vaultService.updateCartTotals(cart: cart)
+            // Don't update totals immediately
+        }
+        
+        // Update totals after animation
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+            measurePerformance(name: "AddBackItem_UpdateTotals", context: "Item: \(tuple.cartItem.itemId)") {
+                vaultService.updateCartTotals(cart: cart)
+            }
         }
     }
     
     private func markUnfulfilled() {
-        // Use smoother animation aligned with list height animation
-        withAnimation(.spring(response: 0.5, dampingFraction: 0.88)) {
+        withAnimation(.easeInOut(duration: 0.25)) {
             tuple.cartItem.isFulfilled = false
-            vaultService.updateCartTotals(cart: cart)
+            // Don't update totals immediately
         }
+        
+        // Update totals after animation
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+            measurePerformance(name: "MarkUnfulfilled_UpdateTotals", context: "Item: \(tuple.cartItem.itemId)") {
+                vaultService.updateCartTotals(cart: cart)
+            }
+        }
+    }
+}
+
+private struct StoreSectionHeader: View {
+    let store: String
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                HStack(spacing: 2) {
+                    Image(systemName: "storefront")
+                        .font(.system(size: 10))
+                        .foregroundColor(.white)
+                    
+                    Text(store)
+                        .lexendFont(11, weight: .bold)
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Color.black)
+                .cornerRadius(6)
+                Spacer()
+            }
+            .padding(.leading)
+        }
+        .listRowInsets(EdgeInsets())
+        .textCase(nil)
     }
 }
