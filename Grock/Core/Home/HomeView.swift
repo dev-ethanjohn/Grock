@@ -54,7 +54,7 @@ struct HomeView: View {
     var body: some View {
         NavigationStack {
             ZStack(alignment: .top) {
-                Color(hex: "#f7f7f7").ignoresSafeArea()
+                Color(hex: "#e0e0e0").ignoresSafeArea()
                 
                 MenuView()
                     .opacity(viewModel.showMenu ? 1 : 0)
@@ -79,8 +79,6 @@ struct HomeView: View {
                         onSave: { newName in
                             cartToRename.name = newName
                             vaultService.updateCartTotals(cart: cartToRename)
-                            // Refresh the UI
-                            cartRefreshTrigger = UUID()
                             self.cartToRename = nil
                         },
                         onDismiss: {
@@ -137,7 +135,6 @@ struct HomeView: View {
                     .environment(cartStateManager) // ADD THIS LINE - Pass CartStateManager
                     .onDisappear {
                         viewModel.loadCarts()
-                        cartRefreshTrigger = UUID()
                         
                         if viewModel.pendingCartToShow != nil {
                             viewModel.completePendingCartDisplay()
@@ -179,7 +176,6 @@ struct HomeView: View {
             
             ActiveCarts(
                 viewModel: viewModel,
-                refreshTrigger: cartRefreshTrigger,
                 onDeleteCart: { cart in
                     cartToDelete = cart
                     showingDeleteAlert = true
@@ -498,9 +494,7 @@ struct HomeView: View {
     
     private func deleteCart(_ cart: Cart) {
         withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-            vaultService.deleteCart(cart)
-            // Refresh the UI
-            cartRefreshTrigger = UUID()
+            cartViewModel.deleteCart(cart)
         }
     }
     

@@ -128,9 +128,9 @@ private struct StoreSectionRow: View {
         .listRowInsets(EdgeInsets())
         .listRowSeparator(.hidden)
         .listRowBackground(stateManager.effectiveRowBackgroundColor)
-        // Disable animations during scroll for better performance
+        // Simple transition to prevent lag
         .transition(.opacity)
-        .animation(nil, value: isSkipped)
+        .animation(.easeInOut(duration: 0.25), value: isSkipped)
     }
     
     @ViewBuilder

@@ -4,7 +4,6 @@ import SwiftData
 struct ActiveCarts: View {
     @Environment(VaultService.self) private var vaultService
     @Bindable var viewModel: HomeViewModel
-    let refreshTrigger: UUID
     
     @State private var colorChangeTrigger = UUID()
     

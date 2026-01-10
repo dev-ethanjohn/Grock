@@ -2,7 +2,7 @@ import SwiftUI
 import SwiftData
 
 struct CartItemRowListView: View {
-    @Bindable var cartItem: CartItem
+    let cartItem: CartItem
     @State private var item: Item?
     let cart: Cart
     let onFulfillItem: () -> Void
@@ -39,6 +39,9 @@ struct CartItemRowListView: View {
             handleCartItemUpdate(notification)
         }
         .id("\(cartItem.itemId)_\(refreshTrigger)_\(item?.name ?? "")")
+        .trackPerformance(name: "CartItemRowListView_Redraw", context: "Item: \(cartItem.itemId)")
+        // Disable implicit animations during scroll for better performance
+        .animation(nil, value: refreshTrigger)
     }
     
     private func loadItem() {
@@ -75,7 +78,7 @@ struct CartItemRowListView: View {
 
 // MARK: - Main Row Content (Updated)
 private struct MainRowContent: View {
-    @Bindable var cartItem: CartItem
+    let cartItem: CartItem
     let item: Item?
     let cart: Cart
     let onFulfillItem: () -> Void
@@ -106,6 +109,16 @@ private struct MainRowContent: View {
     @State private var currentPrice: Double = 0
     @State private var currentTotalPrice: Double = 0
     @State private var displayUnit: String = ""
+    @State private var pendingUpdateWorkItem: DispatchWorkItem?
+    
+    private func scheduleDebouncedUpdate(animated: Bool = false, delay: TimeInterval = 0.05) {
+        pendingUpdateWorkItem?.cancel()
+        let work = DispatchWorkItem { [weak vaultService] in
+            updateDerivedValues(animated: animated)
+        }
+        pendingUpdateWorkItem = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
+    }
     
     init(cartItem: CartItem, item: Item?, cart: Cart, onFulfillItem: @escaping () -> Void, onEditItem: @escaping () -> Void, onDeleteItem: @escaping () -> Void, isLastItem: Bool, isFirstItem: Bool) {
         self.cartItem = cartItem
@@ -153,8 +166,8 @@ private struct MainRowContent: View {
             )
         }
         .opacity(rowOpacity)
-        // Smoother animation aligned with list height animation
-        .animation(.spring(response: 0.5, dampingFraction: 0.88), value: cart.isShopping)
+        // Disable implicit animation on scroll for smoother performance
+        .animation(nil, value: cart.isShopping)
         .contentShape(Rectangle())
         .onTapGesture {
             if !isFulfilling {
@@ -177,7 +190,7 @@ private struct MainRowContent: View {
             item: item,
             cart: cart,
             onUpdate: { animated in
-                updateDerivedValues(animated: animated)
+                scheduleDebouncedUpdate(animated: animated)
             }
         )
     }
@@ -229,7 +242,8 @@ private struct MainRowContent: View {
         
         let newQuantity = cartItem.quantity
         let newPrice = cartItem.getPrice(from: vault, cart: cart)
-        let newTotalPrice = cartItem.getTotalPrice(from: vault, cart: cart)
+        // Use direct access optimization
+        let newTotalPrice = newPrice * newQuantity
         let newUnit = cartItem.getUnit(from: vault, cart: cart)
         
         cartItem.syncQuantities(cart: cart)
@@ -476,7 +490,7 @@ private struct ItemNameRow: View {
             .id(item?.name ?? cartItem.shoppingOnlyName ?? "Unknown")
             .foregroundColor(stateManager.hasBackgroundImage ? .white.opacity(0.95) : .primary)
             .contentTransition(.numericText())
-            .animation(.spring(response: 0.5, dampingFraction: 0.7), value: currentQuantity)
+            .animation(nil, value: currentQuantity)
         
         baseText
     }
@@ -501,7 +515,7 @@ private struct ItemPriceRow: View {
                 .lexendFont(12)
                 .lineLimit(1)
                 .contentTransition(.numericText())
-                .animation(.spring(response: 0.5, dampingFraction: 0.7), value: currentPrice)
+                .animation(nil, value: currentPrice)
                 .foregroundColor(stateManager.hasBackgroundImage ? .white.opacity(0.9) : Color(hex: "231F30"))
             
             Spacer()
@@ -510,7 +524,7 @@ private struct ItemPriceRow: View {
                 .lexendFont(14, weight: .bold)
                 .lineLimit(1)
                 .contentTransition(.numericText())
-                .animation(.spring(response: 0.5, dampingFraction: 0.7), value: currentTotalPrice)
+                .animation(nil, value: currentTotalPrice)
                 .foregroundColor(stateManager.hasBackgroundImage ? .white : Color(hex: "231F30"))
         }
         .opacity(isItemFulfilled ? 0.5 : 1.0)
@@ -570,51 +584,52 @@ private extension View {
         onUpdate: @escaping (Bool) -> Void
     ) -> some View {
         self
+            // Throttle updates to avoid excessive redraws during scrolling
             .onChange(of: cartItem.plannedPrice) { oldValue, newValue in
-                if oldValue != newValue { onUpdate(true) }
+                if oldValue != newValue { onUpdate(false) } // No animation for scroll
             }
             .onChange(of: cartItem.plannedUnit) { oldValue, newValue in
-                if oldValue != newValue { onUpdate(true) }
+                if oldValue != newValue { onUpdate(false) }
             }
             .onChange(of: item?.name) { oldValue, newValue in
-                if oldValue != newValue { onUpdate(true) }
+                if oldValue != newValue { onUpdate(false) }
             }
             .onChange(of: cartItem.quantity) { oldValue, newValue in
-                if oldValue != newValue { onUpdate(true) }
+                if oldValue != newValue { onUpdate(false) }
             }
             .onChange(of: cartItem.actualPrice) { oldValue, newValue in
-                if oldValue != newValue { onUpdate(true) }
+                if oldValue != newValue { onUpdate(false) }
             }
             .onChange(of: cartItem.actualQuantity) { oldValue, newValue in
-                if oldValue != newValue { onUpdate(true) }
+                if oldValue != newValue { onUpdate(false) }
             }
             .onChange(of: cartItem.shoppingOnlyPrice) { oldValue, newValue in
-                if oldValue != newValue { onUpdate(true) }
+                if oldValue != newValue { onUpdate(false) }
             }
             .onChange(of: cartItem.isFulfilled) { oldValue, newValue in
-                if oldValue != newValue { onUpdate(true) }
+                if oldValue != newValue { onUpdate(true) } // Allow animation for fulfillment changes
             }
             .onChange(of: cartItem.isSkippedDuringShopping) { oldValue, newValue in
-                if oldValue != newValue { onUpdate(true) }
+                if oldValue != newValue { onUpdate(true) } // Allow animation for skip changes
             }
             .onChange(of: cart.status) { oldValue, newValue in
-                if oldValue != newValue { onUpdate(true) }
+                if oldValue != newValue { onUpdate(true) } // Allow animation for mode changes
             }
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ShoppingDataUpdated"))) { _ in
-                onUpdate(true)
+                onUpdate(false) // No animation for data updates during scroll
             }
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("CartItemUpdated"))) { notification in
                 if let userInfo = notification.userInfo,
                    let updatedItemId = userInfo["itemId"] as? String,
                    updatedItemId == cartItem.itemId {
-                    onUpdate(true)
+                    onUpdate(false) // No animation for updates during scroll
                 }
             }
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("VaultItemUpdated"))) { notification in
                 if let userInfo = notification.userInfo,
                    let updatedItemId = userInfo["itemId"] as? String,
                    updatedItemId == cartItem.itemId {
-                    onUpdate(true)
+                    onUpdate(false) // No animation for updates during scroll
                 }
             }
     }
