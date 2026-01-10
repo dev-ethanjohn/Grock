@@ -8,6 +8,7 @@
 import SwiftUI
 
 struct MenuView: View {
+    @State private var currencyManager = CurrencyManager.shared
     
     var body: some View {
         NavigationStack {
@@ -31,9 +32,43 @@ struct MenuView: View {
                 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
+                        
+                        // Currency Selector
+                        Menu {
+                            ForEach(currencyManager.availableCurrencies) { currency in
+                                Button {
+                                    currencyManager.setCurrency(currency)
+                                } label: {
+                                    if currency.code == currencyManager.selectedCurrency.code {
+                                        Label("\(currency.symbol) \(currency.code) - \(currency.name)", systemImage: "checkmark")
+                                    } else {
+                                        Text("\(currency.symbol) \(currency.code) - \(currency.name)")
+                                    }
+                                }
+                            }
+                        } label: {
+                            HStack(spacing: 16) {
+                                Image(systemName: "banknote")
+                                    .foregroundColor(Color(hex: "999"))
+                                    .frame(width: 24, height: 24, alignment: .leading)
+                                
+                                Text("Currency")
+                                    .font(.system(size: 16))
+                                    .fontWeight(.medium)
+                                    .foregroundColor(Color.black)
+                                
+                                Spacer()
+                                
+                                Text(currencyManager.selectedCurrency.code)
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.gray)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.vertical, 4)
+                        }
+                        
                         ForEach(MenuItem.userSettingsMenuItems) { item in
                             MenuRow(item: item)
-//                            Divider()
                         }
                         
                         Spacer()
