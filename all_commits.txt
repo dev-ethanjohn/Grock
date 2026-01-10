@@ -1,0 +1,141 @@
+5aac063 2025-09-27 21:55:38 +0800  Initial Commit
+19cb15b 2025-10-03 19:06:21 +0800  initial commit
+53798f7 2025-10-05 21:19:10 +0800  add addItem view
+f48a69e 2025-10-06 10:56:54 +0800  Implement item deletion of vault items
+58ea3dd 2025-10-06 16:54:26 +0800  Add fluid animation to category icon overlay when on switch
+0431ac7 2025-10-06 18:04:49 +0800  Replace stack to a ListView for native swipe action
+e3d4ea0 2025-10-07 01:17:22 +0800  add stepper to itemlistrow
+0ff63c0 2025-10-07 19:56:41 +0800  fix: resolve CartViewModel environment propagation crashes
+4b3f65c 2025-10-07 23:50:05 +0800  feat: implement dynamic stepper and better animation
+859dbb6 2025-10-08 09:39:17 +0800  feat: make tabbed navigation direction consistent between category switches
+5b241df 2025-10-08 16:26:54 +0800  feat: add edit sheet for individual vault items
+bd42fdd 2025-10-08 23:24:08 +0800  index on main: 5b241df feat: add edit sheet for individual vault items
+2e0d5e2 2025-10-08 23:24:08 +0800  (refs/stash) On main: WIP before going back
+e9b4f1d 2025-10-09 01:13:14 +0800  ensure categories is in order
+a72efa7 2025-10-09 10:56:14 +0800  refactor: setup service for shared vault logic
+85b4e28 2025-10-09 15:18:01 +0800  feat: sync create and update functions for vault items
+b8333ae 2025-10-09 19:54:44 +0800  fix: add Store model to persist stores independently in vault
+2ecdf9c 2025-10-10 09:48:46 +0800  style: improve animation
+ebd1993 2025-10-13 00:51:11 +0800  style: add cart preview UI
+6cab18f 2025-10-13 16:17:29 +0800  fix: cart preview slow dismiss animation
+30da8c9 2025-10-14 12:05:19 +0800  fix: cart preview popover
+0e5175e 2025-10-15 17:00:09 +0800  feat: improve homeview cartlist ui
+82b075f 2025-10-15 17:41:38 +0800  refactor: implement custom toolbar stack
+6ea36be 2025-10-17 23:59:04 +0800  refactor: remove unnecessary component duplicates to form fields
+9c2f2c7 2025-10-21 15:46:19 +0800  style: setup initial style for cart detail
+09a0164 2025-10-24 22:58:32 +0800  style: style listview
+149bf2e 2025-10-26 18:48:44 +0800  style: detail cart list
+b84ec8d 2025-10-27 17:18:51 +0800  fix: edit item sheet race condition conflict with navigation
+95afb3f 2025-10-28 21:23:24 +0800  improve onboarding flow
+fa6ba11 2025-10-29 01:18:28 +0800  fix: fix: persist cart selection across onboarding with shared ViewModel
+0e8c01e 2025-10-30 19:14:26 +0800  feat: sync cart detail active item data with vault
+3e14f73 2025-10-31 03:32:24 +0800  feat: add tooltip hint for category picker
+9cee4a4 2025-11-02 15:29:05 +0800  feat: add vault guide
+b9e8cb9 2025-11-03 17:59:25 +0800  fix: ensure reset animations for first view of vault
+adddfd9 2025-11-03 20:06:47 +0800  enhance store name textfield input handling and validation
+33cf248 2025-11-04 00:19:38 +0800  fix: ensure first cart celebration appears after app reset
+1767fac 2025-11-10 13:13:27 +0800  feat: add menu view
+2ebebff 2025-11-10 20:05:46 +0800  feat: add unit checkmarks
+fd8694f 2025-11-13 06:09:03 +0800  refactor: organize onboarding data flow with mvvm
+28f31e0 2025-11-13 09:15:51 +0800  clean: home files
+263661b 2025-11-14 11:47:01 +0800  feat: improve animation to Add Item popover
+11a3f6e 2025-11-14 18:15:47 +0800  fix: revert focusState loss on onboarding
+ea90183 2025-11-17 13:50:00 +0800  feat: implement text normalization for all form fields
+185237f 2025-11-18 18:37:38 +0800  feat: add error feedback to item fields
+9fa5f96 2025-11-18 21:26:20 +0800  feat: add shake to fields
+5955e20 2025-11-20 12:07:59 +0800  feat: improve UI
+d1739b6 2025-11-20 18:06:27 +0800  fix: layout issues
+6176240 2025-11-22 01:12:59 +0800  fix: ensure vault item rows do not shuffle on delete
+5fa0f8c 2025-11-23 16:29:52 +0800  feat: add duplicate checks to item name
+8ab7fef 2025-11-23 21:38:56 +0800  fix: real-time duplicate validation when store changes
+c56e2d4 2025-11-24 08:10:10 +0800  fix: badge count not updating when deleting active items
+f19be45 2025-11-25 10:03:27 +0800  fix: inconsistent gesture on switching list
+a51fef4 2025-11-26 19:55:41 +0800  refactor: use better vertical scroll layouting
+435e5d4 2025-11-26 20:43:18 +0800  fix: dismiss keyboard when vault sheet is dragged down
+02fbfef 2025-11-26 23:04:56 +0800  feat: add conditional text for long list of rows
+6cfe0b0 2025-11-28 12:25:32 +0800  refactor: optimize keyboard interaction and ui
+9aa89e5 2025-11-28 19:47:30 +0800  feat: improve vault interactions
+b36fae1 2025-11-29 10:13:17 +0800  feat: readd bottom message for long lists
+1e03547 2025-11-29 23:43:54 +0800  feat: add confirmation dialog when exiting vault while with active items
+ec18256 2025-11-30 12:57:18 +0800  feat: reveal empty cart row after detail screen dismissal
+5ad4cb3 2025-11-30 15:47:45 +0800  feat: the same transition applied from vault cart to home cart
+683c0a4 2025-11-30 21:18:14 +0800  feat: improve create cart popoveranimations
+48e4ebc 2025-12-02 17:42:07 +0800  fix(ui): tappable area on category icon inconsistent
+662a0d0 2025-12-04 15:45:04 +0800  refactor: replace introspect with keyboard publisher
+a36acbf 2025-12-04 16:34:10 +0800  enhance: better keyboard sycn with button toolbar
+eae9dab 2025-12-05 01:56:15 +0800  improve ui
+f668521 2025-12-05 02:13:27 +0800  minimize reanimation of chechmark during shopping state
+a9c6ed0 2025-12-05 10:27:02 +0800  fix: minimize view rebuilds to cart item rows
+dc5c59e 2025-12-05 18:35:16 +0800  fix: sync cart data
+ef43ea8 2025-12-05 20:57:55 +0800  feat: setup budget popover
+106b6fb 2025-12-05 23:23:48 +0800  fix(ui): allow manage cart button to flow at sync with budget popover
+5dab47f 2025-12-06 14:22:38 +0800  fix: remove portion to vaultitem
+d7d6da5 2025-12-06 19:20:35 +0800  fix: sync portion current data with editsheet portion field value
+605c520 2025-12-06 21:06:58 +0800  refactor: change custom swipe action with native swipe action api
+728b017 2025-12-07 21:51:28 +0800  feat: improve budget udpate animation
+290dd85 2025-12-08 01:24:11 +0800  fix: slow progress pill animation
+768bc31 2025-12-10 09:55:10 +0800  refactor: utilize list over scrollview for cart detail listview
+3fa35de 2025-12-10 15:10:26 +0800  feat: add finish trip action button
+aac2bb7 2025-12-11 15:40:43 +0800  feat: setup completed items popover
+d1b550a 2025-12-12 19:06:46 +0800  feat: setup completed item list sheet
+51044a3 2025-12-13 12:46:20 +0800  refactor: containerize completed sheet components
+4f69174 2025-12-13 15:09:47 +0800  fix: sync pill cart value for planning
+8d8326f 2025-12-15 16:13:01 +0800  feat: Add shopping mode edit popover
+1b0d987 2025-12-15 20:01:48 +0800  feat: setup placeholder message when all items on shopping mode were fulfilled
+fed7610 2025-12-16 10:21:24 +0800  fix: Shopping mode skip/fulfill properly filters items with animated height shrink
+1d335e7 2025-12-16 10:57:32 +0800  style: apply better animation for cart row view
+24f87b0 2025-12-16 13:20:09 +0800  fix: icon animation to item row
+5a18618 2025-12-17 00:16:04 +0800  feat: add fulfillment popover
+e2a6ea1 2025-12-17 15:37:28 +0800  remove completed sheet at bottom
+348d42b 2025-12-18 18:02:29 +0800  feat: add cart level date context
+bd7b58a 2025-12-18 18:39:47 +0800  feat: show unit abbreviations in button with detailed menu labels
+4536c0e 2025-12-19 01:56:06 +0800  feat: setup renamecart popover
+1ab0959 2025-12-19 16:24:42 +0800  feat: configure rename textfield for cart list
+038a6e6 2025-12-19 21:44:02 +0800  fix: connect manage cart vs vault system
+fc472de 2025-12-19 23:24:48 +0800  refactor: sort cart items by added date with newest at top
+ca5d105 2025-12-20 00:16:32 +0800  refactor: improve pill animation
+58ce908 2025-12-20 20:39:00 +0800  feat: setup add new items sheet for shopping cart state
+3b59ac0 2025-12-20 21:38:26 +0800  refactor: simplify manage cart state
+6aa65b7 2025-12-20 23:23:25 +0800  refactor: ensure cart planning and shopping context are separate
+3c5fd95 2025-12-21 01:39:04 +0800  fix: update manage list view after adding new store in the same category
+6a8dd7e 2025-12-21 15:49:47 +0800  feat: Add smooth numeric animations for cart item updates
+7ea5473 2025-12-22 16:55:27 +0800  feat: setup shopping status summary
+5ea0f74 2025-12-23 12:03:54 +0800  feat: setup completed sheet
+9bd3c2b 2025-12-23 13:10:09 +0800  fix: sync shopping and vault item changes on list view
+39c1c0a 2025-12-24 14:02:41 +0800  clean: provide consistent font pattern
+e4f6dea 2025-12-24 22:15:20 +0800  feat: provide sliding navigation to add new items sheet
+a893f4d 2025-12-26 00:12:00 +0800  style: improve add new item cart sheet UI
+67addf6 2025-12-27 18:00:36 +0800  feat: setup temporary browse vault page
+973c748 2025-12-28 19:21:16 +0800  feat: ensure focusis supported to items in browsevault list
+bbae6ef 2025-12-29 09:35:04 +0800  fix: allow same item name with different stores (case-insensitive)
+00ec319 2025-12-29 11:19:15 +0800  style: apply animation to browse vault item that gets removed
+0c63080 2025-12-30 11:03:11 +0800  style: improve browse vault toolbar ui
+8335f70 2025-12-31 14:10:37 +0800  feat: readd done button
+fc4cf56 2026-01-01 11:01:15 +0800  fix: sync items data from planning to actual shopping flow
+8ebc1b1 2026-01-01 11:03:36 +0800  fix: sync items data from planning to actual shopping flow
+88ed889 2026-01-02 00:01:26 +0800  fix: cart item updates not reflecting in UI after edit
+0717598 2026-01-02 15:04:03 +0800  feat: apply new badge for shopping items
+40a2be3 2026-01-02 23:30:35 +0800  style: apply persistence to new badge
+10cdd6d 2026-01-03 00:43:06 +0800  fix: ensure newly added items to planning cart is displayed top to bottom
+c7d68fe 2026-01-03 13:15:28 +0800  feat: add new badge
+9e68383 2026-01-03 19:29:03 +0800  sync browse vault with itemslist active data
+d6415c2 2026-01-03 23:29:16 +0800  sync BrowseVaultItemRow quantity logic with VaultItemRow behavior
+20616ed 2026-01-04 00:43:51 +0800  feat: add alert before removing a shopping item via browse vault view list
+4250287 2026-01-04 01:14:23 +0800  feat:provide portion field
+a276605 2026-01-04 08:31:07 +0800  fix: fulfilled items total now calculates price × quantity not just price
+ab29795 2026-01-04 14:39:36 +0800  setup finish trip sheet
+cc4d76f 2026-01-04 15:09:50 +0800  fix: use total fulfilled value over cart value for finish trip analysis
+b040638 2026-01-04 23:12:09 +0800  feat: setup list background picker
+34d44a5 2026-01-05 10:42:09 +0800  feat: setup image background support for listview
+df252b5 2026-01-05 16:42:56 +0800  feat: apply texture to image background on the list container
+5200a69 2026-01-06 14:16:58 +0800  refactor: move UI state bindings from CartDetailScreen to CartStateManager
+9d86932 2026-01-06 23:08:46 +0800  style: improve ui ux of cartdetail on shopping
+403a08b 2026-01-07 17:47:34 +0800  fix: unrecognized catgeory for shopping items
+0b0bebb 2026-01-08 08:40:07 +0800  feat: apply active gradient to shopping mode carts
+fd0f6a0 2026-01-08 21:20:16 +0800  feat: setup userame prompt after onboarding
+01f528d 2026-01-08 23:38:16 +0800  refactor: convert nameentry field to a sheet
+520e025 2026-01-09 17:32:16 +0800  refactor: make homeview UI more easy and approachable
+ca4888c 2026-01-09 20:31:38 +0800  refactor: transfer currency tab to menu view
+b079a22 2026-01-10 00:21:21 +0800  feat: apply glowing graident to itemslistview
+c833013 2026-01-10 00:34:34 +0800  revert to having o gradient applied to itemslistview
+b62a38f 2026-01-10 08:44:44 +0800  (HEAD -> main, origin/main, backup-latest) fix: sync all currencies
