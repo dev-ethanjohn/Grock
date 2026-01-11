@@ -99,6 +99,8 @@ private struct StoreSectionRow: View {
     private var isSkipped: Bool { tuple.cartItem.isSkippedDuringShopping }
     private var isFulfilled: Bool { tuple.cartItem.isFulfilled }
     
+    @State private var rowSlideOffset: CGFloat = 0
+    
     var body: some View {
         VStack(spacing: 0) {
             CartItemRowListView(
@@ -125,12 +127,24 @@ private struct StoreSectionRow: View {
                     .padding(.horizontal, 12)
             }
         }
+        .offset(x: rowSlideOffset)
+        .opacity(max(0, 1.0 - (Double(abs(rowSlideOffset)) / 100.0)))
+         .onChange(of: isSkipped) { oldValue, newValue in
+             if newValue {
+                 // Slide out when skipped
+                 withAnimation(.easeOut(duration: 0.3)) {
+                     rowSlideOffset = 100
+                 }
+             } else {
+                 // Slide back when unskipped
+                 withAnimation(.easeOut(duration: 0.3)) {
+                     rowSlideOffset = 0
+                 }
+             }
+         }
         .listRowInsets(EdgeInsets())
         .listRowSeparator(.hidden)
         .listRowBackground(stateManager.effectiveRowBackgroundColor)
-        // Simple transition to prevent lag
-        .transition(.opacity)
-        .animation(.easeInOut(duration: 0.25), value: isSkipped)
     }
     
     @ViewBuilder

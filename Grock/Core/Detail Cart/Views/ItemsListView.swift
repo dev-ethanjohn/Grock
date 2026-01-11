@@ -310,15 +310,13 @@ private struct ItemsListContent: View {
                 ShoppingProgressSummary(cart: cart)
                     .presentationCornerRadius(24)
                     .environment(vaultService)
-                    .transition(
-                        .asymmetric(
-                            insertion: .opacity
-                                .combined(with: .move(edge: .bottom))
-                                .combined(with: .scale(scale: 0.95, anchor: .bottom)),
-                            removal: .opacity
-                                .combined(with: .move(edge: .bottom))
+                    .transition(.asymmetric(
+                        insertion: .opacity,
+                        removal: .modifier(
+                            active: ReverseCharacterRevealModifier(progress: 0),
+                            identity: ReverseCharacterRevealModifier(progress: 1)
                         )
-                    )
+                    ))
                     .offset(y: stateManager.hasBackgroundImage ? 0 : 4)
             }
         }

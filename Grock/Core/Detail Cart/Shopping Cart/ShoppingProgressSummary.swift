@@ -7,7 +7,6 @@ struct ShoppingProgressSummary: View {
     @Environment(VaultService.self) private var vaultService
     
     @State private var showCompletedItemsSheet = false
-    @State private var currencyManager = CurrencyManager.shared
     
     // Total items includes ALL active items (vault items + shopping-only items with quantity > 0)
     // Total items includes ONLY ACTIVE items (non-skipped, non-deleted)
@@ -38,43 +37,41 @@ struct ShoppingProgressSummary: View {
     }
     
     
+    // Fulfilled items: only vault items that are fulfilled
     private var fulfilledItems: Int {
         cart.cartItems.filter { cartItem in
-            // Include ALL items (both vault and shopping-only) that are fulfilled
-            cartItem.isFulfilled &&
-            cartItem.quantity > 0  // Still in cart
+            !cartItem.isShoppingOnlyItem &&  // Only vault items
+            cartItem.isFulfilled &&          // Marked as fulfilled
+            cartItem.quantity > 0            // Still in cart
         }.count
     }
-     
     
     private var fulfilledItemsTotal: String {
-        guard let vault = vaultService.vault else {
-            let selectedCurrency = currencyManager.selectedCurrency
-            let numberFormatter = NumberFormatter()
-            numberFormatter.numberStyle = .decimal
-            numberFormatter.minimumFractionDigits = 2
-            numberFormatter.maximumFractionDigits = 2
-            
-            let formattedAmount = numberFormatter.string(from: NSNumber(value: 0)) ?? "0.00"
-            return "\(selectedCurrency.symbol)\(formattedAmount)"
-        }
-        
         let fulfilledTotal = cart.cartItems
             .filter { cartItem in
+                // Only include items that are still in cart (quantity > 0)
                 cartItem.quantity > 0 && cartItem.isFulfilled
             }
             .reduce(0.0) { total, cartItem in
-                total + cartItem.getTotalPrice(from: vault, cart: cart)
+                if cartItem.isShoppingOnlyItem {
+                    return total + (cartItem.shoppingOnlyPrice ?? 0)
+                } else {
+                    let actualPrice = cartItem.actualPrice ?? 0
+                    return total + actualPrice
+                }
             }
         
-        let selectedCurrency = currencyManager.selectedCurrency
-        let numberFormatter = NumberFormatter()
-        numberFormatter.numberStyle = .decimal
-        numberFormatter.minimumFractionDigits = 2
-        numberFormatter.maximumFractionDigits = 2
+        return formatCurrency(amount: fulfilledTotal)
+    }
+    
+    private func formatCurrency(amount: Double) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.locale = Locale.current
+        formatter.currencyCode = CurrencyManager.shared.selectedCurrency.code
+        formatter.currencySymbol = CurrencyManager.shared.selectedCurrency.symbol
         
-        let formattedAmount = numberFormatter.string(from: NSNumber(value: fulfilledTotal)) ?? String(format: "%.2f", fulfilledTotal)
-        return "\(selectedCurrency.symbol)\(formattedAmount)"
+        return formatter.string(from: NSNumber(value: amount)) ?? "\(CurrencyManager.shared.selectedCurrency.symbol)\(String(format: "%.2f", amount))"
     }
     
     @State private var pulseOpacity = 0.0
@@ -95,8 +92,6 @@ struct ShoppingProgressSummary: View {
                     text: "\(fulfilledItems)/\(totalItems) items fulfilled, totalling \(fulfilledItemsTotal)",
                     delay: 0.15
                 )
-                // Add currency code to ID to trigger re-creation when currency changes
-                .id("reveal-\(fulfilledItems)-\(totalItems)-\(fulfilledItemsTotal)-\(currencyManager.selectedCurrency.code)")
                 .fuzzyBubblesFont(13, weight: .bold)
                 .foregroundColor(Color(hex: "717171"))
                 
@@ -128,10 +123,6 @@ struct ShoppingProgressSummary: View {
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
             .presentationCornerRadius(24)
-        }
-        .onChange(of: CurrencyManager.shared.selectedCurrency) { oldValue, newValue in
-            // When currency changes, update the local state to trigger view refresh
-            currencyManager = CurrencyManager.shared
         }
     }
     
@@ -218,5 +209,32 @@ struct CharacterRevealView: View {
             .delay(delay + 0.5),
             value: isAnimating
         )
+    }
+}
+
+
+
+struct ReverseCharacterRevealModifier: ViewModifier, Animatable {
+    var progress: Double
+    
+    var animatableData: Double {
+        get { progress }
+        set { progress = newValue }
+    }
+    
+    private var safeProgress: Double {
+        max(0, min(1, progress))
+    }
+    
+    func body(content: Content) -> some View {
+        content
+            .mask(
+                GeometryReader { geometry in
+                    Rectangle()
+                        .frame(width: max(0, geometry.size.width * CGFloat(safeProgress)))
+                        .frame(maxHeight: .infinity, alignment: .leading)
+                }
+            )
+            .opacity(safeProgress > 0.1 ? 1 : 0)
     }
 }
