@@ -1,6 +1,9 @@
 import SwiftUI
 import SwiftData
 
+import SwiftUI
+import SwiftData
+
 struct StoreSectionListView: View {
     let store: String
     let items: [(cartItem: CartItem, item: Item?)]
@@ -14,6 +17,7 @@ struct StoreSectionListView: View {
     @Environment(CartStateManager.self) private var stateManager
     
     @State private var animatingOutSkippedItems: Set<String> = []
+    @State private var skippedItemOffsets: [String: CGFloat] = [:] // Track offsets per item
     
     // FIXED: Remove the old parameters and use stateManager instead
     
@@ -49,7 +53,8 @@ struct StoreSectionListView: View {
                             onFulfillItem: onFulfillItem,
                             onEditItem: onEditItem,
                             onDeleteItem: onDeleteItem,
-                            handleSkipItem: handleSkipItem
+                            handleSkipItem: handleSkipItem,
+                            rowOffset: skippedItemOffsets[tuple.cartItem.itemId] ?? 0 // Pass offset
                         )
                     }
                 }
@@ -63,10 +68,17 @@ struct StoreSectionListView: View {
     private func handleSkipItem(_ cartItem: CartItem) {
         animatingOutSkippedItems.insert(cartItem.itemId)
         
-        withAnimation(.easeInOut(duration: 0.25)) {
-            cartItem.isSkippedDuringShopping = true
-            cartItem.isFulfilled = false
-            // DON'T update totals immediately during animation
+        // Start slide animation
+        withAnimation(.easeOut(duration: 0.3)) {
+            skippedItemOffsets[cartItem.itemId] = 100
+        }
+        
+        // Update skip state after a tiny delay (so animation starts first)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            withAnimation(.easeOut(duration: 0.25)) {
+                cartItem.isSkippedDuringShopping = true
+                cartItem.isFulfilled = false
+            }
         }
         
         // Update totals AFTER animation completes
@@ -76,8 +88,31 @@ struct StoreSectionListView: View {
             }
         }
         
+        // Remove from display after animation
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             animatingOutSkippedItems.remove(cartItem.itemId)
+            skippedItemOffsets.removeValue(forKey: cartItem.itemId)
+        }
+    }
+    
+    // Add this function to handle "Add Back"
+    private func handleAddBackSkippedItem(_ cartItem: CartItem) {
+        // Reset offset
+        withAnimation(.easeOut(duration: 0.3)) {
+            skippedItemOffsets[cartItem.itemId] = 0
+        }
+        
+        // Update skip state
+        withAnimation(.easeOut(duration: 0.25)) {
+            cartItem.isSkippedDuringShopping = false
+            cartItem.quantity = max(1, cartItem.originalPlanningQuantity ?? 1)
+        }
+        
+        // Update totals after animation
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+            measurePerformance(name: "AddBackItem_UpdateTotals", context: "Item: \(cartItem.itemId)") {
+                vaultService.updateCartTotals(cart: cart)
+            }
         }
     }
 }
@@ -91,6 +126,7 @@ private struct StoreSectionRow: View {
     let onEditItem: (CartItem) -> Void
     let onDeleteItem: (CartItem) -> Void
     let handleSkipItem: (CartItem) -> Void
+    let rowOffset: CGFloat // Receive offset from parent
     
     @Environment(VaultService.self) private var vaultService
     @Environment(CartStateManager.self) private var stateManager
@@ -98,8 +134,6 @@ private struct StoreSectionRow: View {
     private var isShoppingOnlyItem: Bool { tuple.cartItem.isShoppingOnlyItem }
     private var isSkipped: Bool { tuple.cartItem.isSkippedDuringShopping }
     private var isFulfilled: Bool { tuple.cartItem.isFulfilled }
-    
-    @State private var rowSlideOffset: CGFloat = 0
     
     var body: some View {
         VStack(spacing: 0) {
@@ -127,21 +161,8 @@ private struct StoreSectionRow: View {
                     .padding(.horizontal, 12)
             }
         }
-        .offset(x: rowSlideOffset)
-        .opacity(max(0, 1.0 - (Double(abs(rowSlideOffset)) / 100.0)))
-         .onChange(of: isSkipped) { oldValue, newValue in
-             if newValue {
-                 // Slide out when skipped
-                 withAnimation(.easeOut(duration: 0.3)) {
-                     rowSlideOffset = 100
-                 }
-             } else {
-                 // Slide back when unskipped
-                 withAnimation(.easeOut(duration: 0.3)) {
-                     rowSlideOffset = 0
-                 }
-             }
-         }
+        .offset(x: rowOffset) // Apply the offset from parent
+        .opacity(max(0, 1.0 - (Double(abs(rowOffset)) / 100.0))) // Fade as it slides
         .listRowInsets(EdgeInsets())
         .listRowSeparator(.hidden)
         .listRowBackground(stateManager.effectiveRowBackgroundColor)
@@ -167,7 +188,11 @@ private struct StoreSectionRow: View {
             } else {
                 if isSkipped {
                     Button {
-                        addBackSkippedItem()
+                        // We need to pass this back to the parent to handle the offset
+                        // For now, just reset the item
+                        tuple.cartItem.isSkippedDuringShopping = false
+                        tuple.cartItem.quantity = max(1, tuple.cartItem.originalPlanningQuantity ?? 1)
+                        vaultService.updateCartTotals(cart: cart)
                     } label: {
                         Label("Add Back", systemImage: "plus.circle")
                     }
@@ -219,21 +244,6 @@ private struct StoreSectionRow: View {
 
     private func deleteShoppingOnlyItem() {
         onDeleteItem(tuple.cartItem)
-    }
-    
-    private func addBackSkippedItem() {
-        withAnimation(.easeInOut(duration: 0.25)) {
-            tuple.cartItem.isSkippedDuringShopping = false
-            tuple.cartItem.quantity = max(1, tuple.cartItem.originalPlanningQuantity ?? 1)
-            // Don't update totals immediately
-        }
-        
-        // Update totals after animation
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-            measurePerformance(name: "AddBackItem_UpdateTotals", context: "Item: \(tuple.cartItem.itemId)") {
-                vaultService.updateCartTotals(cart: cart)
-            }
-        }
     }
     
     private func markUnfulfilled() {
