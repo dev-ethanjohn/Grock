@@ -342,6 +342,7 @@ struct UnifiedItemPopover: View {
         isSaving = true
         
         if mode == .edit {
+            // EDIT MODE - No animation, just update immediately
             if abs(priceValue - currentPrice) > 0.01 ||
                 abs(portionValue - currentQuantity) > 0.01 {
                 
@@ -350,13 +351,13 @@ struct UnifiedItemPopover: View {
                     cartItem.shoppingOnlyUnit = plannedUnit
                     cartItem.actualPrice = priceValue
                     cartItem.actualQuantity = portionValue
-                    cartItem.quantity = portionValue  // FIX: Sync quantity too
+                    cartItem.quantity = portionValue
                     cartItem.syncQuantities(cart: cart)
                     cartItem.wasEditedDuringShopping = true
                 } else {
                     cartItem.actualPrice = priceValue
                     cartItem.actualQuantity = portionValue
-                    cartItem.quantity = portionValue  // FIX: Sync quantity too
+                    cartItem.quantity = portionValue
                     cartItem.syncQuantities(cart: cart)
                     cartItem.wasEditedDuringShopping = true
                 }
@@ -369,38 +370,90 @@ struct UnifiedItemPopover: View {
                     userInfo: ["cartItemId": cartItem.itemId]
                 )
             }
+            
+            isSaving = false
+            onSave?()
+            dismissPopover()
+            
         } else {
-            // FULFILL MODE
+            // FULFILL MODE - Sophisticated animation sequence
+            
+            // Update data immediately but DON'T mark as fulfilled yet
             if cartItem.isShoppingOnlyItem {
                 cartItem.shoppingOnlyPrice = priceValue
                 cartItem.shoppingOnlyUnit = plannedUnit
-                cartItem.actualPrice = priceValue
-                cartItem.actualQuantity = portionValue
-                cartItem.quantity = portionValue  // FIX: Sync quantity too
-                cartItem.syncQuantities(cart: cart)
-                cartItem.isFulfilled = true
-                cartItem.wasEditedDuringShopping = true
-            } else {
-                cartItem.actualPrice = priceValue
-                cartItem.actualQuantity = portionValue
-                cartItem.quantity = portionValue  // FIX: Sync quantity too
-                cartItem.syncQuantities(cart: cart)
-                cartItem.isFulfilled = true
-                cartItem.wasEditedDuringShopping = true
             }
             
-            vaultService.updateCartTotals(cart: cart)
+            cartItem.actualPrice = priceValue
+            cartItem.actualQuantity = portionValue
+            cartItem.quantity = portionValue
+            cartItem.syncQuantities(cart: cart)
+            cartItem.wasEditedDuringShopping = true
             
+            // Start animation sequence - use animationState instead of fulfillmentAnimationState
+            cartItem.animationState = .checkmarkAppearing
+            cartItem.fulfillmentStartTime = Date()
+            cartItem.shouldShowCheckmark = true
+            
+            // Post notification for animation start
             NotificationCenter.default.post(
-                name: NSNotification.Name("ShoppingDataUpdated"),
+                name: NSNotification.Name("ItemFulfillmentAnimationStarted"),
                 object: nil,
-                userInfo: ["cartItemId": cartItem.itemId]
+                userInfo: [
+                    "cartId": cart.id,
+                    "itemId": cartItem.itemId,
+                    "price": priceValue,
+                    "quantity": portionValue
+                ]
             )
+            
+            // FASTER ANIMATION SEQUENCE:
+                 // 1. Checkmark appears with bounce (0.0-0.3s)
+                 // 2. Strikethrough starts IMMEDIATELY (no wait)
+                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                     cartItem.animationState = .strikethroughAnimating
+                     cartItem.shouldStrikethrough = true
+                     
+                     NotificationCenter.default.post(
+                         name: NSNotification.Name("ItemStrikethroughAnimating"),
+                         object: nil,
+                         userInfo: ["cartId": cart.id, "itemId": cartItem.itemId]
+                     )
+                     
+                     // 3. Start removal animation after strikethrough is partially done
+                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                         cartItem.animationState = .removalAnimating
+                         cartItem.isFulfilled = true // Mark as fulfilled
+                         
+                         NotificationCenter.default.post(
+                             name: NSNotification.Name("ItemRemovalAnimating"),
+                             object: nil,
+                             userInfo: ["cartId": cart.id, "itemId": cartItem.itemId]
+                         )
+                         
+                         // 4. Cleanup after removal
+                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                             cartItem.animationState = .none
+                             cartItem.shouldShowCheckmark = false
+                             cartItem.shouldStrikethrough = false
+                             cartItem.fulfillmentStartTime = nil
+                             
+                             vaultService.updateCartTotals(cart: cart)
+                             
+                             NotificationCenter.default.post(
+                                 name: NSNotification.Name("ShoppingDataUpdated"),
+                                 object: nil,
+                                 userInfo: ["cartItemId": cartItem.itemId]
+                             )
+                         }
+                     }
+                 }
+            
+            // Close popover immediately (animation continues in background)
+            isSaving = false
+            onSave?()
+            dismissPopover()
         }
-        
-        isSaving = false
-        onSave?()
-        dismissPopover()
     }
     
     private func dismissPopover() {

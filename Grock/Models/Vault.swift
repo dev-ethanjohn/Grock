@@ -1,7 +1,14 @@
 import Foundation
 import SwiftData
 
-
+enum FulfillmentAnimationState: Int, Codable {
+    case none = 0
+    case checkmarkAppearing = 1
+    case checkmarkVisible = 2
+    case strikethroughAnimating = 3
+    case strikethroughComplete = 4
+    case removalAnimating = 5
+}
 
 @Model
 class User {
@@ -202,7 +209,7 @@ class Cart {
 
 @Model
 class CartItem {
-    @Attribute var addedAt: Date = Date()
+    @Attribute var addedAt: Date  // Remove default value
     var itemId: String
     var quantity: Double
     var isFulfilled: Bool
@@ -225,11 +232,17 @@ class CartItem {
     var shoppingOnlyStore: String?
     var shoppingOnlyPrice: Double?
     var shoppingOnlyUnit: String?
-    var shoppingOnlyCategory: String? // Store category as String (GroceryCategory rawValue) for later vault saving
+    var shoppingOnlyCategory: String?
     
-    // MARK: - NEW: Original planning quantity for restoration
+    // MARK: - Original planning quantity for restoration
     var originalPlanningQuantity: Double?
     var addedDuringShopping: Bool = false
+    
+    // MARK: - Animation states for fulfillment
+    var fulfillmentAnimationState: Int = 0  // Use Int instead of enum for @Model
+    var fulfillmentStartTime: Date?
+    var shouldShowCheckmark: Bool = false
+    var shouldStrikethrough: Bool = false
     
     init(
         itemId: String,
@@ -250,8 +263,13 @@ class CartItem {
         shoppingOnlyUnit: String? = nil,
         shoppingOnlyCategory: String? = nil,
         originalPlanningQuantity: Double? = nil,
-        addedDuringShopping: Bool = false
+        addedDuringShopping: Bool = false,
+        fulfillmentAnimationState: Int = 0,
+        fulfillmentStartTime: Date? = nil,
+        shouldShowCheckmark: Bool = false,
+        shouldStrikethrough: Bool = false
     ) {
+        self.addedAt = Date()  // Set default value in initializer
         self.itemId = itemId
         self.quantity = quantity
         self.plannedStore = plannedStore
@@ -271,10 +289,23 @@ class CartItem {
         self.shoppingOnlyCategory = shoppingOnlyCategory
         self.originalPlanningQuantity = originalPlanningQuantity
         self.addedDuringShopping = addedDuringShopping
-        // ⬇️ ADDED: This ensures all items get a proper timestamp
-        self.addedAt = Date()
+        self.fulfillmentAnimationState = fulfillmentAnimationState
+        self.fulfillmentStartTime = fulfillmentStartTime
+        self.shouldShowCheckmark = shouldShowCheckmark
+        self.shouldStrikethrough = shouldStrikethrough
     }
     
+    // Helper for animation state
+    var animationState: FulfillmentAnimationState {
+        get {
+            return FulfillmentAnimationState(rawValue: fulfillmentAnimationState) ?? .none
+        }
+        set {
+            fulfillmentAnimationState = newValue.rawValue
+        }
+    }
+    
+    // MARK: - Static factory method for shopping-only items
     static func createShoppingOnlyItem(
         name: String,
         store: String,
@@ -300,7 +331,7 @@ class CartItem {
             shoppingOnlyUnit: unit,
             shoppingOnlyCategory: category?.rawValue,
             originalPlanningQuantity: nil,
-            addedDuringShopping: true // Shopping-only items are always added during shopping
+            addedDuringShopping: true
         )
     }
     

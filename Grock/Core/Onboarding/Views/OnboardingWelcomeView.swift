@@ -17,6 +17,12 @@ class HapticManager {
         heavyImpact.prepare()
     }
     
+    
+    func playSuccess() {
+        let generator = UINotificationFeedbackGenerator()
+        generator.notificationOccurred(.success)
+    }
+    
     func playLight() {
         lightImpact.impactOccurred()
         lightImpact.prepare() // Prepare for next use
