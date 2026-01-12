@@ -289,10 +289,6 @@ struct HomeView: View {
             }
             
             Menu {
-                Section("Currency") {
-                    currencyPicker
-                }
-                
                 Section {
                     Button(role: .destructive, action: viewModel.resetApp) {
                         Label(
