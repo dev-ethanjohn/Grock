@@ -64,6 +64,15 @@ struct ShoppingProgressSummary: View {
         return formatCurrency(amount: fulfilledTotal)
     }
     
+    private var completedItems: [(cartItem: CartItem, item: Item?)] {
+        cart.cartItems.filter {
+            $0.isFulfilled && !$0.isSkippedDuringShopping
+        }.map { c in
+            (c, vaultService.findItemById(c.itemId))
+        }
+    }
+    
+    
     private func formatCurrency(amount: Double) -> String {
         let formatter = NumberFormatter()
         formatter.numberStyle = .currency
@@ -73,6 +82,18 @@ struct ShoppingProgressSummary: View {
         
         return formatter.string(from: NSNumber(value: amount)) ?? "\(CurrencyManager.shared.selectedCurrency.symbol)\(String(format: "%.2f", amount))"
     }
+    
+    private var totalAmount: Double {
+        let completedTotal = completedItems.reduce(0) { sum, tuple in
+            let cartItem = tuple.cartItem
+            let price = cartItem.actualPrice ?? cartItem.plannedPrice ?? 0
+            let quantity = cartItem.actualQuantity ?? cartItem.quantity
+            return sum + (price * quantity)
+        }
+        
+        return completedTotal
+    }
+    
     
     @State private var pulseOpacity = 0.0
     
@@ -89,7 +110,7 @@ struct ShoppingProgressSummary: View {
             
             VStack(alignment: .leading, spacing: 4) {
                 CharacterRevealView(
-                    text: "\(fulfilledItems)/\(totalItems) items fulfilled, totalling \(fulfilledItemsTotal)",
+                    text: "\(fulfilledItems)/\(totalItems) items fulfilled, totalling \(totalAmount)",
                     delay: 0.15
                 )
                 .fuzzyBubblesFont(13, weight: .bold)

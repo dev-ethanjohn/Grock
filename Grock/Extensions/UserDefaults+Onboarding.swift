@@ -13,11 +13,17 @@ extension UserDefaults {
         static let userName = "userName"
         static let hasPromptedForNameAfterOnboarding = "hasPromptedForNameAfterOnboarding"
         static let hasPromptedForNameAfterVaultCelebration = "hasPromptedForNameAfterVaultCelebration"
+        static let hasSeenProWelcome = "hasSeenProWelcome"
     }
 
     var hasCompletedOnboarding: Bool {
         get { bool(forKey: Keys.hasCompletedOnboarding) }
         set { set(newValue, forKey: Keys.hasCompletedOnboarding) }
+    }
+    
+    var hasSeenProWelcome: Bool {
+        get { bool(forKey: Keys.hasSeenProWelcome) }
+        set { set(newValue, forKey: Keys.hasSeenProWelcome) }
     }
     
     var userName: String? {

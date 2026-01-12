@@ -233,6 +233,7 @@ final class HomeViewModel {
         UserDefaults.standard.userName = nil
         UserDefaults.standard.hasPromptedForNameAfterOnboarding = false
         UserDefaults.standard.hasPromptedForNameAfterVaultCelebration = false
+        UserDefaults.standard.hasSeenProWelcome = false
         
         // Reset vault animation flag
         UserDefaults.standard.set(false, forKey: "hasShownVaultAnimation")
@@ -251,6 +252,7 @@ final class HomeViewModel {
         print("   - userName: cleared")
         print("   - hasPromptedForNameAfterOnboarding: false")
         print("   - hasPromptedForNameAfterVaultCelebration: false")
+        print("   - hasSeenProWelcome: false")
     }
     
     // MARK: - UI Helpers

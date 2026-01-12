@@ -40,6 +40,7 @@ struct HomeView: View {
     @State private var cartToRename: Cart? = nil
     @State private var cartToDelete: Cart? = nil
     @State private var showingDeleteAlert = false
+    @State private var showProWelcomeSheet = false
     
     // Name entry sheet state
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding: Bool = false
@@ -92,6 +93,9 @@ struct HomeView: View {
             .ignoresSafeArea()
             .sheet(isPresented: $viewModel.showVault) {
                 vaultSheet
+            }
+            .sheet(isPresented: $showProWelcomeSheet) {
+                ProWelcomeSheet(isPresented: $showProWelcomeSheet)
             }
             .customPopover(isPresented: $showCreateCartPopover) {
                 CreateCartPopover(
@@ -146,6 +150,7 @@ struct HomeView: View {
                 if !newValue {
                     viewModel.transferPendingCart()
                     scheduleVaultButtonAnimation()
+                    checkForProWelcome()
                 } else {
                     cancelVaultButtonAnimation()
                 }
@@ -153,6 +158,7 @@ struct HomeView: View {
             .onChange(of: viewModel.selectedCart) { oldValue, newValue in
                 if newValue == nil {
                     scheduleVaultButtonAnimation()
+                    checkForProWelcome()
                 } else {
                     cancelVaultButtonAnimation()
                 }
@@ -494,6 +500,30 @@ struct HomeView: View {
         }
     }
     
+    // MARK: - Pro Welcome Logic
+    private func checkForProWelcome() {
+        // Conditions:
+        // 1. Not seen yet
+        guard !UserDefaults.standard.hasSeenProWelcome else { return }
+        
+        // 2. Has completed onboarding
+        guard hasCompletedOnboarding else { return }
+        
+        // 3. Has entered name (Vault celebration finished)
+        // Use SwiftData as source of truth for name
+        guard let name = vaultService.currentUser?.name, 
+              !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        
+        // 4. We are on HomeView (Vault dismissed, Cart Detail dismissed)
+        if !viewModel.showVault && viewModel.selectedCart == nil {
+            print("🎁 Showing Pro Welcome Sheet")
+            // Add a slight delay for better UX (allow dismissal animations to finish)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                showProWelcomeSheet = true
+            }
+        }
+    }
+
     // MARK: - Vault Button Animation Logic
     private func scheduleVaultButtonAnimation() {
         print("DEBUG: Checking vault animation conditions")
