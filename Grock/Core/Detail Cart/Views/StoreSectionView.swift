@@ -283,15 +283,15 @@ private struct StoreSectionHeader: View {
                 HStack(spacing: 2) {
                     Image(systemName: "storefront")
                         .font(.system(size: 10))
-                        .foregroundColor(.white)
+                        .foregroundColor(.black)
                     
                     Text(displayStoreName)
                         .lexendFont(11, weight: .bold)
                 }
-                .foregroundColor(.white)
+                .foregroundColor(.black)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
-                .background(Color.black)
+                .background(Color.white)
                 .cornerRadius(6)
                 Spacer()
             }

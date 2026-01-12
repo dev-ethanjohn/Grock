@@ -207,21 +207,21 @@ final class HomeViewModel {
     
     // MARK: - App Management
     func resetApp() {
-        // Clear the vault using vaultService
-        if let vault = vaultService.vault {
-            // Clear all items and categories from the vault
-            vault.categories.forEach { category in
-                category.items.removeAll()
-            }
-            vault.categories.removeAll()
-            vault.carts.removeAll()
-        }
-
-        // Save changes
+        // Fully reset SwiftData user and vault so app behaves like a new install
         do {
+            let descriptor = FetchDescriptor<User>()
+            let users = try modelContext.fetch(descriptor)
+            
+            for user in users {
+                modelContext.delete(user)
+            }
+            
             try modelContext.save()
+            
+            vaultService.currentUser = nil
+            vaultService.loadUserAndVault()
         } catch {
-            print("❌ Error saving after reset: \(error)")
+            print("❌ Error resetting user and vault: \(error)")
         }
 
         // Reset celebration flags

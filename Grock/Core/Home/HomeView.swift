@@ -42,7 +42,6 @@ struct HomeView: View {
     @State private var showingDeleteAlert = false
     
     // Name entry sheet state
-    @AppStorage("userName") private var currentUserName: String?
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding: Bool = false
     
     init(viewModel: HomeViewModel) {
@@ -159,9 +158,6 @@ struct HomeView: View {
                 }
             }
             .onAppear {
-                scheduleVaultButtonAnimation()
-            }
-            .onChange(of: currentUserName) { _, _ in
                 scheduleVaultButtonAnimation()
             }
             .onChange(of: hasCompletedOnboarding) { _, _ in
@@ -505,7 +501,7 @@ struct HomeView: View {
         print("DEBUG: showVault: \(viewModel.showVault)")
         print("DEBUG: selectedCart: \(String(describing: viewModel.selectedCart))")
         print("DEBUG: hasCompletedOnboarding: \(hasCompletedOnboarding)")
-        print("DEBUG: currentUserName: \(currentUserName ?? "nil")")
+        print("DEBUG: currentUserName: \(vaultService.currentUser?.name ?? "nil")")
 
         // Only schedule if we haven't shown it, vault is closed, and no cart is selected
         // AND user has completed onboarding and entered their name
@@ -513,7 +509,7 @@ struct HomeView: View {
               !viewModel.showVault,
               viewModel.selectedCart == nil,
               hasCompletedOnboarding,
-              let name = currentUserName, !name.isEmpty else { 
+              let name = vaultService.currentUser?.name, !name.isEmpty else {
             print("DEBUG: Conditions not met for vault animation")
             return 
         }

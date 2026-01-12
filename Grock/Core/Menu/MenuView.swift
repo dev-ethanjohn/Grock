@@ -52,7 +52,8 @@ struct MenuView: View {
                             Spacer()
                             
                             Button {
-                                editingName = vaultService.currentUser?.name ?? ""
+                                let name = vaultService.currentUser?.name ?? ""
+                                editingName = name
                                 isEditingName = true
                             } label: {
                                 Image(systemName: "pencil")

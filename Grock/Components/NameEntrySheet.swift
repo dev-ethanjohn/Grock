@@ -120,7 +120,6 @@ struct NameEntrySheet: View {
     // MARK: - Actions
     private func saveName() {
         let trimmedName = userName.trimmingCharacters(in: .whitespacesAndNewlines)
-        UserDefaults.standard.userName = trimmedName
         onSave?(trimmedName)
         dismissSheet()
     }

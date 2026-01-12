@@ -803,7 +803,7 @@ extension View {
                     isPresented: showNameEntrySheet,
                     createCartButtonVisible: createCartButtonVisible,
                     onSave: { name in
-                        print("✅ Name saved: \(name)")
+                        vaultService.updateUserName(name)
                     },
                     onDismiss: {
                         withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {

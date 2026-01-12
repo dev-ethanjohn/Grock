@@ -65,7 +65,9 @@ extension VaultService {
    
     /// Updates the current user's name
     func updateUserName(_ newName: String) {
-        currentUser?.name = newName
+        let trimmedName = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty else { return }
+        currentUser?.name = trimmedName
         saveContext()
     }
 }
