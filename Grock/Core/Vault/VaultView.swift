@@ -63,6 +63,13 @@ struct VaultView: View {
     // Name entry popover
     @State private var showNameEntrySheet = false
     
+    @AppStorage("userName") private var userName: String = ""
+    @State private var isCelebrationSequenceActive = false
+    
+    private var hasEnteredName: Bool {
+        !userName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+    
     // Track keyboard state for immediate dismissal
     @FocusState private var isAnyFieldFocused: Bool
     
@@ -103,6 +110,11 @@ struct VaultView: View {
                 firstItemId: firstItemId,
                 showNameEntrySheet: $showNameEntrySheet
             )
+            .onChange(of: userName) { _, _ in
+                if hasEnteredName {
+                    isCelebrationSequenceActive = false
+                }
+            }
     }
     
     private var baseContent: some View {
@@ -146,6 +158,14 @@ struct VaultView: View {
             popoversOverlay
             
             keyboardDoneButtonOverlay
+            
+            if isCelebrationSequenceActive {
+                Color.black.opacity(0.001)
+                    .contentShape(Rectangle())
+                    .ignoresSafeArea()
+                    .allowsHitTesting(true)
+                    .zIndex(100)
+            }
         }
     }
     
@@ -377,6 +397,9 @@ struct VaultView: View {
         if shouldTriggerCelebration {
             print("🎉 Celebration triggered by parent view!")
             showCelebration = true
+            if !hasEnteredName {
+                isCelebrationSequenceActive = true
+            }
             UserDefaults.standard.set(true, forKey: "hasSeenVaultCelebration")
         } else {
             checkAndStartCelebration()
@@ -804,6 +827,7 @@ extension View {
                     createCartButtonVisible: createCartButtonVisible,
                     onSave: { name in
                         vaultService.updateUserName(name)
+                        UserDefaults.standard.userName = name
                     },
                     onDismiss: {
                         withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
@@ -812,8 +836,9 @@ extension View {
                     }
                 )
                 .presentationDetents([.height(100)])
-                .presentationDragIndicator(.visible)
+                .presentationDragIndicator(.hidden)
                 .presentationCornerRadius(24)
+                .interactiveDismissDisabled(true)
             }
             .fullScreenCover(isPresented: showCelebration) {
                 CelebrationView(

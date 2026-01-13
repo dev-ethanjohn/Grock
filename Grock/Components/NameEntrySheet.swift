@@ -75,7 +75,7 @@ struct NameEntrySheet: View {
                                 .contentTransition(.numericText())
                                 .animation(.spring(response: 0.25, dampingFraction: 0.85), value: currentCharacterCount)
                             
-                            Text(" / \(remainingCharacterCount)")
+                            Text(" / \(maxNameLength)")
                         }
                         .font(.caption2)
                         .monospacedDigit()
