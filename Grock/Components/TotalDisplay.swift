@@ -5,9 +5,10 @@ struct TotalDisplay: View {
     
     var body: some View {
         HStack(spacing: 2) {
-            //TODO: use locale currency
-            Text("Total: ₱")
+            Text("Total: \(CurrencyManager.shared.selectedCurrency.symbol)")
                 .lexendFont(14, weight: .semibold)
+                .contentTransition(.numericText())
+                .animation(.snappy, value: CurrencyManager.shared.selectedCurrency.symbol)
             
             Text(calculatedTotal, format: .number.precision(.fractionLength(2)))
                 .lexendFont(16, weight: .semibold)

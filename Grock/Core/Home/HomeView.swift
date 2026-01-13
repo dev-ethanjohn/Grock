@@ -44,6 +44,7 @@ struct HomeView: View {
     
     // Name entry sheet state
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding: Bool = false
+    @AppStorage("hasSeenProWelcome") private var hasSeenProWelcome: Bool = false
     
     init(viewModel: HomeViewModel) {
         self._viewModel = State(initialValue: viewModel)
@@ -165,9 +166,15 @@ struct HomeView: View {
             }
             .onAppear {
                 scheduleVaultButtonAnimation()
+                checkForProWelcome()
             }
             .onChange(of: hasCompletedOnboarding) { _, _ in
                 scheduleVaultButtonAnimation()
+            }
+            .onChange(of: hasSeenProWelcome) { _, newValue in
+                if newValue {
+                    scheduleVaultButtonAnimation()
+                }
             }
         }
     }
@@ -513,10 +520,7 @@ struct HomeView: View {
         // 4. We are on HomeView (Vault dismissed, Cart Detail dismissed)
         if !viewModel.showVault && viewModel.selectedCart == nil {
             print("🎁 Showing Pro Welcome Sheet")
-            // Add a slight delay for better UX (allow dismissal animations to finish)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-                showProWelcomeSheet = true
-            }
+            showProWelcomeSheet = true
         }
     }
 
@@ -528,19 +532,22 @@ struct HomeView: View {
         print("DEBUG: selectedCart: \(String(describing: viewModel.selectedCart))")
         print("DEBUG: hasCompletedOnboarding: \(hasCompletedOnboarding)")
         print("DEBUG: currentUserName: \(vaultService.currentUser?.name ?? "nil")")
+        print("DEBUG: hasSeenProWelcome: \(hasSeenProWelcome)")
 
         // Only schedule if we haven't shown it, vault is closed, and no cart is selected
         // AND user has completed onboarding and entered their name
+        // AND user has seen the Pro Welcome sheet
         guard !hasShownVaultAnimation,
               !viewModel.showVault,
               viewModel.selectedCart == nil,
               hasCompletedOnboarding,
-              let name = vaultService.currentUser?.name, !name.isEmpty else {
+              let name = vaultService.currentUser?.name, !name.isEmpty,
+              hasSeenProWelcome else {
             print("DEBUG: Conditions not met for vault animation")
             return 
         }
         
-        print("DEBUG: Scheduling vault animation for 20 seconds from now")
+        print("DEBUG: Scheduling vault animation")
 
         // Cancel any existing task
         cancelVaultButtonAnimation()
@@ -553,7 +560,8 @@ struct HomeView: View {
             self.hasShownVaultAnimation = true
         }
         
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2, execute: task)
+        self.animationTask = task
+        
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: task)
     }
     

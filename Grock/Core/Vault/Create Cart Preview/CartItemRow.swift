@@ -30,15 +30,16 @@ struct CartItemRow: View {
     }
     
     private var displayTotal: String {
+        let symbol = CurrencyManager.shared.selectedCurrency.symbol
         if itemTotal == Double(Int(itemTotal)) {
             // Whole number - remove decimals
-            return "₱\(Int(itemTotal))"
+            return "\(symbol)\(Int(itemTotal))"
         } else if itemTotal * 10 == Double(Int(itemTotal * 10)) {
             // Single decimal place (like 12.50 becomes 12.5)
-            return String(format: "₱%.1f", itemTotal)
+            return String(format: "%@%.1f", symbol, itemTotal)
         } else {
             // Two decimal places
-            return String(format: "₱%.2f", itemTotal)
+            return String(format: "%@%.2f", symbol, itemTotal)
         }
     }
     
