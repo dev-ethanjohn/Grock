@@ -1,45 +1,64 @@
 import SwiftUI
+import Lottie
 
 struct ProWelcomeSheet: View {
     @Binding var isPresented: Bool
-    
+    @State private var playAnimation = false
+    @State private var hasPlayed = false
+
     var body: some View {
         VStack(spacing: 24) {
-            ScrollView {
-                VStack(alignment: .center, spacing: 20) {
-                    
-                    Text("Hello friend,")
-                    
-                    Text("If managing grocery spending ever feels confusing, overwhelming, or just tiring — there’s nothing wrong with you.")
-                    Text("I used to shop carefully, but still leave wondering if I spent too much. Prices change, some items are out of stock, and I often have to adjust my plans or budget on the spot. Most of the time, I was just trying my best while figuring out what things would actually cost.")
-                    
-                    Text("I built Grock because I needed a calmer, clearer way to understand my own spending — not to be perfect, but to notice patterns, remember what really costs what, and feel a little more confident each time I shopped.")
-                    
-                    Text("I wanted to share something with you: 2 days of Grock Pro — a small gift from me. No strings, no pressure, just a chance to see if it makes shopping feel a little lighter, the way it did for me.")
-                    
-                    Text("Thank you for being here.")
 
+            GeometryReader { geometry in
+                ScrollView {
+                    VStack(alignment: .center, spacing: 20) {
+
+                        Text("Hello friend,")
+                            .padding(.bottom, 40)
+
+                        Text("Grocery shopping can feel confusing, overwhelming, or just tiring — you're not alone.")
+
+                        Text("I used to plan carefully and still leave wondering if I spent too much. Prices change, items run out, and plans shift.")
+
+                        Text("Keeping track of prices and noticing patterns didn't make shopping perfect, but it made it calmer and easier to feel in control.")
+
+                        Text("Here's a small gift — the next ")
+                        + Text("2 days")
+                            .lexendFont(14, weight: .bold)
+                            .foregroundStyle(.black)
+                        + Text(" everything is unlocked. No pressure, just a chance to feel a little lighter and more confident.")
+
+                        Text("- Ethan :)")
+                            .padding(.top, 40)
+                    }
+                    .foregroundStyle(.black.opacity(0.7))
+                    .multilineTextAlignment(.center)
+                    .fuzzyBubblesFont(14, weight: .light)
+                    .padding(.horizontal, 32)
+                    .padding(.top, 32)
+                    .frame(minHeight: geometry.size.height)
                 }
-                .multilineTextAlignment(.center)
-                .fuzzyBubblesFont(14, weight: .bold)
-                .padding(.horizontal)
-                .padding(.top, 32)
             }
-            
+
             Button {
-                isPresented = false
+                guard !hasPlayed else { return }
+                hasPlayed = true
+                playAnimation = true
+
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) {
+                    isPresented = false
+                }
             } label: {
-                Text("Thanks!")
-                    .font(.headline)
-                    .fontWeight(.bold)
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.black)
-                    .cornerRadius(16)
+                LottieView(animation: .named("thanks"))
+                    .playing(
+                        playAnimation
+                        ? .fromProgress(0, toProgress: 1, loopMode: .playOnce)
+                        : .fromProgress(0, toProgress: 0, loopMode: .playOnce)
+                    )
             }
-            .padding(.horizontal)
-            .padding(.bottom, 16)
+            .buttonStyle(.plain)
+            .frame(width: 200, height: 200)
+            .offset(y: 50)
         }
         .presentationDetents([.large])
         .presentationCornerRadius(24)
@@ -50,7 +69,16 @@ struct ProWelcomeSheet: View {
 }
 
 #Preview {
-    Color.gray.sheet(isPresented: .constant(true)) {
-        ProWelcomeSheet(isPresented: .constant(true))
+    PreviewWrapper()
+}
+
+private struct PreviewWrapper: View {
+    @State private var isPresented = true
+
+    var body: some View {
+        Color.clear
+            .sheet(isPresented: $isPresented) {
+                ProWelcomeSheet(isPresented: $isPresented)
+            }
     }
 }
