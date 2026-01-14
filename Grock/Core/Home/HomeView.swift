@@ -10,6 +10,7 @@ struct HomeView: View {
     @State private var viewModel: HomeViewModel
     @State private var cartStateManager: CartStateManager
     @Namespace private var vaultButtonNamespace
+    @Namespace private var insightsNamespace
     
     @State private var tabs: [CartTabsModel] = [
         .init(id: CartTabsModel.Tab.active),
@@ -98,10 +99,17 @@ struct HomeView: View {
             .sheet(isPresented: $viewModel.showVault) {
                 vaultSheet
             }
-            .sheet(isPresented: $showInsights) {
-                InsightsView()
-                    .environment(vaultService)
-                    .environment(cartViewModel)
+            .fullScreenCover(isPresented: $showInsights) {
+                if #available(iOS 18.0, *) {
+                    InsightsView()
+                        .environment(vaultService)
+                        .environment(cartViewModel)
+                        .navigationTransition(.zoom(sourceID: "insightsIcon", in: insightsNamespace))
+                } else {
+                    InsightsView()
+                        .environment(vaultService)
+                        .environment(cartViewModel)
+                }
             }
             .sheet(isPresented: $showProWelcomeSheet) {
                 ProWelcomeSheet(isPresented: $showProWelcomeSheet)
@@ -212,16 +220,33 @@ struct HomeView: View {
                     createCartButton
                         .frame(maxWidth: .infinity, alignment: .center)
                     
-                    Button(action: {
-                        showInsights = true
-                    }) {
-                        Image(systemName: "chart.bar.xaxis")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(.white)
-                            .frame(width: 44, height: 44)
-                            .background(Color.black)
-                            .clipShape(Circle())
-                            .shadow(color: Color.black.opacity(0.15), radius: 4, x: 0, y: 2)
+                    Group {
+                        if #available(iOS 18.0, *) {
+                            Button(action: {
+                                showInsights = true
+                            }) {
+                                Image(systemName: "chart.bar.xaxis")
+                                    .font(.system(size: 18, weight: .semibold))
+                                    .foregroundColor(.white)
+                                    .frame(width: 44, height: 44)
+                                    .background(Color.black)
+                                    .clipShape(Circle())
+                                    .shadow(color: Color.black.opacity(0.15), radius: 4, x: 0, y: 2)
+                                    .matchedTransitionSource(id: "insightsIcon", in: insightsNamespace)
+                            }
+                        } else {
+                            Button(action: {
+                                showInsights = true
+                            }) {
+                                Image(systemName: "chart.bar.xaxis")
+                                    .font(.system(size: 18, weight: .semibold))
+                                    .foregroundColor(.white)
+                                    .frame(width: 44, height: 44)
+                                    .background(Color.black)
+                                    .clipShape(Circle())
+                                    .shadow(color: Color.black.opacity(0.15), radius: 4, x: 0, y: 2)
+                            }
+                        }
                     }
                     .padding(.trailing, 20)
                     .padding(.bottom, 50)
