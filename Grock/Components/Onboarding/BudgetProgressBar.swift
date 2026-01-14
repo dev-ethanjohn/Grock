@@ -60,6 +60,10 @@ struct FluidBudgetPillView: View {
         pillWidth >= 100
     }
     
+    private var hasBudget: Bool {
+        animatedBudget > 0
+    }
+    
     var body: some View {
         HStack(alignment: .center, spacing: 16) {
             GeometryReader { geometry in

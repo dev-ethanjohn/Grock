@@ -158,7 +158,7 @@ struct HomeCartRowView: View {
             withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
                 appeared = true
             }
-            currentProgress = cart.totalSpent / cart.budget
+            currentProgress = cart.budget > 0 ? cart.totalSpent / cart.budget : 0
             
             // Load background image
             loadBackgroundImage()
@@ -168,12 +168,12 @@ struct HomeCartRowView: View {
             viewModel.updateBudget(newValue, animated: true)
             
             withAnimation(.linear(duration: 0.3)) {
-                currentProgress = cart.totalSpent / newValue
+                currentProgress = newValue > 0 ? cart.totalSpent / newValue : 0
             }
         }
         .onChange(of: cart.totalSpent) { oldValue, newValue in
             withAnimation(.linear(duration: 0.3)) {
-                currentProgress = newValue / cart.budget
+                currentProgress = cart.budget > 0 ? newValue / cart.budget : 0
             }
         }
         .onChange(of: CurrencyManager.shared.selectedCurrency) { oldValue, newValue in
@@ -204,10 +204,22 @@ struct HomeCartRowView: View {
     
     private var headerRow: some View {
         HStack(alignment: .top) {
-            Text(cart.name)
-                .fuzzyBubblesFont(18, weight: .bold)
-                .foregroundColor(hasBackgroundImage ? .white : .black)
-                .offset(y: -4)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(cart.name)
+                    .fuzzyBubblesFont(18, weight: .bold)
+                    .foregroundColor(hasBackgroundImage ? .white : .black)
+                
+                Group {
+                    if cart.budget > 0 {
+                        Text("Budgeted")
+                    } else {
+                        Text("No budget")
+                    }
+                }
+                .lexendFont(10, weight: .medium)
+                .foregroundColor(hasBackgroundImage ? .white.opacity(0.8) : Color.black.opacity(0.5))
+            }
+            .offset(y: -2)
             
             Spacer()
             

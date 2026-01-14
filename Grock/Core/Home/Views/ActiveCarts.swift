@@ -79,7 +79,7 @@ struct ActiveCarts: View {
                 .listRowInsets(EdgeInsets(
                             top: 0,
                             leading: 0,
-                            bottom: index == viewModel.displayedCarts.count - 1 ? 0 : 12,
+                            bottom: index == viewModel.displayedCarts.count - 1 ? 0 : 16,
                             trailing: 0
                         ))
                 .transition(.asymmetric(

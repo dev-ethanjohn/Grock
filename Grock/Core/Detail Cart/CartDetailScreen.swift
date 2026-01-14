@@ -1311,6 +1311,12 @@ struct CartDetailContent: View {
     
     // MARK: - Event Handlers
     private func handleCartStatusChange(_ newValue: CartStatus) {
+        // Auto-dismiss if cart is completed
+        if newValue == .completed {
+            dismiss()
+            return
+        }
+
         if newValue == .shopping && hasItems {
             withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                 stateManager.showingCompletedSheet = true

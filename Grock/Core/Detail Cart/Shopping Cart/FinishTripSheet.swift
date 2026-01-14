@@ -4,7 +4,7 @@ struct FinishTripSheet: View {
     @Bindable var cart: Cart  // CHANGED: Make cart mutable
     @Environment(VaultService.self) private var vaultService
     @Environment(\.dismiss) private var dismiss
-    @State private var detent: PresentationDetent = .medium
+    @State private var showingEditBudget = false
     
     // Computed properties
     private var cartInsights: CartInsights {
@@ -17,6 +17,10 @@ struct FinishTripSheet: View {
     
     private var skippedCount: Int {
         cart.cartItems.filter { $0.isSkippedDuringShopping }.count
+    }
+    
+    private var skippedItemsList: [CartItem] {
+        cart.cartItems.filter { $0.isSkippedDuringShopping }
     }
     
     private var addedDuringShoppingCount: Int {
@@ -54,18 +58,8 @@ struct FinishTripSheet: View {
         }
         
         let difference = abs(budgetDifference)
-        
-        #if DEBUG
-        print("🧮 FinishTripSheet Debug:")
-        print("   totalSpent (fulfilled only): \(totalSpent)")
-        print("   cartBudget: \(cartBudget)")
-        print("   budgetDifference: \(budgetDifference)")
-        print("   |budgetDifference|: \(difference)")
-        print("   Cart ID: \(cart.id)")
-        print("   Cart name: \(cart.name)")
-        #endif
-        
         let symbol = CurrencyManager.shared.selectedCurrency.symbol
+        
         if budgetDifference > 0.01 {
             // Over budget by more than 1 cent
             return "\(symbol)\(String(format: "%.0f", difference)) over budget"
@@ -107,102 +101,180 @@ struct FinishTripSheet: View {
     }
     
     var body: some View {
-        VStack(spacing: 0) {
-            // Big number section
-            VStack(spacing: 8) {
-                Text("How did your shopping go?")
-                    .lexendFont(20, weight: .semibold)
-                    .foregroundColor(Color(hex: "231F30"))
-                    .padding(.top, 32)
-                
-                Text(totalSpent.formattedCurrency)
-                    .lexendFont(48, weight: .bold)
-                    .foregroundColor(Color(hex: "231F30"))
-                    .contentTransition(.numericText())
-                    .animation(.spring(response: 0.5, dampingFraction: 0.7), value: totalSpent)
-                    .animation(.spring(response: 0.5, dampingFraction: 0.7), value: CurrencyManager.shared.selectedCurrency)
-                
-                HStack(spacing: 4) {
-                    Text(emojiForDifference)
-                        .font(.system(size: 16))
-                    
-                    Text(differenceText)
-                        .lexendFont(16)
-                        .foregroundColor(differenceColor)
-                        .contentTransition(.numericText())
-                        .animation(.snappy, value: CurrencyManager.shared.selectedCurrency)
+        ZStack {
+            VStack(spacing: 0) {
+                ScrollView {
+                    VStack(spacing: 0) {
+                        // Big number section
+                        VStack(spacing: 8) {
+                            Text("How did your shopping go?")
+                                .lexendFont(20, weight: .semibold)
+                                .foregroundColor(Color(hex: "231F30"))
+                                .padding(.top, 32)
+                            
+                            Text(totalSpent.formattedCurrency)
+                                .lexendFont(48, weight: .bold)
+                                .foregroundColor(Color(hex: "231F30"))
+                                .contentTransition(.numericText())
+                                .animation(.spring(response: 0.5, dampingFraction: 0.7), value: totalSpent)
+                                .animation(.spring(response: 0.5, dampingFraction: 0.7), value: CurrencyManager.shared.selectedCurrency)
+                            
+                            // 3. Budget Reflection (Adaptive)
+                            if cartBudget > 0 {
+                                HStack(spacing: 4) {
+                                    Text(emojiForDifference)
+                                        .font(.system(size: 16))
+                                    
+                                    Text(differenceText)
+                                        .lexendFont(16)
+                                        .foregroundColor(differenceColor)
+                                        .contentTransition(.numericText())
+                                        .animation(.snappy, value: CurrencyManager.shared.selectedCurrency)
+                                }
+                                .padding(.bottom, 32)
+                            } else {
+                                // Missing Budget Prompt
+                                VStack(spacing: 12) {
+                                    Text("Want to add a budget for this trip?")
+                                        .lexendFont(14, weight: .medium)
+                                        .foregroundColor(Color(hex: "666"))
+                                    
+                                    Text("It helps make sense of your spending later.")
+                                        .lexendFont(12)
+                                        .foregroundColor(Color(hex: "999"))
+                                    
+                                    Button(action: {
+                                        showingEditBudget = true
+                                    }) {
+                                        Text("Add Budget")
+                                            .lexendFont(14, weight: .semibold)
+                                            .foregroundColor(.white)
+                                            .padding(.horizontal, 16)
+                                            .padding(.vertical, 8)
+                                            .background(Color.black)
+                                            .cornerRadius(20)
+                                    }
+                                }
+                                .padding(.bottom, 32)
+                            }
+                        }
+                        
+                        // Separator
+                        DashedLine()
+                            .stroke(style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
+                            .frame(height: 0.5)
+                            .foregroundColor(Color(hex: "999").opacity(0.5))
+                            .padding(.horizontal)
+                        
+                        // 1. Factual Recap (Always Shown) - Three pills summary
+                        HStack(spacing: 12) {
+                            StatPill(
+                                emoji: "✅",
+                                count: fulfilledCount,
+                                label: "fulfilled"
+                            )
+                            
+                            StatPill(
+                                emoji: "⏭",
+                                count: skippedCount,
+                                label: "skipped"
+                            )
+                            
+                            StatPill(
+                                emoji: "🆕",
+                                count: addedDuringShoppingCount,
+                                label: "added"
+                            )
+                        }
+                        .padding(.vertical, 28)
+                        
+                        // 2. Skipped Items (Conditional)
+                        if !skippedItemsList.isEmpty {
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text("Items you didn't get")
+                                    .lexendFont(16, weight: .semibold)
+                                    .foregroundColor(Color(hex: "231F30"))
+                                    .padding(.horizontal, 24)
+                                
+                                ForEach(skippedItemsList) { cartItem in
+                                    HStack {
+                                        Text(vaultService.findItemById(cartItem.itemId)?.name ?? "Unknown Item")
+                                            .lexendFont(14, weight: .medium)
+                                            .foregroundColor(Color(hex: "333"))
+                                        
+                                        Spacer()
+                                        
+                                        Text("Skipped")
+                                            .lexendFont(12)
+                                            .foregroundColor(.orange)
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 4)
+                                            .background(Color.orange.opacity(0.1))
+                                            .cornerRadius(4)
+                                    }
+                                    .padding(.horizontal, 24)
+                                    .padding(.vertical, 8)
+                                    .background(Color(hex: "F9F9F9"))
+                                    .cornerRadius(12)
+                                    .padding(.horizontal, 24)
+                                }
+                            }
+                            .padding(.bottom, 28)
+                        }
+                        
+                        // 4. Optional Reflection (Lightweight)
+                        VStack(spacing: 16) {
+                            Text("Anything unexpected today?")
+                                .lexendFont(16, weight: .semibold)
+                                .foregroundColor(Color(hex: "231F30"))
+                            
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 12) {
+                                    ReflectionButton(text: "Prices higher", emoji: "📈")
+                                    ReflectionButton(text: "Items missing", emoji: "❌")
+                                    ReflectionButton(text: "Bought extra", emoji: "🛒")
+                                    ReflectionButton(text: "As planned", emoji: "✨")
+                                }
+                                .padding(.horizontal, 24)
+                            }
+                        }
+                        .padding(.bottom, 32)
+                    }
                 }
-                .padding(.bottom, 32)
-            }
-            
-            // Separator
-            DashedLine()
-                .stroke(style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
-                .frame(height: 0.5)
-                .foregroundColor(Color(hex: "999").opacity(0.5))
-                .padding(.horizontal)
-            
-            // Three pills summary
-            HStack(spacing: 12) {
-                StatPill(
-                    emoji: "✅",
-                    count: fulfilledCount,
-                    label: "fulfilled"
-                )
                 
-                StatPill(
-                    emoji: "⏭",
-                    count: skippedCount,
-                    label: "skipped"
-                )
-                
-                StatPill(
-                    emoji: "🆕",
-                    count: addedDuringShoppingCount,
-                    label: "added"
-                )
-            }
-            .padding(.vertical, 28)
-            
-            // Budget context (optional - shows budget amount)
-            if cartBudget > 0 {
-                HStack {
-                    Text("Budget: \(cartBudget.formattedCurrency)")
-                        .lexendFont(14)
-                        .foregroundColor(Color(hex: "666"))
-                    
-                    Spacer()
-                    
-                    Text("Remaining: \(max(0, cartBudget - totalSpent).formattedCurrency)")
-                        .lexendFont(14, weight: .medium)
-                        .foregroundColor(cartBudget - totalSpent >= 0 ? Color(hex: "4CAF50") : Color(hex: "FA003F"))
+                // Done button (Always enabled)
+                VStack(spacing: 12) {
+                    Button(action: {
+                        vaultService.completeShopping(cart: cart)
+                        dismiss()
+                    }) {
+                        Text("Finish Trip")
+                            .lexendFont(18, weight: .semibold)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .background(Color.black)
+                            .cornerRadius(50)
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 32)
                 }
-                .padding(.horizontal, 24)
-                .padding(.bottom, 16)
             }
             
-            // Done button
-            VStack(spacing: 12) {
-                Button(action: {
-                    // Complete shopping and dismiss
-                    vaultService.completeShopping(cart: cart)
-                    dismiss()
-                }) {
-                    Text("Done")
-                        .lexendFont(18, weight: .semibold)
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(Color.black)
-                        .cornerRadius(50)
-                }
-                .padding(.horizontal, 24)
-                .padding(.bottom, 32)
+            if showingEditBudget {
+                EditBudgetPopover(
+                    isPresented: $showingEditBudget,
+                    currentBudget: cart.budget,
+                    onSave: { newBudget in
+                        cart.budget = newBudget
+                        vaultService.updateCartTotals(cart: cart)
+                    },
+                    onDismiss: nil
+                )
+                .zIndex(1)
             }
-            
-            Spacer()
         }
-        .presentationDetents([.medium], selection: $detent)
+        .presentationDetents([.large])
         .presentationDragIndicator(.visible)
         .presentationCornerRadius(24)
         .interactiveDismissDisabled(false) // Allow dismissal
@@ -210,6 +282,32 @@ struct FinishTripSheet: View {
         // Add this to observe cart changes
         .onChange(of: cart.budget) { oldValue, newValue in
             print("💰 Cart budget changed: \(oldValue) → \(newValue)")
+        }
+    }
+}
+
+// MARK: - Helper Components
+private struct ReflectionButton: View {
+    let text: String
+    let emoji: String
+    @State private var isSelected = false
+    
+    var body: some View {
+        Button(action: {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                isSelected.toggle()
+            }
+        }) {
+            HStack(spacing: 6) {
+                Text(emoji)
+                Text(text)
+                    .lexendFont(14, weight: .medium)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(isSelected ? Color.black : Color(hex: "F5F5F5"))
+            .foregroundColor(isSelected ? .white : .black)
+            .cornerRadius(20)
         }
     }
 }
@@ -243,4 +341,3 @@ private struct StatPill: View {
         )
     }
 }
-

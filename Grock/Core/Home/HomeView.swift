@@ -18,6 +18,7 @@ struct HomeView: View {
     ]
     
     @State private var showCreateCartPopover = false
+    @State private var showInsights = false
     
     @State private var activeTab: CartTabsModel.Tab = .active
     @State private var tabBarScrollState: CartTabsModel.Tab?
@@ -94,6 +95,11 @@ struct HomeView: View {
             .ignoresSafeArea()
             .sheet(isPresented: $viewModel.showVault) {
                 vaultSheet
+            }
+            .sheet(isPresented: $showInsights) {
+                InsightsView()
+                    .environment(vaultService)
+                    .environment(cartViewModel)
             }
             .sheet(isPresented: $showProWelcomeSheet) {
                 ProWelcomeSheet(isPresented: $showProWelcomeSheet)
@@ -200,8 +206,24 @@ struct HomeView: View {
             
             VStack {
                 Spacer()
-                createCartButton
-                    .frame(maxWidth: .infinity, alignment: .center)
+                ZStack(alignment: .bottomTrailing) {
+                    createCartButton
+                        .frame(maxWidth: .infinity, alignment: .center)
+                    
+                    Button(action: {
+                        showInsights = true
+                    }) {
+                        Image(systemName: "chart.bar.xaxis")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundColor(.white)
+                            .frame(width: 44, height: 44)
+                            .background(Color.black)
+                            .clipShape(Circle())
+                            .shadow(color: Color.black.opacity(0.15), radius: 4, x: 0, y: 2)
+                    }
+                    .padding(.trailing, 32)
+                    .padding(.bottom, 36)
+                }
             }
         }
         .ignoresSafeArea()
