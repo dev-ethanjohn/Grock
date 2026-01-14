@@ -253,7 +253,7 @@ struct CartConfirmationPopover: View {
                 .normalizedText($cartTitle)
                 .autocorrectionDisabled()
                 .textInputAutocapitalization(.never)
-                .lexendFont(20, weight: .semibold)
+                .fuzzyBubblesFont(20, weight: .bold)
                 .foregroundColor(.black)
                 .multilineTextAlignment(.leading)
                 .focused($focusedField, equals: .title)

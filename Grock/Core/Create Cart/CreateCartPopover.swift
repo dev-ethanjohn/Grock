@@ -132,7 +132,6 @@ struct CreateCartPopover: View {
         }
         .onChange(of: isPresented) { _, newValue in
             if !newValue {
-                // Clear focus when dismissed
                 focusedField = nil
             }
         }
@@ -144,7 +143,7 @@ struct CreateCartPopover: View {
     private var titleSection: some View {
         VStack(alignment: .leading, spacing: 4) {
             TextField("My Monday Shopping Trip...", text: $cartTitle)
-                .lexendFont(20, weight: .semibold)
+                .fuzzyBubblesFont(20, weight: .bold)
                 .foregroundColor(.black)
                 .multilineTextAlignment(.leading)
                 .focused($focusedField, equals: .title)

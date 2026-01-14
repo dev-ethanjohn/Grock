@@ -372,6 +372,11 @@ struct VaultView: View {
     }
     
     private func handleOnAppear() {
+        // Ensure Create Cart button is hidden if name is not entered
+        if !hasEnteredName {
+            createCartButtonVisible = false
+        }
+        
         initializeActiveItemsFromExistingCart()
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {

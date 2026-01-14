@@ -5,31 +5,37 @@ struct ProWelcomeSheet: View {
     @Binding var isPresented: Bool
     @State private var playAnimation = false
     @State private var hasPlayed = false
-
+    
     var body: some View {
         VStack(spacing: 24) {
-
+            
             GeometryReader { geometry in
                 ScrollView {
                     VStack(alignment: .center, spacing: 20) {
-
+                        
                         Text("Hello friend,")
                             .padding(.bottom, 40)
-
+                            .lineSpacing(8) // Added line spacing
+                        
                         Text("Grocery shopping can feel confusing, overwhelming, or just tiring — you're not alone.")
-
+                            .lineSpacing(8) // Added line spacing
+                        
                         Text("I used to plan carefully and still leave wondering if I spent too much. Prices change, items run out, and plans shift.")
-
+                            .lineSpacing(8) // Added line spacing
+                        
                         Text("Keeping track of prices and noticing patterns didn't make shopping perfect, but it made it calmer and easier to feel in control.")
-
-                        Text("Here's a small gift — the next ")
-                        + Text("2 days")
+                            .lineSpacing(8) // Added line spacing
+                        
+                        (Text("Here's a small gift — the next ")
+                         + Text("2 days")
                             .lexendFont(14, weight: .bold)
                             .foregroundStyle(.black)
-                        + Text(" everything is unlocked. No pressure, just a chance to feel a little lighter and more confident.")
-
+                         + Text(" everything is unlocked. No pressure, just a chance to feel a little lighter and more confident."))
+                        .lineSpacing(8) // Added line spacing
+                        
                         Text("- Ethan :)")
                             .padding(.top, 40)
+                            .lineSpacing(8) // Added line spacing
                     }
                     .foregroundStyle(.black.opacity(0.7))
                     .multilineTextAlignment(.center)
@@ -39,12 +45,12 @@ struct ProWelcomeSheet: View {
                     .frame(minHeight: geometry.size.height)
                 }
             }
-
+            
             Button {
                 guard !hasPlayed else { return }
                 hasPlayed = true
                 playAnimation = true
-
+                
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) {
                     isPresented = false
                 }
@@ -74,7 +80,7 @@ struct ProWelcomeSheet: View {
 
 private struct PreviewWrapper: View {
     @State private var isPresented = true
-
+    
     var body: some View {
         Color.clear
             .sheet(isPresented: $isPresented) {

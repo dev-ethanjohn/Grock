@@ -264,6 +264,7 @@ private struct StoreSectionRow: View {
 private struct StoreSectionHeader: View {
     let store: String
     @Environment(VaultService.self) private var vaultService
+    @Environment(CartStateManager.self) private var stateManager
     
     // Find the current store name from the vault to ensure we display the latest name
     private var displayStoreName: String {
@@ -283,15 +284,15 @@ private struct StoreSectionHeader: View {
                 HStack(spacing: 2) {
                     Image(systemName: "storefront")
                         .font(.system(size: 10))
-                        .foregroundColor(.black)
+                        .foregroundColor(stateManager.hasBackgroundImage ? .black : .white)
                     
                     Text(displayStoreName)
                         .lexendFont(11, weight: .bold)
                 }
-                .foregroundColor(.black)
+                .foregroundColor(stateManager.hasBackgroundImage ? .black : .white)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
-                .background(Color.white)
+                .background(stateManager.hasBackgroundImage ? Color.white : Color.black)
                 .cornerRadius(6)
                 Spacer()
             }
