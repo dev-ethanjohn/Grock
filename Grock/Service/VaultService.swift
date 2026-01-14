@@ -1134,8 +1134,9 @@ extension VaultService {
         for cartItem in cart.cartItems {
             let plannedPrice = cartItem.plannedPrice ?? 0.0
             let actualPrice = cartItem.actualPrice ?? plannedPrice
-            let plannedQty = cartItem.quantity
-            let actualQty = cartItem.actualQuantity ?? plannedQty
+            // Use originalPlanningQuantity if available (for items edited during shopping), otherwise fallback to current quantity
+            let plannedQty = cartItem.originalPlanningQuantity ?? cartItem.quantity
+            let actualQty = cartItem.actualQuantity ?? cartItem.quantity
            
             let plannedTotal = plannedPrice * plannedQty
             let actualTotal = actualPrice * actualQty

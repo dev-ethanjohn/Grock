@@ -209,7 +209,7 @@ class Cart {
 
 @Model
 class CartItem {
-    @Attribute var addedAt: Date  // Remove default value
+    @Attribute var addedAt: Date?  // Make optional for backward compatibility
     var itemId: String
     var quantity: Double
     var isFulfilled: Bool

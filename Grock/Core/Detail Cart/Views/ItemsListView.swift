@@ -121,7 +121,7 @@ private struct MainContentView: View {
             }
         }
         
-        return filteredItems.sorted { $0.cartItem.addedAt > $1.cartItem.addedAt }
+        return filteredItems.sorted { ($0.cartItem.addedAt ?? Date.distantPast) > ($1.cartItem.addedAt ?? Date.distantPast) }
     }
     
     private var sortedStoresByNewestItem: [String] {
@@ -130,7 +130,7 @@ private struct MainContentView: View {
         for store in sortedStoresWithRefresh {
             let displayItems = getDisplayItems(for: store)
             let newestDate = displayItems
-                .map { $0.cartItem.addedAt }
+                .map { $0.cartItem.addedAt ?? Date.distantPast }
                 .max() ?? Date.distantPast
             storeTimestamps[store] = newestDate
         }
@@ -274,7 +274,7 @@ private struct ItemsListContent: View {
             }
         }
         
-        return filteredItems.sorted { $0.cartItem.addedAt > $1.cartItem.addedAt }
+        return filteredItems.sorted { ($0.cartItem.addedAt ?? Date.distantPast) > ($1.cartItem.addedAt ?? Date.distantPast) }
     }
     
     private var sortedStoresByNewestItem: [String] {
@@ -283,7 +283,7 @@ private struct ItemsListContent: View {
         for store in sortedStoresWithRefresh {
             let displayItems = getDisplayItems(for: store)
             let newestDate = displayItems
-                .map { $0.cartItem.addedAt }
+                .map { $0.cartItem.addedAt ?? Date.distantPast }
                 .max() ?? Date.distantPast
             storeTimestamps[store] = newestDate
         }

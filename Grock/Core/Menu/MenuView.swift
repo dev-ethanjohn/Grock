@@ -123,6 +123,30 @@ struct MenuView: View {
                             .padding(.vertical, 4)
                         }
                         
+                        // Insights
+                        NavigationLink {
+                            InsightsView()
+                        } label: {
+                            HStack(spacing: 16) {
+                                Image(systemName: "chart.bar.xaxis")
+                                    .foregroundColor(Color(hex: "999"))
+                                    .frame(width: 24, height: 24, alignment: .leading)
+                                
+                                Text("Insights")
+                                    .font(.system(size: 16))
+                                    .fontWeight(.medium)
+                                    .foregroundColor(Color.black)
+                                
+                                Spacer()
+                                
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.gray)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.vertical, 4)
+                        }
+                        
                         ForEach(MenuItem.userSettingsMenuItems) { item in
                             MenuRow(item: item)
                         }
