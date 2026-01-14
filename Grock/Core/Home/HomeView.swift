@@ -43,6 +43,8 @@ struct HomeView: View {
     @State private var showingDeleteAlert = false
     @State private var showProWelcomeSheet = false
     
+    @State private var subscriptionManager = SubscriptionManager.shared
+    
     // Name entry sheet state
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding: Bool = false
     @AppStorage("hasSeenProWelcome") private var hasSeenProWelcome: Bool = false
@@ -221,8 +223,8 @@ struct HomeView: View {
                             .clipShape(Circle())
                             .shadow(color: Color.black.opacity(0.15), radius: 4, x: 0, y: 2)
                     }
-                    .padding(.trailing, 32)
-                    .padding(.bottom, 36)
+                    .padding(.trailing, 20)
+                    .padding(.bottom, 50)
                 }
             }
         }
@@ -325,6 +327,15 @@ struct HomeView: View {
                             systemImage: "arrow.counterclockwise"
                         )
                     }
+                    
+                    Button {
+                        subscriptionManager.togglePro()
+                    } label: {
+                        Label(
+                            subscriptionManager.isPro ? "Switch to Free (Dev)" : "Switch to Pro (Dev)",
+                            systemImage: subscriptionManager.isPro ? "lock.open" : "lock"
+                        )
+                    }
                 }
             } label: {
                 Image(systemName: "arrow.counterclockwise")
@@ -416,9 +427,7 @@ struct HomeView: View {
                 .foregroundColor(.white)
                 .clipShape(Capsule())
         }
-        .padding(.bottom)
-        .padding(.bottom)
-        .padding(.bottom, 20)
+        .padding(.bottom, 50)
     }
     
     private var trailingToolbarButton: some View {
