@@ -407,15 +407,26 @@ private extension View {
     func applyBorderAndCorners(hasBackgroundImage: Bool, isShopping: Bool) -> some View {
         self
             .cornerRadius(16)
+            .overlay(
+                ShoppingModeGradientView(cornerRadius: 16, hasBackgroundImage: hasBackgroundImage)
+                    .opacity(isShopping ? 1 : 0)
+                    .animation(.easeInOut(duration: 0.3), value: isShopping)
+            )
             .background(
                 RoundedRectangle(cornerRadius: 16)
                     .fill(hasBackgroundImage ? Color.white.opacity(0.95) : Color.clear)
             )
-            .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(Color.black, lineWidth: 0.3)
-            )
+//            .overlay(
+//                RoundedRectangle(cornerRadius: 16)
+//                    .stroke(Color.black, lineWidth: 0.1)
+//            )
             .offset(y: (isShopping && hasBackgroundImage) ? -4 : 0)
+            .shadow(
+                color: Color.black.opacity(isShopping ? 0.14 : 0),
+                radius: 0.5,
+                x: 0,
+                y: 0.5
+            )
     }
     
     func applyAnimations(calculatedHeight: CGFloat, isShopping: Bool) -> some View {

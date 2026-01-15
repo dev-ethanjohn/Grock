@@ -63,7 +63,7 @@ struct ModeToggleView: View {
             )
         }
         .padding(.top, stateManager.headerHeight)
-        .background(Color(hex: "#f7f7f7"))
+//        .background(Color(hex: "#f7f7f7"))
         .zIndex(100)
         .allowsHitTesting(true)
         .onChange(of: cart.status) { oldValue, newValue in

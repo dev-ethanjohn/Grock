@@ -146,11 +146,11 @@ struct HomeCartRowView: View {
                 .opacity(cart.isShopping ? 1 : 0)
                 .animation(.easeInOut(duration: 0.3), value: cart.isShopping)
         )
-        .overlay(
-            // Border always visible (on top)
-            RoundedRectangle(cornerRadius: 24)
-//                .stroke(Color(hex: "CACACA"), lineWidth: 1)
-                .stroke(Color.black, lineWidth: 0.5)
+        .shadow(
+            color: Color.black.opacity(cart.isShopping ? 0.05 : 0),
+            radius: 0.5,
+            x: 0,
+            y: 0.5
         )
         .scaleEffect(appeared ? 1.0 : 0.95)
         .opacity(appeared ? 1.0 : 0)
@@ -204,7 +204,7 @@ struct HomeCartRowView: View {
     
     private var headerRow: some View {
         HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(cart.name)
                     .fuzzyBubblesFont(18, weight: .bold)
                     .foregroundColor(hasBackgroundImage ? .white : .black)

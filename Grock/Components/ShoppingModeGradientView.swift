@@ -30,6 +30,7 @@ struct ShoppingModeGradientView: View {
                 .blendMode(.plusLighter)
                 .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
             }
+            .allowsHitTesting(false)
         }
         // If hasBackgroundImage is false, don't show anything
     }
