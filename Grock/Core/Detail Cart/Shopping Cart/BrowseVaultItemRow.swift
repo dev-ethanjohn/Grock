@@ -210,7 +210,7 @@ struct BrowseVaultItemRow: View {
         
         if storeItem.isShoppingOnlyItem {
             if let cartItem = findCartItem(), cart.isShopping {
-                let timeSinceAdded = Date().timeIntervalSince(cartItem.addedAt)
+                let timeSinceAdded = Date().timeIntervalSince(cartItem.addedAt ?? Date.distantPast)
                 if timeSinceAdded < 3.0 {
                     if !hasShownNewBadge {
                         showNewBadge = true

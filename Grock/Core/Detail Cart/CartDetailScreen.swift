@@ -37,7 +37,6 @@ struct CartDetailScreen: View {
     @State private var showingCompleteAlert = false
     @State private var itemToEdit: Item? = nil
     @State private var editingItem: CartItem? = nil
-    @State private var refreshTrigger = UUID()
     @State private var previousHasItems = false
     @State private var alertManager = AlertManager()
     @Namespace private var buttonNamespace
@@ -48,8 +47,7 @@ struct CartDetailScreen: View {
     }
     
     private var itemsByStore: [String: [(cartItem: CartItem, item: Item?)]] {
-        _ = refreshTrigger
-        return groupCartItemsByStore(cart.cartItems.sorted { $0.addedAt > $1.addedAt })
+        return groupCartItemsByStore(cart.cartItems.sorted { ($0.addedAt ?? Date.distantPast) > ($1.addedAt ?? Date.distantPast) })
     }
     
     private var sortedStores: [String] {
@@ -86,7 +84,6 @@ struct CartDetailScreen: View {
             showingDeleteAlert: $showingDeleteAlert,
             showingCompleteAlert: $showingCompleteAlert,
             itemToEdit: $itemToEdit,
-            refreshTrigger: $refreshTrigger,
             previousHasItems: $previousHasItems,
             alertManager: $alertManager,
             hasItems: hasItems,
@@ -121,7 +118,6 @@ struct CartDetailScreen: View {
             editingItem: $editingItem,
             showingCompleteAlert: $showingCompleteAlert,
             itemToEdit: $itemToEdit,
-            refreshTrigger: $refreshTrigger,
             previousHasItems: $previousHasItems,
             buttonNamespace: buttonNamespace
         )
@@ -144,7 +140,6 @@ struct CartDetailScreen: View {
                     cartItem: cartItem,
                     onSave: {
                         vaultService.updateCartTotals(cart: cart)
-                        refreshTrigger = UUID()
                     },
                     onDismiss: {
                         stateManager.showingShoppingPopover = false
@@ -169,7 +164,6 @@ struct CartDetailScreen: View {
                     cartItem: cartItem,
                     onSave: {
                         vaultService.updateCartTotals(cart: cart)
-                        refreshTrigger = UUID()
                         
                         if currentFulfilledCount > 0 && !stateManager.showingCompletedSheet {
                             stateManager.showingCompletedSheet = true
@@ -195,7 +189,6 @@ struct CartDetailScreen: View {
                     onSave: { newName in
                         cart.name = newName
                         vaultService.updateCartTotals(cart: cart)
-                        refreshTrigger = UUID()
                     },
                     onDismiss: nil
                 )
@@ -350,7 +343,6 @@ struct CartDetailAllModifiers: ViewModifier {
     @Binding var showingDeleteAlert: Bool
     @Binding var showingCompleteAlert: Bool
     @Binding var itemToEdit: Item?
-    @Binding var refreshTrigger: UUID
     @Binding var previousHasItems: Bool
     @Binding var alertManager: AlertManager
     
@@ -385,7 +377,6 @@ struct CartDetailAllModifiers: ViewModifier {
                 Button("Cancel", role: .cancel) { }
                 Button("Start Shopping") {
                     vaultService.startShopping(cart: cart)
-                    refreshTrigger = UUID()
                 }
             } message: {
                 Text("This will freeze your planned prices. You'll be able to update actual prices during shopping.")
@@ -397,7 +388,6 @@ struct CartDetailAllModifiers: ViewModifier {
                 Button("Cancel", role: .cancel) { }
                 Button("Switch to Planning") {
                     vaultService.returnToPlanning(cart: cart)
-                    refreshTrigger = UUID()
                 }
             } message: {
                 Text("Switching back to Planning will reset this trip to your original plan.")
@@ -415,8 +405,7 @@ struct CartDetailAllModifiers: ViewModifier {
             .editItemSheet(
                 itemToEdit: $itemToEdit,
                 cart: cart,
-                vaultService: vaultService,
-                refreshTrigger: $refreshTrigger
+                vaultService: vaultService
             )
             .cartSheets(
                 cart: cart,
@@ -433,8 +422,7 @@ struct CartDetailAllModifiers: ViewModifier {
                     set: { stateManager.selectedFilter = $0 }
                 ),
                 vaultService: vaultService,
-                cartViewModel: cartViewModel,
-                refreshTrigger: $refreshTrigger
+                cartViewModel: cartViewModel
             )
             .finishTripSheet(
                 cart: cart,
@@ -498,18 +486,12 @@ struct CartDetailAllModifiers: ViewModifier {
         
         DispatchQueue.main.async {
             vaultService.updateCartTotals(cart: cart)
-            refreshTrigger = UUID()
         }
     }
     
     private func handleShoppingDataUpdated(_ notification: Notification) {
         DispatchQueue.main.async {
-            refreshTrigger = UUID()
             vaultService.updateCartTotals(cart: cart)
-            
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                refreshTrigger = UUID()
-            }
         }
     }
 }
@@ -605,14 +587,12 @@ extension View {
         cart: Cart,
         showing: Binding<Bool>,
         detent: Binding<PresentationDetent>,
-        refreshTrigger: Binding<UUID>,
         vaultService: VaultService
     ) -> some View {
         self.sheet(isPresented: showing) {
             CompletedSheetContent(
                 cart: cart,
                 detent: detent,
-                refreshTrigger: refreshTrigger,
                 vaultService: vaultService
             )
         }
@@ -622,7 +602,6 @@ extension View {
 struct CompletedSheetContent: View {
     let cart: Cart
     @Binding var detent: PresentationDetent
-    @Binding var refreshTrigger: UUID
     let vaultService: VaultService
     
     var body: some View {
@@ -637,7 +616,6 @@ struct CompletedSheetContent: View {
                     // Handle unfulfilling a regular completed item
                     vaultService.toggleItemFulfillment(cart: cart, itemId: cartItem.itemId)
                 }
-                refreshTrigger = UUID()
             }
         )
         .conditionalPresentationBackground()
@@ -1153,7 +1131,6 @@ struct CartDetailContent: View {
     @Binding var editingItem: CartItem?
     @Binding var showingCompleteAlert: Bool
     @Binding var itemToEdit: Item?
-    @Binding var refreshTrigger: UUID
     @Binding var previousHasItems: Bool
     var buttonNamespace: Namespace.ID
     
@@ -1390,7 +1367,6 @@ struct CartDetailContent: View {
         withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
             vaultService.removeItemFromCart(cart: cart, itemId: cartItem.itemId)
             vaultService.updateCartTotals(cart: cart)
-            refreshTrigger = UUID()
         }
     }
     
@@ -1412,8 +1388,7 @@ extension View {
         showingFilterSheet: Binding<Bool>,
         selectedFilter: Binding<FilterOption>,
         vaultService: VaultService,
-        cartViewModel: CartViewModel,
-        refreshTrigger: Binding<UUID>
+        cartViewModel: CartViewModel
     ) -> some View {
         self
             .sheet(isPresented: showingCartSheet) {
@@ -1423,7 +1398,6 @@ extension View {
                         .environment(cartViewModel)
                         .onDisappear {
                             vaultService.updateCartTotals(cart: cart)
-                            refreshTrigger.wrappedValue = UUID()
                         }
                 } else {
                     AddNewItemToCartSheet(
@@ -1441,15 +1415,6 @@ extension View {
                                 object: nil,
                                 userInfo: ["cartItemId": cart.id]
                             )
-                            
-                            // Update refresh trigger multiple times to ensure update
-                            refreshTrigger.wrappedValue = UUID()
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                                refreshTrigger.wrappedValue = UUID()
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                                    refreshTrigger.wrappedValue = UUID()
-                                }
-                            }
                         }
                     )
                     .environment(vaultService)
@@ -1457,7 +1422,6 @@ extension View {
                     .onDisappear {
                         print("🔄 Shopping sheet dismissed, forcing refresh")
                         vaultService.updateCartTotals(cart: cart)
-                        refreshTrigger.wrappedValue = UUID()
                     }
                 }
             }
@@ -1496,8 +1460,7 @@ extension View {
     func editItemSheet(
         itemToEdit: Binding<Item?>,
         cart: Cart,
-        vaultService: VaultService,
-        refreshTrigger: Binding<UUID>
+        vaultService: VaultService
     ) -> some View {
         self
             .sheet(item: itemToEdit) { item in
@@ -1508,7 +1471,6 @@ extension View {
                     onSave: { updatedItem in
                         print("💾 EditItemSheet saved")
                         vaultService.updateCartTotals(cart: cart)
-                        refreshTrigger.wrappedValue = UUID()
                     },
                     context: .cart
                 )

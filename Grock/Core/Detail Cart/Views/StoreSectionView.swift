@@ -36,7 +36,7 @@ struct StoreSectionListView: View {
             }
         }
         
-        return filteredItems.sorted { $0.cartItem.addedAt > $1.cartItem.addedAt }
+        return filteredItems.sorted { ($0.cartItem.addedAt ?? Date.distantPast) > ($1.cartItem.addedAt ?? Date.distantPast) }
     }
     
     var body: some View {

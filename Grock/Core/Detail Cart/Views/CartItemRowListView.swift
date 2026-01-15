@@ -12,7 +12,6 @@ struct CartItemRowListView: View {
     
     @Environment(VaultService.self) private var vaultService
     @Environment(CartStateManager.self) private var stateManager
-    @State private var refreshTrigger = 0
     
     // Animation states
     @State private var showCheckmarkAnimation = false
@@ -61,8 +60,7 @@ struct CartItemRowListView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ItemRemovalAnimating"))) { notification in
             handleAnimationNotification(notification, animationType: .removal)
         }
-        .id("\(cartItem.itemId)_\(refreshTrigger)_\(item?.name ?? "")")
-        .animation(nil, value: refreshTrigger)
+        .id("\(cartItem.itemId)_\(item?.name ?? "")")
     }
     
     private func loadItem() {
@@ -75,7 +73,6 @@ struct CartItemRowListView: View {
               updatedItemId == cartItem.itemId else { return }
         
         loadItem()
-        refreshTrigger += 1
     }
     
     private func handleCartItemUpdate(_ notification: Notification) {
@@ -92,8 +89,6 @@ struct CartItemRowListView: View {
         if let plannedStore = userInfo["plannedStore"] as? String {
             cartItem.plannedStore = plannedStore
         }
-        
-        refreshTrigger += 1
     }
     
     private func handleAnimationNotification(_ notification: Notification, animationType: AnimationType) {
@@ -369,7 +364,7 @@ private struct MainRowContent: View {
             return
         }
         
-        let timeSinceAdded = Date().timeIntervalSince(cartItem.addedAt)
+        let timeSinceAdded = Date().timeIntervalSince(cartItem.addedAt ?? Date.distantPast)
         
         if timeSinceAdded < 5.0 && !hasShownNewBadge {
             showNewBadge = true
