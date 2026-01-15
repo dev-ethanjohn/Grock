@@ -243,7 +243,10 @@ private struct MainRowContent: View {
         .animation(nil, value: cart.isShopping)
         .contentShape(Rectangle())
         .onTapGesture {
-            if !isFulfilling {
+            guard !isFulfilling else { return }
+            if cart.isShopping {
+                onFulfillItem()
+            } else {
                 onEditItem()
             }
         }
@@ -258,14 +261,19 @@ private struct MainRowContent: View {
         .onChange(of: cart.isShopping) { oldValue, newValue in
             handleShoppingModeChange(oldValue: oldValue, newValue: newValue)
         }
-//        .applyDataChangeObservers(
-//            cartItem: cartItem,
-//            item: item,
-//            cart: cart,
-//            onUpdate: { animated in
-//                scheduleDebouncedUpdate(animated: animated)
-//            }
-//        )
+        .onReceive(NotificationCenter.default.publisher(for: .shoppingItemQuantityChanged)) { notification in
+            guard let userInfo = notification.userInfo,
+                  let cartId = userInfo["cartId"] as? String,
+                  cartId == cart.id else { return }
+            
+            if let itemId = userInfo["itemId"] as? String {
+                if itemId == cartItem.itemId {
+                    scheduleDebouncedUpdate(animated: true)
+                }
+            } else {
+                scheduleDebouncedUpdate(animated: false)
+            }
+        }
     }
     
     // MARK: - Computed Properties
@@ -371,6 +379,7 @@ private struct MainRowContent: View {
             startNewItemAnimation()
         } else if hasShownNewBadge {
             showNewBadge = true
+            badgeScale = 1.0
         } else {
             showNewBadge = false
         }

@@ -79,6 +79,22 @@ struct BrowseVaultItemRow: View {
         return .vaultOnly
     }
     
+    private var badgeText: String {
+        if storeItem.isShoppingOnlyItem {
+            return "New"
+        }
+        
+        if let cartItem = findCartItem(), cartItem.quantity > 0 {
+            if cartItem.addedDuringShopping {
+                return "Vault"
+            } else {
+                return "Planned"
+            }
+        }
+        
+        return "Vault"
+    }
+    
     private var shouldShowNewBadge: Bool {
         showNewBadge
             && storeItem.isShoppingOnlyItem
@@ -98,6 +114,8 @@ struct BrowseVaultItemRow: View {
             
             ItemDetails(
                 storeItem: storeItem,
+                itemType: itemType,
+                badgeText: badgeText,
                 textColor: textColor,
                 priceColor: priceColor,
                 contentOpacity: contentOpacity,
@@ -157,18 +175,11 @@ struct BrowseVaultItemRow: View {
     // MARK: - UI State Properties
     
     private var shouldShowIndicator: Bool {
-        switch itemType {
-        case .vaultOnly: return false
-        case .plannedCart, .shoppingOnly: return currentQuantity > 0
-        }
+        badgeText == "Planned" && currentQuantity > 0
     }
     
     private var indicatorColor: Color {
-        switch itemType {
-        case .vaultOnly: return .clear
-        case .plannedCart: return .blue
-        case .shoppingOnly: return .orange
-        }
+        badgeText == "Planned" ? .blue : .clear
     }
     
     private var textColor: Color {
@@ -217,9 +228,11 @@ struct BrowseVaultItemRow: View {
                         startNewBadgeAnimation()
                     } else {
                         showNewBadge = true
+                        badgeScale = 1.0
                     }
                 } else if hasShownNewBadge {
                     showNewBadge = true
+                    badgeScale = 1.0
                 }
             }
         }
@@ -562,6 +575,8 @@ private struct StateIndicator: View {
 
 private struct ItemDetails: View {
     let storeItem: StoreItem
+    let itemType: ItemType
+    let badgeText: String
     let textColor: Color
     let priceColor: Color
     let contentOpacity: Double
@@ -576,6 +591,14 @@ private struct ItemDetails: View {
                     .lexendFont(17)
                     .foregroundColor(textColor)
                     .opacity(contentOpacity)
+                
+                Text(badgeText)
+                    .font(.system(size: 9, weight: .semibold))
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 2)
+                    .background(badgeColor.opacity(0.15))
+                    .foregroundColor(badgeColor)
+                    .clipShape(Capsule())
                 
                 if shouldShowNewBadge {
                     NewBadgeView(
@@ -608,6 +631,14 @@ private struct ItemDetails: View {
                 Spacer()
             }
             .lexendFont(12)
+        }
+    }
+    
+    private var badgeColor: Color {
+        switch badgeText {
+        case "Planned": return .blue
+        case "New": return .orange
+        default: return Color(hex: "888888")
         }
     }
 }

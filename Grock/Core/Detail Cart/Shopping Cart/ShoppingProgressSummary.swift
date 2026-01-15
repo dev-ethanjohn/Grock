@@ -10,7 +10,7 @@ struct ShoppingProgressSummary: View {
     
     // Total items includes ALL active items (vault items + shopping-only items with quantity > 0)
     // Total items includes ONLY ACTIVE items (non-skipped, non-deleted)
-    private var totalItems: Int {
+    private var totalItemsBought: Int {
         cart.cartItems.filter { cartItem in
             // Exclude items that should not be counted:
             // 1. Shopping-only items with quantity <= 0 (effectively deleted/removed)
@@ -83,7 +83,7 @@ struct ShoppingProgressSummary: View {
         return formatter.string(from: NSNumber(value: amount)) ?? "\(CurrencyManager.shared.selectedCurrency.symbol)\(String(format: "%.2f", amount))"
     }
     
-    private var totalAmount: Double {
+    private var totalAmountSpent: String {
         let completedTotal = completedItems.reduce(0) { sum, tuple in
             let cartItem = tuple.cartItem
             let price = cartItem.actualPrice ?? cartItem.plannedPrice ?? 0
@@ -91,7 +91,7 @@ struct ShoppingProgressSummary: View {
             return sum + (price * quantity)
         }
         
-        return completedTotal
+        return formatCurrency(amount: completedTotal)
     }
     
     
@@ -110,7 +110,7 @@ struct ShoppingProgressSummary: View {
             
             VStack(alignment: .leading, spacing: 4) {
                 CharacterRevealView(
-                    text: "\(fulfilledItems)/\(totalItems) items fulfilled, totalling \(totalAmount)",
+                    text: "\(fulfilledItems)/\(totalItemsBought) items fulfilled, totalling \(totalAmountSpent)",
                     delay: 0.15
                 )
                 .fuzzyBubblesFont(13, weight: .bold)

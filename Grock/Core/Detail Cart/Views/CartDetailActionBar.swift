@@ -55,8 +55,15 @@ struct CartDetailActionBar: View {
                         Image(systemName: "plus")
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundStyle(.black)
+                            .frame(width: 40, height: 40)
+                            .background(
+                                Circle()
+                                    .fill(.white)
+                                    .shadow(color: .black.opacity(0.1), radius: 3, y: 4)
+                            )
                             .matchedGeometryEffect(id: "buttonContent", in: namespace)
                             .transition(.opacity)
+
                     }
                 }
                 .padding(.horizontal, showFinishTrip ? 2 : 24)

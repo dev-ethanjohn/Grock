@@ -10,29 +10,31 @@ struct ShoppingModeGradientView: View {
     }
     
     var body: some View {
-        // ONLY show gradient if hasBackgroundImage is true
-        if hasBackgroundImage {
-            TimelineView(.animation(minimumInterval: 0.016)) { context in
-                let time = context.date.timeIntervalSince1970
-                
-                let rotation = Angle(degrees: (time * 240).truncatingRemainder(dividingBy: 360))
-                
-                AngularGradient(
-                    gradient: Gradient(colors: titaniumColors),
-                    center: .center,
-                    angle: rotation
-                )
-                .mask(
-                    RoundedRectangle(cornerRadius: cornerRadius)
-                        .stroke(lineWidth: 6)
-                        .blur(radius: 3)
-                )
-                .blendMode(.plusLighter)
-                .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+        Group {
+            if hasBackgroundImage {
+                TimelineView(.animation(minimumInterval: 0.016)) { context in
+                    let time = context.date.timeIntervalSince1970
+                    
+                    let rotation = Angle(degrees: (time * 240).truncatingRemainder(dividingBy: 360))
+                    
+                    AngularGradient(
+                        gradient: Gradient(colors: titaniumColors),
+                        center: .center,
+                        angle: rotation
+                    )
+                    .mask(
+                        RoundedRectangle(cornerRadius: cornerRadius)
+                            .stroke(lineWidth: 6)
+                            .blur(radius: 3)
+                    )
+                    .blendMode(.plusLighter)
+                    .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+                }
+            } else {
+                Color.clear.opacity(0)
             }
-            .allowsHitTesting(false)
         }
-        // If hasBackgroundImage is false, don't show anything
+        .allowsHitTesting(false)
     }
     
     private var titaniumColors: [Color] {
