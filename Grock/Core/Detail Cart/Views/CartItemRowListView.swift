@@ -227,17 +227,17 @@ private struct MainRowContent: View {
                 buttonScale: buttonScale,
                 isFulfilling: $isFulfilling,
                 iconScale: $iconScale,
-                checkmarkScale: $checkmarkScale, // Add this
+                checkmarkScale: $checkmarkScale,
                 onFulfillItem: onFulfillItem,
                 isFirstItem: isFirstItem
             )
             .applyRowBackground(
-                          isShoppingOnlyItem: isShoppingOnlyItem,
-                          showNewBadge: showNewBadge,
-                          hasShownNewBadge: hasShownNewBadge,
-                          rowHighlight: rowHighlight,
-                          isItemFulfilled: isItemFulfilled // Add this
-                      )
+                isShoppingOnlyItem: isShoppingOnlyItem,
+                showNewBadge: showNewBadge,
+                hasShownNewBadge: hasShownNewBadge,
+                rowHighlight: rowHighlight,
+                isItemFulfilled: isItemFulfilled
+            )
         }
         .opacity(rowOpacity)
         .animation(nil, value: cart.isShopping)
@@ -1002,4 +1002,3 @@ private struct FulfillmentButton: View {
         }
     }
 }
-

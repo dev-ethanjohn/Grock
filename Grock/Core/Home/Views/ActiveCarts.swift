@@ -56,19 +56,18 @@ struct ActiveCarts: View {
                     .contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: 24))
                     .contextMenu {
                         Button {
-                            onRenameCart(cart) // Use callback
+                            onRenameCart(cart)
                         } label: {
                             Label("Rename Cart", systemImage: "pencil")
                         }
                         
                         Button(role: .destructive) {
-                            onDeleteCart(cart) // Use callback
+                            onDeleteCart(cart)
                         } label: {
                             Label("Delete Cart", systemImage: "trash")
                         }
                     }
                     .onLongPressGesture {
-                        // Optional: Provide haptic feedback on long press
                         let generator = UIImpactFeedbackGenerator(style: .medium)
                         generator.impactOccurred()
                     }

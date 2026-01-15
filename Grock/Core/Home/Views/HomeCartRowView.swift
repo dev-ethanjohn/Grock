@@ -150,7 +150,7 @@ struct HomeCartRowView: View {
             // Border always visible (on top)
             RoundedRectangle(cornerRadius: 24)
 //                .stroke(Color(hex: "CACACA"), lineWidth: 1)
-                .stroke(Color.black, lineWidth: 0.3)
+                .stroke(Color.black, lineWidth: 0.5)
         )
         .scaleEffect(appeared ? 1.0 : 0.95)
         .opacity(appeared ? 1.0 : 0)
@@ -204,20 +204,20 @@ struct HomeCartRowView: View {
     
     private var headerRow: some View {
         HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(cart.name)
                     .fuzzyBubblesFont(18, weight: .bold)
                     .foregroundColor(hasBackgroundImage ? .white : .black)
                 
-                Group {
-                    if cart.budget > 0 {
-                        Text("Budgeted")
-                    } else {
-                        Text("No budget")
-                    }
+                if cart.isShopping {
+                    Text("Shopping")
+                        .lexendFont(10, weight: .medium)
+                        .foregroundColor(
+                            hasBackgroundImage
+                            ? .white.opacity(0.8)
+                            : Color.black.opacity(0.5)
+                        )
                 }
-                .lexendFont(10, weight: .medium)
-                .foregroundColor(hasBackgroundImage ? .white.opacity(0.8) : Color.black.opacity(0.5))
             }
             .offset(y: -2)
             
