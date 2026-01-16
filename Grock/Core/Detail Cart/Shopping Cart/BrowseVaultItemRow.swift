@@ -84,11 +84,11 @@ struct BrowseVaultItemRow: View {
             return "New"
         }
         
-        if let cartItem = findCartItem(), cartItem.quantity > 0 {
-            if cartItem.addedDuringShopping {
-                return "Vault"
-            } else {
+        if let cartItem = findCartItem() {
+            if cartItem.originalPlanningQuantity != nil {
                 return "Planned"
+            } else {
+                return "Vault"
             }
         }
         

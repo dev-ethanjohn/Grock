@@ -135,6 +135,22 @@ private struct StoreSectionRow: View {
     private var isSkipped: Bool { tuple.cartItem.isSkippedDuringShopping }
     private var isFulfilled: Bool { tuple.cartItem.isFulfilled }
     
+    private enum CartItemType {
+        case planned   // part of original plan
+        case vault     // added from vault during shopping (no original planning quantity)
+        case new       // shopping-only item
+    }
+    
+    private var itemType: CartItemType {
+        if tuple.cartItem.isShoppingOnlyItem {
+            return .new
+        }
+        if tuple.cartItem.originalPlanningQuantity != nil {
+            return .planned
+        }
+        return .vault
+    }
+    
     var body: some View {
         VStack(spacing: 0) {
             CartItemRowListView(
@@ -171,25 +187,26 @@ private struct StoreSectionRow: View {
     @ViewBuilder
     private var swipeActionsContent: some View {
         if cart.isShopping {
-            if isShoppingOnlyItem {
-                Button(role: .destructive) {
-                    deleteShoppingOnlyItem()
-                } label: {
-                    Label("Delete", systemImage: "trash")
-                }
-                .tint(.red)
-            } else if tuple.cartItem.addedDuringShopping {
-                Button {
-                    deactivateVaultItemAddedDuringShopping()
-                } label: {
-                    Label("Remove", systemImage: "minus.circle")
-                }
-                .tint(.orange)
-            } else {
+        switch itemType {
+        case .new:
+            Button(role: .destructive) {
+                deleteShoppingOnlyItem()
+            } label: {
+                Label("Remove", systemImage: "trash")
+            }
+            .tint(.red)
+            
+        case .vault:
+            Button(role: .destructive) {
+                deactivateVaultItemAddedDuringShopping()
+            } label: {
+                Label("Remove", systemImage: "trash")
+            }
+            .tint(.red)
+                
+            case .planned:
                 if isSkipped {
                     Button {
-                        // We need to pass this back to the parent to handle the offset
-                        // For now, just reset the item
                         tuple.cartItem.isSkippedDuringShopping = false
                         tuple.cartItem.quantity = max(1, tuple.cartItem.originalPlanningQuantity ?? 1)
                         vaultService.updateCartTotals(cart: cart)
