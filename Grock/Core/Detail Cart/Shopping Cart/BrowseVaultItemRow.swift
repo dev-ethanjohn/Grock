@@ -195,7 +195,7 @@ struct BrowseVaultItemRow: View {
     private var textColor: Color {
         switch itemType {
         case .vaultOnly:
-            return Color(hex: "333").opacity(0.7)
+            return currentQuantity > 0 ? .black : Color(hex: "333").opacity(0.7)
         case .plannedCart, .shoppingOnly:
             return currentQuantity > 0 ? .black : Color(hex: "333").opacity(0.7)
         }
@@ -204,7 +204,7 @@ struct BrowseVaultItemRow: View {
     private var priceColor: Color {
         switch itemType {
         case .vaultOnly:
-            return Color(hex: "666").opacity(0.7)
+            return currentQuantity > 0 ? .gray : Color(hex: "666").opacity(0.7)
         case .plannedCart, .shoppingOnly:
             return currentQuantity > 0 ? .gray : Color(hex: "888").opacity(0.7)
         }
@@ -212,8 +212,10 @@ struct BrowseVaultItemRow: View {
     
     private var contentOpacity: Double {
         switch itemType {
-        case .vaultOnly: return 0.7
-        case .plannedCart, .shoppingOnly: return currentQuantity > 0 ? 1.0 : 0.7
+        case .vaultOnly: 
+            return currentQuantity > 0 ? 1.0 : 0.7
+        case .plannedCart, .shoppingOnly: 
+            return currentQuantity > 0 ? 1.0 : 0.7
         }
     }
     
@@ -277,6 +279,37 @@ struct BrowseVaultItemRow: View {
         
         let clamped = min(newValue, 100)
         
+        // Always try to activate if current quantity is 0
+        if currentQuantity == 0 {
+             if !storeItem.isShoppingOnlyItem {
+                 if findCartItem() == nil {
+                     if cart.isShopping {
+                         vaultService.addVaultItemToCartDuringShopping(
+                             item: storeItem.item,
+                             store: storeName,
+                             price: storeItem.priceOption.pricePerUnit.priceValue,
+                             unit: storeItem.priceOption.pricePerUnit.unit,
+                             cart: cart,
+                             quantity: 1
+                         )
+                     } else {
+                         vaultService.addVaultItemToCart(
+                             item: storeItem.item,
+                             cart: cart,
+                             quantity: 1,
+                             selectedStore: storeName
+                         )
+                     }
+                     // Force an immediate UI update
+                     textValue = formatValue(1)
+                     onQuantityChange?()
+                     sendShoppingUpdateNotification()
+                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                     return
+                 }
+             }
+        }
+        
         if storeItem.isShoppingOnlyItem {
             updateCartItemWithQuantity(clamped)
         } else {
@@ -300,8 +333,10 @@ struct BrowseVaultItemRow: View {
                         selectedStore: storeName
                     )
                 }
-                sendShoppingUpdateNotification()
+                // Force an immediate UI update
+                textValue = formatValue(1)
                 onQuantityChange?()
+                sendShoppingUpdateNotification()
             }
         }
         
@@ -394,7 +429,13 @@ struct BrowseVaultItemRow: View {
             pendingQuantityZero = true
             
         case .vaultOnly:
-            break
+            if let index = cart.cartItems.firstIndex(where: { $0.id == cartItem.id }) {
+                cart.cartItems.remove(at: index)
+                vaultService.updateCartTotals(cart: cart)
+            }
+            textValue = ""
+            onQuantityChange?()
+            sendShoppingUpdateNotification()
         }
     }
     
@@ -679,12 +720,27 @@ private struct QuantityControlsView: View {
         HStack(spacing: 8) {
             switch itemType {
             case .vaultOnly:
-                ControlPlusButton(
-                    color: Color(hex: "888888").opacity(0.7),
-                    strokeColor: Color(hex: "F2F2F2").darker(by: 0.1),
-                    isFocused: isFocused,
-                    action: onPlus
-                )
+                if currentQuantity > 0 {
+                    ControlMinusButton(isFocused: isFocused, action: onMinus)
+                    QuantityTextField(
+                        textValue: $textValue,
+                        focusBinding: focusBinding,
+                        onCommit: onTextCommit
+                    )
+                    ControlPlusButton(
+                        color: Color(hex: "1E2A36"),
+                        strokeColor: .clear,
+                        isFocused: isFocused,
+                        action: onPlus
+                    )
+                } else {
+                    ControlPlusButton(
+                        color: Color(hex: "888888").opacity(0.7),
+                        strokeColor: Color(hex: "F2F2F2").darker(by: 0.1),
+                        isFocused: isFocused,
+                        action: onPlus
+                    )
+                }
                 
             case .plannedCart:
                 if currentQuantity > 0 {
