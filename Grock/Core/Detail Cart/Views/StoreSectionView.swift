@@ -78,6 +78,7 @@ struct StoreSectionListView: View {
             withAnimation(.easeOut(duration: 0.25)) {
                 cartItem.isSkippedDuringShopping = true
                 cartItem.isFulfilled = false
+                cartItem.quantity = 0
             }
         }
         

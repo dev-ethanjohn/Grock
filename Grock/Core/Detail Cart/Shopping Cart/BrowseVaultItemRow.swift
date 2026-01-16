@@ -69,9 +69,10 @@ struct BrowseVaultItemRow: View {
         }
         
         if let cartItem = findCartItem() {
-            if cartItem.quantity > 0 {
+            if cartItem.originalPlanningQuantity != nil {
                 return .plannedCart
-            } else {
+            }
+            if cartItem.quantity > 0 {
                 return .vaultOnly
             }
         }
@@ -146,6 +147,8 @@ struct BrowseVaultItemRow: View {
             itemType: itemType,
             isFocused: isFocused,
             storeItemId: storeItem.item.id,
+            isSkippedPlannedItem: isSkippedPlannedItem,
+            itemName: itemName,
             onTap: handleRowTap
         ))
         .onAppear(perform: handleAppear)
@@ -174,8 +177,15 @@ struct BrowseVaultItemRow: View {
     
     // MARK: - UI State Properties
     
+    private var isSkippedPlannedItem: Bool {
+        guard let cartItem = findCartItem() else { return false }
+        return !storeItem.isShoppingOnlyItem &&
+            cartItem.originalPlanningQuantity != nil &&
+            cartItem.isSkippedDuringShopping
+    }
+    
     private var shouldShowIndicator: Bool {
-        badgeText == "Planned" && currentQuantity > 0
+        badgeText == "Planned" && currentQuantity > 0 && !isSkippedPlannedItem
     }
     
     private var indicatorColor: Color {
@@ -210,6 +220,11 @@ struct BrowseVaultItemRow: View {
     // MARK: - Event Handlers
     
     private func handleRowTap() {
+        if isSkippedPlannedItem {
+            handleUnskipPlannedItem()
+            return
+        }
+        
         if isFocused {
             isFocused = false
             commitTextField()
@@ -313,6 +328,12 @@ struct BrowseVaultItemRow: View {
         updateCartItemWithQuantity(clamped)
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
     }
+    
+    private func handleUnskipPlannedItem() {
+        guard let cartItem = findCartItem() else { return }
+        let restoredQuantity = max(1, cartItem.originalPlanningQuantity ?? 1)
+        updateCartItemWithQuantity(restoredQuantity)
+    }
 
     private func handleRemoveShoppingOnlyItem() {
         guard storeItem.isShoppingOnlyItem else { return }
@@ -362,7 +383,7 @@ struct BrowseVaultItemRow: View {
         case .plannedCart:
             cartItem.quantity = 0
             cartItem.syncQuantities(cart: cart)
-            cartItem.isSkippedDuringShopping = false
+            cartItem.isSkippedDuringShopping = true
             vaultService.updateCartTotals(cart: cart)
             textValue = formatValue(0)
             onQuantityChange?()
@@ -833,6 +854,8 @@ private struct RowContainerModifier: ViewModifier {
     let itemType: ItemType
     let isFocused: Bool
     let storeItemId: String
+    let isSkippedPlannedItem: Bool
+    let itemName: String
     let onTap: () -> Void
     
     func body(content: Content) -> some View {
@@ -841,6 +864,18 @@ private struct RowContainerModifier: ViewModifier {
             .padding(.horizontal)
             .padding(.vertical, 8)
             .background(.white)
+            .overlay {
+                if isSkippedPlannedItem {
+                    ZStack {
+                        Color(hex: "F9F9F9")
+                        
+                        Text("Unskip \(itemName) item")
+                            .fuzzyBubblesFont(15, weight: .bold)
+                            .foregroundColor(Color(hex: "333333"))
+                            .underline()
+                    }
+                }
+            }
             .scaleEffect(isRemoving ? 0.9 : appearScale)
             .opacity(isRemoving ? 0 : appearOpacity)
             .offset(x: isRemoving ? -UIScreen.main.bounds.width : 0)

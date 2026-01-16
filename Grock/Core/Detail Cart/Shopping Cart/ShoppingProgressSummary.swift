@@ -29,9 +29,8 @@ struct ShoppingProgressSummary: View {
 
     private var skippedItems: Int {
         cart.cartItems.filter { cartItem in
-            !cartItem.isShoppingOnlyItem &&           // Only vault items
+            !cartItem.isShoppingOnlyItem &&           // Only vault items (planned items)
             cartItem.isSkippedDuringShopping &&       // Marked as skipped
-            cartItem.quantity > 0 &&                  // Still in cart (quantity > 0)
             !cartItem.addedDuringShopping             // NOT added during shopping (these should be deleted, not skipped)
         }.count
     }
