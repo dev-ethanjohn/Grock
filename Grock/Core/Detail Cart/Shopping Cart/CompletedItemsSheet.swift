@@ -108,7 +108,7 @@ private struct CompletedHeader: View {
                         
                         + Text(" \(totalAmount.formattedCurrency)")
                             .lexendFont(16)
-                            .foregroundStyle(.black.opacity(0.6))
+                            .foregroundStyle(.black)
                     } else if skippedCount > 0 {
                         Text("\(skippedCount) skipped item\(skippedCount == 1 ? "" : "s")")
                             .lexendFont(16)
@@ -154,7 +154,7 @@ private struct CompletedItemsList: View {
                                     .stroke(style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
                                     .frame(height: 0.5)
                                     .foregroundColor(Color(hex: "999").opacity(0.5))
-                                    .padding(.horizontal, 12)
+//                                    .padding(.horizontal, 12)
                             }
                         }
                     }
@@ -327,12 +327,10 @@ private struct CompletedItemRow: View {
                     .lexendFont(12)
                 }
                 
-                Spacer()
             }
+            .frame(maxWidth: .infinity)
             .padding(.bottom, 4)
-            .padding(.horizontal, 0)
             .padding(.vertical, 8)
-            .background(.white)
             .transition(.opacity)
         }
     }

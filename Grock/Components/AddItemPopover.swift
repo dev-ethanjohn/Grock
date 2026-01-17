@@ -83,6 +83,7 @@ struct AddItemPopover: View {
                     verticalPadding: 12,
                     maxWidth: true
                 ) {
+                    KeyboardManager.dismissWithAnimation()
                     if formViewModel.attemptSubmission(),
                        let category = formViewModel.selectedCategory,
                        let priceValue = Double(formViewModel.itemPrice) {
@@ -200,6 +201,8 @@ struct AddItemPopover: View {
     private func dismissPopover() {
         duplicateCheckTask?.cancel()
         itemNameFieldIsFocused = false
+        keyboardVisible = false
+        KeyboardManager.dismissWithAnimation()
         isPresented = false
         onDismiss?()
     }

@@ -424,12 +424,12 @@ private extension View {
 //                    .stroke(Color.black, lineWidth: 0.1)
 //            )
             .offset(y: (isShopping && hasBackgroundImage) ? -4 : 0)
-            .shadow(
-                color: Color.black.opacity(isShopping ? 0.14 : 0),
-                radius: 0.5,
-                x: 0,
-                y: 0.5
-            )
+//            .shadow(
+//                color: Color.black.opacity(isShopping ? 0.14 : 0),
+//                radius: 0.5,
+//                x: 0,
+//                y: 0.5
+//            )
     }
     
     func applyAnimations(calculatedHeight: CGFloat, isShopping: Bool) -> some View {

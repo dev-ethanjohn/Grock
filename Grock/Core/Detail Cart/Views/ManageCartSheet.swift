@@ -123,7 +123,7 @@ struct ManageCartSheet: View {
             }
             
             ZStack {
-                if keyboardResponder.isVisible {
+                if keyboardResponder.isVisible && focusedItemId != nil {
                     KeyboardDoneButton(
                         keyboardHeight: keyboardResponder.currentHeight,
                         onDone: {
@@ -656,7 +656,6 @@ struct CategoryItemsListView: View {
     @Binding var localActiveItems: [String: Double]
     
     @Environment(VaultService.self) private var vaultService
-    @State private var focusedItemId: String?
     
     // Store availableStores as @State
     @State private var currentStores: [String] = []
@@ -682,7 +681,6 @@ struct CategoryItemsListView: View {
                 )
             }
         }
-        .preference(key: TextFieldFocusPreferenceKey.self, value: focusedItemId)
         .onAppear {
             updateStores()
         }
@@ -710,10 +708,12 @@ struct CategoryItemsListView: View {
     private var emptyCategoryView: some View {
         VStack {
             Spacer()
-            Text("No items in this category")
+            Text("No items yet in \(category.title) \(category.emoji)")
                 .foregroundColor(.gray)
             Spacer()
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .transition(.scale(scale: 0.8).combined(with: .opacity))
     }
 }
 

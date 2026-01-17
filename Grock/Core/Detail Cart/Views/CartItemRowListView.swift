@@ -607,7 +607,7 @@ private struct ItemNameRow: View {
         HStack(spacing: 4) {
             ZStack(alignment: .leading) {
                 // Item name text
-                Text("\(currentQuantity.formattedQuantity) \(displayUnit) \(item?.name ?? cartItem.shoppingOnlyName ?? "Unknown Item") ")
+                Text("\(currentQuantity.formattedQuantity)\(displayUnit) \(item?.name ?? cartItem.shoppingOnlyName ?? "Unknown Item") ")
                     .lexendFont(16, weight: stateManager.hasBackgroundImage ? .semibold : .regular)
                     .lineLimit(3)
                     .fixedSize(horizontal: false, vertical: true)
