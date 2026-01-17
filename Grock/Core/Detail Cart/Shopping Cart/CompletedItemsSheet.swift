@@ -21,7 +21,7 @@ struct CompletedItemsSheet: View {
 
     private var skippedItems: [(cartItem: CartItem, item: Item?)] {
         cart.cartItems.filter {
-            !$0.isShoppingOnlyItem && // Only vault items
+            !$0.isShoppingOnlyItem && 
             $0.isSkippedDuringShopping
         }.map { c in
             (c, vaultService.findItemById(c.itemId))

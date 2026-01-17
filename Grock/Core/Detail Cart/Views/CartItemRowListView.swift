@@ -274,6 +274,9 @@ private struct MainRowContent: View {
                 scheduleDebouncedUpdate(animated: false)
             }
         }
+        .onChange(of: cartItem.quantity) { oldValue, newValue in
+            scheduleDebouncedUpdate(animated: true)
+        }
     }
     
     // MARK: - Computed Properties

@@ -428,6 +428,7 @@ struct ManageCartSheet: View {
         
         let selectedItemIds = Set(localActiveItems.keys)
         let currentCartItemIds = Set(cart.cartItems.map { $0.itemId })
+        var changedQuantities: [(itemId: String, newQuantity: Double)] = []
         
         // Remove items that were deselected OR have zero quantity
         let itemsToRemove = currentCartItemIds.subtracting(selectedItemIds)
@@ -435,6 +436,7 @@ struct ManageCartSheet: View {
             if let item = vaultService.findItemById(itemId) {
                 print("   🗑️ Removing: \(item.name)")
                 vaultService.removeItemFromCart(cart: cart, itemId: itemId)
+                changedQuantities.append((itemId: itemId, newQuantity: 0))
             }
         }
         
@@ -447,10 +449,12 @@ struct ManageCartSheet: View {
                         if quantity > 0 {
                             print("   🔄 Updating: \(item.name) from \(existingCartItem.quantity) to \(quantity)")
                             existingCartItem.quantity = quantity
+                            changedQuantities.append((itemId: itemId, newQuantity: quantity))
                         } else {
                             // Remove item if quantity is 0
                             print("   🗑️ Removing (zero quantity): \(item.name)")
                             vaultService.removeItemFromCart(cart: cart, itemId: itemId)
+                            changedQuantities.append((itemId: itemId, newQuantity: 0))
                         }
                     }
                 } else {
@@ -459,6 +463,7 @@ struct ManageCartSheet: View {
                         print("   ➕ Adding: \(item.name) × \(quantity)")
                         // CHANGED: Use addVaultItemToCart instead of addItemToCart
                         vaultService.addVaultItemToCart(item: item, cart: cart, quantity: quantity)
+                        changedQuantities.append((itemId: itemId, newQuantity: quantity))
                     }
                 }
             }
@@ -467,12 +472,31 @@ struct ManageCartSheet: View {
         vaultService.updateCartTotals(cart: cart)
         print("   ✅ Final cart items: \(cart.cartItems.count)")
         
+        // Broadcast detailed quantity changes for row/UI refresh
+        for change in changedQuantities {
+            NotificationCenter.default.post(
+                name: .shoppingItemQuantityChanged,
+                object: nil,
+                userInfo: [
+                    "cartId": cart.id,
+                    "itemId": change.itemId,
+                    "newQuantity": change.newQuantity
+                ]
+            )
+        }
+        
         NotificationCenter.default.post(
             name: .shoppingItemQuantityChanged,
             object: nil,
             userInfo: [
                 "cartId": cart.id
             ]
+        )
+        
+        NotificationCenter.default.post(
+            name: .shoppingDataUpdated,
+            object: nil,
+            userInfo: ["cartItemId": cart.id]
         )
     }
     
