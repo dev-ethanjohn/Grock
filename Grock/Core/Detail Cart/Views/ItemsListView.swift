@@ -259,6 +259,7 @@ private struct ItemsListContent: View {
     
     @Environment(VaultService.self) private var vaultService
     @Environment(CartStateManager.self) private var stateManager
+//    @Namespace private var summaryNamespace
     
     // Helper methods
     private func getDisplayItems(for store: String) -> [(cartItem: CartItem, item: Item?)] {
@@ -310,6 +311,7 @@ private struct ItemsListContent: View {
                 ShoppingProgressSummary(cart: cart)
                     .presentationCornerRadius(24)
                     .environment(vaultService)
+//                    .matchedGeometryEffect(id: "shoppingSummary", in: summaryNamespace)
                     .transition(.asymmetric(
                         insertion: .opacity,
                         removal: .modifier(
@@ -320,6 +322,7 @@ private struct ItemsListContent: View {
                     .offset(y: stateManager.hasBackgroundImage ? 0 : 4)
             }
         }
+        .animation(.spring(response: 0.45, dampingFraction: 0.85), value: calculatedHeight)
         .animation(.spring(response: 0.45, dampingFraction: 0.75), value: cart.isShopping)
     }
 }

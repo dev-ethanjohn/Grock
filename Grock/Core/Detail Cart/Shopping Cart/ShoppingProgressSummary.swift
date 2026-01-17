@@ -178,10 +178,12 @@ struct ShoppingProgressSummary: View {
 struct CharacterRevealView: View {
     let text: String
     let delay: Double
+    var animateOnChange: Bool = false
     @State private var revealedCharacters: Int = 0
     @State private var isAnimating = false
     @State private var underlineWidth: CGFloat = 0
     @State private var textWidth: CGFloat = 0
+    @State private var didAppear = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -202,9 +204,13 @@ struct CharacterRevealView: View {
             }
             .background(
                 GeometryReader { geometry in
-                    Color.clear.onAppear {
-                        textWidth = geometry.size.width
-                    }
+                    Color.clear
+                        .onAppear {
+                            textWidth = geometry.size.width
+                        }
+                        .onChange(of: geometry.size.width) { _, newValue in
+                            textWidth = newValue
+                        }
                 }
             )
             .onAppear {
@@ -220,30 +226,32 @@ struct CharacterRevealView: View {
                 .offset(y: -0.5)
         }
         .onAppear {
+            guard !didAppear else { return }
+            didAppear = true
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-                withAnimation(
-                    .easeOut(duration: 0.32)
-                ) {
+                withAnimation(.easeOut(duration: 0.32)) {
                     revealedCharacters = text.count
                 }
-                
-                withAnimation(
-                    .easeOut(duration: Double(text.count) * 0.01 + 0.32)
-                ) {
+                withAnimation(.easeOut(duration: Double(text.count) * 0.01 + 0.32)) {
                     underlineWidth = textWidth
                 }
             }
-            
             DispatchQueue.main.asyncAfter(deadline: .now() + delay + 0.25) {
-                withAnimation(
-                    .spring(
-                        response: 0.2,
-                        dampingFraction: 0.8,
-                        blendDuration: 0.1
-                    )
-                ) {
+                withAnimation(.spring(response: 0.2, dampingFraction: 0.8, blendDuration: 0.1)) {
                     isAnimating = true
                 }
+            }
+        }
+        .onChange(of: text) { _, _ in
+            if animateOnChange {
+                withAnimation(.easeOut(duration: 0.2)) {
+                    revealedCharacters = text.count
+                    underlineWidth = textWidth
+                }
+            } else {
+                revealedCharacters = text.count
+                underlineWidth = textWidth
+                isAnimating = false
             }
         }
 //        .scaleEffect(isAnimating ? 1.007 : 1.0)
