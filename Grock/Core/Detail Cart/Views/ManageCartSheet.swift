@@ -123,7 +123,7 @@ struct ManageCartSheet: View {
             }
             
             ZStack {
-                if keyboardResponder.isVisible && focusedItemId != nil {
+                if keyboardResponder.isVisible {
                     KeyboardDoneButton(
                         keyboardHeight: keyboardResponder.currentHeight,
                         onDone: {
@@ -139,6 +139,9 @@ struct ManageCartSheet: View {
         .navigationBarHidden(true) // Hide native navigation bar
         .background(.white)
         .ignoresSafeArea(.keyboard)
+        .onPreferenceChange(TextFieldFocusPreferenceKey.self) { itemId in
+            focusedItemId = itemId
+        }
         .onAppear {
             initializeActiveItemsFromCart()
             if selectedCategory == nil {
@@ -189,7 +192,6 @@ struct ManageCartSheet: View {
                 fillAnimation = 1.0
             }
         }
-        .preference(key: TextFieldFocusPreferenceKey.self, value: focusedItemId)
         .presentationDragIndicator(.visible)
         .presentationCornerRadius(24)
     }
@@ -464,6 +466,14 @@ struct ManageCartSheet: View {
         
         vaultService.updateCartTotals(cart: cart)
         print("   ✅ Final cart items: \(cart.cartItems.count)")
+        
+        NotificationCenter.default.post(
+            name: .shoppingItemQuantityChanged,
+            object: nil,
+            userInfo: [
+                "cartId": cart.id
+            ]
+        )
     }
     
     private func selectCategory(_ category: GroceryCategory, proxy: ScrollViewProxy) {
@@ -726,7 +736,6 @@ struct ManageCartItemsListView: View {
         }
         .listStyle(PlainListStyle())
         .listSectionSpacing(16)
-        .preference(key: TextFieldFocusPreferenceKey.self, value: focusedItemId)
         .onAppear {
             previousStores = availableStores
         }

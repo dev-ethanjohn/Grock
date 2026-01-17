@@ -781,7 +781,7 @@ private struct ItemPriceRow: View {
                 .lineLimit(1)
                 .contentTransition(.numericText())
                 .animation(nil, value: currentPrice)
-                .foregroundColor(textColor) // Apply gray color
+                .foregroundColor(textColor)
             
             Spacer()
             
@@ -790,7 +790,7 @@ private struct ItemPriceRow: View {
                 .lineLimit(1)
                 .contentTransition(.numericText())
                 .animation(nil, value: currentTotalPrice)
-                .foregroundColor(textColor) // Apply gray color
+                .foregroundColor(.white)
         }
         .opacity(isItemFulfilled ? 0.5 : 1.0) // Additional opacity for fulfilled
     }

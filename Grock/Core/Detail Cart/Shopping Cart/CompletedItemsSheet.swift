@@ -104,7 +104,7 @@ private struct CompletedHeader: View {
                     if fulfilledCount > 0 {
                         Text("Fulfilled total so far:")
                             .lexendFont(16)
-                            .foregroundStyle(.black.opacity(0.6))
+                            .foregroundStyle(.black)
                         
                         + Text(" \(totalAmount.formattedCurrency)")
                             .lexendFont(16)
@@ -115,10 +115,9 @@ private struct CompletedHeader: View {
                             .foregroundStyle(.orange.opacity(0.8))
                     } else {
                         
-                        
                         Text("No fulfilled items yet")
                             .lexendFont(16)
-                            .foregroundStyle(.black.opacity(0.6))
+                            .foregroundStyle(.black)
                     }
                 }
             }
