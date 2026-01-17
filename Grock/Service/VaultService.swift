@@ -1090,6 +1090,24 @@ extension VaultService {
         updateCartTotals(cart: cart)
         saveContext()
         print(cartItem.isFulfilled ? "✅ Fulfilled item" : "❌ Unfulfilled item")
+        
+        NotificationCenter.default.post(
+            name: NSNotification.Name("CartItemFulfillmentToggled"),
+            object: nil,
+            userInfo: [
+                "cartId": cart.id,
+                "itemId": itemId,
+                "isFulfilled": cartItem.isFulfilled
+            ]
+        )
+        
+        NotificationCenter.default.post(
+            name: NSNotification.Name("ShoppingDataUpdated"),
+            object: nil,
+            userInfo: [
+                "cartItemId": cart.id
+            ]
+        )
     }
 }
 

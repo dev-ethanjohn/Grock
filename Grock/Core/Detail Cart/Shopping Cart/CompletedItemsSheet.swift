@@ -7,6 +7,7 @@ struct CompletedItemsSheet: View {
     let onUnfulfillItem: (CartItem) -> Void
     
     @Environment(VaultService.self) private var vaultService
+    @State private var refreshKey = UUID()
     
     @State private var showSkippedItems = false
     
@@ -49,6 +50,7 @@ struct CompletedItemsSheet: View {
                 completedItems: completedItems,
                 skippedItems: skippedItems
             )
+            .padding(.bottom, 24)
             
             CompletedItemsList(
                 cart: cart,
@@ -59,6 +61,13 @@ struct CompletedItemsSheet: View {
             )
         }
         .padding()
+        .id(refreshKey)
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("CartItemFulfillmentToggled"))) { notification in
+            guard let userInfo = notification.userInfo,
+                  let cartId = userInfo["cartId"] as? String,
+                  cartId == cart.id else { return }
+            refreshKey = UUID()
+        }
     }
 }
 
@@ -94,11 +103,11 @@ private struct CompletedHeader: View {
                 HStack(spacing: 8) {
                     if fulfilledCount > 0 {
                         Text("Fulfilled total so far:")
-                            .fuzzyBubblesFont(16, weight: .bold)
+                            .lexendFont(16)
                             .foregroundStyle(.black.opacity(0.6))
                         
                         + Text(" \(totalAmount.formattedCurrency)")
-                            .fuzzyBubblesFont(18, weight: .bold)
+                            .lexendFont(16)
                             .foregroundStyle(.black.opacity(0.6))
                     } else if skippedCount > 0 {
                         Text("\(skippedCount) skipped item\(skippedCount == 1 ? "" : "s")")
@@ -133,70 +142,87 @@ private struct CompletedItemsList: View {
                     // Show completed items first
                     if !completedItems.isEmpty {
                         ForEach(Array(completedItems.enumerated()), id: \.offset) { index, tuple in
-                            SimpleCompletedItemRow(
+                            CompletedItemRow(
                                 cartItem: tuple.cartItem,
                                 item: tuple.item,
-                                cart: cart,
                                 isSkipped: false,
-                                onUnfulfill: { onUnfulfillItem(tuple.cartItem) }
+                                onAction: { onUnfulfillItem(tuple.cartItem) }
                             )
                             .id("completed-\(tuple.cartItem.itemId)-\(index)")
                             
                             if index < completedItems.count - 1 || !skippedItems.isEmpty {
-                                Divider()
-                                    .padding(.horizontal, 20)
+                                DashedLine()
+                                    .stroke(style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
+                                    .frame(height: 0.5)
+                                    .foregroundColor(Color(hex: "999").opacity(0.5))
+                                    .padding(.horizontal, 12)
                             }
                         }
                     }
                     
                     // Show skipped items in accordion
                     if !skippedItems.isEmpty {
-                        // Accordion header for skipped items
-                        Button(action: {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                showSkippedItems.toggle()
-                            }
-                        }) {
-                            HStack {
-                                Image(systemName: showSkippedItems ? "chevron.down" : "chevron.right")
-                                    .font(.system(size: 14, weight: .medium))
-                                    .foregroundColor(.orange)
-                                
-                                Text("\(skippedItems.count) skipped for this trip")
-                                    .lexendFont(14, weight: .medium)
-                                    .foregroundColor(.orange)
-                                
-                                Spacer()
-                                
-                                Text("Tap to \(showSkippedItems ? "hide" : "show")")
-                                    .lexendFont(12)
-                                    .foregroundColor(.orange.opacity(0.7))
-                            }
-                            .padding(.vertical, 12)
-                            .padding(.horizontal, 20)
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .id("skipped-header-\(cart.id)")
-                        
-                        // Skipped items (collapsible)
-                        if showSkippedItems {
-                            ForEach(Array(skippedItems.enumerated()), id: \.offset) { index, tuple in
-                                SimpleCompletedItemRow(
-                                    cartItem: tuple.cartItem,
-                                    item: tuple.item,
-                                    cart: cart,
-                                    isSkipped: true,
-                                    onUnfulfill: { onUnfulfillItem(tuple.cartItem) }
-                                )
-                                .id("skipped-\(tuple.cartItem.itemId)-\(index)")
-                                
-                                if index < skippedItems.count - 1 {
-                                    Divider()
-                                        .padding(.horizontal, 20)
+                        VStack(spacing: 0) {
+                            // Accordion header for skipped items
+                            Button(action: {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                    showSkippedItems.toggle()
                                 }
+                            }) {
+                                HStack(spacing: 6) {
+                                    Spacer()
+                                    
+                                    Text("(\(skippedItems.count))")
+                                        .lexendFont(13)
+                                    
+                                    Text("Skipped Items")
+                                        .lexendFont(13)
+        
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 11, weight: .medium))
+                                        .rotationEffect(.degrees(showSkippedItems ? 90 : 0))
+                                    
+                                    Spacer()
+                                }
+                                .foregroundColor(.gray)
+                                .padding(.vertical)
+                                .padding(.trailing)
+                                .padding(.leading, 4)
+                                .frame(maxWidth: .infinity)
+                                .contentShape(Rectangle())
+                                .background(!showSkippedItems ? Color(hex: "F9F9F9") : Color.clear)
+                            }
+                            .buttonStyle(.plain)
+                            .id("skipped-header-\(cart.id)")
+                            
+                            // Skipped items (collapsible)
+                            if showSkippedItems {
+                                VStack(spacing: 0) {
+                                    ForEach(Array(skippedItems.enumerated()), id: \.offset) { index, tuple in
+                                        CompletedItemRow(
+                                            cartItem: tuple.cartItem,
+                                            item: tuple.item,
+                                            isSkipped: true,
+                                            onAction: { onUnfulfillItem(tuple.cartItem) }
+                                        )
+                                        .id("skipped-\(tuple.cartItem.itemId)-\(index)")
+                                        
+                                        if index < skippedItems.count - 1 {
+                                            DashedLine()
+                                                .stroke(style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
+                                                .frame(height: 0.5)
+                                                .foregroundColor(Color(hex: "999").opacity(0.5))
+                                                .padding(.horizontal, 12)
+                                        }
+                                    }
+                                }
+                                .offset(y: showSkippedItems ? 0 : -10)
+                                .opacity(showSkippedItems ? 1 : 0)
+                                .animation(.spring(response: 0.3, dampingFraction: 0.85), value: showSkippedItems)
                             }
                         }
+                        .background(showSkippedItems ? Color(hex: "F9F9F9") : Color.clear)
+                        .clipped()
                     }
                 }
             }
@@ -215,7 +241,7 @@ private struct EmptyStateView: View {
                 .rotationEffect(.degrees(0))
             
             Text("Start by fulfilling items or continue your shopping")
-                .fuzzyBubblesFont(14)
+                .lexendFont(14)
                 .foregroundColor(Color(hex: "777"))
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 40)
@@ -226,117 +252,89 @@ private struct EmptyStateView: View {
     }
 }
 
-
-private struct SimpleCompletedItemRow: View {
+private struct CompletedItemRow: View {
     let cartItem: CartItem
     let item: Item?
-    let cart: Cart
     let isSkipped: Bool
-    let onUnfulfill: () -> Void
+    let onAction: () -> Void
+    
+    private var itemName: String {
+        item?.name ?? "Unknown Item"
+    }
+    
+    private var price: Double {
+        cartItem.actualPrice ?? cartItem.plannedPrice ?? 0
+    }
+    
+    private var unit: String {
+        cartItem.actualUnit ?? cartItem.plannedUnit ?? "ea"
+    }
+    
+    private var quantity: Double {
+        cartItem.actualQuantity ?? cartItem.quantity
+    }
+    
+    private var totalPrice: Double {
+        price * quantity
+    }
     
     var body: some View {
-        HStack {
-            // Status indicator
-            if isSkipped {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 20))
-                    .foregroundColor(.gray)
-            } else {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 20))
-                    .foregroundColor(.green)
-            }
-            
-            VStack(alignment: .leading, spacing: 4) {
-                Text(item?.name ?? "Unknown Item")
-                    .lexendFont(16, weight: .medium)
-                    .foregroundColor(isSkipped ? Color(hex: "999") : Color(hex: "333"))
-                    .strikethrough(isSkipped, color: Color(hex: "999"))
-                
-                Text("Qty: \(cartItem.quantity, specifier: "%.0f")")
-                    .lexendFont(14)
-                    .foregroundColor(isSkipped ? Color(hex: "999") : Color(hex: "666"))
-            }
-            
-            Spacer()
-            
-            // Show price if not skipped (skipped items have 0 value)
-            if !isSkipped, let price = cartItem.actualPrice ?? cartItem.plannedPrice {
-                Text("\(price.formattedCurrency)")
-                    .lexendFont(14, weight: .medium)
-                    .foregroundColor(Color(hex: "333"))
-            } else if isSkipped {
-                Text("Skipped")
-                    .lexendFont(12)
-                    .foregroundColor(.orange)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Color.orange.opacity(0.1))
-                    .cornerRadius(4)
-            }
-            
-            Button(action: onUnfulfill) {
-                if isSkipped {
-                    Image(systemName: "arrow.uturn.backward.circle")
-                        .font(.system(size: 20))
-                        .foregroundColor(.orange)
-                } else {
-                    Image(systemName: "arrow.uturn.backward.circle")
-                        .font(.system(size: 20))
-                        .foregroundColor(.blue)
+        if isSkipped {
+            Text("Unskip \(itemName) item")
+                .lexendFont(15, weight: .medium)
+                .foregroundColor(Color(hex: "333333"))
+                .underline()
+                .frame(maxWidth: .infinity, alignment: .center)
+                .contentShape(Rectangle())
+                .onTapGesture(perform: onAction)
+                .padding(.bottom, 4)
+                .padding(.horizontal)
+                .padding(.vertical)
+                .background(Color(hex: "F9F9F9"))
+                .transition(.opacity)
+        } else {
+            HStack(alignment: .top, spacing: 8) {
+                Button(action: onAction) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 22))
+                        .foregroundColor(.green)
                 }
+                .buttonStyle(.plain)
+                .padding(.top, 4)
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 4) {
+                        Text("\(quantity, specifier: "%g") \(unit) \(itemName)")
+                            .lexendFont(16, weight: .regular)
+                            .foregroundColor(.black)
+                            .contentTransition(.numericText())
+                    }
+                    
+                    HStack(spacing: 0) {
+                        Text("\(CurrencyManager.shared.selectedCurrency.symbol)\(price, specifier: "%g")")
+                            .foregroundColor(.gray)
+                            .contentTransition(.numericText())
+                        
+                        Text("/\(unit)")
+                            .foregroundColor(.gray)
+                        
+                        Spacer()
+                        
+                        Text(totalPrice.formattedCurrency)
+                            .lexendFont(13, weight: .semibold)
+                            .foregroundColor(Color(hex: "231F30"))
+                            .contentTransition(.numericText())
+                    }
+                    .lexendFont(12)
+                }
+                
+                Spacer()
             }
+            .padding(.bottom, 4)
+            .padding(.horizontal, 0)
+            .padding(.vertical, 8)
+            .background(.white)
+            .transition(.opacity)
         }
-        .padding(.vertical, 12)
-        .padding(.horizontal, 20)
     }
 }
-
-//#Preview("Completed Items") {
-//    let mockCart = Cart(name: "Preview Cart", budget: 100.0, status: .shopping)
-//    
-//    // Add some items
-//    let item1 = CartItem(
-//        itemId: UUID().uuidString,
-//        quantity: 2,
-//        plannedStore: "Store 1",
-//        isFulfilled: true,
-//        plannedPrice: 10.0,
-//        plannedUnit: "each"
-//    )
-//    
-//    let item2 = CartItem(
-//        itemId: UUID().uuidString,
-//        quantity: 1,
-//        plannedStore: "Store 2",
-//        isFulfilled: false,
-//        isSkippedDuringShopping: true,
-//        plannedPrice: 5.0,
-//        plannedUnit: "each"
-//    )
-//    
-//    mockCart.cartItems = [item1, item2]
-//    
-//    // Create a mock environment - include ALL models
-//    let schema = Schema([
-//        User.self,
-//        Vault.self,
-//        Store.self,
-//        Category.self,
-//        Item.self,
-//        PriceOption.self,
-//        PricePerUnit.self,
-//        Cart.self,
-//        CartItem.self
-//    ])
-//    
-//    let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
-//    let container = try! ModelContainer(for: schema, configurations: [config])
-//    let modelContext = ModelContext(container)
-//    
-//    CompletedItemsSheet(
-//        cart: mockCart,
-//        onUnfulfillItem: { _ in }
-//    )
-//    .environment(VaultService(modelContext: modelContext))
-//}

@@ -551,7 +551,7 @@ struct AddNewItemView: View {
     private var headerSection: some View {
         VStack(alignment: .center, spacing: 2) {
             Text("Found an extra item?")
-                .fuzzyBubblesFont(20, weight: .bold)
+                .lexendFont(20, weight: .medium)
             
             Text("This wasn't on your plan, but you can add it to this trip")
                 .lexendFont(12, weight: .light)

@@ -50,6 +50,53 @@ struct HomeCartRowView: View {
         }
     }
     
+    private var cardBackground: some View {
+        Group {
+            if hasBackgroundImage, let backgroundImage {
+                ZStack {
+                    Image(uiImage: backgroundImage)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .clipped()
+                        .blur(radius: 2)
+                        .overlay(Color.black.opacity(0.4))
+                    
+                    VisibleNoiseView(
+                        grainSize: 0.0001,
+                        density: 0.5,
+                        opacity: 0.20
+                    )
+                }
+            } else {
+                ZStack {
+                    backgroundColor
+                        .overlay {
+                            NoiseOverlayView(
+                                grainSize: 0.1,
+                                density: 0.7,
+                                opacity: 0.70
+                            )
+                        }
+                }
+            }
+        }
+    }
+    
+    private var shoppingModeOverlay: some View {
+        ShoppingModeGradientView(cornerRadius: 24, hasBackgroundImage: hasBackgroundImage)
+            .opacity(cart.isShopping ? 1 : 0)
+            .animation(.easeInOut(duration: 0.3), value: cart.isShopping)
+    }
+    
+    private var borderOverlay: some View {
+        RoundedRectangle(cornerRadius: 24)
+            .stroke(
+                Color.gray.opacity(1),
+                lineWidth: 0.3
+            )
+    }
+    
     // Total items includes ONLY ACTIVE items (non-skipped, non-deleted)
     private var totalItems: Int {
         cart.cartItems.filter { cartItem in
@@ -106,52 +153,16 @@ struct HomeCartRowView: View {
             progressSection
         }
         .padding()
-        .background(
-            Group {
-                if hasBackgroundImage, let backgroundImage = backgroundImage {
-                    ZStack {
-                        // Background image with overlay
-                        Image(uiImage: backgroundImage)
-                            .resizable()
-                            .scaledToFill()
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            .clipped()
-                            .blur(radius: 2)
-                            .overlay(Color.black.opacity(0.4))
-                        
-                        VisibleNoiseView(
-                            grainSize: 0.0001,      // Medium grain size
-                            density: 0.5,        // Visible but not overwhelming
-                            opacity: 0.20       // Subtle but noticeable
-                        )
-                    }
-                } else {
-                    ZStack {
-                        backgroundColor
-                            .overlay {
-                                NoiseOverlayView(
-                                    grainSize: 0.1,
-                                    density: 0.7,
-                                    opacity: 0.70
-                                )
-                            }
-                    }
-                }
-            }
-        )
+        .background(cardBackground)
         .clipShape(RoundedRectangle(cornerRadius: 24))
-        .overlay(
-            // Shopping mode: animated titanium glowing border (behind the border)
-            ShoppingModeGradientView(cornerRadius: 24, hasBackgroundImage: hasBackgroundImage)
-                .opacity(cart.isShopping ? 1 : 0)
-                .animation(.easeInOut(duration: 0.3), value: cart.isShopping)
-        )
+        .overlay(shoppingModeOverlay)
         .shadow(
-            color: Color.black.opacity(cart.isShopping ? 0.05 : 0),
+            color: Color.black.opacity(cart.isShopping ? 0.25 : 0),
             radius: 0.5,
             x: 0,
             y: 0.5
         )
+        .overlay(borderOverlay)
         .scaleEffect(appeared ? 1.0 : 0.95)
         .opacity(appeared ? 1.0 : 0)
         .onAppear {

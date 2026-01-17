@@ -609,9 +609,28 @@ struct CompletedSheetContent: View {
             cart: cart,
             onUnfulfillItem: { cartItem in
                 if cartItem.isSkippedDuringShopping {
-                    // Handle unskipping an item
+                    let restoredQuantity = max(1, cartItem.originalPlanningQuantity ?? 1)
+                    cartItem.quantity = restoredQuantity
+                    cartItem.syncQuantities(cart: cart)
                     cartItem.isSkippedDuringShopping = false
                     cartItem.isFulfilled = false
+                    vaultService.updateCartTotals(cart: cart)
+                    NotificationCenter.default.post(
+                        name: .shoppingItemQuantityChanged,
+                        object: nil,
+                        userInfo: [
+                            "cartId": cart.id,
+                            "itemId": cartItem.itemId,
+                            "itemName": vaultService.findItemById(cartItem.itemId)?.name ?? "",
+                            "newQuantity": restoredQuantity,
+                            "itemType": "plannedCart"
+                        ]
+                    )
+                    NotificationCenter.default.post(
+                        name: NSNotification.Name("ShoppingDataUpdated"),
+                        object: nil,
+                        userInfo: ["cartItemId": cart.id]
+                    )
                 } else {
                     // Handle unfulfilling a regular completed item
                     vaultService.toggleItemFulfillment(cart: cart, itemId: cartItem.itemId)
@@ -1030,4 +1049,3 @@ extension View {
         }
     }
 }
-
