@@ -472,6 +472,36 @@ struct EditItemSheet: View {
                 )
             }
             
+            // Broadcast vault item changes so row UIs reload item details (store/unit/price)
+            NotificationCenter.default.post(
+                name: NSNotification.Name("VaultItemUpdated"),
+                object: nil,
+                userInfo: [
+                    "itemId": item.id,
+                    "store": formViewModel.storeName,
+                    "unit": formViewModel.unit
+                ]
+            )
+            
+            // Update planned fields for all carts when editing from vault context
+            if context == .vault {
+                if let priceVal = Double(formViewModel.itemPrice) {
+                    updateAllCartsWithItem(
+                        itemId: item.id,
+                        price: priceVal,
+                        unit: formViewModel.unit,
+                        store: formViewModel.storeName
+                    )
+                }
+            }
+            
+            // Trigger cart detail recomputation/totals
+            NotificationCenter.default.post(
+                name: NSNotification.Name("ShoppingDataUpdated"),
+                object: nil,
+                userInfo: ["cartItemId": cart?.id ?? ""]
+            )
+            
             // Call save callback
             onSave?(item)
             dismiss()

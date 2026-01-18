@@ -11,6 +11,9 @@ struct ManageCartSheet: View {
     @State private var toolbarAppeared = false
     @State private var showAddItemPopover = false
     @State private var createCartButtonVisible = true
+    @State private var searchText: String = ""
+    @State private var isSearching: Bool = false
+    @Namespace private var searchNamespace
     
     // Use LOCAL state for active items in this sheet
     @State private var localActiveItems: [String: Double] = [:]
@@ -61,7 +64,10 @@ struct ManageCartSheet: View {
                 // Custom Header
                 CustomHeaderView(
                     showAddItemPopover: $showAddItemPopover,
-                    duplicateError: $duplicateError
+                    duplicateError: $duplicateError,
+                    searchText: $searchText,
+                    isSearching: $isSearching,
+                    matchedNamespace: searchNamespace
                 )
                 
                 // Use currentVault instead of vaultService.vault directly
@@ -69,7 +75,7 @@ struct ManageCartSheet: View {
                     ZStack(alignment: .top) {
                         categoryContentScrollView
                             .frame(maxHeight: .infinity)
-                            .padding(.top, 56) // Height of category section
+                            .padding(.top, 80)
                             .zIndex(0)
                         
                         VaultCategorySectionView(selectedCategory: selectedCategory) {
@@ -84,6 +90,7 @@ struct ManageCartSheet: View {
                     emptyVaultView
                 }
             }
+            
             
             // Bottom action bar with chevrons
             if currentVault != nil && !showAddItemPopover {
@@ -174,6 +181,20 @@ struct ManageCartSheet: View {
         .onChange(of: selectedCategory) { oldValue, newValue in
             updateChevronVisibility()
         }
+        .onChange(of: searchText) { oldValue, newValue in
+            let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty, let vault = vaultService.vault else { return }
+            if let matched = matchCategoryForSearch(trimmed, vault: vault) {
+                if let current = selectedCategory,
+                   let currentIndex = GroceryCategory.allCases.firstIndex(of: current),
+                   let newIndex = GroceryCategory.allCases.firstIndex(of: matched) {
+                    navigationDirection = newIndex > currentIndex ? .right : .left
+                }
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                    selectedCategory = matched
+                }
+            }
+        }
         .onChange(of: hasActiveItems) { oldValue, newValue in
             if newValue {
                 if !oldValue {
@@ -260,7 +281,8 @@ struct ManageCartSheet: View {
             if let selectedCategory = selectedCategory {
                 CategoryItemsListView(
                     category: selectedCategory,
-                    localActiveItems: $localActiveItems
+                    localActiveItems: $localActiveItems,
+                    searchText: searchText
                 )
                 .id(selectedCategory.id)
                 .padding(.top, 8)
@@ -561,6 +583,16 @@ struct ManageCartSheet: View {
         }
     }
     
+    private func matchCategoryForSearch(_ text: String, vault: Vault) -> GroceryCategory? {
+        for groceryCategory in GroceryCategory.allCases {
+            if let vaultCategory = vault.categories.first(where: { $0.name == groceryCategory.title }) {
+                let hasMatch = vaultCategory.items.contains { $0.name.localizedCaseInsensitiveContains(text) }
+                if hasMatch { return groceryCategory }
+            }
+        }
+        return nil
+    }
+    
     private var firstCategoryWithItems: GroceryCategory? {
         guard let vault = vaultService.vault else { return nil }
         
@@ -602,35 +634,32 @@ struct ManageCartSheet: View {
 private struct CustomHeaderView: View {
     @Binding var showAddItemPopover: Bool
     @Binding var duplicateError: String?
+    @Binding var searchText: String
+    @Binding var isSearching: Bool
+    var matchedNamespace: Namespace.ID
+    @FocusState private var searchFieldIsFocused: Bool
     
     var body: some View {
-        VStack(spacing: 0) {
+        ZStack(alignment: .leading) {
+            // Centered title
             HStack {
-                // Search button
-                Button(action: {
-                    // Search action
-                }) {
-                    Image("search")
-                        .resizable()
-                        .frame(width: 24, height: 24)
-                }
-                .padding(.leading, 16)
-                
                 Spacer()
-                
-                // Title
                 Text("Manage Cart")
                     .font(.headline)
                     .foregroundColor(.black)
-                
                 Spacer()
-                
-                // Add button
+            }
+            .frame(height: 44)
+            .padding(.top, 18)
+            
+            // Trailing Add button
+            HStack {
+                Spacer()
                 Button(action: {
                     UIApplication.shared.endEditing()
                     withAnimation(.easeInOut(duration: 0.2)) {
                         showAddItemPopover = true
-                        duplicateError = nil // Clear previous errors
+                        duplicateError = nil
                     }
                 }) {
                     Text("Add")
@@ -644,8 +673,73 @@ private struct CustomHeaderView: View {
                 .padding(.trailing, 16)
             }
             .frame(height: 44)
-            .padding(.top, 10)
+            .padding(.top, 18)
             
+            // Search stack overlay
+            if isSearching {
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundColor(.gray)
+                        .matchedGeometryEffect(id: "searchIcon", in: matchedNamespace, isSource: false)
+                    ZStack(alignment: .leading) {
+                        if searchText.isEmpty {
+                            Text("Search items in Manage Cart")
+                                .foregroundColor(.gray)
+                                .opacity(0.5)
+                        }
+                        TextField("", text: $searchText)
+                            .textFieldStyle(.plain)
+                            .autocorrectionDisabled()
+                            .textInputAutocapitalization(.never)
+                            .focused($searchFieldIsFocused)
+                    }
+                    Button(action: {
+                        isSearching = false
+                        searchText = ""
+                        searchFieldIsFocused = false
+                    }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(.gray)
+                            .transition(.scale.combined(with: .opacity))
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(
+                    Capsule()
+                        .fill(Color(.systemGray6))
+                        .matchedGeometryEffect(id: "searchCapsule", in: matchedNamespace, isSource: false)
+                )
+                .padding(.horizontal, 16)
+                .padding(.top, 14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .transition(.scale.combined(with: .opacity))
+            } else {
+                // Compact search button stack
+                HStack {
+                    Button(action: {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                            isSearching = true
+                        }
+                        searchFieldIsFocused = true
+                    }) {
+                        ZStack {
+                            Capsule()
+                                .fill(Color.white)
+                                .matchedGeometryEffect(id: "searchCapsule", in: matchedNamespace, isSource: true)
+                                .frame(height: 28)
+                                .frame(width: 36, alignment: .leading)
+                            Image(systemName: "magnifyingglass")
+                                .foregroundColor(.gray)
+                                .frame(width: 18, height: 18)
+                                .matchedGeometryEffect(id: "searchIcon", in: matchedNamespace, isSource: true)
+                        }
+                    }
+                }
+                .padding(.leading, 16)
+                .padding(.top, 14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
         }
         .background(Color.white)
     }
@@ -654,18 +748,26 @@ private struct CustomHeaderView: View {
 struct CategoryItemsListView: View {
     let category: GroceryCategory
     @Binding var localActiveItems: [String: Double]
+    let searchText: String
     
     @Environment(VaultService.self) private var vaultService
     
     // Store availableStores as @State
     @State private var currentStores: [String] = []
+    @State private var refreshTick: Int = 0
     
     private var categoryItems: [Item] {
         guard let vault = vaultService.vault,
               let foundCategory = vault.categories.first(where: { $0.name == category.title })
         else { return [] }
         
-        return foundCategory.items.sorted { $0.createdAt > $1.createdAt }
+        let items = foundCategory.items.sorted { $0.createdAt > $1.createdAt }
+        let trimmed = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            return items
+        } else {
+            return items.filter { $0.name.localizedCaseInsensitiveContains(trimmed) }
+        }
     }
     
     var body: some View {
@@ -679,6 +781,7 @@ struct CategoryItemsListView: View {
                     category: category,
                     localActiveItems: $localActiveItems
                 )
+                .id(refreshTick)
             }
         }
         .onAppear {
@@ -690,6 +793,21 @@ struct CategoryItemsListView: View {
         // Also watch for when items count changes
         .onChange(of: categoryItems.count) { oldCount, newCount in
             updateStores()
+        }
+        .onChange(of: searchText) { _, _ in
+            updateStores()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("VaultItemUpdated"))) { _ in
+            updateStores()
+            refreshTick &+= 1
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("CartUpdated"))) { _ in
+            updateStores()
+            refreshTick &+= 1
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("DataUpdated"))) { _ in
+            updateStores()
+            refreshTick &+= 1
         }
     }
     
@@ -708,12 +826,19 @@ struct CategoryItemsListView: View {
     private var emptyCategoryView: some View {
         VStack {
             Spacer()
-            Text("No items yet in \(category.title) \(category.emoji)")
+            Text(emptyMessage)
                 .foregroundColor(.gray)
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .transition(.scale(scale: 0.8).combined(with: .opacity))
+    }
+    
+    private var emptyMessage: String {
+        let trimmed = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty
+        ? "No items yet in \(category.title) \(category.emoji)"
+        : "No items found"
     }
 }
 

@@ -793,7 +793,7 @@ private struct ItemPriceRow: View {
                 .lineLimit(1)
                 .contentTransition(.numericText())
                 .animation(nil, value: currentTotalPrice)
-                .foregroundColor(.white)
+                .foregroundColor(stateManager.hasBackgroundImage ? .white : .black)
         }
         .opacity(isItemFulfilled ? 0.5 : 1.0) // Additional opacity for fulfilled
     }
