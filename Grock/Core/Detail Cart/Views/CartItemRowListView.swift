@@ -244,11 +244,7 @@ private struct MainRowContent: View {
         .contentShape(Rectangle())
         .onTapGesture {
             guard !isFulfilling else { return }
-            if cart.isShopping {
-                onFulfillItem()
-            } else {
-                onEditItem()
-            }
+            onEditItem()
         }
         .onAppear {
             setupInitialState()
