@@ -27,7 +27,6 @@ struct UnifiedItemPopover: View {
     @State private var contentScale: CGFloat = 0
     @State private var keyboardVisible: Bool = false
     
-    // Computed properties
     private var storeName: String {
         cartItem.getStore(cart: cart)
     }
@@ -118,7 +117,6 @@ struct UnifiedItemPopover: View {
             
             VStack(spacing: 20) {
                 
-                // Item description with inline delta
                 ItemDescriptionText(
                     itemName: item.name,
                     categoryEmoji: categoryInfo.emoji,
@@ -128,24 +126,20 @@ struct UnifiedItemPopover: View {
                     plannedUnit: plannedUnit
                 )
                 
-                // Input fields section - DIFFERENT BEHAVIOR BASED ON MODE
                 inputFieldsSection
                     .onAppear {
                         price = String(format: "%.2f", currentPrice)
                         portion = String(format: currentQuantity.truncatingRemainder(dividingBy: 1) == 0 ? "%.0f" : "%.2f", currentQuantity)
                     }
                 
-                // Total cost display for fulfill mode
                 if mode == .fulfill {
                     totalCostDisplay
                 }
                 
-                // Error message
                 if let errorMessage {
                     ErrorMessageDisplay(errorMessage: errorMessage)
                 }
                 
-                // Action buttons
                 ActionButtons(
                     mode: mode,
                     hasChanges: hasChanges,
@@ -191,12 +185,9 @@ struct UnifiedItemPopover: View {
         }
     }
     
-    // MARK: - Input Fields Section (Different for each mode)
     private var inputFieldsSection: some View {
         VStack(spacing: 6) {
-            // Label section - DIFFERENT BASED ON MODE
             if mode == .edit {
-                // EDIT MODE: Conditional label
                 Text(currentPrompt.text)
                     .lexendFont(13, weight: .medium)
                     .foregroundColor(.secondary)
@@ -224,7 +215,6 @@ struct UnifiedItemPopover: View {
                 .padding(.horizontal, 4)
             }
             
-            // Input fields (same for both modes)
             HStack(spacing: 4) {
                 PriceField(
                     price: $price,
@@ -243,11 +233,9 @@ struct UnifiedItemPopover: View {
                 )
                 .frame(width: 120)
             }
-//            .background(.red)
         }
     }
     
-    // MARK: - Total Cost Display (Fulfill mode only)
     private var totalCostDisplay: some View {
         VStack(spacing: 4) {
             DashedLine()
@@ -292,46 +280,6 @@ struct UnifiedItemPopover: View {
         }
     }
     
-    // MARK: - Helper Methods
-//    private func saveChanges() {
-//        guard let priceValue = Double(price),
-//              let portionValue = Double(portion) else {
-//            errorMessage = "Please enter valid numbers"
-//            return
-//        }
-//        
-//        isSaving = true
-//        
-//        // Update cart item with actual data
-//        if mode == .edit {
-//            if abs(priceValue - currentPrice) > 0.01 ||
-//                abs(portionValue - currentQuantity) > 0.01 {
-//                cartItem.actualPrice = priceValue
-//                cartItem.actualQuantity = portionValue
-//                cartItem.wasEditedDuringShopping = true
-//                
-//                vaultService.updateCartTotals(cart: cart)
-//                
-//                NotificationCenter.default.post(
-//                    name: NSNotification.Name("ShoppingDataUpdated"),
-//                    object: nil,
-//                    userInfo: ["cartItemId": cartItem.itemId]
-//                )
-//            }
-//        } else {
-//            // Fulfill mode - always update and mark as fulfilled
-//            cartItem.actualPrice = priceValue
-//            cartItem.actualQuantity = portionValue
-//            cartItem.isFulfilled = true
-//            cartItem.wasEditedDuringShopping = true
-//            
-//            vaultService.updateCartTotals(cart: cart)
-//        }
-//        
-//        isSaving = false
-//        onSave?()
-//        dismissPopover()
-//    }
     private func saveChanges() {
         guard let priceValue = Double(price),
               let portionValue = Double(portion) else {

@@ -180,6 +180,10 @@ struct HomeView: View {
                     cancelVaultButtonAnimation()
                 }
             }
+            .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ShowInsightsAfterTrip"))) { _ in
+                viewModel.selectedCart = nil
+                showInsights = true
+            }
             .onAppear {
                 scheduleVaultButtonAnimation()
                 checkForProWelcome()

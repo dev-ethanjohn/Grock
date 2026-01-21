@@ -5,6 +5,7 @@ struct FinishTripSheet: View {
     @Environment(VaultService.self) private var vaultService
     @Environment(\.dismiss) private var dismiss
     @State private var showingEditBudget = false
+    @State private var newItemToggles: [String: Bool] = [:]
     
     // Computed properties
     private var cartInsights: CartInsights {
@@ -25,6 +26,14 @@ struct FinishTripSheet: View {
     
     private var addedDuringShoppingCount: Int {
         cart.cartItems.filter { $0.addedDuringShopping || $0.isShoppingOnlyItem }.count
+    }
+    
+    private var newItemsList: [CartItem] {
+        cart.cartItems.filter { ($0.addedDuringShopping || $0.isShoppingOnlyItem) && $0.isFulfilled }
+    }
+    
+    private var addedDuringShoppingFulfilledCount: Int {
+        cart.cartItems.filter { ($0.addedDuringShopping || $0.isShoppingOnlyItem) && $0.isFulfilled }.count
     }
     
     // FIXED: Only count fulfilled items' total value
@@ -100,63 +109,88 @@ struct FinishTripSheet: View {
         }
     }
     
+    private var headerSummaryText: String {
+        let symbol = CurrencyManager.shared.selectedCurrency.symbol
+        if cartBudget <= 0 {
+            return "Set a plan to make sense of this trip later."
+        }
+        if budgetDifference > 0.01 {
+            return "You set a \(symbol)\(String(format: "%.0f", cartBudget)) plan, and this trip went a bit over."
+        } else {
+            return "You set a \(symbol)\(String(format: "%.0f", cartBudget)) plan, and this trip stayed comfortably within it."
+        }
+    }
+    
+    private func categoryColor(for cartItem: CartItem) -> Color {
+        if cartItem.isShoppingOnlyItem, let raw = cartItem.shoppingOnlyCategory,
+           let groceryCategory = GroceryCategory(rawValue: raw) {
+            return groceryCategory.pastelColor.darker(by: 0.4).saturated(by: 0.4)
+        }
+        if let item = vaultService.findItemById(cartItem.itemId),
+           let category = vaultService.getCategory(for: item.id) {
+            if let groceryCategory = GroceryCategory.allCases.first(where: { $0.title == category.name }) {
+                return groceryCategory.pastelColor.darker(by: 0.4).saturated(by: 0.4)
+            }
+        }
+        return Color(hex: "CCCCCC")
+    }
+    
+    private var changedItemsCount: Int {
+        guard let vault = vaultService.vault else { return 0 }
+        let epsilon = 0.005
+        
+        func hasPriceChange(_ item: CartItem) -> Bool {
+            if item.isShoppingOnlyItem || !item.isFulfilled { return false }
+            let planned = item.plannedPrice ?? item.getCurrentPrice(from: vault, store: item.plannedStore) ?? 0.0
+            if let actual = item.actualPrice {
+                return abs(actual - planned) > epsilon
+            }
+            return false
+        }
+        
+        func hasQuantityChange(_ item: CartItem) -> Bool {
+            if item.isShoppingOnlyItem || !item.isFulfilled { return false }
+            if let actualQ = item.actualQuantity {
+                return abs(actualQ - item.quantity) > epsilon
+            }
+            return false
+        }
+        
+        return cart.cartItems.filter { !($0.isShoppingOnlyItem) && $0.isFulfilled && (hasPriceChange($0) || hasQuantityChange($0)) }.count
+    }
+    
     var body: some View {
         ZStack {
             VStack(spacing: 0) {
                 ScrollView {
                     VStack(spacing: 0) {
-                        // Big number section
-                        VStack(spacing: 8) {
-                            Text("How did your shopping go?")
-                                .lexendFont(20, weight: .semibold)
+                        VStack(spacing: 12) {
+                            Text(headerSummaryText)
+                                .fuzzyBubblesFont(18, weight: .bold)
                                 .foregroundColor(Color(hex: "231F30"))
-                                .padding(.top, 32)
+                                .multilineTextAlignment(.center)
+                                .padding(.top, 24)
                             
-                            Text(totalSpent.formattedCurrency)
-                                .lexendFont(48, weight: .bold)
-                                .foregroundColor(Color(hex: "231F30"))
-                                .contentTransition(.numericText())
-                                .animation(.spring(response: 0.5, dampingFraction: 0.7), value: totalSpent)
-                                .animation(.spring(response: 0.5, dampingFraction: 0.7), value: CurrencyManager.shared.selectedCurrency)
+                            Text("you spent \(totalSpent.formattedCurrency)")
+                                .lexendFont(12)
+                                .foregroundColor(Color(hex: "666"))
                             
-                            // 3. Budget Reflection (Adaptive)
-                            if cartBudget > 0 {
-                                HStack(spacing: 4) {
-                                    Text(emojiForDifference)
-                                        .font(.system(size: 16))
-                                    
-                                    Text(differenceText)
-                                        .lexendFont(16)
-                                        .foregroundColor(differenceColor)
-                                        .contentTransition(.numericText())
-                                        .animation(.snappy, value: CurrencyManager.shared.selectedCurrency)
-                                }
-                                .padding(.bottom, 32)
-                            } else {
-                                // Missing Budget Prompt
-                                VStack(spacing: 12) {
-                                    Text("Want to add a budget for this trip?")
-                                        .lexendFont(14, weight: .medium)
-                                        .foregroundColor(Color(hex: "666"))
-                                    
-                                    Text("It helps make sense of your spending later.")
-                                        .lexendFont(12)
-                                        .foregroundColor(Color(hex: "999"))
-                                    
-                                    Button(action: {
-                                        showingEditBudget = true
-                                    }) {
-                                        Text("Add Budget")
-                                            .lexendFont(14, weight: .semibold)
-                                            .foregroundColor(.white)
-                                            .padding(.horizontal, 16)
-                                            .padding(.vertical, 8)
-                                            .background(Color.black)
-                                            .cornerRadius(20)
-                                    }
-                                }
-                                .padding(.bottom, 32)
+                            HStack(spacing: 8) {
+                                FluidBudgetPillView(
+                                    cart: cart,
+                                    animatedBudget: cartBudget,
+                                    onBudgetTap: { showingEditBudget = true },
+                                    hasBackgroundImage: false,
+                                    isHeader: true
+                                )
+                                
+                                Text(cartBudget.formattedCurrency)
+                                    .lexendFont(14, weight: .bold)
+                                    .foregroundColor(Color(hex: "231F30"))
+                                    .opacity(0)
                             }
+                            .padding(.horizontal, 24)
+                            .padding(.bottom, 20)
                         }
                         
                         // Separator
@@ -166,79 +200,91 @@ struct FinishTripSheet: View {
                             .foregroundColor(Color(hex: "999").opacity(0.5))
                             .padding(.horizontal)
                         
-                        // 1. Factual Recap (Always Shown) - Three pills summary
-                        HStack(spacing: 12) {
-                            StatPill(
-                                emoji: "✅",
-                                count: fulfilledCount,
-                                label: "fulfilled"
+                        VStack(spacing: 12) {
+                            AccordionCardView(
+                                icon: "arrow.left.arrow.right",
+                                title: "What changed (\(max(changedItemsCount, 0)))",
+                                subtitle: "Price or quantity differed from plan",
+                                background: Color(hex: "EDE1FF"),
+                                accent: Color(hex: "7E57C2")
                             )
                             
-                            StatPill(
-                                emoji: "⏭",
-                                count: skippedCount,
-                                label: "skipped"
+                            AccordionCardView(
+                                icon: "shippingbox.fill",
+                                title: "Added during shopping (\(addedDuringShoppingFulfilledCount))",
+                                subtitle: "Saved items you decided to include mid-trip",
+                                background: Color(hex: "EFEFEF"),
+                                accent: Color(hex: "6D6D6D")
                             )
                             
-                            StatPill(
-                                emoji: "🆕",
-                                count: addedDuringShoppingCount,
-                                label: "added"
+                            AccordionCardView(
+                                icon: "minus.circle.fill",
+                                title: "Skipped items (\(skippedCount))",
+                                subtitle: "Planned items not bought",
+                                background: Color(hex: "FFE7D8"),
+                                accent: Color(hex: "FF7F50")
                             )
                         }
-                        .padding(.vertical, 28)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 12)
                         
-                        // 2. Skipped Items (Conditional)
-                        if !skippedItemsList.isEmpty {
-                            VStack(alignment: .leading, spacing: 12) {
-                                Text("Items you didn't get")
+                        VStack(spacing: 8) {
+                            HStack {
+                                Text("New items (\(newItemsList.count))")
                                     .lexendFont(16, weight: .semibold)
                                     .foregroundColor(Color(hex: "231F30"))
-                                    .padding(.horizontal, 24)
                                 
-                                ForEach(skippedItemsList) { cartItem in
-                                    HStack {
-                                        Text(vaultService.findItemById(cartItem.itemId)?.name ?? "Unknown Item")
-                                            .lexendFont(14, weight: .medium)
-                                            .foregroundColor(Color(hex: "333"))
-                                        
-                                        Spacer()
-                                        
-                                        Text("Skipped")
-                                            .lexendFont(12)
-                                            .foregroundColor(.orange)
-                                            .padding(.horizontal, 8)
-                                            .padding(.vertical, 4)
-                                            .background(Color.orange.opacity(0.1))
-                                            .cornerRadius(4)
-                                    }
-                                    .padding(.horizontal, 24)
-                                    .padding(.vertical, 8)
-                                    .background(Color(hex: "F9F9F9"))
-                                    .cornerRadius(12)
-                                    .padding(.horizontal, 24)
-                                }
+                                Spacer()
+                                
+                                Text("save to vault?")
+                                    .lexendFont(12)
+                                    .foregroundColor(Color(hex: "666"))
                             }
-                            .padding(.bottom, 28)
-                        }
-                        
-                        // 4. Optional Reflection (Lightweight)
-                        VStack(spacing: 16) {
-                            Text("Anything unexpected today?")
-                                .lexendFont(16, weight: .semibold)
-                                .foregroundColor(Color(hex: "231F30"))
+                            .padding(.horizontal, 24)
                             
-                            ScrollView(.horizontal, showsIndicators: false) {
+                            DashedLine()
+                                .stroke(style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
+                                .frame(height: 0.5)
+                                .foregroundColor(Color(hex: "999").opacity(0.5))
+                                .padding(.horizontal, 24)
+                            
+                            ForEach(newItemsList, id: \.itemId) { cartItem in
+                                let item = vaultService.findItemById(cartItem.itemId)
+                                let name = item?.name ?? cartItem.shoppingOnlyName ?? "Unknown Item"
+                                let unit = vaultService.vault.map { vault in
+                                    cartItem.getUnit(from: vault, cart: cart)
+                                } ?? ""
+                                let price = vaultService.vault.map { vault in
+                                    cartItem.getPrice(from: vault, cart: cart)
+                                } ?? 0.0
+                                
                                 HStack(spacing: 12) {
-                                    ReflectionButton(text: "Prices higher", emoji: "📈")
-                                    ReflectionButton(text: "Items missing", emoji: "❌")
-                                    ReflectionButton(text: "Bought extra", emoji: "🛒")
-                                    ReflectionButton(text: "As planned", emoji: "✨")
+                                    Circle()
+                                        .fill(categoryColor(for: cartItem))
+                                        .frame(width: 6, height: 6)
+                                    
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(name)
+                                            .lexendFont(14, weight: .medium)
+                                            .foregroundColor(Color(hex: "231F30"))
+                                        Text("\(price.formattedCurrency) / \(unit)")
+                                            .lexendFont(12)
+                                            .foregroundColor(Color(hex: "888"))
+                                    }
+                                    
+                                    Spacer()
+                                    
+                                    Toggle("", isOn: Binding(
+                                        get: { newItemToggles[cartItem.itemId] ?? true },
+                                        set: { newItemToggles[cartItem.itemId] = $0 }
+                                    ))
+                                    .labelsHidden()
                                 }
                                 .padding(.horizontal, 24)
+                                .padding(.vertical, 8)
                             }
                         }
-                        .padding(.bottom, 32)
+                        .padding(.bottom, 24)
                     }
                 }
                 
@@ -246,7 +292,11 @@ struct FinishTripSheet: View {
                 VStack(spacing: 12) {
                     Button(action: {
                         vaultService.completeShopping(cart: cart)
-                        dismiss()
+                        NotificationCenter.default.post(
+                            name: NSNotification.Name("ShowInsightsAfterTrip"),
+                            object: nil,
+                            userInfo: ["cartId": cart.id]
+                        )
                     }) {
                         Text("Finish Trip")
                             .lexendFont(18, weight: .semibold)
@@ -338,6 +388,52 @@ private struct StatPill: View {
         .background(
             RoundedRectangle(cornerRadius: 12)
                 .fill(Color(hex: "F7F2ED"))
+        )
+    }
+}
+
+private struct AccordionCardView: View {
+    let icon: String
+    let title: String
+    let subtitle: String
+    let background: Color
+    let accent: Color
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(background.opacity(0.9))
+                    .frame(width: 36, height: 36)
+                Image(systemName: icon)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(accent)
+            }
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .lexendFont(14, weight: .semibold)
+                    .foregroundColor(Color(hex: "231F30"))
+                Text(subtitle)
+                    .lexendFont(12)
+                    .foregroundColor(Color(hex: "666"))
+            }
+            
+            Spacer()
+            
+            Image(systemName: "chevron.up")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(Color(hex: "231F30"))
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(background.opacity(0.4))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(background.opacity(0.8), lineWidth: 1)
         )
     }
 }
