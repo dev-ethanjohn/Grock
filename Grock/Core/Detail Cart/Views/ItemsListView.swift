@@ -296,7 +296,7 @@ private struct ItemsListContent: View {
         VStack(spacing: 0) {
             // Main content with conditional offset and shadow
             StoreItemsList(
-                sortedStoresByNewestItem: sortedStoresByNewestItem,
+                storeOrder: sortedStoresWithRefresh,
                 getDisplayItems: getDisplayItems,
                 cart: cart,
                 onFulfillItem: onFulfillItem,
@@ -329,7 +329,7 @@ private struct ItemsListContent: View {
 
 // MARK: - Store Items List
 private struct StoreItemsList: View {
-    let sortedStoresByNewestItem: [String]
+    let storeOrder: [String]
     let getDisplayItems: (String) -> [(cartItem: CartItem, item: Item?)]
     let cart: Cart
     let onFulfillItem: (CartItem) -> Void
@@ -357,7 +357,7 @@ private struct StoreItemsList: View {
     
     private var listContent: some View {
         List {
-            ForEach(Array(sortedStoresByNewestItem.enumerated()), id: \.offset) { (index, store) in
+            ForEach(Array(storeOrder.enumerated()), id: \.offset) { (index, store) in
                 let displayItems = getDisplayItems(store)
                 
                 if !displayItems.isEmpty {
@@ -370,7 +370,7 @@ private struct StoreItemsList: View {
                         },
                         onEditItem: onEditItem,
                         onDeleteItem: onDeleteItem,
-                        isLastStore: index == sortedStoresByNewestItem.count - 1
+                        isLastStore: index == storeOrder.count - 1
                     )
                     .listRowInsets(EdgeInsets())
                     .listRowSeparator(.hidden)

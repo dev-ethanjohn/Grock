@@ -429,7 +429,9 @@ class CartItem {
         switch cart.status {
         case .planning:
             return plannedStore
-        case .shopping, .completed:
+        case .shopping:
+            return plannedStore
+        case .completed:
             return actualStore ?? plannedStore
         }
     }

@@ -51,7 +51,9 @@ struct CartDetailScreen: View {
     }
     
     private var sortedStores: [String] {
-        Array(itemsByStore.keys).sorted()
+        let stores = Array(itemsByStore.keys).sorted()
+        // DO NOT change order during shopping - rely on alphabetical sort to prevent jumping
+        return stores
     }
     
     private var totalItemCount: Int {
