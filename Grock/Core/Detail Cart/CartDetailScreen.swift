@@ -793,6 +793,10 @@ struct CartDetailContent: View {
                                 stateManager.animatedBudget = newBudget
                             }
                             
+                            cart.budget = newBudget
+                            vaultService.updateCartTotals(cart: cart)
+                            NotificationCenter.default.post(name: .cartBudgetUpdated, object: nil, userInfo: ["cartId": cart.id, "budget": newBudget])
+                            
                             stateManager.isSavingBudget = false
                         }
                     },

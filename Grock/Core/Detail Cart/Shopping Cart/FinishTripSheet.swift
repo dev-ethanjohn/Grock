@@ -169,36 +169,30 @@ struct FinishTripSheet: View {
                                 .fuzzyBubblesFont(18, weight: .bold)
                                 .foregroundColor(Color(hex: "231F30"))
                                 .multilineTextAlignment(.center)
-                                .padding(.top, 24)
-                            
-                            Text("you spent \(totalSpent.formattedCurrency)")
-                                .lexendFont(12)
-                                .foregroundColor(Color(hex: "666"))
+                                .padding(.horizontal, 50)
+                                .padding(.vertical, 20)
+                                .padding(.top, 32)
                             
                             HStack(spacing: 8) {
                                 FluidBudgetPillView(
                                     cart: cart,
                                     animatedBudget: cartBudget,
-                                    onBudgetTap: { showingEditBudget = true },
+                                    onBudgetTap: nil,
                                     hasBackgroundImage: false,
-                                    isHeader: true
+                                    isHeader: true,
+                                    customIndicatorSpent: totalSpent
                                 )
-                                
-                                Text(cartBudget.formattedCurrency)
-                                    .lexendFont(14, weight: .bold)
-                                    .foregroundColor(Color(hex: "231F30"))
-                                    .opacity(0)
+                                .frame(maxWidth: .infinity)
+                                .allowsHitTesting(false)
                             }
-                            .padding(.horizontal, 24)
+                            .frame(maxWidth: .infinity)
+                            .padding(.horizontal, 20)
                             .padding(.bottom, 20)
                         }
+                        .background(.white)
+                        .shadow(color: .black.opacity(0.16), radius: 7, x: 0, y: 3)
                         
-                        // Separator
-                        DashedLine()
-                            .stroke(style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
-                            .frame(height: 0.5)
-                            .foregroundColor(Color(hex: "999").opacity(0.5))
-                            .padding(.horizontal)
+   
                         
                         VStack(spacing: 12) {
                             AccordionCardView(
@@ -225,66 +219,67 @@ struct FinishTripSheet: View {
                                 accent: Color(hex: "FF7F50")
                             )
                         }
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 12)
+                        .padding(20)
                         
-                        VStack(spacing: 8) {
-                            HStack {
-                                Text("New items (\(newItemsList.count))")
-                                    .lexendFont(16, weight: .semibold)
-                                    .foregroundColor(Color(hex: "231F30"))
-                                
-                                Spacer()
-                                
-                                Text("save to vault?")
-                                    .lexendFont(12)
-                                    .foregroundColor(Color(hex: "666"))
-                            }
-                            .padding(.horizontal, 24)
-                            
-                            DashedLine()
-                                .stroke(style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
-                                .frame(height: 0.5)
-                                .foregroundColor(Color(hex: "999").opacity(0.5))
-                                .padding(.horizontal, 24)
-                            
-                            ForEach(newItemsList, id: \.itemId) { cartItem in
-                                let item = vaultService.findItemById(cartItem.itemId)
-                                let name = item?.name ?? cartItem.shoppingOnlyName ?? "Unknown Item"
-                                let unit = vaultService.vault.map { vault in
-                                    cartItem.getUnit(from: vault, cart: cart)
-                                } ?? ""
-                                let price = vaultService.vault.map { vault in
-                                    cartItem.getPrice(from: vault, cart: cart)
-                                } ?? 0.0
-                                
-                                HStack(spacing: 12) {
-                                    Circle()
-                                        .fill(categoryColor(for: cartItem))
-                                        .frame(width: 6, height: 6)
-                                    
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(name)
-                                            .lexendFont(14, weight: .medium)
-                                            .foregroundColor(Color(hex: "231F30"))
-                                        Text("\(price.formattedCurrency) / \(unit)")
-                                            .lexendFont(12)
-                                            .foregroundColor(Color(hex: "888"))
-                                    }
+                        if !newItemsList.isEmpty {
+                            VStack(spacing: 8) {
+                                HStack {
+                                    Text("New items (\(newItemsList.count))")
+                                        .lexendFont(16, weight: .semibold)
+                                        .foregroundColor(Color(hex: "231F30"))
                                     
                                     Spacer()
                                     
-                                    Toggle("", isOn: Binding(
-                                        get: { newItemToggles[cartItem.itemId] ?? true },
-                                        set: { newItemToggles[cartItem.itemId] = $0 }
-                                    ))
-                                    .labelsHidden()
+                                    Text("save to vault?")
+                                        .lexendFont(12)
+                                        .foregroundColor(Color(hex: "666"))
                                 }
                                 .padding(.horizontal, 24)
-                                .padding(.vertical, 8)
+                                
+                                DashedLine()
+                                    .stroke(style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
+                                    .frame(height: 0.5)
+                                    .foregroundColor(Color(hex: "999").opacity(0.5))
+                                    .padding(.horizontal, 24)
+                                
+                                ForEach(newItemsList, id: \.itemId) { cartItem in
+                                    let item = vaultService.findItemById(cartItem.itemId)
+                                    let name = item?.name ?? cartItem.shoppingOnlyName ?? "Unknown Item"
+                                    let unit = vaultService.vault.map { vault in
+                                        cartItem.getUnit(from: vault, cart: cart)
+                                    } ?? ""
+                                    let price = vaultService.vault.map { vault in
+                                        cartItem.getPrice(from: vault, cart: cart)
+                                    } ?? 0.0
+                                    
+                                    HStack(spacing: 12) {
+                                        Circle()
+                                            .fill(categoryColor(for: cartItem))
+                                            .frame(width: 6, height: 6)
+                                        
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(name)
+                                                .lexendFont(14, weight: .medium)
+                                                .foregroundColor(Color(hex: "231F30"))
+                                            Text("\(price.formattedCurrency) / \(unit)")
+                                                .lexendFont(12)
+                                                .foregroundColor(Color(hex: "888"))
+                                        }
+                                        
+                                        Spacer()
+                                        
+                                        Toggle("", isOn: Binding(
+                                            get: { newItemToggles[cartItem.itemId] ?? true },
+                                            set: { newItemToggles[cartItem.itemId] = $0 }
+                                        ))
+                                        .labelsHidden()
+                                    }
+                                    .padding(.horizontal, 24)
+                                    .padding(.vertical, 8)
+                                }
                             }
+                            .padding(.bottom, 24)
                         }
-                        .padding(.bottom, 24)
                     }
                 }
                 

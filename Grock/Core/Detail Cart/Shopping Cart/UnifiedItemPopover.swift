@@ -111,7 +111,7 @@ struct UnifiedItemPopover: View {
     
     var body: some View {
         ZStack {
-            Color.black.opacity(0.4 * overlayOpacity)
+            Color.black.opacity(0.6 * overlayOpacity)
                 .ignoresSafeArea()
                 .onTapGesture { dismissPopover() }
             

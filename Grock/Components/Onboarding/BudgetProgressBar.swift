@@ -6,14 +6,26 @@ struct FluidBudgetPillView: View {
     let onBudgetTap: (() -> Void)?
     let hasBackgroundImage: Bool
     let isHeader: Bool // 👈 New parameter to identify if it's in header
+    var customTotalSpent: Double? = nil // 👈 Optional custom spent amount
+    var customIndicatorSpent: Double? = nil
     
     @Environment(VaultService.self) private var vaultService
     @Namespace private var animationNamespace
     @State private var pillWidth: CGFloat = 0
     
+    private var displayedSpent: Double {
+        customTotalSpent ?? cart.totalSpent
+    }
+    
     private var progress: Double {
         guard animatedBudget > 0 else { return 0 }
-        let spent = cart.totalSpent
+        let spent = displayedSpent
+        return min(spent / animatedBudget, 1.0)
+    }
+    
+    private var indicatorProgress: Double {
+        guard animatedBudget > 0 else { return 0 }
+        let spent = customIndicatorSpent ?? displayedSpent
         return min(spent / animatedBudget, 1.0)
     }
     
@@ -65,20 +77,36 @@ struct FluidBudgetPillView: View {
     }
     
     var body: some View {
-        HStack(alignment: .center, spacing: 16) {
+        let showsIndicator = customIndicatorSpent != nil
+        let barHeight: CGFloat = 22
+        let totalHeight: CGFloat = showsIndicator ? 46 : barHeight
+        
+        HStack(alignment: .bottom, spacing: 16) {
             GeometryReader { geometry in
                 let targetWidth = CGFloat(progress) * geometry.size.width
+                let indicatorWidth = CGFloat(indicatorProgress) * geometry.size.width
                 let visualWidth = max(20, targetWidth)
+                let barTopOffset = max(0, geometry.size.height - barHeight)
                 
-                ZStack(alignment: .leading) {
+                ZStack(alignment: .topLeading) {
+                    if let customIndicatorSpent {
+                        let clampedCenterX = min(max(indicatorWidth, 70), geometry.size.width - 70)
+                        Text("you spent \(customIndicatorSpent.formattedCurrency)")
+                            .lexendFont(12)
+                            .foregroundColor(Color(hex: "666"))
+                            .fixedSize()
+                            .position(x: clampedCenterX, y: 6)
+                    }
+                    
                     // Background track
                     Capsule()
                         .fill(Color.white.opacity(0.3))
                         .frame(height: 20)
                         .overlay(
                             Capsule()
-                                .stroke(Color(hex: "cacaca"), lineWidth: 0.3)
+                                .stroke(Color(hex: "cacaca"), lineWidth: 1)
                         )
+                        .offset(y: barTopOffset + 1)
                     
                     // Animated progress fill with gradient
                     if shouldShowTextInside && pillWidth > 30 {
@@ -99,12 +127,26 @@ struct FluidBudgetPillView: View {
                                     .stroke(.black, lineWidth: 1)
                             )
                             .matchedGeometryEffect(id: "pillFill", in: animationNamespace)
+                            .offset(y: barTopOffset)
+                    }
+                    
+                    if customIndicatorSpent != nil {
+                        let clampedX = max(0, min(geometry.size.width, indicatorWidth)) - 1
+                        Rectangle()
+                            .fill(Color.black)
+                            .frame(width: 2, height: barHeight)
+                            .offset(x: clampedX, y: barTopOffset)
+                        
+                        Circle()
+                            .fill(Color.black)
+                            .frame(width: 6, height: 6)
+                            .offset(x: clampedX - 1, y: barTopOffset - 3)
                     }
                     
                     HStack(spacing: 8) {
                         if shouldShowTextInside && pillWidth > 30 {
                             // Text INSIDE the pill
-                            Text(cart.totalSpent.formattedCurrency)
+                            Text(displayedSpent.formattedCurrency)
                                 .lexendFont(14, weight: .bold)
                                 .foregroundColor(insidePillTextColor)
                                 .matchedGeometryEffect(id: "amount", in: animationNamespace)
@@ -118,6 +160,7 @@ struct FluidBudgetPillView: View {
                                 ))
                                 .frame(maxWidth: pillWidth - 24, alignment: .trailing)
                                 .padding(.leading, 12)
+                                .offset(y: barTopOffset)
                         }
                         
                         if !shouldShowTextInside || pillWidth < 40 {
@@ -129,9 +172,10 @@ struct FluidBudgetPillView: View {
                                     Capsule()
                                         .stroke(.black, lineWidth: 1)
                                 )
+                                .offset(y: barTopOffset)
                             
                             // Text OUTSIDE the pill
-                            Text(cart.totalSpent.formattedCurrency)
+                            Text(displayedSpent.formattedCurrency)
                                 .lexendFont(14, weight: .bold)
                                 .foregroundColor(outsidePillTextColor)
                                 .matchedGeometryEffect(id: "amount", in: animationNamespace)
@@ -143,6 +187,7 @@ struct FluidBudgetPillView: View {
                                         .combined(with: .opacity)
                                         .combined(with: .scale(scale: 0.95))
                                 ))
+                                .offset(y: barTopOffset)
                         }
                     }
                     .animation(.spring(response: 0.5, dampingFraction: 0.8), value: shouldShowTextInside)
@@ -157,7 +202,7 @@ struct FluidBudgetPillView: View {
                     }
                 }
             }
-            .frame(height: 22)
+            .frame(height: totalHeight)
             
             // Budget amount button
             Button(action: {
@@ -171,6 +216,6 @@ struct FluidBudgetPillView: View {
             }
             .buttonStyle(.plain)
         }
-        .frame(height: 22)
+        .frame(height: totalHeight)
     }
 }

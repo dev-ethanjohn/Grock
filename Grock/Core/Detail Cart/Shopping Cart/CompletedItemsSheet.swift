@@ -307,6 +307,16 @@ private struct CompletedItemRow: View {
                             .lexendFont(16, weight: .regular)
                             .foregroundColor(.black)
                             .contentTransition(.numericText())
+                        
+                        if cartItem.isShoppingOnlyItem || cartItem.addedDuringShopping {
+                            Text("new")
+                                .lexendFont(11, weight: .semibold)
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 2)
+                                .background(Color(hex: "FF7F50"))
+                                .cornerRadius(10)
+                        }
                     }
                     
                     HStack(spacing: 0) {

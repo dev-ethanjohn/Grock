@@ -533,30 +533,39 @@ private struct ItemDetailsSection: View {
     }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ItemNameRow(
-                cartItem: cartItem,
-                item: item,
-                cart: cart,
-                currentQuantity: currentQuantity,
-                shouldDisplayBadge: shouldDisplayBadge,
-                badgeScale: badgeScale,
-                badgeRotation: badgeRotation,
-                isItemFulfilled: isItemFulfilled,
-                isFirstItem: isFirstItem,
-                displayUnit: displayUnit
-            )
+        HStack(alignment: .bottom, spacing: 20) {
+            VStack(alignment: .leading, spacing: 0) {
+                ItemNameRow(
+                    cartItem: cartItem,
+                    item: item,
+                    cart: cart,
+                    currentQuantity: currentQuantity,
+                    shouldDisplayBadge: shouldDisplayBadge,
+                    badgeScale: badgeScale,
+                    badgeRotation: badgeRotation,
+                    isItemFulfilled: isItemFulfilled,
+                    isFirstItem: isFirstItem,
+                    displayUnit: displayUnit
+                )
+                
+                ItemPriceRow(
+                    cartItem: cartItem,
+                    item: item,
+                    currentPrice: currentPrice,
+                    displayUnit: displayUnit,
+                    isItemFulfilled: isItemFulfilled
+                )
+            }
             
-            ItemPriceRow(
-                cartItem: cartItem,
-                item: item,
-                currentPrice: currentPrice,
-                displayUnit: displayUnit,
-                currentTotalPrice: currentTotalPrice,
-                isItemFulfilled: isItemFulfilled
-            )
+            
+            Text(currentTotalPrice.formattedCurrency)
+                .lexendFont(13, weight: .semibold)
+                .lineLimit(1)
+                .contentTransition(.numericText())
+                .animation(nil, value: currentTotalPrice)
+                .foregroundColor(stateManager.hasBackgroundImage ? .white : .black)
+                .opacity(isItemFulfilled ? 0.5 : 1.0)
         }
-//        .opacity(isItemFulfilled ? 0.5 : 1.0)
     }
 }
 
@@ -757,10 +766,8 @@ private struct ItemPriceRow: View {
     let item: Item?
     let currentPrice: Double
     let displayUnit: String
-    let currentTotalPrice: Double
     let isItemFulfilled: Bool
     
-    @Environment(VaultService.self) private var vaultService
     @Environment(CartStateManager.self) private var stateManager
     
     private var textColor: Color {
@@ -774,41 +781,13 @@ private struct ItemPriceRow: View {
     }
     
     var body: some View {
-        HStack(spacing: 4) {
-            Text("\(currentPrice.formattedCurrency) / \(displayUnit) • \(categoryTitle)")
-                .lexendFont(12)
-                .lineLimit(1)
-                .contentTransition(.numericText())
-                .animation(nil, value: currentPrice)
-                .foregroundColor(textColor)
-            
-            Spacer()
-            
-            Text(currentTotalPrice.formattedCurrency)
-                .lexendFont(13, weight: .semibold)
-                .lineLimit(1)
-                .contentTransition(.numericText())
-                .animation(nil, value: currentTotalPrice)
-                .foregroundColor(stateManager.hasBackgroundImage ? .white : .black)
-        }
-        .opacity(isItemFulfilled ? 0.5 : 1.0) // Additional opacity for fulfilled
-    }
-    
-    private var categoryTitle: String {
-        if cartItem.isShoppingOnlyItem, let categoryRawValue = cartItem.shoppingOnlyCategory,
-           let groceryCategory = GroceryCategory(rawValue: categoryRawValue) {
-            return groceryCategory.title
-        }
-        
-        guard let item = item,
-              let category = vaultService.getCategory(for: item.id) else {
-            return "Uncategorized"
-        }
-        
-        if let groceryCategory = GroceryCategory.allCases.first(where: { $0.title == category.name }) {
-            return groceryCategory.title
-        }
-        return category.name
+        Text("\(currentPrice.formattedCurrency) / \(displayUnit)")
+            .lexendFont(12)
+            .lineLimit(1)
+            .contentTransition(.numericText())
+            .animation(nil, value: currentPrice)
+            .foregroundColor(textColor)
+            .opacity(isItemFulfilled ? 0.5 : 1.0)
     }
 }
 
