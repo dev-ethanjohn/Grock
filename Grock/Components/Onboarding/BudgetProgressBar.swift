@@ -140,7 +140,7 @@ struct FluidBudgetPillView: View {
                         Circle()
                             .fill(Color.black)
                             .frame(width: 6, height: 6)
-                            .offset(x: clampedX - 1, y: barTopOffset - 3)
+                            .offset(x: clampedX - 2, y: barTopOffset - 3)
                     }
                     
                     HStack(spacing: 8) {

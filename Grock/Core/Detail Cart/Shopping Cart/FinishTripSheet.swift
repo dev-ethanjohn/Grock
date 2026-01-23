@@ -20,21 +20,10 @@ struct FinishTripSheet: View {
         cart.cartItems.filter { $0.isSkippedDuringShopping }.count
     }
     
-    private var skippedItemsList: [CartItem] {
-        cart.cartItems.filter { $0.isSkippedDuringShopping }
-    }
-    
     private var addedDuringShoppingCount: Int {
         cart.cartItems.filter { $0.addedDuringShopping || $0.isShoppingOnlyItem }.count
     }
     
-    private var newItemsList: [CartItem] {
-        cart.cartItems.filter { ($0.addedDuringShopping || $0.isShoppingOnlyItem) && $0.isFulfilled }
-    }
-    
-    private var addedDuringShoppingFulfilledCount: Int {
-        cart.cartItems.filter { ($0.addedDuringShopping || $0.isShoppingOnlyItem) && $0.isFulfilled }.count
-    }
     
     // FIXED: Only count fulfilled items' total value
     private var totalSpent: Double {
@@ -150,8 +139,9 @@ struct FinishTripSheet: View {
         
         func hasQuantityChange(_ item: CartItem) -> Bool {
             if item.isShoppingOnlyItem || !item.isFulfilled { return false }
+            let plannedQ = item.originalPlanningQuantity ?? item.quantity
             if let actualQ = item.actualQuantity {
-                return abs(actualQ - item.quantity) > epsilon
+                return abs(actualQ - plannedQ) > epsilon
             }
             return false
         }
@@ -159,67 +149,217 @@ struct FinishTripSheet: View {
         return cart.cartItems.filter { !($0.isShoppingOnlyItem) && $0.isFulfilled && (hasPriceChange($0) || hasQuantityChange($0)) }.count
     }
     
+    // MARK: - Computed lists for accordion sections
+    private var changedItemsList: [CartItem] {
+        guard let vault = vaultService.vault else { return [] }
+        let epsilon = 0.005
+        return cart.cartItems.filter { item in
+            if item.isShoppingOnlyItem || !item.isFulfilled { return false }
+            let plannedPrice = item.plannedPrice ?? item.getCurrentPrice(from: vault, store: item.plannedStore) ?? 0.0
+            let priceChanged = (item.actualPrice.map { abs($0 - plannedPrice) > epsilon } ?? false)
+            let plannedQty = item.originalPlanningQuantity ?? item.quantity
+            let qtyChanged = (item.actualQuantity.map { abs($0 - plannedQty) > epsilon } ?? false)
+            return priceChanged || qtyChanged
+        }
+    }
+    
+    private var addedDuringShoppingVaultFulfilled: [CartItem] {
+        cart.cartItems.filter { item in
+            item.addedDuringShopping && !item.isShoppingOnlyItem && item.isFulfilled
+        }
+    }
+    
+    private var skippedPlannedItems: [CartItem] {
+        cart.cartItems.filter { item in
+            // Only planned items (not new/shopping-only and not added during shopping) that were not fulfilled
+            !item.isShoppingOnlyItem && !item.addedDuringShopping && !item.isFulfilled
+        }
+    }
+    
+    private var newItemsList: [CartItem] {
+        // Only shopping-only items that were fulfilled appear in New Items
+        cart.cartItems.filter { $0.isShoppingOnlyItem && $0.isFulfilled }
+    }
+    
+    // MARK: - Accordion states
+    @State private var showChangedSection: Bool = true
+    @State private var showAddedDuringShoppingSection: Bool = false
+    @State private var showSkippedSection: Bool = false
+    
+    // MARK: - Merge new items into vault
+    private func mergeSelectedNewItemsToVault() {
+        guard vaultService.vault != nil else { return }
+        
+        for cartItem in newItemsList {
+            let isSelected = newItemToggles[cartItem.itemId] ?? true
+            guard isSelected else { continue }
+            
+            let name = cartItem.shoppingOnlyName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            guard !name.isEmpty else { continue }
+            
+            let store = (cartItem.shoppingOnlyStore ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !store.isEmpty else { continue }
+            
+            let price = cartItem.shoppingOnlyPrice ?? 0
+            let unit = (cartItem.shoppingOnlyUnit ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            
+            let category: GroceryCategory
+            if let raw = cartItem.shoppingOnlyCategory,
+               let parsed = GroceryCategory(rawValue: raw) {
+                category = parsed
+            } else {
+                category = .pantry
+            }
+            
+            _ = vaultService.addItem(
+                name: name,
+                to: category,
+                store: store,
+                price: price,
+                unit: unit.isEmpty ? "ea" : unit
+            )
+        }
+    }
+    
     var body: some View {
         ZStack {
             VStack(spacing: 0) {
+                // Sticky header
+                FinishSheetHeaderView(
+                    headerSummaryText: headerSummaryText,
+                    cart: cart,
+                    cartBudget: cartBudget,
+                    totalSpent: totalSpent
+                )
+                .background(.white)
+                .shadow(color: .black.opacity(0.16), radius: 7, x: 0, y: 3)
+                
+                // Scrollable content below header
                 ScrollView {
                     VStack(spacing: 0) {
-                        VStack(spacing: 12) {
-                            Text(headerSummaryText)
-                                .fuzzyBubblesFont(18, weight: .bold)
-                                .foregroundColor(Color(hex: "231F30"))
-                                .multilineTextAlignment(.center)
-                                .padding(.horizontal, 50)
-                                .padding(.vertical, 20)
-                                .padding(.top, 32)
-                            
-                            HStack(spacing: 8) {
-                                FluidBudgetPillView(
-                                    cart: cart,
-                                    animatedBudget: cartBudget,
-                                    onBudgetTap: nil,
-                                    hasBackgroundImage: false,
-                                    isHeader: true,
-                                    customIndicatorSpent: totalSpent
-                                )
-                                .frame(maxWidth: .infinity)
-                                .allowsHitTesting(false)
+                        // What changed accordion
+                        AccordionSectionView(
+                            icon: "arrow.left.arrow.right",
+                            title: "What changed (\(max(changedItemsList.count, 0)))",
+                            subtitle: "Price or quantity differed from plan",
+                            background: Color(hex: "F0E2FF"),
+                            accent: Color(hex: "7300DF"),
+                            isExpanded: $showChangedSection,
+                            hasContent: !changedItemsList.isEmpty
+                        ) {
+                            VStack(spacing: 10) {
+                                ForEach(changedItemsList, id: \.itemId) { cartItem in
+                                    let itemName = vaultService.findItemById(cartItem.itemId)?.name ?? "Unknown Item"
+                                    let plannedPrice = cartItem.plannedPrice ?? 0
+                                    let actualPrice = cartItem.actualPrice ?? plannedPrice
+                                    let plannedQty = cartItem.originalPlanningQuantity ?? cartItem.quantity
+                                    let actualQty = cartItem.actualQuantity ?? cartItem.quantity
+                                    let unit = cartItem.actualUnit ?? cartItem.plannedUnit ?? ""
+                                    let delta = max(0, actualPrice - plannedPrice)
+                                    
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(itemName)
+                                            .lexendFont(16, weight: .regular)
+                                            .foregroundColor(.black)
+                                        
+                                        HStack(spacing: 6) {
+                                            let priceChanged = abs(actualPrice - plannedPrice) > 0.0001
+                                            let qtyChanged = abs(actualQty - plannedQty) > 0.0001
+                                            
+                                            if priceChanged {
+                                                Text("\(plannedPrice.formattedCurrency)")
+                                                    .strikethrough()
+                                                    .foregroundColor(Color(hex: "777"))
+                                                
+                                                Text("→ \(actualPrice.formattedCurrency) / \(unit)")
+                                                    .foregroundColor(Color(hex: "231F30"))
+                                            }
+                                            
+                                            if priceChanged && qtyChanged {
+                                                Text("•")
+                                                    .foregroundColor(Color(hex: "999"))
+                                            }
+                                            
+                                            if qtyChanged {
+                                                Text("\(plannedQty.formattedQuantity) → \(actualQty.formattedQuantity)\(unit.isEmpty ? "" : " \(unit)")")
+                                                    .foregroundColor(Color(hex: "231F30"))
+                                            }
+                                            
+                                            Spacer()
+                                            
+                                            if priceChanged && delta > 0.0001 {
+                                                Text("↑ \(delta.formattedCurrency)")
+                                                    .foregroundColor(Color(hex: "FA003F"))
+                                            }
+                                        }
+                                        .lexendFont(13)
+                                    }
+                                    .padding(.vertical, 6)
+                                    
+                                    if cartItem != changedItemsList.last {
+                                        DashedLine()
+                                            .stroke(style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
+                                            .frame(height: 0.5)
+                                            .foregroundColor(Color(hex: "999").opacity(0.5))
+                                    }
+                                }
                             }
-                            .frame(maxWidth: .infinity)
+                            .padding(.leading, 16)
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.top, 12)
+                        
+                        // Added during shopping (vault items) accordion
+                        AccordionSectionView(
+                            icon: "shippingbox.fill",
+                            title: "Added during shopping (\(addedDuringShoppingVaultFulfilled.count))",
+                            subtitle: "Saved items you decided to include mid-trip",
+                            background: Color(hex: "EFEFEF"),
+                            accent: Color(hex: "6D6D6D"),
+                            isExpanded: $showAddedDuringShoppingSection,
+                            hasContent: !addedDuringShoppingVaultFulfilled.isEmpty
+                        ) {
+                            VStack(spacing: 6) {
+                                ForEach(addedDuringShoppingVaultFulfilled, id: \.itemId) { cartItem in
+                                    let itemName = vaultService.findItemById(cartItem.itemId)?.name ?? "Unknown Item"
+                                    let qty = cartItem.actualQuantity ?? cartItem.quantity
+                                    Text("\(qty.formattedQuantity) \(itemName)")
+                                        .lexendFont(13)
+                                        .foregroundColor(Color(hex: "231F30"))
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .padding(.vertical, 4)
+                                }
+                            }
                             .padding(.horizontal, 20)
-                            .padding(.bottom, 20)
                         }
-                        .background(.white)
-                        .shadow(color: .black.opacity(0.16), radius: 7, x: 0, y: 3)
+                        .padding(.horizontal, 20)
+                        .padding(.top, 12)
                         
-   
-                        
-                        VStack(spacing: 12) {
-                            AccordionCardView(
-                                icon: "arrow.left.arrow.right",
-                                title: "What changed (\(max(changedItemsCount, 0)))",
-                                subtitle: "Price or quantity differed from plan",
-                                background: Color(hex: "EDE1FF"),
-                                accent: Color(hex: "7E57C2")
-                            )
-                            
-                            AccordionCardView(
-                                icon: "shippingbox.fill",
-                                title: "Added during shopping (\(addedDuringShoppingFulfilledCount))",
-                                subtitle: "Saved items you decided to include mid-trip",
-                                background: Color(hex: "EFEFEF"),
-                                accent: Color(hex: "6D6D6D")
-                            )
-                            
-                            AccordionCardView(
-                                icon: "minus.circle.fill",
-                                title: "Skipped items (\(skippedCount))",
-                                subtitle: "Planned items not bought",
-                                background: Color(hex: "FFE7D8"),
-                                accent: Color(hex: "FF7F50")
-                            )
+                        // Skipped items accordion (planned items not fulfilled)
+                        AccordionSectionView(
+                            icon: "minus.circle.fill",
+                            title: "Skipped items (\(skippedPlannedItems.count))",
+                            subtitle: "Planned items not bought",
+                            background: Color(hex: "FFE7D8"),
+                            accent: Color(hex: "FF7F50"),
+                            isExpanded: $showSkippedSection,
+                            hasContent: !skippedPlannedItems.isEmpty
+                        ) {
+                            VStack(spacing: 6) {
+                                ForEach(skippedPlannedItems, id: \.itemId) { cartItem in
+                                    let itemName = vaultService.findItemById(cartItem.itemId)?.name ?? "Unknown Item"
+                                    let qty = cartItem.quantity
+                                    Text("\(qty.formattedQuantity) \(itemName)")
+                                        .lexendFont(13)
+                                        .foregroundColor(Color(hex: "231F30"))
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .padding(.vertical, 4)
+                                }
+                            }
+                            .padding(.horizontal, 20)
                         }
-                        .padding(20)
+                        .padding(.horizontal, 20)
+                        .padding(.top, 12)
                         
                         if !newItemsList.isEmpty {
                             VStack(spacing: 8) {
@@ -253,10 +393,6 @@ struct FinishTripSheet: View {
                                     } ?? 0.0
                                     
                                     HStack(spacing: 12) {
-                                        Circle()
-                                            .fill(categoryColor(for: cartItem))
-                                            .frame(width: 6, height: 6)
-                                        
                                         VStack(alignment: .leading, spacing: 2) {
                                             Text(name)
                                                 .lexendFont(14, weight: .medium)
@@ -281,29 +417,49 @@ struct FinishTripSheet: View {
                             .padding(.bottom, 24)
                         }
                     }
+                    .padding(.vertical)
                 }
                 
-                // Done button (Always enabled)
-                VStack(spacing: 12) {
+                // Completion actions
+                VStack(spacing: 6) {
+                    FormCompletionButton(
+                        title: "Finish and Save Changes",
+                        isEnabled: true,
+                        cornerRadius: 100,
+                        verticalPadding: 12,
+                        maxRadius: 1000,
+                        bounceScale: (0.98, 1.05, 1.0),
+                        bounceTiming: (0.1, 0.3, 0.3),
+                        maxWidth: true,
+                        action: {
+                            mergeSelectedNewItemsToVault()
+                            vaultService.completeShopping(cart: cart)
+                            NotificationCenter.default.post(
+                                name: NSNotification.Name("ShowInsightsAfterTrip"),
+                                object: nil,
+                                userInfo: ["cartId": cart.id]
+                            )
+                        }
+                    )
+                    .frame(maxWidth: .infinity)
+                    
                     Button(action: {
-                        vaultService.completeShopping(cart: cart)
-                        NotificationCenter.default.post(
-                            name: NSNotification.Name("ShowInsightsAfterTrip"),
-                            object: nil,
-                            userInfo: ["cartId": cart.id]
-                        )
-                    }) {
-                        Text("Finish Trip")
-                            .lexendFont(18, weight: .semibold)
-                            .foregroundColor(.white)
+                        dismiss()
+                    }, label: {
+                        Text("Continue Shopping")
+                            .fuzzyBubblesFont(14, weight: .bold)
+                            .foregroundColor(.black)
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 16)
-                            .background(Color.black)
-                            .cornerRadius(50)
-                    }
-                    .padding(.horizontal, 24)
-                    .padding(.bottom, 32)
+                            .padding(.vertical, 12)
+                            .cornerRadius(100)
+                            .overlay {
+                                Capsule()
+                                    .stroke(Color(.systemGray4), lineWidth: 1)
+                            }
+                    })
                 }
+                .padding(.horizontal, 20)
+                .padding(.bottom)
             }
             
             if showingEditBudget {
@@ -331,6 +487,112 @@ struct FinishTripSheet: View {
     }
 }
 
+// MARK: - Header and Highlights subviews
+private struct FinishSheetHeaderView: View {
+    let headerSummaryText: String
+    let cart: Cart
+    let cartBudget: Double
+    let totalSpent: Double
+    
+    var body: some View {
+        VStack(spacing: 12) {
+            Text(headerSummaryText)
+                .fuzzyBubblesFont(18, weight: .bold)
+                .foregroundColor(Color(hex: "231F30"))
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 50)
+                .padding(.vertical, 20)
+                .padding(.top, 32)
+            
+            HStack(spacing: 8) {
+                FluidBudgetPillView(
+                    cart: cart,
+                    animatedBudget: cartBudget,
+                    onBudgetTap: nil,
+                    hasBackgroundImage: false,
+                    isHeader: true,
+                    customIndicatorSpent: totalSpent
+                )
+                .frame(maxWidth: .infinity)
+                .allowsHitTesting(false)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 20)
+            .padding(.bottom, 20)
+        }
+    }
+}
+
+private struct AccordionSectionView<Content: View>: View {
+    let icon: String
+    let title: String
+    let subtitle: String
+    let background: Color
+    let accent: Color
+    @Binding var isExpanded: Bool
+    let hasContent: Bool
+    let content: () -> Content
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            Button(action: {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    isExpanded.toggle()
+                }
+            }) {
+                HStack(alignment: .top, spacing: 12) {
+                    HStack(spacing: 12) {
+                        Image(systemName: icon)
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundColor(accent)
+                            .padding(12)
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(title)
+                                .lexendFont(15, weight: .semibold)
+                                .foregroundColor(accent)
+                            Text(subtitle)
+                                .lexendFont(11)
+                                .foregroundColor(accent.opacity(0.8))
+                        }
+                    }
+                    
+                    Spacer()
+                    
+                    VStack {
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 16, weight: .bold))
+                            .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                            .foregroundColor(.black)
+                    }
+                }
+                .contentShape(Rectangle())
+                .padding(12)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(background.opacity(1))
+                )
+            }
+            .buttonStyle(.plain)
+            
+            Group {
+                if isExpanded && hasContent {
+                    content()
+                        .padding(.top, 8)
+                        .transition(
+                            .asymmetric(
+                                insertion: .move(edge: .bottom).combined(with: .opacity),
+                                removal: .move(edge: .bottom).combined(with: .opacity)
+                            )
+                        )
+                }
+            }
+            .animation(.spring(response: 0.35, dampingFraction: 0.85), value: isExpanded)
+            .clipped()
+        }
+    }
+}
 // MARK: - Helper Components
 private struct ReflectionButton: View {
     let text: String
@@ -349,7 +611,6 @@ private struct ReflectionButton: View {
                     .lexendFont(14, weight: .medium)
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 10)
             .background(isSelected ? Color.black : Color(hex: "F5F5F5"))
             .foregroundColor(isSelected ? .white : .black)
             .cornerRadius(20)

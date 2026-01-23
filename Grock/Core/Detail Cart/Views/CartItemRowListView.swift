@@ -534,7 +534,7 @@ private struct ItemDetailsSection: View {
     
     var body: some View {
         HStack(alignment: .bottom, spacing: 20) {
-            VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 2) {
                 ItemNameRow(
                     cartItem: cartItem,
                     item: item,
@@ -781,13 +781,20 @@ private struct ItemPriceRow: View {
     }
     
     var body: some View {
-        Text("\(currentPrice.formattedCurrency) / \(displayUnit)")
-            .lexendFont(12)
-            .lineLimit(1)
-            .contentTransition(.numericText())
-            .animation(nil, value: currentPrice)
-            .foregroundColor(textColor)
-            .opacity(isItemFulfilled ? 0.5 : 1.0)
+        
+        HStack(spacing: 0) {
+            Text("\(currentPrice.formattedCurrency) ")
+                .lexendFont(12, weight: .medium)
+                .foregroundColor(stateManager.hasBackgroundImage ? .white.opacity(0.8) : Color(hex: "231F30"))
+            Text("/ \(displayUnit)")
+                .lexendFont(11)
+                .lineLimit(1)
+                .contentTransition(.numericText())
+                .animation(nil, value: currentPrice)
+                .foregroundColor(textColor)
+                .opacity(isItemFulfilled ? 0.5 : 1.0)
+        }
+
     }
 }
 

@@ -75,7 +75,7 @@ struct ManageCartSheet: View {
                     ZStack(alignment: .top) {
                         categoryContentScrollView
                             .frame(maxHeight: .infinity)
-                            .padding(.top, 80)
+                            .padding(.top, 40)
                             .zIndex(0)
                         
                         VaultCategorySectionView(selectedCategory: selectedCategory) {
@@ -670,7 +670,7 @@ private struct CustomHeaderView: View {
                         .background(Color.black)
                         .cornerRadius(20)
                 }
-                .padding(.trailing, 16)
+                .padding(.trailing, 20)
             }
             .frame(height: 44)
             .padding(.top, 18)
@@ -679,13 +679,15 @@ private struct CustomHeaderView: View {
             if isSearching {
                 HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass")
-                        .foregroundColor(.gray)
+                        .font(.headline)
+                        .fontWeight(.medium)
+                        .foregroundColor(.black)
                         .matchedGeometryEffect(id: "searchIcon", in: matchedNamespace, isSource: false)
                     ZStack(alignment: .leading) {
                         if searchText.isEmpty {
                             Text("Search items in Manage Cart")
-                                .foregroundColor(.gray)
-                                .opacity(0.5)
+                                .lexendFont(16)
+                                .foregroundColor(.gray.opacity(0.5))
                         }
                         TextField("", text: $searchText)
                             .textFieldStyle(.plain)
@@ -715,7 +717,6 @@ private struct CustomHeaderView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .transition(.scale.combined(with: .opacity))
             } else {
-                // Compact search button stack
                 HStack {
                     Button(action: {
                         withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
@@ -730,8 +731,9 @@ private struct CustomHeaderView: View {
                                 .frame(height: 28)
                                 .frame(width: 36, alignment: .leading)
                             Image(systemName: "magnifyingglass")
-                                .foregroundColor(.gray)
-                                .frame(width: 18, height: 18)
+                                .font(.headline)
+                                .fontWeight(.medium)
+                                .foregroundStyle(.black)
                                 .matchedGeometryEffect(id: "searchIcon", in: matchedNamespace, isSource: true)
                         }
                     }
@@ -742,6 +744,7 @@ private struct CustomHeaderView: View {
             }
         }
         .background(Color.white)
+        .padding(.bottom, 8)
     }
 }
 
