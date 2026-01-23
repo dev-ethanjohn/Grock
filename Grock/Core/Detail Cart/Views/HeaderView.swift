@@ -51,7 +51,11 @@ struct HeaderView: View {
                         stateManager.showingEditCartName = true
                     }
                     
-                    Divider()
+                    Button(stateManager.showCategoryIcons ? "Hide Category Icons" : "Show Category Icons", systemImage: stateManager.showCategoryIcons ? "eye.slash" : "eye") {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                            stateManager.showCategoryIcons.toggle()
+                        }
+                    }
                     
                     if cart.isPlanning {
                         Button("Start Shopping", systemImage: "cart") {

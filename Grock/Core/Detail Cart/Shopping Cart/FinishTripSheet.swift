@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 struct FinishTripSheet: View {
     @Bindable var cart: Cart  // CHANGED: Make cart mutable
@@ -181,6 +182,68 @@ struct FinishTripSheet: View {
         cart.cartItems.filter { $0.isShoppingOnlyItem && $0.isFulfilled }
     }
     
+    // MARK: - Display models for subviews
+    private var changedItemsDisplay: [ChangedItemDisplay] {
+        changedItemsList.map { cartItem in
+            let itemName = vaultService.findItemById(cartItem.itemId)?.name ?? "Unknown Item"
+            let plannedPrice = cartItem.plannedPrice ?? 0
+            let actualPrice = cartItem.actualPrice ?? plannedPrice
+            let plannedQty = cartItem.originalPlanningQuantity ?? cartItem.quantity
+            let actualQty = cartItem.actualQuantity ?? cartItem.quantity
+            let unit = cartItem.actualUnit ?? cartItem.plannedUnit ?? ""
+            return ChangedItemDisplay(
+                id: cartItem.itemId,
+                name: itemName,
+                plannedPrice: plannedPrice,
+                actualPrice: actualPrice,
+                plannedQty: plannedQty,
+                actualQty: actualQty,
+                unit: unit
+            )
+        }
+    }
+    
+    private var addedDuringShoppingDisplay: [AddedItemDisplay] {
+        addedDuringShoppingVaultFulfilled.map { cartItem in
+            let itemName = vaultService.findItemById(cartItem.itemId)?.name ?? "Unknown Item"
+            let qty = cartItem.actualQuantity ?? cartItem.quantity
+            return AddedItemDisplay(id: cartItem.itemId, name: itemName, qty: qty)
+        }
+    }
+    
+    private var skippedItemsDisplay: [SkippedItemDisplay] {
+        skippedPlannedItems.map { cartItem in
+            let itemName = vaultService.findItemById(cartItem.itemId)?.name ?? "Unknown Item"
+            let qty = cartItem.quantity
+            return SkippedItemDisplay(id: cartItem.itemId, name: itemName, qty: qty)
+        }
+    }
+    
+    private var newItemsDisplay: [NewItemDisplay] {
+        newItemsList.map { cartItem in
+            let item = vaultService.findItemById(cartItem.itemId)
+            let name = item?.name ?? cartItem.shoppingOnlyName ?? "Unknown Item"
+            let unit = vaultService.vault.map { vault in
+                cartItem.getUnit(from: vault, cart: cart)
+            } ?? ""
+            let price = vaultService.vault.map { vault in
+                cartItem.getPrice(from: vault, cart: cart)
+            } ?? 0.0
+            var emoji: String? = nil
+            var title: String? = nil
+            if cartItem.isShoppingOnlyItem, let raw = cartItem.shoppingOnlyCategory, let cat = GroceryCategory(rawValue: raw) {
+                emoji = cat.emoji
+                title = cat.title
+            } else if let vaultItem = item, let category = vaultService.getCategory(for: vaultItem.id) {
+                title = category.name
+                if let groceryCat = GroceryCategory.allCases.first(where: { $0.title == category.name }) {
+                    emoji = groceryCat.emoji
+                }
+            }
+            return NewItemDisplay(id: cartItem.itemId, name: name, unit: unit, price: price, categoryEmoji: emoji, categoryTitle: title)
+        }
+    }
+    
     // MARK: - Accordion states
     @State private var showChangedSection: Bool = true
     @State private var showAddedDuringShoppingSection: Bool = false
@@ -236,7 +299,7 @@ struct FinishTripSheet: View {
                 
                 // Scrollable content below header
                 ScrollView {
-                    VStack(spacing: 0) {
+                    VStack(spacing: 12) {
                         // What changed accordion
                         AccordionSectionView(
                             icon: "arrow.left.arrow.right",
@@ -247,67 +310,9 @@ struct FinishTripSheet: View {
                             isExpanded: $showChangedSection,
                             hasContent: !changedItemsList.isEmpty
                         ) {
-                            VStack(spacing: 10) {
-                                ForEach(changedItemsList, id: \.itemId) { cartItem in
-                                    let itemName = vaultService.findItemById(cartItem.itemId)?.name ?? "Unknown Item"
-                                    let plannedPrice = cartItem.plannedPrice ?? 0
-                                    let actualPrice = cartItem.actualPrice ?? plannedPrice
-                                    let plannedQty = cartItem.originalPlanningQuantity ?? cartItem.quantity
-                                    let actualQty = cartItem.actualQuantity ?? cartItem.quantity
-                                    let unit = cartItem.actualUnit ?? cartItem.plannedUnit ?? ""
-                                    let delta = max(0, actualPrice - plannedPrice)
-                                    
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        Text(itemName)
-                                            .lexendFont(16, weight: .regular)
-                                            .foregroundColor(.black)
-                                        
-                                        HStack(spacing: 6) {
-                                            let priceChanged = abs(actualPrice - plannedPrice) > 0.0001
-                                            let qtyChanged = abs(actualQty - plannedQty) > 0.0001
-                                            
-                                            if priceChanged {
-                                                Text("\(plannedPrice.formattedCurrency)")
-                                                    .strikethrough()
-                                                    .foregroundColor(Color(hex: "777"))
-                                                
-                                                Text("→ \(actualPrice.formattedCurrency) / \(unit)")
-                                                    .foregroundColor(Color(hex: "231F30"))
-                                            }
-                                            
-                                            if priceChanged && qtyChanged {
-                                                Text("•")
-                                                    .foregroundColor(Color(hex: "999"))
-                                            }
-                                            
-                                            if qtyChanged {
-                                                Text("\(plannedQty.formattedQuantity) → \(actualQty.formattedQuantity)\(unit.isEmpty ? "" : " \(unit)")")
-                                                    .foregroundColor(Color(hex: "231F30"))
-                                            }
-                                            
-                                            Spacer()
-                                            
-                                            if priceChanged && delta > 0.0001 {
-                                                Text("↑ \(delta.formattedCurrency)")
-                                                    .foregroundColor(Color(hex: "FA003F"))
-                                            }
-                                        }
-                                        .lexendFont(13)
-                                    }
-                                    .padding(.vertical, 6)
-                                    
-                                    if cartItem != changedItemsList.last {
-                                        DashedLine()
-                                            .stroke(style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
-                                            .frame(height: 0.5)
-                                            .foregroundColor(Color(hex: "999").opacity(0.5))
-                                    }
-                                }
-                            }
-                            .padding(.leading, 16)
+                            ChangedItemsListView(items: changedItemsDisplay)
                         }
                         .padding(.horizontal, 20)
-                        .padding(.top, 12)
                         
                         // Added during shopping (vault items) accordion
                         AccordionSectionView(
@@ -319,21 +324,9 @@ struct FinishTripSheet: View {
                             isExpanded: $showAddedDuringShoppingSection,
                             hasContent: !addedDuringShoppingVaultFulfilled.isEmpty
                         ) {
-                            VStack(spacing: 6) {
-                                ForEach(addedDuringShoppingVaultFulfilled, id: \.itemId) { cartItem in
-                                    let itemName = vaultService.findItemById(cartItem.itemId)?.name ?? "Unknown Item"
-                                    let qty = cartItem.actualQuantity ?? cartItem.quantity
-                                    Text("\(qty.formattedQuantity) \(itemName)")
-                                        .lexendFont(13)
-                                        .foregroundColor(Color(hex: "231F30"))
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                        .padding(.vertical, 4)
-                                }
-                            }
-                            .padding(.horizontal, 20)
+                            AddedDuringShoppingListView(items: addedDuringShoppingDisplay)
                         }
                         .padding(.horizontal, 20)
-                        .padding(.top, 12)
                         
                         // Skipped items accordion (planned items not fulfilled)
                         AccordionSectionView(
@@ -345,120 +338,36 @@ struct FinishTripSheet: View {
                             isExpanded: $showSkippedSection,
                             hasContent: !skippedPlannedItems.isEmpty
                         ) {
-                            VStack(spacing: 6) {
-                                ForEach(skippedPlannedItems, id: \.itemId) { cartItem in
-                                    let itemName = vaultService.findItemById(cartItem.itemId)?.name ?? "Unknown Item"
-                                    let qty = cartItem.quantity
-                                    Text("\(qty.formattedQuantity) \(itemName)")
-                                        .lexendFont(13)
-                                        .foregroundColor(Color(hex: "231F30"))
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                        .padding(.vertical, 4)
-                                }
-                            }
-                            .padding(.horizontal, 20)
+                            SkippedItemsListView(items: skippedItemsDisplay)
                         }
                         .padding(.horizontal, 20)
-                        .padding(.top, 12)
                         
+                        Text("• • •")
+                            .font(.headline)
+                            .foregroundStyle(.gray)
+                            .bold()
+      
                         if !newItemsList.isEmpty {
-                            VStack(spacing: 8) {
-                                HStack {
-                                    Text("New items (\(newItemsList.count))")
-                                        .lexendFont(16, weight: .semibold)
-                                        .foregroundColor(Color(hex: "231F30"))
-                                    
-                                    Spacer()
-                                    
-                                    Text("save to vault?")
-                                        .lexendFont(12)
-                                        .foregroundColor(Color(hex: "666"))
-                                }
-                                .padding(.horizontal, 24)
-                                
-                                DashedLine()
-                                    .stroke(style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
-                                    .frame(height: 0.5)
-                                    .foregroundColor(Color(hex: "999").opacity(0.5))
-                                    .padding(.horizontal, 24)
-                                
-                                ForEach(newItemsList, id: \.itemId) { cartItem in
-                                    let item = vaultService.findItemById(cartItem.itemId)
-                                    let name = item?.name ?? cartItem.shoppingOnlyName ?? "Unknown Item"
-                                    let unit = vaultService.vault.map { vault in
-                                        cartItem.getUnit(from: vault, cart: cart)
-                                    } ?? ""
-                                    let price = vaultService.vault.map { vault in
-                                        cartItem.getPrice(from: vault, cart: cart)
-                                    } ?? 0.0
-                                    
-                                    HStack(spacing: 12) {
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text(name)
-                                                .lexendFont(14, weight: .medium)
-                                                .foregroundColor(Color(hex: "231F30"))
-                                            Text("\(price.formattedCurrency) / \(unit)")
-                                                .lexendFont(12)
-                                                .foregroundColor(Color(hex: "888"))
-                                        }
-                                        
-                                        Spacer()
-                                        
-                                        Toggle("", isOn: Binding(
-                                            get: { newItemToggles[cartItem.itemId] ?? true },
-                                            set: { newItemToggles[cartItem.itemId] = $0 }
-                                        ))
-                                        .labelsHidden()
-                                    }
-                                    .padding(.horizontal, 24)
-                                    .padding(.vertical, 8)
-                                }
-                            }
-                            .padding(.bottom, 24)
+                            NewItemsListView(titleCount: newItemsList.count, toggles: $newItemToggles, items: newItemsDisplay)
                         }
                     }
-                    .padding(.vertical)
+                    .padding(.vertical, 20)
                 }
                 
-                // Completion actions
-                VStack(spacing: 6) {
-                    FormCompletionButton(
-                        title: "Finish and Save Changes",
-                        isEnabled: true,
-                        cornerRadius: 100,
-                        verticalPadding: 12,
-                        maxRadius: 1000,
-                        bounceScale: (0.98, 1.05, 1.0),
-                        bounceTiming: (0.1, 0.3, 0.3),
-                        maxWidth: true,
-                        action: {
-                            mergeSelectedNewItemsToVault()
-                            vaultService.completeShopping(cart: cart)
-                            NotificationCenter.default.post(
-                                name: NSNotification.Name("ShowInsightsAfterTrip"),
-                                object: nil,
-                                userInfo: ["cartId": cart.id]
-                            )
-                        }
-                    )
-                    .frame(maxWidth: .infinity)
-                    
-                    Button(action: {
+                CompletionActionsView(
+                    onFinish: {
+                        mergeSelectedNewItemsToVault()
+                        vaultService.completeShopping(cart: cart)
+                        NotificationCenter.default.post(
+                            name: NSNotification.Name("ShowInsightsAfterTrip"),
+                            object: nil,
+                            userInfo: ["cartId": cart.id]
+                        )
+                    },
+                    onContinue: {
                         dismiss()
-                    }, label: {
-                        Text("Continue Shopping")
-                            .fuzzyBubblesFont(14, weight: .bold)
-                            .foregroundColor(.black)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
-                            .cornerRadius(100)
-                            .overlay {
-                                Capsule()
-                                    .stroke(Color(.systemGray4), lineWidth: 1)
-                            }
-                    })
-                }
-                .padding(.horizontal, 20)
+                    }
+                )
                 .padding(.bottom)
             }
             
@@ -487,209 +396,70 @@ struct FinishTripSheet: View {
     }
 }
 
-// MARK: - Header and Highlights subviews
-private struct FinishSheetHeaderView: View {
-    let headerSummaryText: String
-    let cart: Cart
-    let cartBudget: Double
-    let totalSpent: Double
+@MainActor
+private func makeFinishTripPreview() -> some View {
+    let container = try! ModelContainer(
+        for: User.self, Vault.self, Category.self, Item.self, PriceOption.self, PricePerUnit.self, Cart.self, CartItem.self,
+        configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+    )
+    let context = ModelContext(container)
+    let service = VaultService(modelContext: context)
     
-    var body: some View {
-        VStack(spacing: 12) {
-            Text(headerSummaryText)
-                .fuzzyBubblesFont(18, weight: .bold)
-                .foregroundColor(Color(hex: "231F30"))
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 50)
-                .padding(.vertical, 20)
-                .padding(.top, 32)
-            
-            HStack(spacing: 8) {
-                FluidBudgetPillView(
-                    cart: cart,
-                    animatedBudget: cartBudget,
-                    onBudgetTap: nil,
-                    hasBackgroundImage: false,
-                    isHeader: true,
-                    customIndicatorSpent: totalSpent
-                )
-                .frame(maxWidth: .infinity)
-                .allowsHitTesting(false)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.horizontal, 20)
-            .padding(.bottom, 20)
-        }
-    }
+    let previewCart = Cart(name: "Preview Trip", budget: 200, status: .shopping)
+    let chips = CartItem.createShoppingOnlyItem(
+        name: "Chips",
+        store: "Store A",
+        price: 2.99,
+        unit: "bag",
+        quantity: 1,
+        category: .pantry
+    )
+    chips.isFulfilled = true
+    let addedVaultItem = CartItem(
+        itemId: "vault-3",
+        quantity: 1,
+        plannedStore: "Store A",
+        isFulfilled: true,
+        plannedPrice: nil,
+        plannedUnit: "ea",
+        actualStore: "Store A",
+        actualPrice: 2.49,
+        actualQuantity: 1,
+        actualUnit: "ea",
+        isShoppingOnlyItem: false,
+        addedDuringShopping: true
+    )
+    previewCart.cartItems = [
+        CartItem(
+            itemId: "vault-1",
+            quantity: 1,
+            plannedStore: "Store A",
+            isFulfilled: true,
+            plannedPrice: 3.0,
+            plannedUnit: "ea",
+            actualStore: "Store A",
+            actualPrice: 3.5,
+            actualQuantity: 2,
+            actualUnit: "ea"
+        ),
+        CartItem(
+            itemId: "vault-2",
+            quantity: 1,
+            plannedStore: "Store A",
+            isFulfilled: false,
+            plannedPrice: 5.0,
+            plannedUnit: "ea"
+        ),
+        addedVaultItem,
+        chips
+    ]
+    
+    return FinishTripSheet(cart: previewCart)
+        .environment(service)
+        .presentationDetents([.large])
+        .background(Color.white)
 }
 
-private struct AccordionSectionView<Content: View>: View {
-    let icon: String
-    let title: String
-    let subtitle: String
-    let background: Color
-    let accent: Color
-    @Binding var isExpanded: Bool
-    let hasContent: Bool
-    let content: () -> Content
-    
-    var body: some View {
-        VStack(spacing: 0) {
-            Button(action: {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                    isExpanded.toggle()
-                }
-            }) {
-                HStack(alignment: .top, spacing: 12) {
-                    HStack(spacing: 12) {
-                        Image(systemName: icon)
-                            .font(.system(size: 16, weight: .bold))
-                            .foregroundColor(accent)
-                            .padding(12)
-                        
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(title)
-                                .lexendFont(15, weight: .semibold)
-                                .foregroundColor(accent)
-                            Text(subtitle)
-                                .lexendFont(11)
-                                .foregroundColor(accent.opacity(0.8))
-                        }
-                    }
-                    
-                    Spacer()
-                    
-                    VStack {
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 16, weight: .bold))
-                            .rotationEffect(.degrees(isExpanded ? 90 : 0))
-                            .foregroundColor(.black)
-                    }
-                }
-                .contentShape(Rectangle())
-                .padding(12)
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(background.opacity(1))
-                )
-            }
-            .buttonStyle(.plain)
-            
-            Group {
-                if isExpanded && hasContent {
-                    content()
-                        .padding(.top, 8)
-                        .transition(
-                            .asymmetric(
-                                insertion: .move(edge: .bottom).combined(with: .opacity),
-                                removal: .move(edge: .bottom).combined(with: .opacity)
-                            )
-                        )
-                }
-            }
-            .animation(.spring(response: 0.35, dampingFraction: 0.85), value: isExpanded)
-            .clipped()
-        }
-    }
-}
-// MARK: - Helper Components
-private struct ReflectionButton: View {
-    let text: String
-    let emoji: String
-    @State private var isSelected = false
-    
-    var body: some View {
-        Button(action: {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                isSelected.toggle()
-            }
-        }) {
-            HStack(spacing: 6) {
-                Text(emoji)
-                Text(text)
-                    .lexendFont(14, weight: .medium)
-            }
-            .padding(.horizontal, 16)
-            .background(isSelected ? Color.black : Color(hex: "F5F5F5"))
-            .foregroundColor(isSelected ? .white : .black)
-            .cornerRadius(20)
-        }
-    }
-}
-
-
-// MARK: - Stat Pill Component
-private struct StatPill: View {
-    let emoji: String
-    let count: Int
-    let label: String
-    
-    var body: some View {
-        VStack(spacing: 4) {
-            HStack(spacing: 2) {
-                Text(emoji)
-                    .font(.system(size: 16))
-                
-                Text("\(count)")
-                    .lexendFont(18, weight: .semibold)
-            }
-            
-            Text(label)
-                .lexendFont(12)
-                .foregroundColor(Color(hex: "666"))
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 12)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color(hex: "F7F2ED"))
-        )
-    }
-}
-
-private struct AccordionCardView: View {
-    let icon: String
-    let title: String
-    let subtitle: String
-    let background: Color
-    let accent: Color
-    
-    var body: some View {
-        HStack(spacing: 12) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(background.opacity(0.9))
-                    .frame(width: 36, height: 36)
-                Image(systemName: icon)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(accent)
-            }
-            
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .lexendFont(14, weight: .semibold)
-                    .foregroundColor(Color(hex: "231F30"))
-                Text(subtitle)
-                    .lexendFont(12)
-                    .foregroundColor(Color(hex: "666"))
-            }
-            
-            Spacer()
-            
-            Image(systemName: "chevron.up")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(Color(hex: "231F30"))
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(background.opacity(0.4))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(background.opacity(0.8), lineWidth: 1)
-        )
-    }
+#Preview("FinishTripSheet") {
+    makeFinishTripPreview()
 }

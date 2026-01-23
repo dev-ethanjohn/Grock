@@ -769,6 +769,21 @@ private struct ItemPriceRow: View {
     let isItemFulfilled: Bool
     
     @Environment(CartStateManager.self) private var stateManager
+    @Environment(VaultService.self) private var vaultService
+    
+    private var categoryEmoji: String {
+        if cartItem.isShoppingOnlyItem,
+           let raw = cartItem.shoppingOnlyCategory,
+           let cat = GroceryCategory(rawValue: raw) {
+            return cat.emoji
+        }
+        if let vaultItem = item,
+           let category = vaultService.getCategory(for: vaultItem.id),
+           let groceryCat = GroceryCategory.allCases.first(where: { $0.title == category.name }) {
+            return groceryCat.emoji
+        }
+        return ""
+    }
     
     private var textColor: Color {
         if isItemFulfilled {
@@ -783,16 +798,22 @@ private struct ItemPriceRow: View {
     var body: some View {
         
         HStack(spacing: 0) {
-            Text("\(currentPrice.formattedCurrency) ")
+            Text("\(currentPrice.formattedCurrency)")
                 .lexendFont(12, weight: .medium)
                 .foregroundColor(stateManager.hasBackgroundImage ? .white.opacity(0.8) : Color(hex: "231F30"))
-            Text("/ \(displayUnit)")
+            Text("/\(displayUnit) ")
                 .lexendFont(11)
                 .lineLimit(1)
                 .contentTransition(.numericText())
                 .animation(nil, value: currentPrice)
                 .foregroundColor(textColor)
                 .opacity(isItemFulfilled ? 0.5 : 1.0)
+            if !categoryEmoji.isEmpty && stateManager.showCategoryIcons {
+                Text(categoryEmoji)
+                    .font(.system(size: 10))
+                    .foregroundColor(stateManager.hasBackgroundImage ? .white.opacity(0.8) : Color(hex: "666"))
+                    .transition(.scale.combined(with: .opacity))
+            }
         }
 
     }

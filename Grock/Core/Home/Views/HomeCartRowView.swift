@@ -276,6 +276,91 @@ struct HomeCartRowView: View {
                 isHeader: false
             )
             
+            if cart.isShopping {
+                // Horizontal category list
+                categoryProgressList
+                    .padding(.top, 4)
+            }
+
+            
+        }
+    }
+    
+    // MARK: - Category Progress List
+    private var categoryProgressList: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 4) {
+                ForEach(activeCategories, id: \.self) { category in
+                    let isFulfilled = isCategoryFulfilled(category)
+                    
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(
+                                RadialGradient(
+                                    colors: [
+                                        category.pastelColor.darker(by: 0.07).saturated(by: 0.03),
+                                        category.pastelColor.darker(by: 0.15).saturated(by: 0.05)
+                                    ],
+                                    center: .center,
+                                    startRadius: 0,
+                                    endRadius: 30
+                                )
+                            )
+                            .shadow(
+                                color: .black.opacity(0.1),
+                                radius: 2,
+                                x: 0,
+                                y: 1
+                            )
+                            .frame(width: 20, height: 20)
+                        
+                        Text(category.emoji)
+                            .font(.system(size: 12))
+                    }
+                    .opacity(isFulfilled ? 1.0 : 0.5)
+                }
+            }
+            .padding(.horizontal, 4)
+            .padding(.bottom, 4)
+        }
+    }
+    
+    // Compute categories present in this cart
+    private var activeCategories: [GroceryCategory] {
+        let categories = cart.cartItems.compactMap { item -> GroceryCategory? in
+            // Skip deleted/zero quantity items
+            if item.quantity <= 0 { return nil }
+            
+            if item.isShoppingOnlyItem {
+                if let raw = item.shoppingOnlyCategory {
+                    return GroceryCategory(rawValue: raw)
+                }
+            } else if let vault = vaultService?.vault {
+                // Find vault item
+                if let category = vault.categories.first(where: { $0.items.contains(where: { $0.id == item.itemId }) }) {
+                    return GroceryCategory.allCases.first(where: { $0.title == category.name })
+                }
+            }
+            return nil
+        }
+        
+        // Return unique categories sorted by standard order
+        let unique = Set(categories)
+        return GroceryCategory.allCases.filter { unique.contains($0) }
+    }
+    
+    private func isCategoryFulfilled(_ category: GroceryCategory) -> Bool {
+        cart.cartItems.contains { item in
+            guard item.quantity > 0 && item.isFulfilled else { return false }
+            
+            if item.isShoppingOnlyItem {
+                return item.shoppingOnlyCategory == category.rawValue
+            } else if let vault = vaultService?.vault {
+                if let itemCategory = vault.categories.first(where: { $0.items.contains(where: { $0.id == item.itemId }) }) {
+                    return itemCategory.name == category.title
+                }
+            }
+            return false
         }
     }
     

@@ -45,7 +45,16 @@ final class CartStateManager {
     var buttonScale: CGFloat = 1.0
     var shouldBounceAfterCelebration = false
     
-    init() {}
+    // Display Preferences
+    var showCategoryIcons: Bool {
+        didSet {
+            UserDefaults.standard.set(showCategoryIcons, forKey: "showCategoryIcons")
+        }
+    }
+    
+    init() {
+        self.showCategoryIcons = UserDefaults.standard.object(forKey: "showCategoryIcons") as? Bool ?? false
+    }
     
     // Computed properties
     var backgroundColor: Color {
