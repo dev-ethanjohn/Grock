@@ -537,7 +537,7 @@ extension UIImage {
     }
 }
 
-class CartBackgroundImageManager {
+class CartBackgroundImageManager: @unchecked Sendable {
     static let shared = CartBackgroundImageManager()
     private let fileManager = FileManager.default
     

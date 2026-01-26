@@ -1,65 +1,45 @@
 import SwiftUI
 
-// struct ScrollOffsetPreferenceKey: PreferenceKey {
-//    static var defaultValue: CGPoint = .zero
-//    static func reduce(value: inout CGPoint, nextValue: () -> CGPoint) { }
-// }
+struct BlurScrollOffsetPreferenceKey: PreferenceKey {
+    static var defaultValue: CGPoint = .zero
+    static func reduce(value: inout CGPoint, nextValue: () -> CGPoint) { }
+}
 
 struct BlurScroll: ViewModifier {
-    
     let blur: CGFloat
     let bottomBlurScale: CGFloat
     let coordinateSpaceName = "scroll"
     
-    @State private var scrollPosition: CGPoint = .zero
+    // NOTE: Removed preferenceKey tracking to prevent stuttering
     
     func body(content: Content) -> some View {
-        
-        let gradient = LinearGradient(stops: [
-            .init(color: .black, location: 0.04 * bottomBlurScale),
-            .init(color: .clear, location: 0.10 * bottomBlurScale)],
-                                      startPoint: .bottom,
-                                      endPoint: .top)
-        
-        let invertedGradient = LinearGradient(stops: [
-            .init(color: .clear, location: 0.04 * bottomBlurScale),
-            .init(color: .black, location: 0.12 * bottomBlurScale)],
-                                              startPoint: .bottom,
-                                              endPoint: .top)
-        
-        GeometryReader { topGeo in
-            ScrollView {
-                ZStack(alignment: .top) {
+        GeometryReader { proxy in
+            ZStack(alignment: .bottom) {
+                ScrollView {
                     content
-                        .mask(
-                            VStack {
-                                invertedGradient
-                                    .frame(height: topGeo.size.height, alignment: .top)
-                                    .offset(y: -scrollPosition.y)
-                                Spacer()
-                            }
-                        )
-                    
-                    content
-                        .blur(radius: blur)
-                        .frame(height: topGeo.size.height, alignment: .top)
-                        .mask(gradient
-                            .frame(height: topGeo.size.height)
-                            .offset(y: -scrollPosition.y)
-                        )
-                        .ignoresSafeArea()
+                        // Add padding at bottom to allow content to scroll fully above the blur
+                        .padding(.bottom, proxy.size.height * 0.15 * bottomBlurScale)
                 }
-                .padding(.bottom, topGeo.size.height * 0.12 * bottomBlurScale)
-                .background(GeometryReader { geo in
-                    Color.clear
-                        .preference(key: ScrollOffsetPreferenceKey.self,
-                                    value: geo.frame(in: .named(coordinateSpaceName)).origin)
-                })
-                .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
-                    self.scrollPosition = value
-                }
+                .scrollIndicators(.hidden)
+                .coordinateSpace(name: coordinateSpaceName)
+                
+                // Bottom Blur Overlay
+                // Using Material for O(1) performance (no duplication, no tracking)
+                Rectangle()
+                    .fill(.ultraThinMaterial)
+                    .mask(
+                        LinearGradient(
+                            stops: [
+                                .init(color: .clear, location: 0),
+                                .init(color: .black, location: 1.0)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .frame(height: proxy.size.height * 0.15 * bottomBlurScale)
+                    .allowsHitTesting(false) // Let touches pass through to scroll
             }
-            .coordinateSpace(name: coordinateSpaceName)
         }
         .ignoresSafeArea()
     }

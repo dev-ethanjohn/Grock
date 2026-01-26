@@ -102,6 +102,10 @@ class CartViewModel {
     }
     
     // MARK: - Convenience Properties
+    // Computed properties here are okay if they are cheap.
+    // However, if `carts` is large, we should consider caching these if accessed frequently in loops.
+    // For now, carts.filter is O(N), which is acceptable for < 100 carts.
+    
     var activeCarts: [Cart] {
         carts.filter { $0.isActive }
     }

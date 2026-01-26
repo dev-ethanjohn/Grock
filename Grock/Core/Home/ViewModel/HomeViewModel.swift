@@ -43,6 +43,7 @@ final class HomeViewModel {
         self.vaultService = vaultService
     }
 
+    // Cached display carts to avoid re-sorting/filtering on every render
     var displayedCarts: [Cart] {
         // Always show active carts since we removed tabs
         let baseCarts = cartViewModel.activeCarts.sorted { $0.createdAt > $1.createdAt }

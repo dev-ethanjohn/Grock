@@ -2,25 +2,34 @@ import SwiftUI
 import SwiftData
 
 // MARK: - Image Cache Manager (Put this OUTSIDE CartDetailContent, at top level)
-class ImageCacheManager {
+class ImageCacheManager: @unchecked Sendable {
     static let shared = ImageCacheManager()
     private var cache: [String: UIImage] = [:]
+    private let lock = NSLock()
     
     private init() {}
     
     func getImage(forCartId cartId: String) -> UIImage? {
+        lock.lock()
+        defer { lock.unlock() }
         return cache[cartId]
     }
     
     func saveImage(_ image: UIImage, forCartId cartId: String) {
+        lock.lock()
+        defer { lock.unlock() }
         cache[cartId] = image
     }
     
     func deleteImage(forCartId cartId: String) {
+        lock.lock()
+        defer { lock.unlock() }
         cache.removeValue(forKey: cartId)
     }
     
     func clearCache() {
+        lock.lock()
+        defer { lock.unlock() }
         cache.removeAll()
     }
 }

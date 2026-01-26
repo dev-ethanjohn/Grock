@@ -1354,3 +1354,38 @@ extension VaultService {
         print("📋 Added Vault item during shopping: \(item.name) ×\(quantity)")
     }
 }
+
+
+extension VaultService {
+    // Add this property to cache item-to-category mappings
+    private static var categoryLookupCache: [String: [String: String]] = [:] // [vaultId: [itemId: categoryName]]
+    
+    func getCategoryName(for itemId: String) -> String? {
+        guard let vault = vault else { return nil }
+        
+        // Create cache key - convert PersistentIdentifier to String
+        let vaultId = vault.id.hashValue.description
+        
+        // Check cache first
+        if let cached = Self.categoryLookupCache[vaultId]?[itemId] {
+            return cached
+        }
+        
+        // Find category
+        if let category = vault.categories.first(where: { $0.items.contains(where: { $0.id == itemId }) }) {
+            // Update cache
+            if Self.categoryLookupCache[vaultId] == nil {
+                Self.categoryLookupCache[vaultId] = [:]
+            }
+            Self.categoryLookupCache[vaultId]?[itemId] = category.name
+            return category.name
+        }
+        
+        return nil
+    }
+    
+    func invalidateCategoryCache() {
+        Self.categoryLookupCache.removeAll()
+    }
+}
+

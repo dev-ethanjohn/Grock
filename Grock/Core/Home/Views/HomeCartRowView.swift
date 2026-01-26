@@ -1,6 +1,5 @@
 import SwiftUI
 import SwiftData
-import Lottie
 
 struct HomeCartRowView: View {
     let cart: Cart
@@ -14,6 +13,10 @@ struct HomeCartRowView: View {
     
     // Add this to observe currency changes
     @State private var currencyManager = CurrencyManager.shared
+    
+    // ✅ Cache active categories to avoid recalculation
+      @State private var cachedActiveCategories: [GroceryCategory] = []
+      @State private var lastCartItemsCount: Int = 0
     
     init(cart: Cart, vaultService: VaultService?) {
         self.cart = cart
@@ -163,15 +166,27 @@ struct HomeCartRowView: View {
         .overlay(borderOverlay)
         .scaleEffect(appeared ? 1.0 : 0.95)
         .opacity(appeared ? 1.0 : 0)
+        // ✅ Add drawingGroup to offload rendering to GPU
+        .drawingGroup()
         .onAppear {
             withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
                 appeared = true
             }
-            currentProgress = cart.budget > 0 ? cart.totalSpent / cart.budget : 0
-            
-            // Load background image
-            loadBackgroundImage()
-        }
+                currentProgress = cart.budget > 0 ? cart.totalSpent / cart.budget : 0
+                
+                // ✅ Load image asynchronously
+                loadBackgroundImageAsync()
+                
+                // ✅ Calculate categories once
+                updateActiveCategories()
+            }
+        .onChange(of: cart.cartItems.count) { oldValue, newValue in
+                 // ✅ Only recalculate when cart items change
+                 if newValue != lastCartItemsCount {
+                     updateActiveCategories()
+                     lastCartItemsCount = newValue
+                 }
+             }
         .onChange(of: cart.budget) { oldValue, newValue in
             guard oldValue != newValue else { return }
             viewModel.updateBudget(newValue, animated: true)
@@ -211,6 +226,76 @@ struct HomeCartRowView: View {
         }
     }
     
+    
+    //NOTE: OPTIMIZATIONS
+    // MARK: - Async Image Loading
+    private func loadBackgroundImageAsync() {
+        // Check flag first (fast)
+        let cartId = cart.id // Capture on MainActor
+        let hasImage = CartBackgroundImageManager.shared.hasBackgroundImage(forCartId: cartId)
+        hasBackgroundImage = hasImage
+        
+        guard hasImage else {
+            backgroundImage = nil
+            return
+        }
+        
+        // Try cache first (fast)
+        if let cachedImage = ImageCacheManager.shared.getImage(forCartId: cartId) {
+            backgroundImage = cachedImage
+            return
+        }
+        
+        // ✅ Load from disk asynchronously
+        Task.detached(priority: .userInitiated) { [cartId] in
+            let image = CartBackgroundImageManager.shared.loadImage(forCartId: cartId)
+            
+            await MainActor.run {
+                self.backgroundImage = image
+                self.hasBackgroundImage = image != nil
+                
+                // Cache it
+                if let image = image {
+                    ImageCacheManager.shared.saveImage(image, forCartId: cartId)
+                }
+            }
+        }
+    }
+    
+    // MARK: - Optimized Category Calculation
+    private func updateActiveCategories() {
+        // VaultService is MainActor-isolated, so we must access it on the main thread.
+        // The caching in VaultService ensures this is efficient (O(N) lookup) after the first run.
+        // Offloading to a detached task would require snapshotting the entire vault state, which is expensive.
+        self.cachedActiveCategories = calculateActiveCategories()
+    }
+    
+    private func calculateActiveCategories() -> [GroceryCategory] {
+         guard !cart.cartItems.isEmpty else { return [] }
+         
+         var categorySet = Set<GroceryCategory>()
+         
+         for item in cart.cartItems {
+             guard item.quantity > 0 else { continue }
+             
+             if item.isShoppingOnlyItem {
+                 if let raw = item.shoppingOnlyCategory,
+                    let cat = GroceryCategory(rawValue: raw) {
+                     categorySet.insert(cat)
+                 }
+             } else {
+                 // ✅ Use cached lookup instead of nested loops
+                 if let categoryName = vaultService?.getCategoryName(for: item.itemId),
+                    let groceryCat = GroceryCategory.allCases.first(where: { $0.title == categoryName }) {
+                     categorySet.insert(groceryCat)
+                 }
+             }
+         }
+         
+         return GroceryCategory.allCases.filter { categorySet.contains($0) }
+     }
+     
+    
     private var headerRow: some View {
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 2) {
@@ -244,16 +329,6 @@ struct HomeCartRowView: View {
             Spacer()
             
             HStack(alignment: .center, spacing: 2) {
-                if cart.isShopping {
-                    
-                    LottieView(animation: .named("Shopping"))
-                        .playing(.fromProgress(0, toProgress: 0.5, loopMode: .loop))
-                        .colorMultiply(hasBackgroundImage ? .white : .black)
-                        .frame(width: 18, height: 18)
-                    
-                    
-                }
-                
                 Image(systemName: "chevron.right")
                     .lexendFont(13, weight: .semibold)
                     .foregroundColor(hasBackgroundImage ? .white : .black)
@@ -295,66 +370,110 @@ struct HomeCartRowView: View {
     }
     
     // MARK: - Category Progress List
+//    private var categoryProgressList: some View {
+//        ScrollView(.horizontal, showsIndicators: false) {
+//            HStack(spacing: 4) {
+//                // Use a lighter-weight approach if possible, or ensure activeCategories is efficient
+//                ForEach(activeCategories, id: \.self) { category in
+//                    let isFulfilled = isCategoryFulfilled(category)
+//                    
+//                    ZStack {
+//                        RoundedRectangle(cornerRadius: 6)
+//                            .fill(
+//                                RadialGradient(
+//                                    colors: [
+//                                        category.pastelColor.darker(by: 0.07).saturated(by: 0.03),
+//                                        category.pastelColor.darker(by: 0.15).saturated(by: 0.05)
+//                                    ],
+//                                    center: .center,
+//                                    startRadius: 0,
+//                                    endRadius: 30
+//                                )
+//                            )
+//                            // Remove shadow for list performance
+////                            .shadow(
+////                                color: .black.opacity(0.1),
+////                                radius: 2,
+////                                x: 0,
+////                                y: 1
+////                            )
+//                            .frame(width: 18, height: 18)
+//                        
+//                        Text(category.emoji)
+//                            .font(.system(size: 11))
+//                    }
+//                    .opacity(isFulfilled ? 1.0 : 0.5)
+//                }
+//            }
+//            .padding(.horizontal, 4)
+//            .padding(.bottom, 4)
+//        }
+//    }
     private var categoryProgressList: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 4) {
-                ForEach(activeCategories, id: \.self) { category in
-                    let isFulfilled = isCategoryFulfilled(category)
-                    
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 6)
-                            .fill(
-                                RadialGradient(
-                                    colors: [
-                                        category.pastelColor.darker(by: 0.07).saturated(by: 0.03),
-                                        category.pastelColor.darker(by: 0.15).saturated(by: 0.05)
-                                    ],
-                                    center: .center,
-                                    startRadius: 0,
-                                    endRadius: 30
-                                )
-                            )
-                            .shadow(
-                                color: .black.opacity(0.1),
-                                radius: 2,
-                                x: 0,
-                                y: 1
-                            )
-                            .frame(width: 18, height: 18)
-                        
-                        Text(category.emoji)
-                            .font(.system(size: 11))
-                    }
-                    .opacity(isFulfilled ? 1.0 : 0.5)
-                }
-            }
-            .padding(.horizontal, 4)
-            .padding(.bottom, 4)
-        }
-    }
+          ScrollView(.horizontal, showsIndicators: false) {
+              HStack(spacing: 4) {
+                  // ✅ Use cached categories instead of computing every frame
+                  ForEach(cachedActiveCategories, id: \.self) { category in
+                      let isFulfilled = isCategoryFulfilled(category)
+                      
+                      ZStack {
+                          RoundedRectangle(cornerRadius: 6)
+                              .fill(
+                                  RadialGradient(
+                                      colors: [
+                                          category.pastelColor.darker(by: 0.07).saturated(by: 0.03),
+                                          category.pastelColor.darker(by: 0.15).saturated(by: 0.05)
+                                      ],
+                                      center: .center,
+                                      startRadius: 0,
+                                      endRadius: 30
+                                  )
+                              )
+                              .frame(width: 18, height: 18)
+                          
+                          Text(category.emoji)
+                              .font(.system(size: 11))
+                      }
+                      .opacity(isFulfilled ? 1.0 : 0.5)
+                  }
+              }
+              .padding(.horizontal, 4)
+              .padding(.bottom, 4)
+          }
+      }
     
     // Compute categories present in this cart
     private var activeCategories: [GroceryCategory] {
-        let categories = cart.cartItems.compactMap { item -> GroceryCategory? in
-            // Skip deleted/zero quantity items
-            if item.quantity <= 0 { return nil }
+        // Optimization: Early exit if cart is empty
+        if cart.cartItems.isEmpty { return [] }
+        
+        var categorySet = Set<GroceryCategory>()
+        
+        // Use a simpler loop to avoid creating intermediate arrays
+        for item in cart.cartItems {
+            if item.quantity <= 0 { continue }
             
             if item.isShoppingOnlyItem {
-                if let raw = item.shoppingOnlyCategory {
-                    return GroceryCategory(rawValue: raw)
+                if let raw = item.shoppingOnlyCategory,
+                   let cat = GroceryCategory(rawValue: raw) {
+                    categorySet.insert(cat)
                 }
             } else if let vault = vaultService?.vault {
-                // Find vault item
+                // Optimization: Avoid triple nested loop if possible.
+                // ideally VaultService should provide a fast lookup map: [ItemId: Category]
+                // For now, we keep the logic but maybe we can optimize the search order or cache it?
+                // This is still O(N*M) but slightly cleaner.
+                
+                // TODO: Add caching for item->category lookup in VaultService to fix this properly
                 if let category = vault.categories.first(where: { $0.items.contains(where: { $0.id == item.itemId }) }) {
-                    return GroceryCategory.allCases.first(where: { $0.title == category.name })
+                    if let groceryCat = GroceryCategory.allCases.first(where: { $0.title == category.name }) {
+                        categorySet.insert(groceryCat)
+                    }
                 }
             }
-            return nil
         }
         
-        // Return unique categories sorted by standard order
-        let unique = Set(categories)
-        return GroceryCategory.allCases.filter { unique.contains($0) }
+        return GroceryCategory.allCases.filter { categorySet.contains($0) }
     }
     
     private func isCategoryFulfilled(_ category: GroceryCategory) -> Bool {
@@ -403,54 +522,72 @@ struct NoiseOverlayView: View {
     let density: CGFloat
     let opacity: CGFloat
     
-    @State private var noiseImage: UIImage?
-    private let cacheSize = CGSize(width: 300, height: 300)
+    // Static noise cache to prevent regeneration
+    private static var cachedNoiseImage: UIImage?
+    private static var isGenerating = false
     
     var body: some View {
         Group {
-            if let noiseImage = noiseImage {
-                Image(uiImage: noiseImage)
+            if let image = Self.cachedNoiseImage {
+                Image(uiImage: image)
                     .resizable()
                     .interpolation(.none)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .blendMode(.softLight) // More visible on solid colors than .overlay
+                    .blendMode(.softLight)
                     .opacity(opacity)
+            } else {
+                // Fallback or placeholder while generating (though we generate on appear if needed)
+                Color.clear
+                    .onAppear {
+                        if Self.cachedNoiseImage == nil && !Self.isGenerating {
+                            generateNoise()
+                        }
+                    }
             }
-        }
-        .onAppear {
-            generateNoise()
         }
     }
     
     private func generateNoise() {
-        let renderer = UIGraphicsImageRenderer(size: cacheSize)
-        
-        let image = renderer.image { context in
-            let cgContext = context.cgContext
+        // Generate on background thread to avoid hitching
+        Self.isGenerating = true
+        DispatchQueue.global(qos: .userInitiated).async {
+            let size = CGSize(width: 300, height: 300)
+            let renderer = UIGraphicsImageRenderer(size: size)
             
-            let pixelSize = max(1, Int(grainSize))
-            let cols = Int(cacheSize.width) / pixelSize
-            let rows = Int(cacheSize.height) / pixelSize
-            
-            for row in 0..<rows {
-                for col in 0..<cols {
-                    if CGFloat.random(in: 0...1) < density {
-                        let gray = CGFloat.random(in: 0.2...0.8)
-                        UIColor(white: gray, alpha: 1.0).setFill()
-                        
-                        let rect = CGRect(
-                            x: col * pixelSize,
-                            y: row * pixelSize,
-                            width: pixelSize,
-                            height: pixelSize
-                        )
-                        cgContext.fill(rect)
+            let image = renderer.image { context in
+                let cgContext = context.cgContext
+                // Fill with transparent base
+                cgContext.setFillColor(UIColor.clear.cgColor)
+                cgContext.fill(CGRect(origin: .zero, size: size))
+                
+                // Use larger pixel size for performance
+                let pixelSize = 2
+                let cols = Int(size.width) / pixelSize
+                let rows = Int(size.height) / pixelSize
+                
+                for row in 0..<rows {
+                    for col in 0..<cols {
+                        if Double.random(in: 0...1) < 0.5 { // Fixed density for cache
+                            let gray = CGFloat.random(in: 0.2...0.8)
+                            cgContext.setFillColor(UIColor(white: gray, alpha: 1.0).cgColor)
+                            
+                            let rect = CGRect(
+                                x: col * pixelSize,
+                                y: row * pixelSize,
+                                width: pixelSize,
+                                height: pixelSize
+                            )
+                            cgContext.fill(rect)
+                        }
                     }
                 }
             }
+            
+            DispatchQueue.main.async {
+                Self.cachedNoiseImage = image
+                Self.isGenerating = false
+            }
         }
-        
-        noiseImage = image
     }
 }
 

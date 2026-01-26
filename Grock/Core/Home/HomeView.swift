@@ -234,6 +234,7 @@ struct HomeView: View {
         )
         .offset(x: viewModel.showMenu ? 265 : 0)
         .scaleEffect(viewModel.showMenu ? 0.9 : 1)
+        .compositingGroup() // Optimization: Composite before applying shadows
         .shadow(color: Color.black.opacity(0.12), radius: 10, x: -2, y: -5)
         .shadow(color: Color.black.opacity(0.12), radius: 10, x: 2, y: 0)
         .ignoresSafeArea(.container, edges: .bottom) // ADD THIS TOO

@@ -38,55 +38,62 @@ struct ActiveCarts: View {
     }
     
     private var cartListView: some View {
-        LazyVStack(spacing: 14) {
-            Color.clear
-                .frame(height: viewModel.headerHeight)
-            
-            ForEach(Array(viewModel.displayedCarts.enumerated()), id: \.element.id) { index, cart in
-                Button(action: {
-                    viewModel.selectCart(cart)
-                }) {
-                    HomeCartRowView(
-                        cart: cart,
-                        vaultService: viewModel.getVaultService(for: cart)
-                    )
-                    .contentShape(.interaction, RoundedRectangle(cornerRadius: 24))
-                    .contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: 24))
-                    .contextMenu {
-                        Button {
-                            onRenameCart(cart)
-                        } label: {
-                            Label("Rename Cart", systemImage: "pencil")
+        // ✅ Use ScrollView instead of LazyVStack with custom blur
+        ScrollView {
+            LazyVStack(spacing: 14) {
+                Color.clear
+                    .frame(height: viewModel.headerHeight)
+                
+                ForEach(viewModel.displayedCarts) { cart in
+                    Button(action: {
+                        viewModel.selectCart(cart)
+                    }) {
+                        HomeCartRowView(
+                            cart: cart,
+                            vaultService: viewModel.getVaultService(for: cart)
+                        )
+                        // ✅ Add ID to help SwiftUI with diffing
+                        .id(cart.id)
+                        .contentShape(.interaction, RoundedRectangle(cornerRadius: 24))
+                        .contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: 24))
+                        .contextMenu {
+                            Button {
+                                onRenameCart(cart)
+                            } label: {
+                                Label("Rename Cart", systemImage: "pencil")
+                            }
+                            
+                            Button(role: .destructive) {
+                                onDeleteCart(cart)
+                            } label: {
+                                Label("Delete Cart", systemImage: "trash")
+                            }
                         }
-                        
-                        Button(role: .destructive) {
-                            onDeleteCart(cart)
-                        } label: {
-                            Label("Delete Cart", systemImage: "trash")
+                        .onLongPressGesture {
+                            let generator = UIImpactFeedbackGenerator(style: .medium)
+                            generator.impactOccurred()
                         }
                     }
-                    .onLongPressGesture {
-                        let generator = UIImpactFeedbackGenerator(style: .medium)
-                        generator.impactOccurred()
-                    }
+                    .buttonStyle(.plain)
+                    .transition(.asymmetric(
+                        insertion: .scale(scale: 0.8).combined(with: .opacity),
+                        removal: .scale(scale: 0.9).combined(with: .opacity)
+                    ))
                 }
-                .buttonStyle(.plain)
-                .transition(.asymmetric(
-                    insertion: .scale(scale: 0.8).combined(with: .opacity),
-                    removal: .scale(scale: 0.9).combined(with: .opacity)
-                ))
                 .animation(
-                    .spring(response: 0.5, dampingFraction: 0.7)
-                        .delay(Double(index) * 0.05),
+                    .spring(response: 0.5, dampingFraction: 0.7),
                     value: viewModel.displayedCarts.count
                 )
                 .padding(.horizontal)
+                
+                Color.clear
+                    .frame(height: 80)
             }
-            
-            // Spacer for floating tab bar
-            Color.clear
-                .frame(height: 80)
+            // ✅ Add scrollTargetLayout for better performance
+            .scrollTargetLayout()
         }
+        // ✅ Optimize scroll behavior
+        .scrollIndicators(.hidden)
         .blurScroll()
     }
     
