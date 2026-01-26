@@ -86,10 +86,10 @@ struct HeaderView: View {
             .padding(.top, 8)
             
             VStack(alignment: .leading, spacing: 0) {
-                Text(cart.name)
-                    .fuzzyBubblesFont(22, weight: .bold)
-                    .foregroundColor(.black)
-                    .padding(.bottom, 6)
+                    Text(cart.name)
+                        .fuzzyBubblesFont(22, weight: .bold)
+                        .foregroundColor(.black)
+
                 
                 HStack {
                     HStack(spacing: 0) {
@@ -141,6 +141,23 @@ struct HeaderView: View {
                           }
                   }
               )
+    }
+    
+    // Total items includes ONLY ACTIVE items (non-skipped, non-deleted)
+    private var totalItems: Int {
+        cart.cartItems.filter { cartItem in
+            if cartItem.isShoppingOnlyItem {
+                return cartItem.quantity > 0
+            } else {
+                return cartItem.quantity > 0 && !cartItem.isSkippedDuringShopping
+            }
+        }.count
+    }
+    
+    private var fulfilledItems: Int {
+        cart.cartItems.filter { cartItem in
+            cartItem.isFulfilled && cartItem.quantity > 0
+        }.count
     }
     
     func tripDateLabel(cart: Cart) -> String {
@@ -206,3 +223,4 @@ struct HeaderView: View {
         return "\(start.formatted(.dateTime.month(.abbreviated).day().year())) – \(end.formatted(.dateTime.month(.abbreviated).day().year()))"
     }
 }
+

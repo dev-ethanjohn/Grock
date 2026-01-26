@@ -1,5 +1,12 @@
 import SwiftUI
 import SwiftData
+ 
+struct HeaderHeightPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
 
 struct FinishTripSheet: View {
     @Bindable var cart: Cart  // CHANGED: Make cart mutable
@@ -248,6 +255,7 @@ struct FinishTripSheet: View {
     @State private var showChangedSection: Bool = true
     @State private var showAddedDuringShoppingSection: Bool = false
     @State private var showSkippedSection: Bool = false
+    @State private var headerHeight: CGFloat = 0
     
     // MARK: - Merge new items into vault
     private func mergeSelectedNewItemsToVault() {
@@ -286,8 +294,94 @@ struct FinishTripSheet: View {
     
     var body: some View {
         ZStack {
-            VStack(spacing: 0) {
-                // Sticky header
+            ZStack(alignment: .top) {
+                VStack(spacing: 8) {
+                        Color.clear.frame(height: headerHeight)
+
+                        AccordionSectionView(
+                            icon: "arrow.left.arrow.right",
+                            title: "What changed (\(max(changedItemsList.count, 0)))",
+                            subtitle: "Price or quantity differed from plan",
+                            accentDeep: Color(hex: "4F00B5"),
+                            isExpanded: $showChangedSection,
+                            hasContent: !changedItemsList.isEmpty
+                        ) {
+                            ChangedItemsListView(items: changedItemsDisplay, background: Color(hex: "F8EBFF"))
+                        }
+                        .padding(.horizontal, 20)
+                        
+                        AccordionSectionView(
+                            icon: "shippingbox.fill",
+                            title: "Added during shopping (\(addedDuringShoppingVaultFulfilled.count))",
+                            subtitle: "Saved items you decided to include mid-trip",
+                            accentDeep: Color(hex: "3A3A3A"),
+                            isExpanded: $showAddedDuringShoppingSection,
+                            hasContent: !addedDuringShoppingVaultFulfilled.isEmpty
+                        ) {
+                            AddedDuringShoppingListView(items: addedDuringShoppingDisplay, background: Color(hex: "EFEFEF"))
+                        }
+                        .padding(.horizontal, 20)
+                        
+                        AccordionSectionView(
+                            icon: "minus.circle.fill",
+                            title: "Skipped items (\(skippedPlannedItems.count))",
+                            subtitle: "Planned items not bought",
+                            accentDeep: Color(hex: "D85C2E"),
+                            isExpanded: $showSkippedSection,
+                            hasContent: !skippedPlannedItems.isEmpty
+                        ) {
+                            SkippedItemsListView(items: skippedItemsDisplay, background: Color(hex: "FFE7D8"))
+                        }
+                        .padding(.horizontal, 20)
+                        
+                        Text("• • •")
+                            .font(.headline)
+                            .foregroundStyle(.gray)
+                            .bold()
+          
+                        if !newItemsList.isEmpty {
+                            NewItemsListView(titleCount: newItemsList.count, toggles: $newItemToggles, items: newItemsDisplay)
+                        }
+                        
+                        Color.clear.frame(height: 120)
+                    }
+                    .padding(.vertical, 20)
+                    .blurScroll(scale: 2.3)
+                
+                // Gradient Overlay
+                VStack {
+                    Spacer()
+                    LinearGradient(
+                        colors: [.white.opacity(0), .white],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(height: UIScreen.main.bounds.height * 0.15)
+                    .allowsHitTesting(false)
+                }
+                .ignoresSafeArea(edges: .bottom)
+
+                // Bottom Actions Overlay
+                VStack(spacing: 0) {
+                    Spacer()
+                    
+                    CompletionActionsView(
+                        onFinish: {
+                            mergeSelectedNewItemsToVault()
+                            vaultService.completeShopping(cart: cart)
+                            NotificationCenter.default.post(
+                                name: NSNotification.Name("ShowInsightsAfterTrip"),
+                                object: nil,
+                                userInfo: ["cartId": cart.id]
+                            )
+                        },
+                        onContinue: {
+                            dismiss()
+                        }
+                    )
+                    .padding(.horizontal, 20)
+                }
+                
                 FinishSheetHeaderView(
                     headerSummaryText: headerSummaryText,
                     cart: cart,
@@ -296,80 +390,13 @@ struct FinishTripSheet: View {
                 )
                 .background(.white)
                 .shadow(color: .black.opacity(0.16), radius: 7, x: 0, y: 3)
-                
-                // Scrollable content below header
-                ScrollView {
-                    VStack(spacing: 12) {
-                        // What changed accordion
-                        AccordionSectionView(
-                            icon: "arrow.left.arrow.right",
-                            title: "What changed (\(max(changedItemsList.count, 0)))",
-                            subtitle: "Price or quantity differed from plan",
-                            background: Color(hex: "F0E2FF"),
-                            accent: Color(hex: "7300DF"),
-                            isExpanded: $showChangedSection,
-                            hasContent: !changedItemsList.isEmpty
-                        ) {
-                            ChangedItemsListView(items: changedItemsDisplay)
-                        }
-                        .padding(.horizontal, 20)
-                        
-                        // Added during shopping (vault items) accordion
-                        AccordionSectionView(
-                            icon: "shippingbox.fill",
-                            title: "Added during shopping (\(addedDuringShoppingVaultFulfilled.count))",
-                            subtitle: "Saved items you decided to include mid-trip",
-                            background: Color(hex: "EFEFEF"),
-                            accent: Color(hex: "6D6D6D"),
-                            isExpanded: $showAddedDuringShoppingSection,
-                            hasContent: !addedDuringShoppingVaultFulfilled.isEmpty
-                        ) {
-                            AddedDuringShoppingListView(items: addedDuringShoppingDisplay)
-                        }
-                        .padding(.horizontal, 20)
-                        
-                        // Skipped items accordion (planned items not fulfilled)
-                        AccordionSectionView(
-                            icon: "minus.circle.fill",
-                            title: "Skipped items (\(skippedPlannedItems.count))",
-                            subtitle: "Planned items not bought",
-                            background: Color(hex: "FFE7D8"),
-                            accent: Color(hex: "FF7F50"),
-                            isExpanded: $showSkippedSection,
-                            hasContent: !skippedPlannedItems.isEmpty
-                        ) {
-                            SkippedItemsListView(items: skippedItemsDisplay)
-                        }
-                        .padding(.horizontal, 20)
-                        
-                        Text("• • •")
-                            .font(.headline)
-                            .foregroundStyle(.gray)
-                            .bold()
-      
-                        if !newItemsList.isEmpty {
-                            NewItemsListView(titleCount: newItemsList.count, toggles: $newItemToggles, items: newItemsDisplay)
-                        }
-                    }
-                    .padding(.vertical, 20)
-                }
-                
-                CompletionActionsView(
-                    onFinish: {
-                        mergeSelectedNewItemsToVault()
-                        vaultService.completeShopping(cart: cart)
-                        NotificationCenter.default.post(
-                            name: NSNotification.Name("ShowInsightsAfterTrip"),
-                            object: nil,
-                            userInfo: ["cartId": cart.id]
-                        )
-                    },
-                    onContinue: {
-                        dismiss()
+                .background(
+                    GeometryReader { proxy in
+                        Color.clear.preference(key: HeaderHeightPreferenceKey.self, value: proxy.size.height)
                     }
                 )
-                .padding(.bottom)
             }
+            .onPreferenceChange(HeaderHeightPreferenceKey.self) { headerHeight = $0 }
             
             if showingEditBudget {
                 EditBudgetPopover(

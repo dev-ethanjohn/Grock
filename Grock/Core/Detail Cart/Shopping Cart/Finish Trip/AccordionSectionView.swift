@@ -4,8 +4,8 @@ struct AccordionSectionView<Content: View>: View {
     let icon: String
     let title: String
     let subtitle: String
-    let background: Color
-    let accent: Color
+//    let accent: Color
+    let accentDeep: Color
     @Binding var isExpanded: Bool
     let hasContent: Bool
     let content: () -> Content
@@ -18,20 +18,24 @@ struct AccordionSectionView<Content: View>: View {
                 }
             }) {
                 HStack(alignment: .top, spacing: 12) {
-                    HStack(spacing: 12) {
+                    HStack(alignment: .top, spacing: 12) {
                         Image(systemName: icon)
                             .font(.system(size: 16, weight: .bold))
-                            .foregroundColor(accent)
-                            .padding(12)
+//                            .foregroundColor(.black)
+                            .foregroundStyle(accentDeep)
+                            .offset(y: 4)
                         
                         VStack(alignment: .leading, spacing: 4) {
                             Text(title)
                                 .lexendFont(14, weight: .semibold)
-                                .foregroundColor(accent)
+                                .foregroundColor(accentDeep)
+//                                .foregroundColor(.black)
                             Text(subtitle)
                                 .lexendFont(12)
-                                .foregroundColor(accent.opacity(0.7))
+//                                .foregroundColor(accent.opacity(0.7))
+                                .foregroundColor(accentDeep.opacity(0.7))
                         }
+                        .foregroundColor(.black.opacity(0.7))
                     }
                     
                     Spacer()
@@ -45,23 +49,17 @@ struct AccordionSectionView<Content: View>: View {
                     }
                 }
                 .contentShape(Rectangle())
-                .padding(12)
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(background.opacity(1))
-                )
+                .padding(.leading, 8)
             }
             .buttonStyle(.plain)
+            .zIndex(1)
             
             Group {
                 if isExpanded && hasContent {
                     content()
                         .padding(.top, 8)
                         .transition(
-                            .asymmetric(
-                                insertion: .move(edge: .bottom).combined(with: .opacity),
-                                removal: .move(edge: .bottom).combined(with: .opacity)
-                            )
+                            .move(edge: .bottom).combined(with: .opacity)
                         )
                 }
             }
@@ -78,8 +76,8 @@ private struct AccordionPreviewWrapper: View {
             icon: "shippingbox.fill",
             title: "Preview Section",
             subtitle: "This is a preview subtitle",
-            background: Color(hex: "EFEFEF"),
-            accent: Color(hex: "6D6D6D"),
+//            accent: Color(hex: "6D6D6D"),
+            accentDeep: Color(hex: "3A3A3A"),
             isExpanded: $expanded,
             hasContent: true
         ) {
@@ -95,7 +93,8 @@ private struct AccordionPreviewWrapper: View {
 }
 
 #Preview("AccordionSectionView") {
-    AccordionPreviewWrapper()
-        .padding()
-        .background(Color.white)
+        AccordionPreviewWrapper()
+            .padding()
+            .background(Color.white)
+            .fixedSize(horizontal: false, vertical: true)
 }

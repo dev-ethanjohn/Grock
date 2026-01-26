@@ -201,6 +201,61 @@ struct HomeView: View {
     
     private var mainContent: some View {
         ZStack(alignment: .topLeading) {
+            homeTabContent
+            
+            // Bottom Buttons Overlay
+            VStack {
+                Spacer()
+                
+                // Buttons Container with safe area padding
+                ZStack(alignment: .center) {
+                    // Create Cart Button (Center)
+                    createCartButton
+                    
+                    // Insights Button (Trailing)
+                    HStack {
+                        Spacer()
+                        insightsButton
+                    }
+                    .padding(.trailing, 24)
+                }
+                .padding(.bottom, safeAreaBottomPadding)
+            }
+        }
+        .mask(
+            RoundedRectangle(
+                cornerRadius: viewModel.showMenu ? 30 : 24,
+                style: .continuous
+            )
+        )
+        .rotation3DEffect(
+            .degrees(viewModel.showMenu ? 30 : 0),
+            axis: (x: 0, y: -1, z: 0)
+        )
+        .offset(x: viewModel.showMenu ? 265 : 0)
+        .scaleEffect(viewModel.showMenu ? 0.9 : 1)
+        .shadow(color: Color.black.opacity(0.12), radius: 10, x: -2, y: -5)
+        .shadow(color: Color.black.opacity(0.12), radius: 10, x: 2, y: 0)
+        .ignoresSafeArea(.container, edges: .bottom) // ADD THIS TOO
+    }
+
+    
+    private var safeAreaBottomPadding: CGFloat {
+        let scenes = UIApplication.shared.connectedScenes
+        let windowScene = scenes.first as? UIWindowScene
+        let safeArea = windowScene?.windows.first?.safeAreaInsets.bottom ?? 0
+        return safeArea > 0 ? safeArea : 20 // Use 20 as fallback if no safe area detected
+    }
+    
+    private var safeAreaTopPadding: CGFloat {
+        let scenes = UIApplication.shared.connectedScenes
+        let windowScene = scenes.first as? UIWindowScene
+        let safeArea = windowScene?.windows.first?.safeAreaInsets.top ?? 0
+        return safeArea > 0 ? safeArea : 47 // Use 47 as fallback (typical notch height)
+    }
+    
+    private var homeTabContent: some View {
+        ZStack(alignment: .topLeading) {
             Color(hex: "#ffffff").ignoresSafeArea()
             
             ActiveCarts(
@@ -217,62 +272,11 @@ struct HomeView: View {
             headerView
             
             homeMenu
-            
-            VStack {
-                Spacer()
-                ZStack(alignment: .bottomTrailing) {
-                    createCartButton
-                        .frame(maxWidth: .infinity, alignment: .center)
-                    
-                    Group {
-                        if #available(iOS 18.0, *) {
-                            Button(action: {
-                                showInsights = true
-                            }) {
-                                Image(systemName: "chart.bar.xaxis")
-                                    .font(.system(size: 18, weight: .semibold))
-                                    .foregroundColor(.white)
-                                    .frame(width: 44, height: 44)
-                                    .background(Color.black)
-                                    .clipShape(Circle())
-                                    .shadow(color: Color.black.opacity(0.15), radius: 4, x: 0, y: 2)
-                                    .matchedTransitionSource(id: "insightsIcon", in: insightsNamespace)
-                            }
-                        } else {
-                            Button(action: {
-                                showInsights = true
-                            }) {
-                                Image(systemName: "chart.bar.xaxis")
-                                    .font(.system(size: 18, weight: .semibold))
-                                    .foregroundColor(.white)
-                                    .frame(width: 44, height: 44)
-                                    .background(Color.black)
-                                    .clipShape(Circle())
-                                    .shadow(color: Color.black.opacity(0.15), radius: 4, x: 0, y: 2)
-                            }
-                        }
-                    }
-                    .padding(.trailing, 20)
-                    .padding(.bottom, 50)
-                }
-            }
         }
-        .ignoresSafeArea()
-        .mask(
-            RoundedRectangle(
-                cornerRadius: viewModel.showMenu ? 30 : 24,
-                style: .continuous
-            )
-        )
-        .rotation3DEffect(
-            .degrees(viewModel.showMenu ? 30 : 0),
-            axis: (x: 0, y: -1, z: 0)
-        )
-        .offset(x: viewModel.showMenu ? 265 : 0)
-        .scaleEffect(viewModel.showMenu ? 0.9 : 1)
-        .shadow(color: Color.black.opacity(0.12), radius: 10, x: -2, y: -5)
-        .shadow(color: Color.black.opacity(0.12), radius: 10, x: 2, y: 0)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
+    
+
     
     private var menuIcon: some View {
         MenuIcon {
@@ -281,7 +285,7 @@ struct HomeView: View {
                 viewModel.toggleMenu()
             }
         }
-        .padding(.top, 110)
+        .padding(.top, safeAreaTopPadding + 60)
         .offset(
             x: viewModel.getMenuIconOffset().x,
             y: viewModel.getMenuIconOffset().y
@@ -305,10 +309,8 @@ struct HomeView: View {
                         .padding(.trailing)
                 }
             }
-            .padding(.top, 60)
+            .padding(.top, safeAreaTopPadding + 10)
             .padding(.bottom, 32)
-            .frame(maxWidth: .infinity)
-            .frame(height: 122)
             .animation(.spring(response: 0.4, dampingFraction: 0.65), value: isVaultButtonExpanded)
             
             Text("Your Trip")
@@ -452,11 +454,126 @@ struct HomeView: View {
                 .fuzzyBubblesFont(18, weight: .bold)
                 .padding(.vertical, 12)
                 .padding(.horizontal, 24)
-                .background(.black)
+                .background(
+                    ZStack {
+                        // Dark Liquid Glass Effect
+                        Capsule()
+                            .fill(.ultraThinMaterial)
+                        
+                        Capsule()
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        .black.opacity(0.8),
+                                        .black.opacity(0.95)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                    }
+                )
                 .foregroundColor(.white)
                 .clipShape(Capsule())
+                .shadow(color: .black.opacity(0.3), radius: 12, x: 0, y: 6)
+                .overlay(
+                    Capsule()
+                        .stroke(
+                            LinearGradient(
+                                colors: [.white.opacity(0.3), .white.opacity(0.1)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 1
+                        )
+                )
         }
-        .padding(.bottom, 50)
+    }
+    
+    private var insightsButton: some View {
+        Group {
+            if #available(iOS 18.0, *) {
+                Button(action: {
+                    showInsights = true
+                }) {
+                    Image(systemName: "chart.bar.xaxis")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(.white)
+                        .frame(width: 44, height: 44)
+                        .background(
+                            ZStack {
+                                Circle()
+                                    .fill(.ultraThinMaterial)
+                                Circle()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [
+                                                .black.opacity(0.8),
+                                                .black.opacity(0.95)
+                                            ],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                            }
+                        )
+                        .clipShape(Circle())
+                        .overlay(
+                            Circle()
+                                .stroke(
+                                    LinearGradient(
+                                        colors: [.white.opacity(0.3), .white.opacity(0.1)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    ),
+                                    lineWidth: 1
+                                )
+                        )
+                        .matchedTransitionSource(id: "insightsIcon", in: insightsNamespace)
+                }
+                .buttonStyle(.plain)
+            } else {
+                Button(action: {
+                    showInsights = true
+                }) {
+                    Image(systemName: "chart.bar.xaxis")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(.white)
+                        .frame(width: 44, height: 44)
+                        .background(
+                            ZStack {
+                                Circle()
+                                    .fill(.ultraThinMaterial)
+                                Circle()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [
+                                                .black.opacity(0.8),
+                                                .black.opacity(0.95)
+                                            ],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                            }
+                        )
+                        .clipShape(Circle())
+                        .overlay(
+                            Circle()
+                                .stroke(
+                                    LinearGradient(
+                                        colors: [.white.opacity(0.3), .white.opacity(0.1)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    ),
+                                    lineWidth: 1
+                                )
+                        )
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
     }
     
     private var trailingToolbarButton: some View {

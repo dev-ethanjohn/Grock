@@ -83,11 +83,9 @@ struct HomeCartRowView: View {
         }
     }
     
-    private var shoppingModeOverlay: some View {
-        ShoppingModeGradientView(cornerRadius: 24, hasBackgroundImage: hasBackgroundImage)
-            .opacity(cart.isShopping ? 1 : 0)
-            .animation(.easeInOut(duration: 0.3), value: cart.isShopping)
-    }
+//    private var shoppingModeOverlay: some View {
+//        EmptyView()
+//    }
     
     private var borderOverlay: some View {
         RoundedRectangle(cornerRadius: 24)
@@ -148,20 +146,20 @@ struct HomeCartRowView: View {
     }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
+        VStack(alignment: .leading, spacing: 14) {
             headerRow
             progressSection
         }
         .padding()
         .background(cardBackground)
         .clipShape(RoundedRectangle(cornerRadius: 24))
-        .overlay(shoppingModeOverlay)
-        .shadow(
-            color: Color.black.opacity(cart.isShopping ? 0.25 : 0),
-            radius: 0.5,
-            x: 0,
-            y: 0.5
-        )
+//        .overlay(shoppingModeOverlay)
+//        .shadow(
+//            color: Color.black.opacity(cart.isShopping ? 0.25 : 0),
+//            radius: 0.5,
+//            x: 0,
+//            y: 0.5
+//        )
         .overlay(borderOverlay)
         .scaleEffect(appeared ? 1.0 : 0.95)
         .opacity(appeared ? 1.0 : 0)
@@ -216,9 +214,20 @@ struct HomeCartRowView: View {
     private var headerRow: some View {
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(cart.name)
-                    .fuzzyBubblesFont(18, weight: .bold)
-                    .foregroundColor(hasBackgroundImage ? .white : .black)
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(cart.name)
+                        .fuzzyBubblesFont(18, weight: .bold)
+                        .foregroundColor(hasBackgroundImage ? .white : .black)
+                    if cart.isShopping {
+                        CharacterRevealViewWithoutUnderline(
+                            text: "(\(fulfilledItems)/\(totalItems))",
+                            delay: 0.15
+                        )
+                        .id("header-reveal-\(fulfilledItems)-\(totalItems)")
+                        .fuzzyBubblesFont(12, weight: .bold)
+                        .foregroundColor(hasBackgroundImage ? .white : .black)
+                    }
+                }
                 
                 if cart.isShopping {
                     Text("Shopping")
@@ -256,17 +265,16 @@ struct HomeCartRowView: View {
     private var progressSection: some View {
         VStack(alignment: .leading, spacing: 4) {
             
-            if cart.isShopping {
-                CharacterRevealViewWithoutUnderline(
-                    text: "\(fulfilledItems)/\(totalItems) items fulfilled, totalling \(fulfilledItemsTotal)",
-                    delay: 0.15
-                )
-                // Add currency code to ID to trigger re-creation when currency changes
-                .id("reveal-\(fulfilledItems)-\(totalItems)-\(fulfilledItemsTotal)-\(currencyManager.selectedCurrency.code)")
-                .fuzzyBubblesFont(12, weight: .bold)
-                .padding(.leading, 4)
-                .foregroundColor(hasBackgroundImage ? .white : .black)
-            }
+//            if cart.isShopping {
+//                CharacterRevealViewWithoutUnderline(
+//                    text: "(\(fulfilledItems)/\(totalItems))",
+//                    delay: 0.15
+//                )
+//                .id("reveal-\(fulfilledItems)-\(totalItems)")
+//                .fuzzyBubblesFont(12, weight: .bold)
+//                .padding(.leading, 4)
+//                .foregroundColor(hasBackgroundImage ? .white : .black)
+//            }
             
             FluidBudgetPillView(
                 cart: cart,
@@ -279,7 +287,7 @@ struct HomeCartRowView: View {
             if cart.isShopping {
                 // Horizontal category list
                 categoryProgressList
-                    .padding(.top, 4)
+                    .padding(.top, 3)
             }
 
             
@@ -294,7 +302,7 @@ struct HomeCartRowView: View {
                     let isFulfilled = isCategoryFulfilled(category)
                     
                     ZStack {
-                        RoundedRectangle(cornerRadius: 8)
+                        RoundedRectangle(cornerRadius: 6)
                             .fill(
                                 RadialGradient(
                                     colors: [
@@ -312,10 +320,10 @@ struct HomeCartRowView: View {
                                 x: 0,
                                 y: 1
                             )
-                            .frame(width: 20, height: 20)
+                            .frame(width: 18, height: 18)
                         
                         Text(category.emoji)
-                            .font(.system(size: 12))
+                            .font(.system(size: 11))
                     }
                     .opacity(isFulfilled ? 1.0 : 0.5)
                 }

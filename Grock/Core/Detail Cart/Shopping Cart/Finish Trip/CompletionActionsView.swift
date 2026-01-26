@@ -25,6 +25,7 @@ struct CompletionActionsView: View {
                     .foregroundColor(.black)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
+                    .background(Color.white)
                     .cornerRadius(100)
                     .overlay {
                         Capsule()
@@ -32,7 +33,7 @@ struct CompletionActionsView: View {
                     }
             })
         }
-        .padding(.horizontal, 20)
+        .background(Color.clear)
     }
 }
 

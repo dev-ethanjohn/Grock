@@ -38,12 +38,9 @@ struct ActiveCarts: View {
     }
     
     private var cartListView: some View {
-        List {
+        LazyVStack(spacing: 0) {
             Color.clear
                 .frame(height: viewModel.headerHeight)
-                .listRowSeparator(.hidden)
-                .listRowBackground(Color.clear)
-                .listRowInsets(EdgeInsets())
             
             ForEach(Array(viewModel.displayedCarts.enumerated()), id: \.element.id) { index, cart in
                 Button(action: {
@@ -73,14 +70,7 @@ struct ActiveCarts: View {
                     }
                 }
                 .buttonStyle(.plain)
-                .listRowSeparator(.hidden)
-                .listRowBackground(Color.clear)
-                .listRowInsets(EdgeInsets(
-                            top: 0,
-                            leading: 0,
-                            bottom: index == viewModel.displayedCarts.count - 1 ? 0 : 16,
-                            trailing: 0
-                        ))
+                .padding(.bottom, index == viewModel.displayedCarts.count - 1 ? 0 : 14)
                 .transition(.asymmetric(
                     insertion: .scale(scale: 0.8).combined(with: .opacity),
                     removal: .scale(scale: 0.9).combined(with: .opacity)
@@ -92,10 +82,12 @@ struct ActiveCarts: View {
                 )
                 .padding(.horizontal)
             }
+            
+            // Spacer for floating tab bar
+            Color.clear
+                .frame(height: 120)
         }
-        .listStyle(PlainListStyle())
-        .scrollContentBackground(.hidden)
-        .scrollIndicators(.hidden)
+        .blurScroll()
     }
     
     private var emptyStateView: some View {

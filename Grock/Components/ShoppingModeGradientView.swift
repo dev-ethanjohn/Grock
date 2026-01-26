@@ -1,3 +1,4 @@
+/* 
 import SwiftUI
 
 struct ShoppingModeGradientView: View {
@@ -48,3 +49,4 @@ struct ShoppingModeGradientView: View {
         ]
     }
 }
+*/
