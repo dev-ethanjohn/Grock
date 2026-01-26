@@ -11,60 +11,66 @@ struct AccordionSectionView<Content: View>: View {
     let content: () -> Content
     
     var body: some View {
-        VStack(spacing: 0) {
-            Button(action: {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                    isExpanded.toggle()
-                }
-            }) {
-                HStack(alignment: .top, spacing: 12) {
-                    HStack(alignment: .top, spacing: 12) {
-                        Image(systemName: icon)
-                            .font(.system(size: 16, weight: .bold))
-//                            .foregroundColor(.black)
-                            .foregroundStyle(accentDeep)
-                            .offset(y: 4)
-                        
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(title)
-                                .lexendFont(14, weight: .semibold)
-                                .foregroundColor(accentDeep)
-//                                .foregroundColor(.black)
-                            Text(subtitle)
-                                .lexendFont(12)
-//                                .foregroundColor(accent.opacity(0.7))
-                                .foregroundColor(accentDeep.opacity(0.7))
+        Group {
+            if hasContent {
+                VStack(spacing: 0) {
+                    Button(action: {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                            isExpanded.toggle()
                         }
-                        .foregroundColor(.black.opacity(0.7))
+                    }) {
+                        HStack(alignment: .top, spacing: 12) {
+                            HStack(alignment: .top, spacing: 12) {
+                                Image(systemName: icon)
+                                    .font(.system(size: 16, weight: .bold))
+//                                    .foregroundColor(.black)
+                                    .foregroundStyle(accentDeep)
+                                    .offset(y: 4)
+                                
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(title)
+                                        .lexendFont(14, weight: .semibold)
+                                        .foregroundColor(accentDeep)
+//                                        .foregroundColor(.black)
+                                    Text(subtitle)
+                                        .lexendFont(12)
+//                                        .foregroundColor(accent.opacity(0.7))
+                                        .foregroundColor(accentDeep.opacity(0.7))
+                                }
+                                .foregroundColor(.black.opacity(0.7))
+                            }
+                            
+                            Spacer()
+                            
+                            VStack {
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 16, weight: .bold))
+                                    .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                                    .foregroundColor(.black)
+                            }
+                        }
+                        .contentShape(Rectangle())
+                        .padding(.leading, 8)
                     }
+                    .buttonStyle(.plain)
+                    .zIndex(1)
                     
-                    Spacer()
-                    
-                    VStack {
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 16, weight: .bold))
-                            .rotationEffect(.degrees(isExpanded ? 90 : 0))
-                            .foregroundColor(.black)
+                    Group {
+                        if isExpanded {
+                            content()
+                                .padding(.top, 8)
+                                .transition(
+                                    .move(edge: .bottom).combined(with: .opacity)
+                                )
+                        }
                     }
+                    .animation(.spring(response: 0.35, dampingFraction: 0.85), value: isExpanded)
+                    .clipped()
                 }
-                .contentShape(Rectangle())
-                .padding(.leading, 8)
+            } else {
+                EmptyView()
             }
-            .buttonStyle(.plain)
-            .zIndex(1)
-            
-            Group {
-                if isExpanded && hasContent {
-                    content()
-                        .padding(.top, 8)
-                        .transition(
-                            .move(edge: .bottom).combined(with: .opacity)
-                        )
-                }
-            }
-            .animation(.spring(response: 0.35, dampingFraction: 0.85), value: isExpanded)
-            .clipped()
         }
     }
 }
@@ -95,6 +101,6 @@ private struct AccordionPreviewWrapper: View {
 #Preview("AccordionSectionView") {
         AccordionPreviewWrapper()
             .padding()
-            .background(Color.white)
+            .background(Color.orange)
             .fixedSize(horizontal: false, vertical: true)
 }

@@ -38,7 +38,7 @@ struct ActiveCarts: View {
     }
     
     private var cartListView: some View {
-        LazyVStack(spacing: 0) {
+        LazyVStack(spacing: 14) {
             Color.clear
                 .frame(height: viewModel.headerHeight)
             
@@ -50,6 +50,7 @@ struct ActiveCarts: View {
                         cart: cart,
                         vaultService: viewModel.getVaultService(for: cart)
                     )
+                    .contentShape(.interaction, RoundedRectangle(cornerRadius: 24))
                     .contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: 24))
                     .contextMenu {
                         Button {
@@ -70,7 +71,6 @@ struct ActiveCarts: View {
                     }
                 }
                 .buttonStyle(.plain)
-                .padding(.bottom, index == viewModel.displayedCarts.count - 1 ? 0 : 14)
                 .transition(.asymmetric(
                     insertion: .scale(scale: 0.8).combined(with: .opacity),
                     removal: .scale(scale: 0.9).combined(with: .opacity)
@@ -85,7 +85,7 @@ struct ActiveCarts: View {
             
             // Spacer for floating tab bar
             Color.clear
-                .frame(height: 120)
+                .frame(height: 80)
         }
         .blurScroll()
     }

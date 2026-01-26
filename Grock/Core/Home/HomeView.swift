@@ -268,10 +268,11 @@ struct HomeView: View {
                     cartToRename = cart
                 }
             )
-            
-            headerView
-            
-            homeMenu
+            ZStack(alignment: .topLeading) {
+                headerView //
+                homeMenu
+         
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -309,7 +310,7 @@ struct HomeView: View {
                         .padding(.trailing)
                 }
             }
-            .padding(.top, safeAreaTopPadding + 10)
+            .padding(.top, safeAreaTopPadding)
             .padding(.bottom, 32)
             .animation(.spring(response: 0.4, dampingFraction: 0.65), value: isVaultButtonExpanded)
             
@@ -375,9 +376,9 @@ struct HomeView: View {
                     .frame(width: 24, height: 20)
             }
         }
-        .padding(.top, 62)
+        .padding(.top, safeAreaTopPadding + 8)
         .padding(.leading)
-        .offset(x: viewModel.showMenu ? 40 : 0, y: viewModel.showMenu ? 40 : 0)
+        .offset(x: viewModel.showMenu ? 40 : 0, y: viewModel.showMenu ? 0 : 0)
         .opacity(viewModel.showMenu ? 0 : 1)
     }
     

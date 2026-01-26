@@ -297,8 +297,10 @@ struct FinishTripSheet: View {
             ZStack(alignment: .top) {
                 VStack(spacing: 8) {
                         Color.clear.frame(height: headerHeight)
+                        
 
-                        AccordionSectionView(
+           
+                    AccordionSectionView(
                             icon: "arrow.left.arrow.right",
                             title: "What changed (\(max(changedItemsList.count, 0)))",
                             subtitle: "Price or quantity differed from plan",
