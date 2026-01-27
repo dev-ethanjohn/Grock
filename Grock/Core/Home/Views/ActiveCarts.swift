@@ -3,6 +3,8 @@ import SwiftData
 
 struct ActiveCarts: View {
     @Environment(VaultService.self) private var vaultService
+    @Environment(CartViewModel.self) private var cartViewModel
+    @Environment(CartStateManager.self) private var stateManager
     @Bindable var viewModel: HomeViewModel
     
     @State private var colorChangeTrigger = UUID()
@@ -16,6 +18,7 @@ struct ActiveCarts: View {
     // Add these callbacks
     let onDeleteCart: (Cart) -> Void
     let onRenameCart: (Cart) -> Void
+    let cartNamespace: Namespace.ID
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -40,22 +43,64 @@ struct ActiveCarts: View {
     private var cartListView: some View {
         // ✅ Use ScrollView instead of LazyVStack with custom blur
         ScrollView {
-            LazyVStack(spacing: 14) {
+            VStack(spacing: 14) {
                 Color.clear
                     .frame(height: viewModel.headerHeight)
                 
                 ForEach(viewModel.displayedCarts) { cart in
-                    Button(action: {
-                        viewModel.selectCart(cart)
-                    }) {
+                    if #available(iOS 18.0, *) {
+                        NavigationLink {
+                            CartDetailScreen(cart: cart)
+                                .environment(vaultService)
+                                .environment(cartViewModel)
+                                .environment(stateManager)
+                                .navigationTransition(.zoom(sourceID: cart.id, in: cartNamespace))
+                                .onDisappear {
+                                    viewModel.loadCarts()
+                                    if viewModel.pendingCartToShow != nil {
+                                        viewModel.completePendingCartDisplay()
+                                    }
+                                }
+                        } label: {
+                            HomeCartRowView(
+                                cart: cart,
+                                vaultService: viewModel.getVaultService(for: cart)
+                            )
+                            .id(cart.id)
+                            .contentShape(.interaction, RoundedRectangle(cornerRadius: 24))
+                            .contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: 24))
+                        }
+                        .buttonStyle(.plain)
+                        .matchedTransitionSource(id: cart.id, in: cartNamespace)
+                        .contextMenu {
+                            Button {
+                                onRenameCart(cart)
+                            } label: {
+                                Label("Rename Cart", systemImage: "pencil")
+                            }
+                            
+                            Button(role: .destructive) {
+                                onDeleteCart(cart)
+                            } label: {
+                                Label("Delete Cart", systemImage: "trash")
+                            }
+                        }
+                        .onLongPressGesture {
+                            let generator = UIImpactFeedbackGenerator(style: .medium)
+                            generator.impactOccurred()
+                        }
+                    } else {
+                        // Fallback for older iOS versions
                         HomeCartRowView(
                             cart: cart,
                             vaultService: viewModel.getVaultService(for: cart)
                         )
-                        // ✅ Add ID to help SwiftUI with diffing
                         .id(cart.id)
                         .contentShape(.interaction, RoundedRectangle(cornerRadius: 24))
                         .contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: 24))
+                        .onTapGesture {
+                            viewModel.selectCart(cart)
+                        }
                         .contextMenu {
                             Button {
                                 onRenameCart(cart)
@@ -74,12 +119,11 @@ struct ActiveCarts: View {
                             generator.impactOccurred()
                         }
                     }
-                    .buttonStyle(.plain)
-                    .transition(.asymmetric(
-                        insertion: .scale(scale: 0.8).combined(with: .opacity),
-                        removal: .scale(scale: 0.9).combined(with: .opacity)
-                    ))
                 }
+                .transition(.asymmetric(
+                    insertion: .scale(scale: 0.8).combined(with: .opacity),
+                    removal: .scale(scale: 0.9).combined(with: .opacity)
+                ))
                 .animation(
                     .spring(response: 0.5, dampingFraction: 0.7),
                     value: viewModel.displayedCarts.count

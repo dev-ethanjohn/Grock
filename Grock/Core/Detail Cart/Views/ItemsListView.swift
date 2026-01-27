@@ -1,5 +1,4 @@
 import SwiftUI
-import CoreMotion
 import Observation
 
 struct ItemsListView: View {
@@ -60,6 +59,10 @@ private struct MainContentView: View {
         guard cart.isShopping else { return false }
         
         let allItems = sortedStoresWithRefresh.flatMap { storeItemsWithRefresh($0) }
+        
+        // If items haven't been loaded/grouped yet, don't show the completion state
+        guard !allItems.isEmpty else { return false }
+        
         let allUnfulfilledItems = allItems.filter {
             !$0.cartItem.isFulfilled && !$0.cartItem.isSkippedDuringShopping
         }
@@ -87,7 +90,7 @@ private struct MainContentView: View {
                         rowBackgroundColor: stateManager.effectiveRowBackgroundColor,
                         maxAllowedHeight: maxAllowedHeight
                     )
-                } else if !hasDisplayItems && cart.isPlanning {
+                } else if !hasDisplayItems && cart.isPlanning && totalItemCount == 0 {
                     EmptyCartView()
                         .transition(.scale)
                         .offset(y: UIScreen.main.bounds.height * 0.4)
@@ -352,39 +355,10 @@ private struct StoreItemsList: View {
     let geometry: GeometryProxy
     
     @Environment(CartStateManager.self) private var stateManager
-    private let motionManager = MotionManager.shared
     
     var body: some View {
-        ZStack(alignment: .center) {
-            // BASE: Static Shadow Layer
-            if cart.isShopping || cart.isPlanning {
-                ListBackgroundView(
-                    hasBackgroundImage: stateManager.hasBackgroundImage,
-                    backgroundImage: stateManager.backgroundImage,
-                    backgroundColor: stateManager.effectiveBackgroundColor,
-                    geometry: geometry,
-                    height: min(calculatedHeight, maxAllowedHeight)
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 16))
-                .frame(height: min(calculatedHeight, maxAllowedHeight))
-                .scaleEffect(0.92)
-                .blur(radius: 8)
-                .offset(y: 24)
-                .opacity(0.5)
-                .brightness(-0.2)
-                .contrast(1.2)
-                .modifier(ParallaxMotionModifier(manager: motionManager, magnitude: -10)) // Reduced magnitude for subtle motion
-            }
-
-            // OVERLAY: Moving Card (Background + List)
-            if cart.isShopping || cart.isPlanning {
-                cardContent
-                    .modifier(ParallaxMotionModifier(manager: motionManager, magnitude: 5)) // Extremely subtle overlay motion
-            } else {
-                cardContent
-            }
-        }
-        .applyAnimations(calculatedHeight: calculatedHeight, isShopping: cart.isShopping)
+        cardContent
+            .applyAnimations(calculatedHeight: calculatedHeight, isShopping: cart.isShopping)
     }
     
     private var cardContent: some View {
@@ -398,14 +372,10 @@ private struct StoreItemsList: View {
                     geometry: geometry,
                     height: min(calculatedHeight, maxAllowedHeight) // ✅ Pass explicit height
                 )
-                .scaleEffect((cart.isShopping || cart.isPlanning) ? 1.1 : 1.0) // Zoom in to prevent edges showing
+                // Removed zoom effect
+                .scaleEffect(1.0)
                 
-                if cart.isShopping || cart.isPlanning {
-                    background
-                        .modifier(ParallaxMotionModifier(manager: motionManager, magnitude: 8)) // Reduced image motion
-                } else {
-                    background
-                }
+                background
             }
             .frame(height: min(calculatedHeight, maxAllowedHeight))
             .clipShape(RoundedRectangle(cornerRadius: 16))
@@ -688,50 +658,6 @@ struct NoiseDemoView: View {
             .padding()
             
             Spacer()
-        }
-    }
-}
-
-// MARK: - Motion Manager
-@Observable
-class MotionManager {
-    static let shared = MotionManager()
-    
-    var pitch: Double = 0.0
-    var roll: Double = 0.0
-    
-    private var manager: CMMotionManager
-    
-    init() {
-        self.manager = CMMotionManager()
-        self.manager.deviceMotionUpdateInterval = 1/60
-        self.manager.startDeviceMotionUpdates(to: .main) { (motionData, error) in
-            if let error = error {
-                print(error)
-                return
-            }
-            
-            if let motionData = motionData {
-                self.pitch = motionData.attitude.pitch
-                self.roll = motionData.attitude.roll
-            }
-        }
-    }
-}
-
-struct ParallaxMotionModifier: ViewModifier {
-    var manager: MotionManager
-    var magnitude: Double
-    
-    @ViewBuilder
-    func body(content: Content) -> some View {
-        if magnitude == 0 {
-            content
-        } else {
-            content
-                // Removed shadow to rely on base layer for depth
-                .offset(x: CGFloat(manager.roll * magnitude),
-                        y: CGFloat(manager.pitch * magnitude))
         }
     }
 }

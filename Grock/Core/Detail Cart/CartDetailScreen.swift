@@ -50,27 +50,17 @@ struct CartDetailScreen: View {
     @State private var alertManager = AlertManager()
     @Namespace private var buttonNamespace
     
-    // Computed properties
-    private var cartInsights: CartInsights {
-        vaultService.getCartInsights(cart: cart)
-    }
-    
-    private var itemsByStore: [String: [(cartItem: CartItem, item: Item?)]] {
-        return groupCartItemsByStore(cart.cartItems.sorted { ($0.addedAt ?? Date.distantPast) > ($1.addedAt ?? Date.distantPast) })
-    }
-    
-    private var sortedStores: [String] {
-        let stores = Array(itemsByStore.keys).sorted()
-        // DO NOT change order during shopping - rely on alphabetical sort to prevent jumping
-        return stores
-    }
+    @State private var itemsByStore: [String: [(cartItem: CartItem, item: Item?)]] = [:]
+    @State private var cartInsights: CartInsights = CartInsights()
+    @State private var sortedStores: [String] = []
+    @State private var didLoadData = false
     
     private var totalItemCount: Int {
         cart.cartItems.count
     }
     
     private var hasItems: Bool {
-        totalItemCount > 0 && !sortedStores.isEmpty
+        totalItemCount > 0
     }
     
     private var currentFulfilledCount: Int {
@@ -104,6 +94,9 @@ struct CartDetailScreen: View {
             checkAndShowCelebration: checkAndShowCelebration
         ))
         .onAppear(perform: initializeState)
+        .task(id: cart.id) {
+            await loadData()
+        }
         .onDisappear(perform: saveStateOnDismiss)
         .onChange(of: allItemsCompleted) { oldValue, newValue in
             if newValue && !showingCompleteAlert {
@@ -228,6 +221,18 @@ struct CartDetailScreen: View {
     }
     
     // MARK: - Helper Functions
+    
+    @MainActor
+    private func loadData() async {
+        let sortedItems = cart.cartItems.sorted { ($0.addedAt ?? Date.distantPast) > ($1.addedAt ?? Date.distantPast) }
+        let grouped = groupCartItemsByStore(sortedItems)
+        
+        itemsByStore = grouped
+        sortedStores = Array(grouped.keys).sorted()
+        cartInsights = vaultService.getCartInsights(cart: cart)
+        didLoadData = true
+    }
+    
     private func groupCartItemsByStore(_ cartItems: [CartItem]) -> [String: [(cartItem: CartItem, item: Item?)]] {
         let cartItemsWithDetails = cartItems.map { cartItem -> (CartItem, Item?) in
             if cartItem.isShoppingOnlyItem {
@@ -255,10 +260,12 @@ struct CartDetailScreen: View {
         
         let grouped = Dictionary(grouping: cartItemsWithDetails) { element -> String in
             let (cartItem, _) = element
-            return cartItem.getStore(cart: cart)
+            let store = cartItem.getStore(cart: cart)
+            return store.isEmpty ? "Unknown Store" : store
         }
         
-        return grouped.filter { !$0.key.isEmpty && !$0.value.isEmpty }
+        // Don't filter out valid items even if something weird happened with the key
+        return grouped
     }
     
     private func initializeState() {

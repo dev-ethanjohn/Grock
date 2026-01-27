@@ -11,6 +11,8 @@ struct HomeView: View {
     @State private var cartStateManager: CartStateManager
     @Namespace private var vaultButtonNamespace
     @Namespace private var insightsNamespace
+    @Namespace private var cartNamespace
+    @State private var cartPath: [String] = []
     
     @State private var tabs: [CartTabsModel] = [
         .init(id: CartTabsModel.Tab.active),
@@ -31,6 +33,7 @@ struct HomeView: View {
     @State private var showCreatePost: Bool = false
     @State private var isAnimating = false
     @State private var isScalingDown = false
+    @State private var showSelectedCart: Bool = false
     
     @State private var vaultButtonScale: CGFloat = 1.0
     @State private var isVaultButtonExpanded: Bool
@@ -57,7 +60,7 @@ struct HomeView: View {
     }
     
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $cartPath) {
             ZStack(alignment: .top) {
                 Color(hex: "#e0e0e0").ignoresSafeArea()
                 
@@ -71,6 +74,36 @@ struct HomeView: View {
                 
                 mainContent
                 
+                if let selected = viewModel.selectedCart {
+                    NavigationLink(
+                        isActive: Binding(
+                            get: { showSelectedCart },
+                            set: { isActive in
+                                if !isActive {
+                                    showSelectedCart = false
+                                    viewModel.selectedCart = nil
+                                }
+                            }
+                        )
+                    ) {
+                        CartDetailScreen(cart: selected)
+                            .environment(vaultService)
+                            .environment(cartViewModel)
+                            .environment(cartStateManager)
+                            .onDisappear {
+                                viewModel.loadCarts()
+                                if viewModel.pendingCartToShow != nil {
+                                    viewModel.completePendingCartDisplay()
+                                }
+                                scheduleVaultButtonAnimation()
+                                checkForProWelcome()
+                            }
+                    } label: {
+                        Color.clear.frame(width: 0, height: 0)
+                    }
+                    .hidden()
+                }
+                    
                 menuIcon
                 
                 // Rename cart popover overlay (using if conditional)
@@ -147,22 +180,6 @@ struct HomeView: View {
                     Text("Are you sure you want to delete this cart? This action cannot be undone.")
                 }
             }
-            // In HomeView.swift
-            .fullScreenCover(item: $viewModel.selectedCart) { cart in
-                CartDetailScreen(cart: cart)
-                    .environment(vaultService)
-                    .environment(cartViewModel)
-                    .environment(cartStateManager) // ADD THIS LINE - Pass CartStateManager
-                    .onDisappear {
-                        viewModel.loadCarts()
-                        
-                        if viewModel.pendingCartToShow != nil {
-                            viewModel.completePendingCartDisplay()
-                        }
-                        
-                        viewModel.selectedCart = nil
-                    }
-            }
             .onChange(of: viewModel.showVault) { oldValue, newValue in
                 if !newValue {
                     viewModel.transferPendingCart()
@@ -172,15 +189,11 @@ struct HomeView: View {
                     cancelVaultButtonAnimation()
                 }
             }
-            .onChange(of: viewModel.selectedCart) { oldValue, newValue in
-                if newValue == nil {
-                    scheduleVaultButtonAnimation()
-                    checkForProWelcome()
-                } else {
-                    cancelVaultButtonAnimation()
-                }
+            .onChange(of: viewModel.selectedCart) { _, newValue in
+                showSelectedCart = newValue != nil
             }
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ShowInsightsAfterTrip"))) { _ in
+                cartPath = []
                 viewModel.selectedCart = nil
                 showInsights = true
             }
@@ -267,8 +280,10 @@ struct HomeView: View {
                 },
                 onRenameCart: { cart in
                     cartToRename = cart
-                }
+                },
+                cartNamespace: cartNamespace
             )
+            .environment(cartStateManager)
             ZStack(alignment: .topLeading) {
                 headerView //
                 homeMenu

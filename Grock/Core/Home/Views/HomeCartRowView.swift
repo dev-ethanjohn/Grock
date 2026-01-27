@@ -1,6 +1,5 @@
 import SwiftUI
 import SwiftData
-import CoreMotion
 
 struct HomeCartRowView: View {
     let cart: Cart
@@ -75,13 +74,6 @@ struct HomeCartRowView: View {
             } else {
                 ZStack {
                     backgroundColor
-                        .overlay {
-                            NoiseOverlayView(
-                                grainSize: 0.1,
-                                density: 0.7,
-                                opacity: 0.70
-                            )
-                        }
                 }
             }
         }
@@ -168,7 +160,7 @@ struct HomeCartRowView: View {
         .scaleEffect(appeared ? 1.0 : 0.95)
         .opacity(appeared ? 1.0 : 0)
         // ✅ Add drawingGroup to offload rendering to GPU
-        .drawingGroup()
+        // .drawingGroup()
         .onAppear {
             withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
                 appeared = true

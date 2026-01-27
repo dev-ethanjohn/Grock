@@ -16,6 +16,9 @@ class VaultService {
    
     // MARK: - Properties
     private let modelContext: ModelContext
+    
+    // Cache for O(1) item lookups
+    private var itemCache: [String: Item] = [:]
    
     // Current state
     var currentUser: User?
@@ -524,6 +527,10 @@ extension VaultService {
         for category in vault.categories {
             if let index = category.items.firstIndex(where: { $0.id == item.id }) {
                 category.items.remove(at: index)
+                
+                // Remove from cache
+                itemCache.removeValue(forKey: item.id)
+                
                 saveContext()
                 break
             }
@@ -540,7 +547,12 @@ extension VaultService {
     func findItemById(_ itemId: String) -> Item? {
         guard let vault = vault else { return nil }
         
-        // First check if it's a shopping-only CartItem in any cart
+        // 1. Fast path: Check cache for vault items
+        if let cachedItem = itemCache[itemId] {
+            return cachedItem
+        }
+        
+        // 2. Slow path: Check if it's a shopping-only CartItem in any cart
         for cart in vault.carts {
             if let cartItem = cart.cartItems.first(where: { $0.itemId == itemId && $0.isShoppingOnlyItem }) {
                 // Create a temporary Item for shopping-only items
@@ -563,9 +575,10 @@ extension VaultService {
             }
         }
         
-        // Otherwise, search in vault
+        // 3. Fallback: Search in vault (in case cache is stale)
         for category in vault.categories {
             if let item = category.items.first(where: { $0.id == itemId }) {
+                itemCache[itemId] = item
                 return item
             }
         }
