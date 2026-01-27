@@ -1,4 +1,6 @@
 import SwiftUI
+import CoreMotion
+import Observation
 
 struct ItemsListView: View {
     let cart: Cart
@@ -173,9 +175,16 @@ private struct MainContentView: View {
         let sectionSpacing: CGFloat = 8
         let listPadding: CGFloat = 24
         
+        // Stop calculating if we exceed the screen height (plus a buffer)
+        // because the view clamps the height anyway.
+        let maxHeightCutoff = UIScreen.main.bounds.height * 1.2
+        
         var totalHeight: CGFloat = listPadding
         
         for store in sortedStoresWithRefresh {
+            // Early exit if we've already exceeded the needed height
+            if totalHeight > maxHeightCutoff { return totalHeight }
+            
             let displayItems = getDisplayItems(for: store)
             
             if !displayItems.isEmpty {
@@ -185,6 +194,9 @@ private struct MainContentView: View {
                     let itemName = item?.name ?? "Unknown"
                     let isFirstInStore = index == 0
                     totalHeight += estimateRowHeight(for: itemName, isFirstInSection: isFirstInStore)
+                    
+                    // Check inside the loop for very large sections
+                    if totalHeight > maxHeightCutoff { return totalHeight }
                 }
                 
                 if store != sortedStoresWithRefresh.last {
@@ -206,26 +218,26 @@ private struct ShoppingCompleteCelebrationView: View {
     var body: some View {
         VStack(spacing: 16) {
             Image(systemName: "party.popper.fill")
-                .font(.system(size: 50))
-                .foregroundColor(Color(hex: "FF6B6B"))
+            .font(.system(size: 50))
+            .foregroundColor(Color(hex: "FF6B6B"))
             
             Text("Shopping Trip Complete! 🎉")
-                .lexendFont(18, weight: .bold)
-                .foregroundColor(Color(hex: "333"))
-                .multilineTextAlignment(.center)
+            .lexendFont(18, weight: .bold)
+            .foregroundColor(Color(hex: "333"))
+            .multilineTextAlignment(.center)
             
             Text("Congratulations! You've checked off all items.")
-                .lexendFont(14)
-                .foregroundColor(Color(hex: "666"))
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
+            .lexendFont(14)
+            .foregroundColor(Color(hex: "666"))
+            .multilineTextAlignment(.center)
+            .padding(.horizontal)
             
             Text("Ready to finish your trip?")
-                .lexendFont(12)
-                .foregroundColor(Color(hex: "999"))
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
-                .padding(.top, 4)
+            .lexendFont(12)
+            .foregroundColor(Color(hex: "999"))
+            .multilineTextAlignment(.center)
+            .padding(.horizontal)
+            .padding(.top, 4)
         }
         .frame(height: min(200, maxAllowedHeight))
         .frame(maxWidth: .infinity)
@@ -239,7 +251,7 @@ private struct ShoppingCompleteCelebrationView: View {
         .cornerRadius(24)
         .overlay(
             RoundedRectangle(cornerRadius: 16)
-                .stroke(Color(hex: "FF6B6B").opacity(0.3), lineWidth: 2)
+            .stroke(Color(hex: "FF6B6B").opacity(0.3), lineWidth: 2)
         )
         .transition(.opacity.combined(with: .scale))
     }
@@ -259,7 +271,7 @@ private struct ItemsListContent: View {
     
     @Environment(VaultService.self) private var vaultService
     @Environment(CartStateManager.self) private var stateManager
-//    @Namespace private var summaryNamespace
+    //    @Namespace private var summaryNamespace
     
     // Helper methods
     private func getDisplayItems(for store: String) -> [(cartItem: CartItem, item: Item?)] {
@@ -309,17 +321,17 @@ private struct ItemsListContent: View {
             
             if cart.isShopping {
                 ShoppingProgressSummary(cart: cart)
-                    .presentationCornerRadius(24)
-                    .environment(vaultService)
-//                    .matchedGeometryEffect(id: "shoppingSummary", in: summaryNamespace)
-                    .transition(.asymmetric(
-                        insertion: .opacity,
-                        removal: .modifier(
-                            active: ReverseCharacterRevealModifier(progress: 0),
-                            identity: ReverseCharacterRevealModifier(progress: 1)
-                        )
-                    ))
-                    .offset(y: stateManager.hasBackgroundImage ? 0 : 4)
+                .presentationCornerRadius(24)
+                .environment(vaultService)
+                //                    .matchedGeometryEffect(id: "shoppingSummary", in: summaryNamespace)
+                .transition(.asymmetric(
+                    insertion: .opacity,
+                    removal: .modifier(
+                        active: ReverseCharacterRevealModifier(progress: 0),
+                        identity: ReverseCharacterRevealModifier(progress: 1)
+                    )
+                ))
+                .offset(y: stateManager.hasBackgroundImage ? 0 : 4)
             }
         }
         .animation(.spring(response: 0.45, dampingFraction: 0.85), value: calculatedHeight)
@@ -340,19 +352,85 @@ private struct StoreItemsList: View {
     let geometry: GeometryProxy
     
     @Environment(CartStateManager.self) private var stateManager
+    private let motionManager = MotionManager.shared
     
     var body: some View {
-        listContent
+        ZStack(alignment: .center) {
+            // BASE: Static Shadow Layer
+            if cart.isShopping {
+                ListBackgroundView(
+                    hasBackgroundImage: stateManager.hasBackgroundImage,
+                    backgroundImage: stateManager.backgroundImage,
+                    backgroundColor: stateManager.effectiveBackgroundColor,
+                    geometry: geometry,
+                    height: min(calculatedHeight, maxAllowedHeight)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .frame(height: min(calculatedHeight, maxAllowedHeight))
+                .scaleEffect(0.92)
+                .blur(radius: 8)
+                .offset(y: 24)
+                .opacity(0.5)
+                .brightness(-0.2)
+                .contrast(1.2)
+                .modifier(ParallaxMotionModifier(manager: motionManager, magnitude: -10)) // Reduced magnitude for subtle motion
+            }
+
+            // OVERLAY: Moving Card (Background + List)
+            if cart.isShopping {
+                cardContent
+                    .modifier(ParallaxMotionModifier(manager: motionManager, magnitude: 3)) // Extremely subtle overlay motion
+            } else {
+                cardContent
+            }
+        }
+        .applyAnimations(calculatedHeight: calculatedHeight, isShopping: cart.isShopping)
+    }
+    
+    private var cardContent: some View {
+        ZStack {
+            // Card Background
+            ZStack {
+                let background = ListBackgroundView(
+                    hasBackgroundImage: stateManager.hasBackgroundImage,
+                    backgroundImage: stateManager.backgroundImage,
+                    backgroundColor: stateManager.effectiveBackgroundColor,
+                    geometry: geometry,
+                    height: min(calculatedHeight, maxAllowedHeight) // ✅ Pass explicit height
+                )
+                .scaleEffect(cart.isShopping ? 1.1 : 1.0) // Zoom in to prevent edges showing
+                
+                if cart.isShopping {
+                    background
+                        .modifier(ParallaxMotionModifier(manager: motionManager, magnitude: 8)) // Reduced image motion
+                } else {
+                    background
+                }
+            }
             .frame(height: min(calculatedHeight, maxAllowedHeight))
-            .applyListStyling()
-            .applyBackground(
-                hasBackgroundImage: stateManager.hasBackgroundImage,
-                backgroundImage: stateManager.backgroundImage,
-                backgroundColor: stateManager.effectiveBackgroundColor,
-                geometry: geometry
-            )
+            .clipShape(RoundedRectangle(cornerRadius: 16))
             .applyBorderAndCorners(hasBackgroundImage: stateManager.hasBackgroundImage, isShopping: cart.isShopping)
-            .applyAnimations(calculatedHeight: calculatedHeight, isShopping: cart.isShopping)
+            
+            .overlay(
+                // Glare Effect
+                LinearGradient(
+                    gradient: Gradient(colors: [.white.opacity(0.3), .clear]),
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .blendMode(.overlay)
+                .mask(RoundedRectangle(cornerRadius: 16))
+            )
+            
+            // List Content
+            listContent
+                .frame(height: min(calculatedHeight, maxAllowedHeight))
+                .applyListStyling()
+                .scrollContentBackground(.hidden)
+                .background(Color.clear)
+                .clipShape(RoundedRectangle(cornerRadius: 16)) // ✅ Clip content to prevent overflow
+                .mask(RoundedRectangle(cornerRadius: 16)) // Double ensure clipping for list content
+        }
     }
     
     private var listContent: some View {
@@ -385,8 +463,8 @@ private struct StoreItemsList: View {
 private extension View {
     func applyListStyling() -> some View {
         self
-            .listStyle(PlainListStyle())
-            .listSectionSpacing(0)
+        .listStyle(PlainListStyle())
+        .listSectionSpacing(0)
     }
     
     func applyBackground(
@@ -396,43 +474,43 @@ private extension View {
         geometry: GeometryProxy
     ) -> some View {
         self
-            .background(
-                ListBackgroundView(
-                    hasBackgroundImage: hasBackgroundImage,
-                    backgroundImage: backgroundImage,
-                    backgroundColor: backgroundColor,
-                    geometry: geometry
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 16))
+        .background(
+            ListBackgroundView(
+                hasBackgroundImage: hasBackgroundImage,
+                backgroundImage: backgroundImage,
+                backgroundColor: backgroundColor,
+                geometry: geometry
             )
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+        )
     }
     
     func applyBorderAndCorners(hasBackgroundImage: Bool, isShopping: Bool) -> some View {
         self
-            .cornerRadius(16)
-            .overlay(EmptyView())
-            .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(hasBackgroundImage ? Color.white.opacity(0.95) : Color.clear)
-            )
-//            .overlay(
-//                RoundedRectangle(cornerRadius: 16)
-//                    .stroke(Color.black, lineWidth: 0.1)
-//            )
-            .offset(y: (isShopping && hasBackgroundImage) ? -4 : 0)
-//            .shadow(
-//                color: Color.black.opacity(isShopping ? 0.14 : 0),
-//                radius: 0.5,
-//                x: 0,
-//                y: 0.5
-//            )
+        .cornerRadius(16)
+        .overlay(EmptyView())
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+            .fill(hasBackgroundImage ? Color.white.opacity(0.95) : Color.clear)
+        )
+        //            .overlay(
+        //                RoundedRectangle(cornerRadius: 16)
+        //                    .stroke(Color.black, lineWidth: 0.1)
+        //            )
+//        .offset(y: (isShopping && hasBackgroundImage) ? -4 : 0)
+        //            .shadow(
+        //                color: Color.black.opacity(isShopping ? 0.14 : 0),
+        //                radius: 0.5,
+        //                x: 0,
+        //                y: 0.5
+        //            )
     }
     
     func applyAnimations(calculatedHeight: CGFloat, isShopping: Bool) -> some View {
         self
-            // Smoother spring for height changes - higher damping prevents bouncy/rocky feel
-            .animation(.spring(response: 0.5, dampingFraction: 0.88), value: calculatedHeight)
-            .animation(.spring(response: 0.45, dampingFraction: 0.75), value: isShopping)
+        // Smoother spring for height changes - higher damping prevents bouncy/rocky feel
+        .animation(.spring(response: 0.5, dampingFraction: 0.88), value: calculatedHeight)
+        .animation(.spring(response: 0.45, dampingFraction: 0.75), value: isShopping)
     }
 }
 
@@ -441,6 +519,7 @@ private struct ListBackgroundView: View {
     let backgroundImage: UIImage?
     let backgroundColor: Color
     let geometry: GeometryProxy
+    var height: CGFloat? = nil // ✅ Optional height parameter
     
     var body: some View {
         ZStack {
@@ -450,7 +529,7 @@ private struct ListBackgroundView: View {
                     Image(uiImage: backgroundImage)
                         .resizable()
                         .scaledToFill()
-                        .frame(width: geometry.size.width, height: geometry.size.height)
+                        .frame(width: geometry.size.width, height: height ?? geometry.size.height) // ✅ Use explicit height if provided
                         .clipped()
                         .overlay(Color.black.opacity(0.4))
                         .blur(radius: 2)
@@ -487,15 +566,15 @@ struct VisibleNoiseView: View {
         Group {
             if let noiseImage = noiseImage {
                 Image(uiImage: noiseImage)
-                    .resizable()
-                    .interpolation(.none) // Keep pixels sharp
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .blendMode(.overlay)
-                    .opacity(opacity)
+                .resizable()
+                .interpolation(.none) // Keep pixels sharp
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .blendMode(.overlay)
+                .opacity(opacity)
             } else {
                 // Fallback while generating
                 Rectangle()
-                    .fill(.gray.opacity(0.1))
+                .fill(.gray.opacity(0.1))
             }
         }
         .onAppear {
@@ -549,35 +628,35 @@ struct NoiseDemoView: View {
         VStack {
             // Background with noise for testing
             Rectangle()
-                .fill(.blue.opacity(0.3))
-                .frame(height: 300)
-                .overlay(
-                    VisibleNoiseView(
-                        grainSize: grainSize,
-                        density: density,
-                        opacity: opacity
-                    )
+            .fill(.blue.opacity(0.3))
+            .frame(height: 300)
+            .overlay(
+                VisibleNoiseView(
+                    grainSize: grainSize,
+                    density: density,
+                    opacity: opacity
                 )
-                .cornerRadius(12)
-                .padding()
+            )
+            .cornerRadius(12)
+            .padding()
             
             // Controls to adjust noise
             VStack(alignment: .leading, spacing: 20) {
                 VStack(alignment: .leading) {
                     Text("Opacity: \(opacity, specifier: "%.2f")")
-                        .font(.caption)
+                    .font(.caption)
                     Slider(value: $opacity, in: 0.1...0.5, step: 0.05)
                 }
                 
                 VStack(alignment: .leading) {
                     Text("Density: \(density, specifier: "%.2f")")
-                        .font(.caption)
+                    .font(.caption)
                     Slider(value: $density, in: 0.05...0.4, step: 0.05)
                 }
                 
                 VStack(alignment: .leading) {
                     Text("Grain Size: \(grainSize, specifier: "%.1f")")
-                        .font(.caption)
+                    .font(.caption)
                     Slider(value: $grainSize, in: 0.5...2.0, step: 0.1)
                 }
                 
@@ -608,6 +687,50 @@ struct NoiseDemoView: View {
             .padding()
             
             Spacer()
+        }
+    }
+}
+
+// MARK: - Motion Manager
+@Observable
+class MotionManager {
+    static let shared = MotionManager()
+    
+    var pitch: Double = 0.0
+    var roll: Double = 0.0
+    
+    private var manager: CMMotionManager
+    
+    init() {
+        self.manager = CMMotionManager()
+        self.manager.deviceMotionUpdateInterval = 1/60
+        self.manager.startDeviceMotionUpdates(to: .main) { (motionData, error) in
+            if let error = error {
+                print(error)
+                return
+            }
+            
+            if let motionData = motionData {
+                self.pitch = motionData.attitude.pitch
+                self.roll = motionData.attitude.roll
+            }
+        }
+    }
+}
+
+struct ParallaxMotionModifier: ViewModifier {
+    var manager: MotionManager
+    var magnitude: Double
+    
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if magnitude == 0 {
+            content
+        } else {
+            content
+                // Removed shadow to rely on base layer for depth
+                .offset(x: CGFloat(manager.roll * magnitude),
+                        y: CGFloat(manager.pitch * magnitude))
         }
     }
 }

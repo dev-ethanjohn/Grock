@@ -369,18 +369,22 @@ struct UnifiedItemPopover: View {
                      )
                      
                      // 3. Start removal animation after strikethrough is partially done
-                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                         cartItem.animationState = .removalAnimating
-                         cartItem.isFulfilled = true // Mark as fulfilled
-                         
-                         NotificationCenter.default.post(
-                             name: NSNotification.Name("ItemRemovalAnimating"),
-                             object: nil,
-                             userInfo: ["cartId": cart.id, "itemId": cartItem.itemId]
-                         )
-                         
-                         // 4. Cleanup after removal
-                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        cartItem.animationState = .removalAnimating
+                        
+                        // Animate the fulfillment state change so the List removes the row smoothly
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            cartItem.isFulfilled = true
+                        }
+                        
+                        NotificationCenter.default.post(
+                            name: NSNotification.Name("ItemRemovalAnimating"),
+                            object: nil,
+                            userInfo: ["cartId": cart.id, "itemId": cartItem.itemId]
+                        )
+                        
+                        // 4. Cleanup after removal
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                              cartItem.animationState = .none
                              cartItem.shouldShowCheckmark = false
                              cartItem.shouldStrikethrough = false

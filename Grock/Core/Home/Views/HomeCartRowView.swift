@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import CoreMotion
 
 struct HomeCartRowView: View {
     let cart: Cart
@@ -391,12 +392,12 @@ struct HomeCartRowView: View {
 //                                )
 //                            )
 //                            // Remove shadow for list performance
-////                            .shadow(
-////                                color: .black.opacity(0.1),
-////                                radius: 2,
-////                                x: 0,
-////                                y: 1
-////                            )
+//                            .shadow(
+//                                color: .black.opacity(0.1),
+//                                radius: 2,
+//                                x: 0,
+//                                y: 1
+//                            )
 //                            .frame(width: 18, height: 18)
 //                        
 //                        Text(category.emoji)
@@ -530,11 +531,11 @@ struct NoiseOverlayView: View {
         Group {
             if let image = Self.cachedNoiseImage {
                 Image(uiImage: image)
-                    .resizable()
-                    .interpolation(.none)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .blendMode(.softLight)
-                    .opacity(opacity)
+                .resizable()
+                .interpolation(.none)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .blendMode(.softLight)
+                .opacity(opacity)
             } else {
                 // Fallback or placeholder while generating (though we generate on appear if needed)
                 Color.clear

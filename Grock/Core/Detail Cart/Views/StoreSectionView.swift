@@ -36,7 +36,8 @@ struct StoreSectionListView: View {
             }
         }
         
-        return filteredItems.sorted { ($0.cartItem.addedAt ?? Date.distantPast) > ($1.cartItem.addedAt ?? Date.distantPast) }
+        // Items are already sorted by parent, so we don't need to re-sort
+        return filteredItems
     }
     
     var body: some View {
