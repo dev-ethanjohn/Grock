@@ -458,7 +458,7 @@ struct HomeView: View {
                 .padding(.horizontal, 24)
                 .background(
                     ZStack {
-                        // Dark Liquid Glass Effect
+ 
                         Capsule()
                             .fill(.ultraThinMaterial)
                         
@@ -466,8 +466,8 @@ struct HomeView: View {
                             .fill(
                                 LinearGradient(
                                     colors: [
-                                        .black.opacity(0.8),
-                                        .black.opacity(0.95)
+                                        .black.opacity(0.85),
+                                        .black.opacity(1)
                                     ],
                                     startPoint: .topLeading,
                                     endPoint: .bottomTrailing

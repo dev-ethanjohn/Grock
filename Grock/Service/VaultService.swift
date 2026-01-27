@@ -59,7 +59,7 @@ extension VaultService {
             }
         } catch {
             self.error = error
-            Logger.error("Failed to load user and vault: \(error)", category: .vault)
+            print("❌ Failed to load user and vault: \(error)")
         }
     }
    
@@ -252,7 +252,7 @@ extension VaultService {
        
         let validation = validateItemName(name, store: store)
         guard validation.isValid else {
-            Logger.warning("Cannot add item: \(validation.errorMessage ?? "Unknown error")", category: .vault)
+            print("❌ Cannot add item: \(validation.errorMessage ?? "Unknown error")")
             return false
         }
        
@@ -293,7 +293,7 @@ extension VaultService {
          // Validate the new item name
          let validation = validateItemName(newName, store: newStore, excluding: item.id)
          guard validation.isValid else {
-             Logger.warning("Cannot update item: \(validation.errorMessage ?? "Unknown error")", category: .vault)
+             print("❌ Cannot update item: \(validation.errorMessage ?? "Unknown error")")
              return false
          }
         
@@ -375,7 +375,7 @@ extension VaultService {
             // Shopping mode: Only update cart item's actual data
             guard let cartItem = cart.cartItems.first(where: { $0.itemId == itemId }),
                   cartItem.isFulfilled else {
-                Logger.warning("Cannot edit unfulfilled item while shopping", category: .cart)
+                print("⚠️ Cannot edit unfulfilled item while shopping")
                 return false
             }
             
@@ -390,7 +390,7 @@ extension VaultService {
             return true
             
         case .completed:
-            Logger.warning("Cannot edit items in completed cart", category: .cart)
+            print("⚠️ Cannot edit items in completed cart")
             return false
         }
     }
@@ -464,36 +464,42 @@ extension VaultService {
     func returnToPlanning(cart: Cart) {
         guard cart.status == .shopping else { return }
         
-        Logger.info("Returning cart '\(cart.name)' to planning mode", category: .cart)
+        print("🔄 Returning cart '\(cart.name)' to planning mode")
         
         // STEP 1: Remove all items that were added during shopping
+        let shoppingAddedItems = cart.cartItems.filter {
+            $0.addedDuringShopping || $0.isShoppingOnlyItem
+        }
+        
         cart.cartItems.removeAll { cartItem in
             cartItem.addedDuringShopping || cartItem.isShoppingOnlyItem
         }
         
+        print("   Removed \(shoppingAddedItems.count) items added during shopping")
+        
         // STEP 2: Reset all remaining vault items to planning state
-        // Optimize: Single pass
-        if let vault = vault {
-            for cartItem in cart.cartItems {
-                // Reset shopping flags
-                cartItem.isFulfilled = false
-                cartItem.isSkippedDuringShopping = false
-                cartItem.wasEditedDuringShopping = false
-                cartItem.addedDuringShopping = false
-                
-                // Clear shopping data
-                cartItem.actualPrice = nil
-                cartItem.actualQuantity = nil
-                cartItem.actualUnit = nil
-                cartItem.actualStore = nil
-                
-                // Restore original planning quantity
-                if let originalQty = cartItem.originalPlanningQuantity {
-                    cartItem.quantity = originalQty
-                    cartItem.originalPlanningQuantity = nil
-                }
-                
-                // Refresh planned data from vault
+        for cartItem in cart.cartItems {
+            // Reset shopping flags
+            cartItem.isFulfilled = false
+            cartItem.isSkippedDuringShopping = false
+            cartItem.wasEditedDuringShopping = false
+            cartItem.addedDuringShopping = false // RESET THIS FLAG
+            
+            // Clear shopping data
+            cartItem.actualPrice = nil
+            cartItem.actualQuantity = nil
+            cartItem.actualUnit = nil
+            cartItem.actualStore = nil
+            
+            // Restore original planning quantity
+            if let originalQty = cartItem.originalPlanningQuantity {
+                cartItem.quantity = originalQty
+                print("   ↳ Restored \(cartItem.itemId) to original quantity: \(originalQty)")
+                cartItem.originalPlanningQuantity = nil
+            }
+            
+            // Refresh planned data from vault
+            if let vault = vault {
                 cartItem.plannedPrice = cartItem.getCurrentPrice(from: vault, store: cartItem.plannedStore)
                 cartItem.plannedUnit = cartItem.getCurrentUnit(from: vault, store: cartItem.plannedStore)
             }
@@ -504,17 +510,11 @@ extension VaultService {
         cart.startedAt = nil
         cart.updatedAt = Date()
         
-        // Optimize: Update totals immediately for UI
         updateCartTotals(cart: cart)
+        saveContext()
         
-        // Defer save to background
-        DispatchQueue.global(qos: .background).async {
-            DispatchQueue.main.async {
-                self.saveContext()
-            }
-        }
-        
-        Logger.info("Cart '\(cart.name)' reset to planning mode", category: .cart)
+        print("✅ Cart '\(cart.name)' reset to planning mode")
+        print("   Kept \(cart.cartItems.count) planned vault items")
     }
     
     /// Deletes an item from the vault
@@ -608,9 +608,9 @@ extension VaultService {
             // ✅ Insert at beginning for most recent first ordering
             vault.stores.insert(newStore, at: 0)
             saveContext()
-            Logger.info("Store added to vault: \(trimmedStore)", category: .vault)
+            print("➕ Store added to vault: \(trimmedStore)")
         } else {
-            Logger.debug("Store already exists: \(trimmedStore)", category: .vault)
+            print("⚠️ Store already exists: \(trimmedStore)")
         }
     }
    
@@ -689,7 +689,7 @@ extension VaultService {
         }
         
         saveContext()
-        Logger.info("Store renamed from '\(oldName)' to '\(trimmedNewName)'", category: .vault)
+        print("✏️ Store renamed from '\(oldName)' to '\(trimmedNewName)'")
     }
     
     /// Deletes a store from the vault
@@ -701,7 +701,7 @@ extension VaultService {
         if let index = vault.stores.firstIndex(where: { $0.name == storeName }) {
             vault.stores.remove(at: index)
             saveContext()
-            Logger.info("Store deleted: \(storeName)", category: .vault)
+            print("🗑️ Store deleted: \(storeName)")
         }
     }
 }
@@ -737,7 +737,7 @@ extension VaultService {
     func deleteCart(_ cart: Cart) {
         vault?.carts.removeAll { $0.id == cart.id }
         saveContext()
-        Logger.info("Deleted cart: \(cart.name)", category: .cart)
+        print("🗑️ Deleted cart: \(cart.name)")
     }
 }
 
@@ -751,38 +751,28 @@ extension VaultService {
         cleanupShoppingOnlyItems(cart: cart)
         
         // CRITICAL: Save original planning quantities
-        // Optimize: Batch updates
-        var itemsToUpdate: [CartItem] = []
+        for cartItem in cart.cartItems where !cartItem.isShoppingOnlyItem {
+            cartItem.originalPlanningQuantity = cartItem.quantity  // Save original
+            print("💾 Saved original planning quantity: \(cartItem.itemId) = \(cartItem.quantity)")
+        }
+        
         for cartItem in cart.cartItems {
-            if !cartItem.isShoppingOnlyItem {
-                cartItem.originalPlanningQuantity = cartItem.quantity
-                itemsToUpdate.append(cartItem)
-            }
-            // Capture planned data in the same pass
             cartItem.capturePlannedData(from: vault!)
         }
         
         cart.status = .shopping
         cart.startedAt = Date()
         cart.updatedAt = Date()
-        
-        // Optimize: Update totals first (memory), then save
         updateCartTotals(cart: cart)
-        
-        // Defer heavy save to background thread to keep UI responsive
-        DispatchQueue.global(qos: .background).async {
-            DispatchQueue.main.async {
-                self.saveContext()
-            }
-        }
-        Logger.info("Started shopping for: \(cart.name)", category: .cart)
+        saveContext()
+        print("🛒 Started shopping for: \(cart.name)")
     }
    
     /// Completes shopping session for a cart
     func completeShopping(cart: Cart) {
          guard cart.status == .shopping else { return }
          
-         Logger.info("Completing shopping for cart: \(cart.name)", category: .cart)
+         print("🔄 Completing shopping for cart: \(cart.name)")
          
          for cartItem in cart.cartItems {
              cartItem.captureActualData()
@@ -795,7 +785,7 @@ extension VaultService {
          updateCartTotals(cart: cart)
          saveContext()
          
-         Logger.info("Shopping completed! Vault prices updated.", category: .cart)
+         print("🎉 Shopping completed! Vault prices updated.")
      }
      
   
@@ -803,12 +793,12 @@ extension VaultService {
     private func updateVaultWithActualData(cartItem: CartItem) {
         // Skip shopping-only items (they shouldn't be saved to vault)
         if cartItem.isShoppingOnlyItem {
-            Logger.debug("Skipping vault update for shopping-only item: \(cartItem.shoppingOnlyName ?? "Unknown")", category: .vault)
+            print("🛍️ Skipping vault update for shopping-only item: \(cartItem.shoppingOnlyName ?? "Unknown")")
             return
         }
         
         guard let item = findItemById(cartItem.itemId) else {
-            Logger.error("Item not found for cartItem: \(cartItem.itemId)", category: .vault)
+            print("❌ Item not found for cartItem: \(cartItem.itemId)")
             return
         }
         
@@ -816,11 +806,14 @@ extension VaultService {
         guard let actualPrice = cartItem.actualPrice,
               let actualUnit = cartItem.actualUnit,
               let actualStore = cartItem.actualStore else {
-            Logger.debug("No actual data to update vault for item: \(item.name)", category: .vault)
+            print("⚠️ No actual data to update vault for item: \(item.name)")
             return
         }
         
-        Logger.debug("Updating vault for item: \(item.name) | Store: \(actualStore) | Price: \(actualPrice)", category: .vault)
+        print("💾 Updating vault for item: \(item.name)")
+        print("   Store: \(actualStore)")
+        print("   Price: \(actualPrice)")
+        print("   Unit: \(actualUnit)")
         
         // Update or add price option in the item
         if let existingPriceOption = item.priceOptions.first(where: { $0.store == actualStore }) {
@@ -829,7 +822,7 @@ extension VaultService {
                 priceValue: actualPrice,
                 unit: actualUnit
             )
-            Logger.debug("Updated existing price option", category: .vault)
+            print("   ✅ Updated existing price option")
         } else {
             // Add new price option
             let newPriceOption = PriceOption(
@@ -840,7 +833,7 @@ extension VaultService {
                 )
             )
             item.priceOptions.append(newPriceOption)
-            Logger.debug("Added new price option", category: .vault)
+            print("   ✅ Added new price option")
         }
         
         // Also ensure the store exists in vault stores
@@ -866,7 +859,7 @@ extension VaultService {
         
          updateCartTotals(cart: cart)
          saveContext()
-         Logger.info("Reopened cart: \(cart.name) - Now using current prices", category: .cart)
+         print("🔄 Reopened cart: \(cart.name) - Now using current prices")
      }
     
     /// Updates the cart name
@@ -902,7 +895,7 @@ extension VaultService {
             existingCartItem.addedAt = Date() // Update timestamp
             
             // DO NOT change addedDuringShopping flag - keep existing value
-            Logger.debug("Updated existing vault item quantity: \(item.name)", category: .cart)
+            print("🔄 Updated existing vault item quantity: \(item.name)")
         } else {
             // Add new item
             let cartItem = CartItem(
@@ -931,7 +924,7 @@ extension VaultService {
         
         updateCartTotals(cart: cart)
         saveContext()
-        Logger.info("Added Vault item to cart: \(item.name) ×\(quantity)", category: .cart)
+        print("📋 Added Vault item to cart: \(item.name) ×\(quantity)")
     }
     
     // MARK: - Shopping-Only Operations (No Vault Shopping Mode)
@@ -944,7 +937,7 @@ extension VaultService {
         quantity: Double = 1,
         category: GroceryCategory? = nil
     ) {
-        Logger.info("Adding shopping-only item: \(name)", category: .cart)
+        print("🛍️ Adding shopping-only item: \(name)")
         
         // Create a shopping-only CartItem (not linked to vault)
         let cartItem = CartItem.createShoppingOnlyItem(
@@ -967,13 +960,15 @@ extension VaultService {
             userInfo: ["cartItemId": cart.id]
         )
         
-        Logger.info("Added Shopping-only item to cart: \(name) ×\(quantity)", category: .cart)
+        print("✅ Added Shopping-only item to cart: \(name) ×\(quantity)")
+        print("   Cart now has \(cart.cartItems.count) items")
+        print("   Shopping-only items: \(cart.cartItems.filter { $0.isShoppingOnlyItem }.count)")
     }
    
     /// Removes an item from a shopping cart
     func removeItemFromCart(cart: Cart, itemId: String) {
         guard let cartItem = cart.cartItems.first(where: { $0.itemId == itemId }) else {
-            Logger.warning("Item not found in cart", category: .cart)
+            print("⚠️ Item not found in cart")
             return
         }
         
@@ -985,19 +980,19 @@ extension VaultService {
                 // SHOPPING-ONLY ITEMS: Remove completely during shopping
                 if let index = cart.cartItems.firstIndex(where: { $0.itemId == itemId }) {
                     cart.cartItems.remove(at: index)
-                    Logger.info("Removed shopping-only item \(itemName) during shopping", category: .cart)
+                    print("🗑️ Removed shopping-only item \(itemName) during shopping")
                 }
             } else {
                 // VAULT ITEMS: Mark as skipped instead of removing
                 cartItem.isSkippedDuringShopping = true
                 cartItem.isFulfilled = false
-                Logger.info("Skipped vault item \(itemName) during shopping", category: .cart)
+                print("⏸️ Skipped vault item \(itemName) during shopping")
             }
         } else {
             // PLANNING MODE: Actually remove the item (both types)
             if let index = cart.cartItems.firstIndex(where: { $0.itemId == itemId }) {
                 cart.cartItems.remove(at: index)
-                Logger.info("Removed \(itemName) from cart: \(cart.name)", category: .cart)
+                print("🗑️ Removed \(itemName) from cart: \(cart.name)")
             }
         }
         
@@ -1032,7 +1027,7 @@ extension VaultService {
        
         updateCartTotals(cart: cart)
         saveContext()
-        Logger.debug("Updated cart item actual data", category: .cart)
+        print("💰 Updated cart item actual data")
     }
    
     /// Updates price and quantity for a cart item
@@ -1082,7 +1077,7 @@ extension VaultService {
            
             updateCartTotals(cart: cart)
             saveContext()
-            Logger.debug("Updated cart item store to: \(newStore)", category: .cart)
+            print("🏪 Updated cart item store to: \(newStore)")
         }
     }
    
@@ -1094,7 +1089,7 @@ extension VaultService {
         cartItem.isFulfilled.toggle()
         updateCartTotals(cart: cart)
         saveContext()
-        Logger.debug(cartItem.isFulfilled ? "Fulfilled item" : "Unfulfilled item", category: .cart)
+        print(cartItem.isFulfilled ? "✅ Fulfilled item" : "❌ Unfulfilled item")
         
         NotificationCenter.default.post(
             name: NSNotification.Name("CartItemFulfillmentToggled"),
@@ -1217,7 +1212,7 @@ private extension VaultService {
             try modelContext.save()
         } catch {
             self.error = error
-            Logger.error("Failed to save: \(error)", category: .vault)
+            print("❌ Failed to save: \(error)")
         }
     }
    
@@ -1231,7 +1226,7 @@ private extension VaultService {
             }
         }
         saveContext()
-        Logger.debug("Updated active carts with new item prices", category: .vault)
+        print("🔄 Updated active carts with new item prices")
     }
 }
 
@@ -1285,7 +1280,7 @@ extension VaultService {
         let shoppingOnlyItems = cart.cartItems.filter { $0.isShoppingOnlyItem }
         
         if !shoppingOnlyItems.isEmpty {
-            Logger.debug("Cleaning up \(shoppingOnlyItems.count) shopping-only items", category: .cart)
+            print("🧹 Cleaning up \(shoppingOnlyItems.count) shopping-only items")
             
             // Remove shopping-only items
             cart.cartItems.removeAll { $0.isShoppingOnlyItem }
@@ -1293,7 +1288,7 @@ extension VaultService {
             updateCartTotals(cart: cart)
             saveContext()
             
-            Logger.debug("Removed shopping-only items", category: .cart)
+            print("✅ Removed shopping-only items")
         }
     }
     
@@ -1302,7 +1297,7 @@ extension VaultService {
         guard cart.status == .completed else { return }
         
         // You could add other cleanup logic here
-        Logger.debug("Cleaning up completed cart: \(cart.name)", category: .cart)
+        print("🧹 Cleaning up completed cart: \(cart.name)")
     }
     
     func addVaultItemToCartDuringShopping(
@@ -1313,7 +1308,7 @@ extension VaultService {
         cart: Cart,
         quantity: Double = 1
     ) {
-        Logger.info("Adding vault item during shopping: \(item.name)", category: .cart)
+        print("🛍️ Adding vault item during shopping: \(item.name)")
         
         // Check if this vault item is already in cart
         if let existingCartItem = cart.cartItems.first(where: {
@@ -1328,7 +1323,7 @@ extension VaultService {
             
             // If it was added during shopping, keep the flag; if not, set it
             existingCartItem.addedDuringShopping = true
-            Logger.debug("Updated existing vault item during shopping: \(item.name)", category: .cart)
+            print("🔄 Updated existing vault item during shopping: \(item.name)")
         } else {
             // Not in cart - add as vault item added DURING shopping
             let cartItem = CartItem(
@@ -1356,7 +1351,7 @@ extension VaultService {
         
         updateCartTotals(cart: cart)
         saveContext()
-        Logger.info("Added Vault item during shopping: \(item.name) ×\(quantity)", category: .cart)
+        print("📋 Added Vault item during shopping: \(item.name) ×\(quantity)")
     }
 }
 

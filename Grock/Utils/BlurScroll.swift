@@ -26,7 +26,7 @@ struct BlurScroll: ViewModifier {
                 // Bottom Blur Overlay
                 // Using Material for O(1) performance (no duplication, no tracking)
                 Rectangle()
-                    .fill(.ultraThinMaterial)
+                    .fill(Material.regular)
                     .mask(
                         LinearGradient(
                             stops: [
@@ -46,7 +46,7 @@ struct BlurScroll: ViewModifier {
 }
 
 extension View {
-    func blurScroll(blur: CGFloat = 12, scale: CGFloat = 1.0) -> some View {
+    func blurScroll(blur: CGFloat = 8, scale: CGFloat = 1.0) -> some View {
         modifier(BlurScroll(blur: blur, bottomBlurScale: scale))
     }
 }

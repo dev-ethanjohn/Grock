@@ -357,7 +357,7 @@ private struct StoreItemsList: View {
     var body: some View {
         ZStack(alignment: .center) {
             // BASE: Static Shadow Layer
-            if cart.isShopping {
+            if cart.isShopping || cart.isPlanning {
                 ListBackgroundView(
                     hasBackgroundImage: stateManager.hasBackgroundImage,
                     backgroundImage: stateManager.backgroundImage,
@@ -377,9 +377,9 @@ private struct StoreItemsList: View {
             }
 
             // OVERLAY: Moving Card (Background + List)
-            if cart.isShopping {
+            if cart.isShopping || cart.isPlanning {
                 cardContent
-                    .modifier(ParallaxMotionModifier(manager: motionManager, magnitude: 3)) // Extremely subtle overlay motion
+                    .modifier(ParallaxMotionModifier(manager: motionManager, magnitude: 5)) // Extremely subtle overlay motion
             } else {
                 cardContent
             }
@@ -398,9 +398,9 @@ private struct StoreItemsList: View {
                     geometry: geometry,
                     height: min(calculatedHeight, maxAllowedHeight) // ✅ Pass explicit height
                 )
-                .scaleEffect(cart.isShopping ? 1.1 : 1.0) // Zoom in to prevent edges showing
+                .scaleEffect((cart.isShopping || cart.isPlanning) ? 1.1 : 1.0) // Zoom in to prevent edges showing
                 
-                if cart.isShopping {
+                if cart.isShopping || cart.isPlanning {
                     background
                         .modifier(ParallaxMotionModifier(manager: motionManager, magnitude: 8)) // Reduced image motion
                 } else {
@@ -448,7 +448,8 @@ private struct StoreItemsList: View {
                         },
                         onEditItem: onEditItem,
                         onDeleteItem: onDeleteItem,
-                        isLastStore: index == storeOrder.count - 1
+                        isLastStore: index == storeOrder.count - 1,
+                        isFirstStore: index == 0
                     )
                     .listRowInsets(EdgeInsets())
                     .listRowSeparator(.hidden)

@@ -12,6 +12,7 @@ struct StoreSectionListView: View {
     let onEditItem: (CartItem) -> Void
     let onDeleteItem: (CartItem) -> Void
     let isLastStore: Bool
+    let isFirstStore: Bool
     
     @Environment(VaultService.self) private var vaultService
     @Environment(CartStateManager.self) private var stateManager
@@ -43,7 +44,7 @@ struct StoreSectionListView: View {
     var body: some View {
         if !displayItems.isEmpty {
             Section(
-                header: StoreSectionHeader(store: store),
+                header: StoreSectionHeader(store: store, isFirstStore: isFirstStore),
                 content: {
                     ForEach(Array(displayItems.enumerated()), id: \.element.cartItem.itemId) { index, tuple in
                         StoreSectionRow(
@@ -282,6 +283,7 @@ private struct StoreSectionRow: View {
 
 private struct StoreSectionHeader: View {
     let store: String
+    let isFirstStore: Bool
     @Environment(VaultService.self) private var vaultService
     @Environment(CartStateManager.self) private var stateManager
     
@@ -317,6 +319,8 @@ private struct StoreSectionHeader: View {
             }
             .padding(.leading)
         }
+        .padding(.vertical, 4)
+        .offset(y: isFirstStore ? 0 : 10)
         .listRowInsets(EdgeInsets())
         .textCase(nil)
     }
