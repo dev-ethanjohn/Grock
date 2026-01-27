@@ -1,4 +1,5 @@
 import SwiftUI
+import CoreMotion
 import Observation
 
 struct ItemsListView: View {
@@ -355,10 +356,31 @@ private struct StoreItemsList: View {
     let geometry: GeometryProxy
     
     @Environment(CartStateManager.self) private var stateManager
+    private let motionManager = MotionManager.shared
     
     var body: some View {
-        cardContent
-            .applyAnimations(calculatedHeight: calculatedHeight, isShopping: cart.isShopping)
+        ZStack(alignment: .center) {
+            ListBackgroundView(
+                hasBackgroundImage: stateManager.hasBackgroundImage,
+                backgroundImage: stateManager.backgroundImage,
+                backgroundColor: stateManager.effectiveBackgroundColor,
+                geometry: geometry,
+                height: min(calculatedHeight, maxAllowedHeight)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .frame(height: min(calculatedHeight, maxAllowedHeight))
+            .scaleEffect(0.92)
+            .blur(radius: 8)
+            .offset(y: 24)
+            .opacity(0.5)
+            .brightness(-0.2)
+            .contrast(1.2)
+            .modifier(ParallaxMotionModifier(manager: motionManager, magnitude: -10))
+            
+            cardContent
+                .modifier(ParallaxMotionModifier(manager: motionManager, magnitude: 3))
+        }
+        .applyAnimations(calculatedHeight: calculatedHeight, isShopping: cart.isShopping)
     }
     
     private var cardContent: some View {
@@ -372,14 +394,22 @@ private struct StoreItemsList: View {
                     geometry: geometry,
                     height: min(calculatedHeight, maxAllowedHeight) // ✅ Pass explicit height
                 )
-                // Removed zoom effect
-                .scaleEffect(1.0)
+                .scaleEffect(stateManager.hasBackgroundImage ? 1.1 : 1.0)
                 
                 background
+                    .modifier(ParallaxMotionModifier(manager: motionManager, magnitude: 8))
             }
             .frame(height: min(calculatedHeight, maxAllowedHeight))
+            .applyListStyling()
+            .applyBackground(
+                hasBackgroundImage: stateManager.hasBackgroundImage,
+                backgroundImage: stateManager.backgroundImage,
+                backgroundColor: stateManager.effectiveBackgroundColor,
+                geometry: geometry
+            )
             .clipShape(RoundedRectangle(cornerRadius: 16))
             .applyBorderAndCorners(hasBackgroundImage: stateManager.hasBackgroundImage, isShopping: cart.isShopping)
+            .applyAnimations(calculatedHeight: calculatedHeight, isShopping: cart.isShopping)
             
             .overlay(
                 // Glare Effect
@@ -658,6 +688,49 @@ struct NoiseDemoView: View {
             .padding()
             
             Spacer()
+        }
+    }
+}
+
+// MARK: - Motion Manager
+@Observable
+class MotionManager {
+    static let shared = MotionManager()
+    
+    var pitch: Double = 0.0
+    var roll: Double = 0.0
+    
+    private var manager: CMMotionManager
+    
+    init() {
+        self.manager = CMMotionManager()
+        self.manager.deviceMotionUpdateInterval = 1/60
+        self.manager.startDeviceMotionUpdates(to: .main) { (motionData, error) in
+            if let error = error {
+                print(error)
+                return
+            }
+            
+            if let motionData = motionData {
+                self.pitch = motionData.attitude.pitch
+                self.roll = motionData.attitude.roll
+            }
+        }
+    }
+}
+
+struct ParallaxMotionModifier: ViewModifier {
+    var manager: MotionManager
+    var magnitude: Double
+    
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if magnitude == 0 {
+            content
+        } else {
+            content
+                .offset(x: CGFloat(manager.roll * magnitude),
+                        y: CGFloat(manager.pitch * magnitude))
         }
     }
 }
