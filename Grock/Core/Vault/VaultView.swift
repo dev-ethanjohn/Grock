@@ -81,6 +81,10 @@ struct VaultView: View {
     // ✅ Updated to use @State with @Observable macro
     @State private var keyboardResponder = KeyboardResponder()
     @State private var focusedItemId: String?
+
+    @State private var searchText: String = ""
+    @State private var isSearching: Bool = false
+    @Namespace private var searchNamespace
     
     private var totalVaultItemsCount: Int {
         guard let vault = vaultService.vault else { return 0 }
@@ -110,6 +114,22 @@ struct VaultView: View {
                 firstItemId: firstItemId,
                 showNameEntrySheet: $showNameEntrySheet
             )
+            .onChange(of: searchText) { _, newValue in
+                let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmed.isEmpty else { return }
+                guard let matchingCategory = matchCategoryForSearch(trimmed) else { return }
+                guard matchingCategory != selectedCategory else { return }
+
+                let oldIndex = selectedCategory.flatMap { GroceryCategory.allCases.firstIndex(of: $0) }
+                let newIndex = GroceryCategory.allCases.firstIndex(of: matchingCategory)
+                if let oldIndex, let newIndex {
+                    navigationDirection = newIndex > oldIndex ? .right : .left
+                }
+
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                    selectedCategory = matchingCategory
+                }
+            }
             .onChange(of: userName) { _, _ in
                 if hasEnteredName {
                     isCelebrationSequenceActive = false
@@ -173,6 +193,9 @@ struct VaultView: View {
         VStack(spacing: 0) {
             VaultToolbarView(
                 toolbarAppeared: $toolbarAppeared,
+                searchText: $searchText,
+                isSearching: $isSearching,
+                matchedNamespace: searchNamespace,
                 onAddTapped: {
                     dismissKeyboard()
                     withAnimation(.easeInOut(duration: 0.2)) {
@@ -518,6 +541,7 @@ struct VaultView: View {
             if let selectedCategory = selectedCategory {
                 CategoryItemsView(
                     category: selectedCategory,
+                    searchText: searchText,
                     onDeleteItem: deleteItem
                 )
                 .frame(width: geometry.size.width, height: geometry.size.height)
@@ -538,6 +562,7 @@ struct VaultView: View {
     
     struct CategoryItemsView: View {
         let category: GroceryCategory
+        let searchText: String
         let onDeleteItem: (Item) -> Void
         
         @Environment(VaultService.self) private var vaultService
@@ -547,7 +572,13 @@ struct VaultView: View {
             guard let vault = vaultService.vault,
                   let foundCategory = vault.categories.first(where: { $0.name == category.title })
             else { return [] }
-            return foundCategory.items.sorted { $0.createdAt > $1.createdAt }
+            let items = foundCategory.items.sorted { $0.createdAt > $1.createdAt }
+            let trimmed = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty {
+                return items
+            } else {
+                return items.filter { $0.name.localizedCaseInsensitiveContains(trimmed) }
+            }
         }
         private var availableStores: [String] {
             let allStores = categoryItems.flatMap { item in
@@ -576,12 +607,19 @@ struct VaultView: View {
         private var emptyCategoryView: some View {
             VStack {
                 Spacer()
-                Text("No items yet in \(category.title) \(category.emoji)")
+                Text(emptyMessage)
                     .foregroundColor(.gray)
                 Spacer()
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .transition(.scale(scale: 0.8).combined(with: .opacity))
+        }
+
+        private var emptyMessage: String {
+            let trimmed = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty
+            ? "No items yet in \(category.title) \(category.emoji)"
+            : "No items found"
         }
     }
     
@@ -640,6 +678,17 @@ struct VaultView: View {
     }
     
     // MARK: - Data Methods
+
+    private func matchCategoryForSearch(_ text: String) -> GroceryCategory? {
+        guard let vault = vaultService.vault else { return nil }
+        for category in GroceryCategory.allCases {
+            guard let foundCategory = vault.categories.first(where: { $0.name == category.title }) else { continue }
+            if foundCategory.items.contains(where: { $0.name.localizedCaseInsensitiveContains(text) }) {
+                return category
+            }
+        }
+        return nil
+    }
     
     private func checkAndStartCelebration() {
         let hasSeenCelebration = UserDefaults.standard.bool(forKey: "hasSeenVaultCelebration")

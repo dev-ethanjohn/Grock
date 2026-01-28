@@ -3,6 +3,9 @@ import SwiftUI
 struct VaultToolbarView: View {
     
     @Binding var toolbarAppeared: Bool
+    @Binding var searchText: String
+    @Binding var isSearching: Bool
+    var matchedNamespace: Namespace.ID
     var onAddTapped: () -> Void
     var onDismissTapped: (() -> Void)?
     var onClearTapped: (() -> Void)?
@@ -10,28 +13,26 @@ struct VaultToolbarView: View {
     
     @State private var addButtonScale: CGFloat = 1.0
     @Namespace private var buttonNamespace
+    @FocusState private var searchFieldIsFocused: Bool
+    @State private var isAnimating: Bool = false
     
     var body: some View {
-        ZStack(alignment: .top) {
-            Text("vault")
-                .lexendFont(16, weight: .bold)
-                .opacity(toolbarAppeared ? 1 : 0)
-                .offset(y: toolbarAppeared ? 0 : -10)
-                .animation(.spring(response: 0.4, dampingFraction: 0.7, blendDuration: 0).delay(0.1), value: toolbarAppeared)
-            
+        ZStack(alignment: .leading) {
+            // Centered title
             HStack {
-                
-                if showClearButton, let onDismissTapped = onDismissTapped {
-                    Button(action: onDismissTapped) {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 16, weight: .bold))
-                            .foregroundColor(.black)
-                            .frame(width: 24, height: 24)
-                    }
-                    .transition(.scale)
-                    .animation(.spring(response: 0.1, dampingFraction: 0.6, blendDuration: 0).delay(0.1), value: toolbarAppeared)
-                }
-                
+                Spacer()
+                Text("vault")
+                    .lexendFont(16, weight: .bold)
+                    .opacity(toolbarAppeared ? 1 : 0)
+                    .offset(y: toolbarAppeared ? 0 : -10)
+                    .animation(.spring(response: 0.4, dampingFraction: 0.7, blendDuration: 0).delay(0.1), value: toolbarAppeared)
+                Spacer()
+            }
+            .frame(height: 44)
+            .padding(.top, 18)
+            
+            // Trailing Buttons (Clear & Add)
+            HStack(spacing: 4) {
                 Spacer()
                 
                 if showClearButton {
@@ -86,9 +87,119 @@ struct VaultToolbarView: View {
                     .scaleEffect(addButtonScale)
                 }
                 .animation(.spring(response: 0.4, dampingFraction: 0.65), value: showClearButton)
+                .padding(.trailing, 20)
+            }
+            .frame(height: 44)
+            .padding(.top, 18)
+            
+            // Leading Stack (X Icon & Search)
+            // Flattened hierarchy to match ManageCartSheet for smoother animation
+            
+            // 1. X Icon (Leading)
+            if showClearButton, let onDismissTapped = onDismissTapped {
+                Button(action: onDismissTapped) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundColor(.black)
+                        .frame(width: 24, height: 24)
+                }
+                .padding(.leading, 16)
+                .padding(.top, 14)
+                .transition(.scale)
+                .animation(.spring(response: 0.4, dampingFraction: 0.7), value: showClearButton)
+            }
+            
+            // 2. Search Component
+            if isSearching {
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.headline)
+                        .fontWeight(.medium)
+                        .foregroundColor(.black)
+                        .matchedGeometryEffect(id: "searchIcon", in: matchedNamespace, isSource: false)
+                    
+                    ZStack(alignment: .leading) {
+                        if searchText.isEmpty {
+                            Text("Search items in Vault")
+                                .lexendFont(16)
+                                .foregroundColor(.gray.opacity(0.5))
+                        }
+                        
+                        TextField("", text: $searchText)
+                            .textFieldStyle(.plain)
+                            .autocorrectionDisabled()
+                            .textInputAutocapitalization(.never)
+                            .focused($searchFieldIsFocused)
+                    }
+                    
+                    Button(action: {
+                        guard !isAnimating else { return }
+                        isAnimating = true
+                        
+                        UIApplication.shared.endEditing()
+                        searchText = ""
+                        searchFieldIsFocused = false
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                            isSearching = false
+                        }
+                        
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                            isAnimating = false
+                        }
+                    }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(.gray)
+                            .transition(.scale.combined(with: .opacity))
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(
+                    Capsule()
+                        .fill(Color(.systemGray6))
+                        .matchedGeometryEffect(id: "searchCapsule", in: matchedNamespace, isSource: false)
+                )
+                // Dynamic padding to account for X icon
+                .padding(.leading, (showClearButton && onDismissTapped != nil) ? 48 : 16)
+                .padding(.trailing, 16)
+                .padding(.top, 14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .transition(.scale.combined(with: .opacity))
+            } else {
+                Button(action: {
+                    guard !isAnimating else { return }
+                    isAnimating = true
+                    
+                    UIApplication.shared.endEditing()
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                        isSearching = true
+                    }
+                    searchFieldIsFocused = true
+                    
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                        isAnimating = false
+                    }
+                }) {
+                    ZStack {
+                        Capsule()
+                            .fill(Color.white)
+                            .matchedGeometryEffect(id: "searchCapsule", in: matchedNamespace, isSource: true)
+                            .frame(height: 28)
+                            .frame(width: 36, alignment: .leading)
+                        
+                        Image(systemName: "magnifyingglass")
+                            .font(.headline)
+                            .fontWeight(.medium)
+                            .foregroundStyle(.black)
+                            .matchedGeometryEffect(id: "searchIcon", in: matchedNamespace, isSource: true)
+                    }
+                }
+                .padding(.leading, (showClearButton && onDismissTapped != nil) ? 48 : 16)
+                .padding(.top, 14)
             }
         }
-        .padding()
+        .background(Color.white)
+        .padding(.bottom, 8)
     }
     
     private func animateAddButton() {

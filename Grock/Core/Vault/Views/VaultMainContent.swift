@@ -10,6 +10,10 @@ struct VaultMainContent: View {
     @Binding var showAddItemPopover: Bool
     @Binding var createCartButtonVisible: Bool
     @Binding var hasActiveItems: Bool
+
+    @State private var searchText: String = ""
+    @State private var isSearching: Bool = false
+    @Namespace private var searchNamespace
     
     let onAddTapped: () -> Void
     let onDismissTapped: () -> Void
@@ -23,6 +27,9 @@ struct VaultMainContent: View {
             VStack(spacing: 0) {
                 VaultToolbarView(
                     toolbarAppeared: $toolbarAppeared,
+                    searchText: $searchText,
+                    isSearching: $isSearching,
+                    matchedNamespace: searchNamespace,
                     onAddTapped: onAddTapped,
                     onDismissTapped: onDismissTapped,
                     onClearTapped: onClearTapped,

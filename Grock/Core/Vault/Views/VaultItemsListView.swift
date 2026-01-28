@@ -76,17 +76,25 @@ struct StoreSection: View {
     var body: some View {
         Section(
             header: HStack {
-                Text(storeName)
-                    .fuzzyBubblesFont(11, weight: .bold)
+            HStack(spacing: 2) {
+                Image(systemName: "storefront")
+                    .font(.system(size: 10))
                     .foregroundStyle(.white)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(category?.pastelColor.saturated(by: 0.3).darker(by: 0.5) ?? Color.primary)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
-                Spacer()
+                
+                Text(storeName)
+                    .lexendFont(11, weight: .bold)
+                    .foregroundStyle(.white)
             }
-                .padding(.leading)
-                .listRowInsets(EdgeInsets())
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(category?.pastelColor.saturated(by: 0.3).darker(by: 0.5) ?? Color.primary)
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+            
+            Spacer()
+        }
+        .padding(.leading)
+        .padding(.vertical, 4)
+        .listRowInsets(EdgeInsets())
         ) {
             ForEach(itemsWithStableIdentifiers, id: \.id) { tuple in
                 VStack(spacing: 0) {

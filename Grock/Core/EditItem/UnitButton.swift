@@ -19,9 +19,17 @@ struct UnitButton: View {
     let discreteUnits: [(abbr: String, full: String)] = [
         ("pc", "piece"),
         ("pack", "pack"),
+        ("sachet", "sachet"),
         ("can", "can"),
+        ("roll", "roll"),
+        ("bar", "bar"),
+        ("stick", "stick"),
         ("bottle", "bottle"),
         ("box", "box"),
+        ("tray", "tray"),
+        ("bunch", "bunch"),
+        ("dozen", "dozen"),
+        ("bundle", "bundle"),
         ("wrap", "wrap"),
         ("bag", "bag")
     ]
