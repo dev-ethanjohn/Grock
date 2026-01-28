@@ -158,7 +158,7 @@ struct FluidBudgetPillView: View {
                                         .combined(with: .opacity)
                                         .combined(with: .scale(scale: 0.95))
                                 ))
-                                .frame(maxWidth: pillWidth - 24, alignment: .trailing)
+                                .frame(width: pillWidth - 24, height: barHeight, alignment: .trailing)
                                 .padding(.leading, 12)
                                 .offset(y: barTopOffset)
                         }
@@ -187,6 +187,7 @@ struct FluidBudgetPillView: View {
                                         .combined(with: .opacity)
                                         .combined(with: .scale(scale: 0.95))
                                 ))
+                                .frame(height: barHeight)
                                 .offset(y: barTopOffset)
                         }
                     }
@@ -215,6 +216,7 @@ struct FluidBudgetPillView: View {
                     .animation(.easeInOut(duration: 0.3), value: animatedBudget)
             }
             .buttonStyle(.plain)
+            .frame(height: barHeight)
         }
         .frame(height: totalHeight)
     }

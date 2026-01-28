@@ -291,7 +291,7 @@ struct HomeCartRowView: View {
     
     private var headerRow: some View {
         HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 0) {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text(cart.name)
                         .fuzzyBubblesFont(18, weight: .bold)
@@ -315,6 +315,7 @@ struct HomeCartRowView: View {
                             ? .white.opacity(0.8)
                             : Color.black.opacity(0.5)
                         )
+                        .offset(y: -4)
                 }
             }
             .offset(y: -2)
@@ -486,25 +487,29 @@ struct HomeCartRowView: View {
     
     // MARK: - Background Image Loading
     private func loadBackgroundImage() {
-        // Check if we have a background image
-        hasBackgroundImage = CartBackgroundImageManager.shared.hasBackgroundImage(forCartId: cart.id)
+        let cartId = cart.id
+        let hasImage = CartBackgroundImageManager.shared.hasBackgroundImage(forCartId: cartId)
+        hasBackgroundImage = hasImage
         
-        if hasBackgroundImage {
-            // Try cache first
-            if let cachedImage = ImageCacheManager.shared.getImage(forCartId: cart.id) {
-                backgroundImage = cachedImage
-            } else {
-                // Load from disk
-                backgroundImage = CartBackgroundImageManager.shared.loadImage(forCartId: cart.id)
-                hasBackgroundImage = backgroundImage != nil
-                
-                // Cache it for next time
-                if let image = backgroundImage {
-                    ImageCacheManager.shared.saveImage(image, forCartId: cart.id)
+        guard hasImage else {
+            backgroundImage = nil
+            return
+        }
+        
+        if let cachedImage = ImageCacheManager.shared.getImage(forCartId: cartId) {
+            backgroundImage = cachedImage
+            return
+        }
+        
+        Task.detached(priority: .userInitiated) { [cartId] in
+            let image = CartBackgroundImageManager.shared.loadImage(forCartId: cartId)?.resized(to: 1400)
+            await MainActor.run {
+                self.backgroundImage = image
+                self.hasBackgroundImage = image != nil
+                if let image {
+                    ImageCacheManager.shared.saveImage(image, forCartId: cartId)
                 }
             }
-        } else {
-            backgroundImage = nil
         }
     }
 }

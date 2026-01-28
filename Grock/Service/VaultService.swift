@@ -36,6 +36,12 @@ class VaultService {
         self.modelContext = modelContext
         loadUserAndVault()
     }
+    
+    /// Clears all internal caches (item lookup, category lookup)
+    func clearCaches() {
+        itemCache.removeAll()
+        invalidateCategoryCache()
+    }
 }
 
 // MARK: - User & Vault Management
@@ -80,14 +86,26 @@ extension VaultService {
    
     /// Ensures all predefined grocery categories exist in the vault
     private func ensureAllCategoriesExist(in vault: Vault) {
-        let existingCategoriesDict = Dictionary(uniqueKeysWithValues: vault.categories.map { ($0.name, $0) })
+        func key(_ name: String) -> String {
+            name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        }
+        
+        let existingCategoriesDict = Dictionary(uniqueKeysWithValues: vault.categories.map { (key($0.name), $0) })
+        let defaultCategoryTitles = GroceryCategory.allCases.map { $0.title }
+        let defaultCategoryKeys = Set(defaultCategoryTitles.map(key))
+        
         var orderedCategories: [Category] = []
         var needsSave = false
        
         for (index, groceryCategory) in GroceryCategory.allCases.enumerated() {
             let categoryName = groceryCategory.title
+            let categoryKey = key(categoryName)
            
-            if let existingCategory = existingCategoriesDict[categoryName] {
+            if let existingCategory = existingCategoriesDict[categoryKey] {
+                if existingCategory.name != categoryName {
+                    existingCategory.name = categoryName
+                    needsSave = true
+                }
                 if existingCategory.sortOrder != index {
                     existingCategory.sortOrder = index
                     needsSave = true
@@ -100,8 +118,24 @@ extension VaultService {
                 needsSave = true
             }
         }
-       
-        vault.categories = orderedCategories.sorted { $0.sortOrder < $1.sortOrder }
+        
+        let extraCategories = vault.categories
+            .filter { !defaultCategoryKeys.contains(key($0.name)) }
+            .sorted {
+                if $0.sortOrder != $1.sortOrder { return $0.sortOrder < $1.sortOrder }
+                return $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+            }
+        
+        var nextSortOrder = GroceryCategory.allCases.count
+        for category in extraCategories {
+            if category.sortOrder < nextSortOrder {
+                category.sortOrder = nextSortOrder
+                needsSave = true
+            }
+            nextSortOrder += 1
+        }
+        
+        vault.categories = (orderedCategories + extraCategories).sorted { $0.sortOrder < $1.sortOrder }
        
         if needsSave {
             saveContext()
@@ -1401,4 +1435,3 @@ extension VaultService {
         Self.categoryLookupCache.removeAll()
     }
 }
-

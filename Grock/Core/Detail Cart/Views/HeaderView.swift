@@ -1,5 +1,6 @@
 import SwiftUI
 import Lottie
+import SwiftData
 
 struct HeaderView: View {
     let cart: Cart
@@ -8,6 +9,7 @@ struct HeaderView: View {
     
     @Environment(VaultService.self) private var vaultService
     @Environment(CartStateManager.self) private var stateManager
+    @Environment(\.modelContext) private var modelContext
     
     private var progress: Double {
         guard stateManager.localBudget > 0 else { return 0 }
@@ -94,7 +96,7 @@ struct HeaderView: View {
                 HStack {
                     HStack(spacing: 0) {
                         Text("Cart Value")
-                            .lexendFont(13, weight: .light)
+                            .lexendFont(16, weight: .light)
                         
                         LottieView(animation: .named("Arrow"))
                             .playing(.fromProgress(0, toProgress: 0.5, loopMode: .playOnce))
@@ -108,7 +110,7 @@ struct HeaderView: View {
                     
                     Spacer()
                     Text("Budget")
-                        .lexendFont(13, weight: .light)
+                        .lexendFont(16, weight: .light)
                 }
                 .padding(.bottom, 4)
                 
@@ -223,4 +225,3 @@ struct HeaderView: View {
         return "\(start.formatted(.dateTime.month(.abbreviated).day().year())) – \(end.formatted(.dateTime.month(.abbreviated).day().year()))"
     }
 }
-

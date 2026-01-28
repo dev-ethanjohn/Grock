@@ -26,8 +26,11 @@ class User {
 @Model
 class Vault: Equatable {
     @Attribute(.unique) var uid: String
+    @Relationship(deleteRule: .cascade)
     var categories: [Category] = []
+    @Relationship(deleteRule: .cascade)
     var carts: [Cart] = []
+    @Relationship(deleteRule: .cascade)
     var stores: [Store] = []
     
     init(uid: String = UUID().uuidString) {
@@ -56,7 +59,7 @@ class Category {
     var name: String
     var sortOrder: Int
     
-    @Relationship(deleteRule: .cascade)
+    @Relationship(deleteRule: .cascade, inverse: \Item.category)
     var items: [Item] = []
     
     init(name: String) {
@@ -70,7 +73,9 @@ class Category {
 class Item: Identifiable {
     @Attribute(.unique) var id: String
     var name: String
+    @Relationship(deleteRule: .cascade, inverse: \PriceOption.item)
     var priceOptions: [PriceOption] = []
+    var category: Category?
     var createdAt: Date
     
     // MARK: - New properties for shopping context
@@ -102,6 +107,7 @@ class Item: Identifiable {
 class PriceOption {
     var store: String
     var pricePerUnit: PricePerUnit
+    var item: Item?
     
     init(store: String, pricePerUnit: PricePerUnit) {
         self.store = store
@@ -138,7 +144,7 @@ class Cart {
     var completedAt: Date?
     var status: CartStatus
     
-    @Relationship(deleteRule: .cascade)
+    @Relationship(deleteRule: .cascade, inverse: \CartItem.cart)
     var cartItems: [CartItem] = []
     
     init(
@@ -213,6 +219,8 @@ class CartItem {
     var itemId: String
     var quantity: Double
     var isFulfilled: Bool
+    
+    var cart: Cart?
     
     var isSkippedDuringShopping: Bool = false
     var plannedStore: String

@@ -47,6 +47,11 @@ struct HomeView: View {
     @State private var showingDeleteAlert = false
     @State private var showProWelcomeSheet = false
     
+    // Backup & Restore
+    @State private var showingRestoreAlert = false
+    @State private var showingBackupSuccessAlert = false
+    @Environment(\.modelContext) private var modelContext
+    
     @State private var subscriptionManager = SubscriptionManager.shared
     
     // Name entry sheet state
@@ -74,35 +79,7 @@ struct HomeView: View {
                 
                 mainContent
                 
-                if let selected = viewModel.selectedCart {
-                    NavigationLink(
-                        isActive: Binding(
-                            get: { showSelectedCart },
-                            set: { isActive in
-                                if !isActive {
-                                    showSelectedCart = false
-                                    viewModel.selectedCart = nil
-                                }
-                            }
-                        )
-                    ) {
-                        CartDetailScreen(cart: selected)
-                            .environment(vaultService)
-                            .environment(cartViewModel)
-                            .environment(cartStateManager)
-                            .onDisappear {
-                                viewModel.loadCarts()
-                                if viewModel.pendingCartToShow != nil {
-                                    viewModel.completePendingCartDisplay()
-                                }
-                                scheduleVaultButtonAnimation()
-                                checkForProWelcome()
-                            }
-                    } label: {
-                        Color.clear.frame(width: 0, height: 0)
-                    }
-                    .hidden()
-                }
+                
                     
                 menuIcon
                 
@@ -180,6 +157,25 @@ struct HomeView: View {
                     Text("Are you sure you want to delete this cart? This action cannot be undone.")
                 }
             }
+            // Backup Alerts
+            .alert("Restore Vault?", isPresented: $showingRestoreAlert) {
+                Button("Cancel", role: .cancel) { }
+                Button("Restore", role: .destructive) {
+                    let backupService = VaultBackupService(modelContext: modelContext, vaultService: vaultService)
+                    do {
+                        try backupService.restore()
+                        viewModel.loadCarts()
+                        cartViewModel.loadCarts()
+                    } catch {
+                        print("Restore failed: \(error)")
+                    }
+                }
+            } message: {
+                Text("This will restore your vault items from the last saved backup. Carts are not restored.")
+            }
+            .alert("Backup Saved", isPresented: $showingBackupSuccessAlert) {
+                Button("OK") { }
+            }
             .onChange(of: viewModel.showVault) { oldValue, newValue in
                 if !newValue {
                     viewModel.transferPendingCart()
@@ -196,6 +192,24 @@ struct HomeView: View {
                 cartPath = []
                 viewModel.selectedCart = nil
                 showInsights = true
+            }
+            .navigationDestination(isPresented: $showSelectedCart) {
+                if let selected = viewModel.selectedCart {
+                    CartDetailScreen(cart: selected)
+                        .environment(vaultService)
+                        .environment(cartViewModel)
+                        .environment(cartStateManager)
+                        .onDisappear {
+                            viewModel.loadCarts()
+                            if viewModel.pendingCartToShow != nil {
+                                viewModel.completePendingCartDisplay()
+                            }
+                            scheduleVaultButtonAnimation()
+                            checkForProWelcome()
+                        }
+                } else {
+                    Color.clear
+                }
             }
             .onAppear {
                 scheduleVaultButtonAnimation()
@@ -365,6 +379,29 @@ struct HomeView: View {
                 withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
                     viewModel.toggleMenu()
                 }
+            }
+            
+            // Vault Backup Icon
+            Menu {
+                Button("Save Vault Items Backup", systemImage: "square.and.arrow.down") {
+                    let backupService = VaultBackupService(modelContext: modelContext, vaultService: vaultService)
+                    do {
+                        try backupService.backup()
+                        showingBackupSuccessAlert = true
+                    } catch {
+                        print("Backup failed: \(error)")
+                    }
+                }
+                
+                Button("Restore Vault Items Backup", systemImage: "arrow.clockwise.icloud") {
+                    showingRestoreAlert = true
+                }
+            } label: {
+                Image(systemName: "externaldrive") // or "archivebox" or "server.rack"
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 24, height: 20)
+                    .foregroundColor(.black)
             }
             
             Menu {

@@ -7,6 +7,7 @@ struct ActiveCarts: View {
     @Environment(CartStateManager.self) private var stateManager
     @Bindable var viewModel: HomeViewModel
     
+    
     @State private var colorChangeTrigger = UUID()
     
     // Remove these state variables
@@ -38,6 +39,7 @@ struct ActiveCarts: View {
                  // Trigger refresh when any cart color changes
                  colorChangeTrigger = UUID()
              }
+        
     }
     
     private var cartListView: some View {
@@ -66,12 +68,11 @@ struct ActiveCarts: View {
                                 cart: cart,
                                 vaultService: viewModel.getVaultService(for: cart)
                             )
-                            .id(cart.id)
                             .contentShape(.interaction, RoundedRectangle(cornerRadius: 24))
                             .contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: 24))
+                            .matchedTransitionSource(id: cart.id, in: cartNamespace)
                         }
                         .buttonStyle(.plain)
-                        .matchedTransitionSource(id: cart.id, in: cartNamespace)
                         .contextMenu {
                             Button {
                                 onRenameCart(cart)
@@ -95,7 +96,6 @@ struct ActiveCarts: View {
                             cart: cart,
                             vaultService: viewModel.getVaultService(for: cart)
                         )
-                        .id(cart.id)
                         .contentShape(.interaction, RoundedRectangle(cornerRadius: 24))
                         .contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: 24))
                         .onTapGesture {

@@ -100,9 +100,7 @@ struct CartDetailScreen: View {
         .onDisappear(perform: saveStateOnDismiss)
         .onChange(of: allItemsCompleted) { oldValue, newValue in
             if newValue && !showingCompleteAlert {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    showingCompleteAlert = true
-                }
+                showingCompleteAlert = true
             }
         }
     }
@@ -279,15 +277,26 @@ struct CartDetailScreen: View {
         
         stateManager.hasBackgroundImage = CartBackgroundImageManager.shared.hasBackgroundImage(forCartId: cart.id)
         if stateManager.hasBackgroundImage {
-            stateManager.backgroundImage = CartBackgroundImageManager.shared.loadImage(forCartId: cart.id)
+            let cartId = cart.id
+            if let cached = ImageCacheManager.shared.getImage(forCartId: cartId) {
+                stateManager.backgroundImage = cached
+            } else {
+                Task.detached(priority: .userInitiated) {
+                    let image = CartBackgroundImageManager.shared.loadImage(forCartId: cartId)
+                    await MainActor.run {
+                        stateManager.backgroundImage = image
+                        if let image {
+                            ImageCacheManager.shared.saveImage(image, forCartId: cartId)
+                        }
+                    }
+                }
+            }
         }
         
         if cart.isShopping && hasItems {
             stateManager.showFinishTripButton = true
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                    stateManager.showingCompletedSheet = true
-                }
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                stateManager.showingCompletedSheet = true
             }
         }
     }
@@ -313,10 +322,8 @@ struct CartDetailScreen: View {
                 }
             }
         } else {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                withAnimation {
-                    stateManager.manageCartButtonVisible = true
-                }
+            withAnimation {
+                stateManager.manageCartButtonVisible = true
             }
         }
     }
@@ -914,19 +921,31 @@ struct CartDetailContent: View {
     }
     
     private func loadBackgroundImage() {
-        stateManager.hasBackgroundImage = CartBackgroundImageManager.shared.hasBackgroundImage(forCartId: cart.id)
+        let cartId = cart.id
+        let hasImage = CartBackgroundImageManager.shared.hasBackgroundImage(forCartId: cartId)
+        stateManager.hasBackgroundImage = hasImage
         
-        if stateManager.selectedColor.hex == "FFFFFF" || stateManager.hasBackgroundImage {
-            if let cachedImage = ImageCacheManager.shared.getImage(forCartId: cart.id) {
-                stateManager.backgroundImage = cachedImage
-                stateManager.hasBackgroundImage = true
-            } else {
-                stateManager.backgroundImage = CartBackgroundImageManager.shared.loadImage(forCartId: cart.id)
-                stateManager.hasBackgroundImage = stateManager.backgroundImage != nil
-            }
-        } else {
+        if !(stateManager.selectedColor.hex == "FFFFFF" || hasImage) {
             stateManager.backgroundImage = nil
             stateManager.hasBackgroundImage = false
+            return
+        }
+        
+        if let cached = ImageCacheManager.shared.getImage(forCartId: cartId) {
+            stateManager.backgroundImage = cached
+            stateManager.hasBackgroundImage = true
+            return
+        }
+        
+        Task.detached(priority: .userInitiated) { [cartId] in
+            let image = CartBackgroundImageManager.shared.loadImage(forCartId: cartId)?.resized(to: 1800)
+            await MainActor.run {
+                stateManager.backgroundImage = image
+                stateManager.hasBackgroundImage = image != nil
+                if let image {
+                    ImageCacheManager.shared.saveImage(image, forCartId: cartId)
+                }
+            }
         }
     }
     
