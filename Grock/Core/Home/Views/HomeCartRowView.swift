@@ -287,11 +287,10 @@ struct HomeCartRowView: View {
          
          return GroceryCategory.allCases.filter { categorySet.contains($0) }
      }
-     
     
     private var headerRow: some View {
         HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 3) {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text(cart.name)
                         .fuzzyBubblesFont(18, weight: .bold)

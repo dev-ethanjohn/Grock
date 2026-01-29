@@ -98,6 +98,16 @@ struct CartDetailScreen: View {
             await loadData()
         }
         .onDisappear(perform: saveStateOnDismiss)
+        .onChange(of: cart.cartItems) { _, _ in
+            // Only reload if the counts mismatch (e.g. item added via sheet)
+            // This prevents reloading during delete animation since we manually updated state
+            let currentCount = itemsByStore.values.reduce(0) { $0 + $1.count }
+            if currentCount != cart.cartItems.count {
+                Task {
+                     await loadData(animate: true)
+                }
+            }
+        }
         .onChange(of: allItemsCompleted) { oldValue, newValue in
             if newValue && !showingCompleteAlert {
                 showingCompleteAlert = true
@@ -121,7 +131,8 @@ struct CartDetailScreen: View {
             showingCompleteAlert: $showingCompleteAlert,
             itemToEdit: $itemToEdit,
             previousHasItems: $previousHasItems,
-            buttonNamespace: buttonNamespace
+            buttonNamespace: buttonNamespace,
+            onDeleteItem: handleDeleteItem
         )
     }
     
@@ -221,14 +232,21 @@ struct CartDetailScreen: View {
     // MARK: - Helper Functions
     
     @MainActor
-    private func loadData() async {
+    private func loadData(animate: Bool = false) async {
         let sortedItems = cart.cartItems.sorted { ($0.addedAt ?? Date.distantPast) > ($1.addedAt ?? Date.distantPast) }
         let grouped = groupCartItemsByStore(sortedItems)
         
-        itemsByStore = grouped
-        sortedStores = Array(grouped.keys).sorted()
-        cartInsights = vaultService.getCartInsights(cart: cart)
-        didLoadData = true
+        if animate {
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                itemsByStore = grouped
+                sortedStores = Array(grouped.keys).sorted()
+                cartInsights = vaultService.getCartInsights(cart: cart)
+            }
+        } else {
+            itemsByStore = grouped
+            sortedStores = Array(grouped.keys).sorted()
+            cartInsights = vaultService.getCartInsights(cart: cart)
+        }
     }
     
     private func groupCartItemsByStore(_ cartItems: [CartItem]) -> [String: [(cartItem: CartItem, item: Item?)]] {
@@ -354,6 +372,38 @@ struct CartDetailScreen: View {
                     stateManager.showFinishTripButton = false
                 }
             }
+        }
+    }
+    
+    private func handleDeleteItem(_ cartItem: CartItem) {
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+            // 1. Manually update local state for instant UI response
+            let storeKeys = Array(itemsByStore.keys)
+            var storeToRemove: String? = nil
+            
+            for store in storeKeys {
+                if var items = itemsByStore[store],
+                   let index = items.firstIndex(where: { $0.cartItem.itemId == cartItem.itemId }) {
+                    
+                    items.remove(at: index)
+                    
+                    if items.isEmpty {
+                        storeToRemove = store
+                        itemsByStore.removeValue(forKey: store)
+                    } else {
+                        itemsByStore[store] = items
+                    }
+                    break
+                }
+            }
+            
+            if let store = storeToRemove {
+                sortedStores.removeAll { $0 == store }
+            }
+            
+            // 2. Update Data Source
+            vaultService.removeItemFromCart(cart: cart, itemId: cartItem.itemId)
+            vaultService.updateCartTotals(cart: cart)
         }
     }
 }
@@ -716,6 +766,7 @@ struct CartDetailContent: View {
     @Binding var itemToEdit: Item?
     @Binding var previousHasItems: Bool
     var buttonNamespace: Namespace.ID
+    let onDeleteItem: (CartItem) -> Void
     
     @Environment(VaultService.self) private var vaultService
     @Environment(CartViewModel.self) private var cartViewModel
@@ -751,7 +802,7 @@ struct CartDetailContent: View {
                                         fulfilledCount: $fulfilledCount,
                                         onFulfillItem: handleFulfillItem,
                                         onEditItem: handleEditItem,
-                                        onDeleteItem: handleDeleteItem
+                                        onDeleteItem: onDeleteItem
                                     )
                                     .transition(.scale)
                                 }
@@ -951,7 +1002,28 @@ struct CartDetailContent: View {
     
     // MARK: - Item Handlers
     private func handleEditItem(cartItem: CartItem) {
-        if let found = vaultService.findItemById(cartItem.itemId) {
+        var itemToUse = vaultService.findItemById(cartItem.itemId)
+        
+        if itemToUse == nil, cartItem.isShoppingOnlyItem {
+            itemToUse = Item(
+                id: cartItem.itemId,
+                name: cartItem.shoppingOnlyName ?? "Unknown Item",
+                priceOptions: cartItem.shoppingOnlyPrice.map { price in
+                    [PriceOption(
+                        store: cartItem.shoppingOnlyStore ?? "Unknown Store",
+                        pricePerUnit: PricePerUnit(
+                            priceValue: price,
+                            unit: cartItem.shoppingOnlyUnit ?? ""
+                        )
+                    )]
+                } ?? [],
+                isTemporaryShoppingItem: true,
+                shoppingPrice: cartItem.shoppingOnlyPrice,
+                shoppingUnit: cartItem.shoppingOnlyUnit
+            )
+        }
+        
+        if let found = itemToUse {
             if cart.status == .shopping {
                 stateManager.selectedItemForPopover = found
                 stateManager.selectedCartItemForPopover = cartItem
@@ -959,13 +1031,6 @@ struct CartDetailContent: View {
             } else {
                 itemToEdit = found
             }
-        }
-    }
-    
-    private func handleDeleteItem(_ cartItem: CartItem) {
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-            vaultService.removeItemFromCart(cart: cart, itemId: cartItem.itemId)
-            vaultService.updateCartTotals(cart: cart)
         }
     }
     

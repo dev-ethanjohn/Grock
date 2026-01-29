@@ -61,7 +61,8 @@ struct StoreSectionListView: View {
                     }
                 }
             )
-            .listSectionSpacing(isLastStore ? 0 : 20)
+            .listSectionSpacing(isLastStore ? 0 : 8
+            )
             // Use simple animation to prevent lag
             .animation(.easeInOut(duration: 0.25), value: displayItems.count)
         }

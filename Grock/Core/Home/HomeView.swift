@@ -67,7 +67,7 @@ struct HomeView: View {
     var body: some View {
         NavigationStack(path: $cartPath) {
             ZStack(alignment: .top) {
-                Color(hex: "#e0e0e0").ignoresSafeArea()
+                Color.white.ignoresSafeArea()
                 
                 MenuView()
                     .opacity(viewModel.showMenu ? 1 : 0)
@@ -284,7 +284,7 @@ struct HomeView: View {
     
     private var homeTabContent: some View {
         ZStack(alignment: .topLeading) {
-            Color(hex: "#ffffff").ignoresSafeArea()
+            Color.white.ignoresSafeArea()
             
             ActiveCarts(
                 viewModel: viewModel,
@@ -299,7 +299,7 @@ struct HomeView: View {
             )
             .environment(cartStateManager)
             ZStack(alignment: .topLeading) {
-                headerView //
+                headerView
                 homeMenu
          
             }
@@ -345,8 +345,14 @@ struct HomeView: View {
             .animation(.spring(response: 0.4, dampingFraction: 0.65), value: isVaultButtonExpanded)
             
             Text("Your Trip")
-                .lexendFont(13)
-                .foregroundStyle(Color(.systemGray))
+                .lexendFont(12)
+                .foregroundStyle(.black)
+                .padding(.horizontal, 7)
+                .padding(.vertical, 2)
+                .background(
+                    Capsule()
+                        .fill(.ultraThickMaterial)
+                )
                 .frame(maxWidth: .infinity, alignment: .center)
                 .padding(.bottom)
         }
@@ -437,24 +443,21 @@ struct HomeView: View {
     
     private var headerBackground: some View {
         ZStack {
-            LinearGradient(
-                gradient: Gradient(stops: [
-                    .init(color: Color(hex: "ffffff").opacity(0.85), location: 0),
-                    .init(color: Color(hex: "ffffff").opacity(0.95), location: 0.1),
-                    .init(color: Color(hex: "ffffff").opacity(1.0), location: 0.2),
-                ]),
-                startPoint: .bottom,
-                endPoint: .top
-            )
-            HStack {
-                Rectangle()
-                    .fill(Color(hex: "ffffff"))
-                    .frame(width: 14)
-                Spacer()
-                Rectangle()
-                    .fill(Color(hex: "ffffff"))
-                    .frame(width: 14)
-            }
+            Rectangle()
+                .fill(.ultraThinMaterial)
+                .mask(
+                    LinearGradient(
+                        stops: [
+                            .init(color: .white, location: 0),
+                            .init(color: .white, location: 0.7),
+                            .init(color: .white.opacity(0.8), location: 0.8),
+                            .init(color: .white.opacity(0.4), location: 0.9),
+                            .init(color: .white.opacity(0), location: 1.0)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
         }
     }
     

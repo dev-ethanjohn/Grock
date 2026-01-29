@@ -47,7 +47,7 @@ struct ActiveCarts: View {
         ScrollView {
             VStack(spacing: 14) {
                 Color.clear
-                    .frame(height: viewModel.headerHeight)
+                    .frame(height: max(0, viewModel.headerHeight - 16))
                 
                 ForEach(viewModel.displayedCarts) { cart in
                     if #available(iOS 18.0, *) {

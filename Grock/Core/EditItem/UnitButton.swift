@@ -25,6 +25,7 @@ struct UnitButton: View {
         ("bar", "bar"),
         ("stick", "stick"),
         ("bottle", "bottle"),
+        ("carton", "carton"),
         ("box", "box"),
         ("tray", "tray"),
         ("bunch", "bunch"),

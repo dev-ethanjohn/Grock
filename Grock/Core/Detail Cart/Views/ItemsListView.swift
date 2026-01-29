@@ -175,7 +175,7 @@ private struct MainContentView: View {
     
     private var estimatedHeight: CGFloat {
         let sectionHeaderHeight: CGFloat = 34
-        let sectionSpacing: CGFloat = 8
+        let sectionSpacing: CGFloat = 10
         let listPadding: CGFloat = 24
         
         // Stop calculating if we exceed the screen height (plus a buffer)

@@ -96,7 +96,7 @@ struct HeaderView: View {
                 HStack {
                     HStack(spacing: 0) {
                         Text("Cart Value")
-                            .lexendFont(16, weight: .light)
+                            .lexendFont(11, weight: .medium)
                         
                         LottieView(animation: .named("Arrow"))
                             .playing(.fromProgress(0, toProgress: 0.5, loopMode: .playOnce))
@@ -110,7 +110,7 @@ struct HeaderView: View {
                     
                     Spacer()
                     Text("Budget")
-                        .lexendFont(16, weight: .light)
+                        .lexendFont(11, weight: .medium)
                 }
                 .padding(.bottom, 4)
                 
