@@ -397,10 +397,14 @@ private struct StoreItemsList: View {
                 .frame(height: min(calculatedHeight, maxAllowedHeight))
                 .applyListStyling()
                 .scrollContentBackground(.hidden)
-                .background(Color.clear)
+                .background(stateManager.effectiveRowBackgroundColor)
                 .clipShape(RoundedRectangle(cornerRadius: 16)) // ✅ Clip content to prevent overflow
                 .mask(RoundedRectangle(cornerRadius: 16)) // Double ensure clipping for list content
         }
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color.gray, lineWidth: 0.5)
+        )
     }
     
     private var listContent: some View {

@@ -174,11 +174,7 @@ private struct StoreSectionRow: View {
             }
             
             if index < displayItems.count - 1 {
-                DashedLine()
-                    .stroke(style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
-                    .frame(height: 0.5)
-                    .foregroundColor(Color(hex: "999").opacity(0.5))
-                    .padding(.horizontal, 12)
+                // Dashed line logic moved to ItemDetailsSection
             }
         }
         .offset(x: rowOffset) // Apply the offset from parent

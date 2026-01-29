@@ -229,7 +229,8 @@ private struct MainRowContent: View {
                 iconScale: $iconScale,
                 checkmarkScale: $checkmarkScale,
                 onFulfillItem: onFulfillItem,
-                isFirstItem: isFirstItem
+                isFirstItem: isFirstItem,
+                isLastItem: isLastItem
             )
             .applyRowBackground(
                 isShoppingOnlyItem: isShoppingOnlyItem,
@@ -464,6 +465,7 @@ private struct CartRowMainContent: View {
     @Binding var checkmarkScale: CGFloat // Add this binding
     let onFulfillItem: () -> Void
     let isFirstItem: Bool
+    let isLastItem: Bool
     
     @Environment(CartStateManager.self) private var stateManager
     @State private var leadingPadding: CGFloat = 16
@@ -498,7 +500,8 @@ private struct CartRowMainContent: View {
                 shouldDisplayBadge: shouldDisplayBadge,
                 badgeScale: badgeScale,
                 badgeRotation: badgeRotation,
-                isFirstItem: isFirstItem
+                isFirstItem: isFirstItem,
+                isLastItem: isLastItem
             )
             .offset(x: cart.isShopping ? 0 : 0)
             .animation(
@@ -506,7 +509,8 @@ private struct CartRowMainContent: View {
                 value: cart.isShopping
             )
         }
-        .padding(.vertical, 12)
+        .padding(.top, 12)
+        .padding(.bottom, isLastItem ? 12 : 0)
         .padding(.leading, cart.isShopping ? 16 : 16)
         .padding(.trailing, 16)
         .cornerRadius(8)
@@ -525,6 +529,7 @@ private struct ItemDetailsSection: View {
     let badgeScale: CGFloat
     let badgeRotation: Double
     let isFirstItem: Bool
+    let isLastItem: Bool
     
     @Environment(CartStateManager.self) private var stateManager
     
@@ -533,38 +538,48 @@ private struct ItemDetailsSection: View {
     }
     
     var body: some View {
-        HStack(alignment: .bottom, spacing: 20) {
-            VStack(alignment: .leading, spacing: 2) {
-                ItemNameRow(
-                    cartItem: cartItem,
-                    item: item,
-                    cart: cart,
-                    currentQuantity: currentQuantity,
-                    shouldDisplayBadge: shouldDisplayBadge,
-                    badgeScale: badgeScale,
-                    badgeRotation: badgeRotation,
-                    isItemFulfilled: isItemFulfilled,
-                    isFirstItem: isFirstItem,
-                    displayUnit: displayUnit
-                )
+        VStack(spacing: 0) {
+            HStack(alignment: .bottom, spacing: 20) {
+                VStack(alignment: .leading, spacing: 2) {
+                    ItemNameRow(
+                        cartItem: cartItem,
+                        item: item,
+                        cart: cart,
+                        currentQuantity: currentQuantity,
+                        shouldDisplayBadge: shouldDisplayBadge,
+                        badgeScale: badgeScale,
+                        badgeRotation: badgeRotation,
+                        isItemFulfilled: isItemFulfilled,
+                        isFirstItem: isFirstItem,
+                        displayUnit: displayUnit
+                    )
+                    
+                    ItemPriceRow(
+                        cartItem: cartItem,
+                        item: item,
+                        currentPrice: currentPrice,
+                        displayUnit: displayUnit,
+                        isItemFulfilled: isItemFulfilled
+                    )
+                }
                 
-                ItemPriceRow(
-                    cartItem: cartItem,
-                    item: item,
-                    currentPrice: currentPrice,
-                    displayUnit: displayUnit,
-                    isItemFulfilled: isItemFulfilled
-                )
+                
+                Text(currentTotalPrice.formattedCurrency)
+                    .lexendFont(13, weight: .semibold)
+                    .lineLimit(1)
+                    .contentTransition(.numericText())
+                    .animation(nil, value: currentTotalPrice)
+                    .foregroundColor(stateManager.hasBackgroundImage ? .white : .black)
+                    .opacity(isItemFulfilled ? 0.5 : 1.0)
             }
             
-            
-            Text(currentTotalPrice.formattedCurrency)
-                .lexendFont(13, weight: .semibold)
-                .lineLimit(1)
-                .contentTransition(.numericText())
-                .animation(nil, value: currentTotalPrice)
-                .foregroundColor(stateManager.hasBackgroundImage ? .white : .black)
-                .opacity(isItemFulfilled ? 0.5 : 1.0)
+            if !isLastItem {
+                DashedLine()
+                    .stroke(style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
+                    .frame(height: 0.5)
+                    .foregroundColor(stateManager.hasBackgroundImage ? .white.opacity(0.5) : Color(hex: "999").opacity(0.5))
+                    .padding(.top, 12)
+            }
         }
     }
 }

@@ -347,8 +347,8 @@ struct HomeView: View {
             Text("Your Trip")
                 .lexendFont(12)
                 .foregroundStyle(.black)
-                .padding(.horizontal, 7)
-                .padding(.vertical, 2)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 3)
                 .background(
                     Capsule()
                         .fill(.ultraThickMaterial)

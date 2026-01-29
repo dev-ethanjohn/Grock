@@ -112,7 +112,7 @@ struct HeaderView: View {
                     Text("Budget")
                         .lexendFont(11, weight: .medium)
                 }
-                .padding(.bottom, 4)
+                .offset(y: 2)
                 
                 
                 VStack(spacing: 8) {
