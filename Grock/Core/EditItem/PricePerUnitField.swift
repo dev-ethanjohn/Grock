@@ -32,7 +32,7 @@ struct PricePerUnitField: View {
                             .keyboardType(.decimalPad)
                             .autocorrectionDisabled(true)
                             .textInputAutocapitalization(.never)
-                            .numbersOnly($price, includeDecimal: true, maxDigits: 6)
+                            .numbersOnly($price, includeDecimal: true)
                             .focused($isFocused)
                             .opacity(isFocused ? 1 : 0)
                     )

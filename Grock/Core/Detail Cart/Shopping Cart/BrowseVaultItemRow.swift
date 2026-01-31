@@ -893,7 +893,7 @@ private struct QuantityTextField: View {
                 .multilineTextAlignment(.center)
                 .autocorrectionDisabled()
                 .focused(focusBinding)
-                .normalizedNumber($textValue, allowDecimal: true, maxDecimalPlaces: 2)
+                .numbersOnly($textValue, includeDecimal: true)
                 .onChange(of: textValue) { _, newText in
                     if let number = Double(newText), number > 100 {
                         textValue = "100"

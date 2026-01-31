@@ -1140,7 +1140,7 @@ struct ManageCartItemRow: View {
                 .multilineTextAlignment(.center)
                 .autocorrectionDisabled()
                 .focused($isFocused)
-                .normalizedNumber($textValue, allowDecimal: true, maxDecimalPlaces: 2)
+                .numbersOnly($textValue, includeDecimal: true)
                 .onChange(of: isFocused) { oldValue, focused in
                     if !focused {
                         commitTextField()

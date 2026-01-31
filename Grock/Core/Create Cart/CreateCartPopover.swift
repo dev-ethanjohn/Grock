@@ -256,7 +256,7 @@ struct CreateCartPopover: View {
                             .fixedSize(horizontal: true, vertical: false)
                             .autocorrectionDisabled(true)
                             .textInputAutocapitalization(.never)
-                            .numbersOnly($budget, includeDecimal: true, maxDigits: 10)
+                            .numbersOnly($budget, includeDecimal: true)
                             .lexendFont(18, weight: .medium)
                             .focused($focusedField, equals: .budget)
                             .opacity(focusedField == .budget ? 1 : 0)

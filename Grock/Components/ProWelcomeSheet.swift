@@ -31,11 +31,11 @@ struct ProWelcomeSheet: View {
                             .lexendFont(14, weight: .bold)
                             .foregroundStyle(.black)
                          + Text(" everything is unlocked. No pressure, just a chance to feel a little lighter and more confident."))
-                        .lineSpacing(8) // Added line spacing
+                        .lineSpacing(8)
                         
                         Text("- Ethan :)")
                             .padding(.top, 40)
-                            .lineSpacing(8) // Added line spacing
+                            .lineSpacing(8)
                     }
                     .foregroundStyle(.black.opacity(0.7))
                     .multilineTextAlignment(.center)

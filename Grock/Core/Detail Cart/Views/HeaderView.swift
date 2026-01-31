@@ -41,8 +41,15 @@ struct HeaderView: View {
                 
                 Spacer()
                 
-                tripDateLabel(cart: cart)
-                    .foregroundColor(Color.black.opacity(0.7))
+                ZStack {
+                    HStack {
+                        tripDateLabel(cart: cart)
+                            .foregroundColor(Color.black.opacity(0.7))
+                    }
+                    .id(cart.status)
+                    .transition(.scale.combined(with: .opacity))
+                }
+                .animation(.spring(response: 0.4, dampingFraction: 0.6), value: cart.status)
                 
                 Spacer()
                 

@@ -33,76 +33,59 @@ struct EditBudgetPopover: View {
                 
                 HStack(alignment: .center) {
                     Text("Edit Budget")
-                        .lexendFont(20, weight: .medium)
-                        .foregroundColor(.black)
+                        .fuzzyBubblesFont(16, weight: .bold)
                     
                     Image("budget")
                         .resizable()
-                        .frame(width: 24, height: 24)
+                        .frame(width: 18, height: 18)
                         
                 }
+                .padding(.top, 6)
                 .padding(.bottom, 32)
  
-                HStack(alignment: .center, spacing: 8) {
-                    VStack(spacing: 6) {
-                        Text("Current Budget")
-                            .lexendFont(12)
-                            .foregroundColor(Color(hex: "777"))
+                // Single centered text field with underline
+                HStack(spacing: 0) {
+                    HStack(spacing: 2) {
+                        Text(CurrencyManager.shared.selectedCurrency.symbol)
+                            .lexendFont(26, weight: .semibold)
+                            .foregroundColor(budgetString.isEmpty ? Color(hex: "999").opacity(0.5) : .black)
+                            .contentTransition(.numericText())
+                            .animation(.snappy, value: CurrencyManager.shared.selectedCurrency.symbol)
                         
-//                        Text(cart.budget.formattedCurrency)
-                        Text(currentBudget.formattedCurrency)
-                            .lexendFont(16, weight: .semibold)
-                            .foregroundColor(.black)
-                            .padding(.vertical, 10)
-                    }
-                    .frame(maxWidth: .infinity)
-                    
-                    VStack(spacing: 6) {
-                        Text("New Budget")
-                            .lexendFont(12)
-                            .foregroundColor(Color(hex: "777"))
-                        
-                        HStack(spacing: 4) {
-                            Text(CurrencyManager.shared.selectedCurrency.symbol)
-                                .lexendFont(16, weight: .semibold)
-                                .foregroundStyle(budgetString.isEmpty ? .gray : .black)
-                                .contentTransition(.numericText())
-                                .animation(.snappy, value: CurrencyManager.shared.selectedCurrency.symbol)
-                            
-                            Text(budgetString.isEmpty ? "0" : budgetString)
-                                .lexendFont(16, weight: .semibold)
-                                .foregroundStyle(budgetString.isEmpty ? .gray : .black)
+                        // Use overlay approach like PricePerUnitField
+                        Text(budgetString.isEmpty ? "0" : budgetString)
+                            .lexendFont(26, weight: .semibold)
+                            .foregroundColor(budgetString.isEmpty ? Color(hex: "999").opacity(0.5) : .black)
+                            .overlay(
+                                TextField("", text: $budgetString, onCommit: {
+                                    if isValidBudget { saveBudget() }
+                                })
+                                .lexendFont(26, weight: .semibold)
+                                .foregroundColor(.clear) // Text is handled by the underlying Text view
                                 .multilineTextAlignment(.center)
-                                .overlay(
-                                    TextField("0", text: $budgetString, onCommit: {
-                                        if isValidBudget { saveBudget() }
-                                    })
-                                    .lexendFont(16, weight: .medium)
-                                    .keyboardType(.decimalPad)
-                                    .autocorrectionDisabled(true)
-                                    .textInputAutocapitalization(.never)
-                                    .focused($budgetFieldIsFocused)
-                                    .opacity(budgetFieldIsFocused ? 1 : 0)
-                                    .multilineTextAlignment(.center)
-                                    .onChange(of: budgetString) {_, newValue in
-                                        validateBudget(newValue)
-                                    }
-                                    
-                                )
-                                .fixedSize(horizontal: true, vertical: false)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .center)
-                        .padding(.vertical, 10)
-                        .background(Color(hex: "F9F9F9"))
-                        .cornerRadius(16)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color(hex: "999"), lineWidth: 0.5)
-                        )
-                        .offset(x: budgetShakeOffset)
+                                .keyboardType(.decimalPad)
+                                .autocorrectionDisabled(true)
+                                .textInputAutocapitalization(.never)
+                                .numbersOnly($budgetString, includeDecimal: true)
+                                .focused($budgetFieldIsFocused)
+                            )
                     }
-                    .frame(maxWidth: .infinity)
+                    .onTapGesture {
+                        budgetFieldIsFocused = true
+                    }
+                    
+                    // Clear button (X) - Removed per request
+
                 }
+                .padding(.vertical, 12)
+                .overlay(
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.3))
+                        .frame(height: 1)
+                        .padding(.top, 16)
+                    , alignment: .bottom
+                )
+                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: !budgetString.isEmpty)
                 
                 if isInvalidAmount {
                     Text(errorMessage)
@@ -171,7 +154,17 @@ struct EditBudgetPopover: View {
         }
         .onAppear {
                   originalBudget = currentBudget // Use currentBudget
-                  budgetString = String(format: "%.0f", currentBudget) // Use currentBudget
+                  
+                  if currentBudget > 0 {
+                      let formatted = String(format: "%.2f", currentBudget)
+                      if formatted.hasSuffix(".00") {
+                          budgetString = String(format: "%.0f", currentBudget)
+                      } else {
+                          budgetString = formatted
+                      }
+                  } else {
+                      budgetString = ""
+                  }
                   
                   withAnimation(.easeOut(duration: 0.2)) {
                       overlayOpacity = 1
@@ -182,6 +175,14 @@ struct EditBudgetPopover: View {
                   
                   DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                       budgetFieldIsFocused = true
+                      
+                      // Select all text
+                      DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                           if let keyWindow = getKeyWindow(),
+                             let textField = keyWindow.findTextField() {
+                              textField.selectAll(nil)
+                          }
+                      }
                   }
               }
               .onDisappear {
@@ -273,6 +274,18 @@ struct EditBudgetPopover: View {
         
         isPresented = false
         onDismiss?()
+    }
+    
+    private func getKeyWindow() -> UIWindow? {
+        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene else {
+            return nil
+        }
+        
+        if let keyWindow = windowScene.keyWindow {
+            return keyWindow
+        }
+        
+        return windowScene.windows.first
     }
 }
 

@@ -186,22 +186,32 @@ private struct StoreSectionRow: View {
     @ViewBuilder
     private var swipeActionsContent: some View {
         if cart.isShopping {
-        switch itemType {
-        case .new:
-            Button(role: .destructive) {
-                deleteShoppingOnlyItem()
-            } label: {
-                Label("Remove", systemImage: "trash")
+            // Buy Button - Primary Action (First)
+            if !isFulfilled && !isSkipped {
+                Button {
+                    onFulfillItem(tuple.cartItem)
+                } label: {
+                    Label("", systemImage: "cart.fill")
+                }
+                .tint(.green)
             }
-            .tint(.red)
             
-        case .vault:
-            Button(role: .destructive) {
-                deactivateVaultItemAddedDuringShopping()
-            } label: {
-                Label("Remove", systemImage: "trash")
-            }
-            .tint(.red)
+            switch itemType {
+            case .new:
+                Button(role: .destructive) {
+                    deleteShoppingOnlyItem()
+                } label: {
+                    Label("", systemImage: "trash")
+                }
+                .tint(.red)
+                
+            case .vault:
+                Button(role: .destructive) {
+                    deactivateVaultItemAddedDuringShopping()
+                } label: {
+                    Label("", systemImage: "trash")
+                }
+                .tint(.red)
                 
             case .planned:
                 if isSkipped {
@@ -210,21 +220,21 @@ private struct StoreSectionRow: View {
                         tuple.cartItem.quantity = max(1, tuple.cartItem.originalPlanningQuantity ?? 1)
                         vaultService.updateCartTotals(cart: cart)
                     } label: {
-                        Label("Add Back", systemImage: "plus.circle")
+                        Label("", systemImage: "plus.circle")
                     }
                     .tint(.green)
                 } else if isFulfilled {
                     Button {
                         markUnfulfilled()
                     } label: {
-                        Label("Unfulfill", systemImage: "circle")
+                        Label("", systemImage: "circle")
                     }
                     .tint(.orange)
                 } else {
                     Button {
                         handleSkipItem(tuple.cartItem)
                     } label: {
-                        Label("Skip", systemImage: "minus.circle")
+                        Label("", systemImage: "minus.circle")
                     }
                     .tint(.orange)
                 }
@@ -233,7 +243,7 @@ private struct StoreSectionRow: View {
             Button(role: .destructive) {
                 onDeleteItem(tuple.cartItem)
             } label: {
-                Label("Delete", systemImage: "trash")
+                Label("", systemImage: "trash")
             }
             .tint(.red)
         }
@@ -241,7 +251,7 @@ private struct StoreSectionRow: View {
         Button {
             onEditItem(tuple.cartItem)
         } label: {
-            Label("Edit", systemImage: "pencil")
+            Label("", systemImage: "pencil")
         }
         .tint(.blue)
     }

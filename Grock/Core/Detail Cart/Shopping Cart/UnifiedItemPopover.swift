@@ -639,8 +639,7 @@ private struct PriceField: View {
                 .animation(.snappy, value: CurrencyManager.shared.selectedCurrency.symbol)
             
             TextField("0.00", text: $price)
-                .keyboardType(.decimalPad)
-                .autocorrectionDisabled()
+                .numbersOnly($price, includeDecimal: true)
                 .focused($focusedField, equals: .price)
                 .lexendFont(14, weight: .semibold)
                 .foregroundColor(.primary)
@@ -680,8 +679,7 @@ private struct PortionField: View {
     var body: some View {
         HStack {
             TextField("0", text: $portion)
-                .keyboardType(.decimalPad)
-                .autocorrectionDisabled()
+                .numbersOnly($portion, includeDecimal: true)
                 .focused($focusedField, equals: .portion)
                 .lexendFont(14, weight: .semibold)
                 .onChange(of: portion) { _, _ in

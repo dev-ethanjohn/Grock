@@ -10,7 +10,7 @@ import Foundation
 import Combine
 
 extension View {
-    func numbersOnly(_ text: Binding<String>, includeDecimal: Bool, maxDigits: Int) -> some View {
+    func numbersOnly(_ text: Binding<String>, includeDecimal: Bool, maxDigits: Int? = nil) -> some View {
         self
             .keyboardType(includeDecimal ? .decimalPad : .numberPad)
             .autocorrectionDisabled(true)
@@ -34,7 +34,7 @@ extension View {
                     
                     // Apply digit limit to integer part - use unique variable name
                     let filteredComponents = filtered.components(separatedBy: ".")
-                    if filteredComponents[0].count > maxDigits {
+                    if let maxDigits = maxDigits, filteredComponents[0].count > maxDigits {
                         let limitedInteger = String(filteredComponents[0].prefix(maxDigits))
                         filtered = filteredComponents.count > 1 ? limitedInteger + "." + filteredComponents[1] : limitedInteger
                     }
@@ -46,7 +46,7 @@ extension View {
                     }
                 } else {
                     // No decimals allowed - just limit digits
-                    if filtered.count > maxDigits {
+                    if let maxDigits = maxDigits, filtered.count > maxDigits {
                         filtered = String(filtered.prefix(maxDigits))
                     }
                 }

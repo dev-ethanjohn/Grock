@@ -17,7 +17,7 @@ struct PortionInput: View {
                 .multilineTextAlignment(.trailing)
                 .keyboardType(.decimalPad)
                 .autocorrectionDisabled()
-                .normalizedNumber($portionString, allowDecimal: true, maxDecimalPlaces: 2)
+                .numbersOnly($portionString, includeDecimal: true)
                 .font(.subheadline)
                 .bold()
                 .fixedSize(horizontal: true, vertical: false)
