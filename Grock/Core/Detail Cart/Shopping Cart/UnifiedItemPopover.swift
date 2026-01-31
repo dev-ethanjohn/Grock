@@ -260,7 +260,7 @@ struct UnifiedItemPopover: View {
                     if abs(totalCostDelta) > 0.01 {
                         HStack(spacing: 2) {
                             Image(systemName: totalCostDelta > 0 ? "arrow.up" : "arrow.down")
-                                .font(.caption2)
+                                .lexend(.caption2)
                                 .foregroundColor(totalCostDeltaColor)
                             
                             Text(totalCostDeltaText)
@@ -608,7 +608,7 @@ private struct ItemDescriptionText: View {
             let arrow = livePriceDelta > 0 ? "↑" : "↓"
             Text(arrow)
                 .foregroundColor(livePriceDeltaColor)
-                .font(.system(size: 12, weight: .bold))
+                .lexendFont(12, weight: .bold)
                 .transition(.scale.combined(with: .opacity))
             
             Text(deltaAmountText)

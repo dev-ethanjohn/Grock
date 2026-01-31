@@ -74,7 +74,7 @@ struct RenameCartNamePopover: View {
                             errorMessage = ""
                         }) {
                             Image(systemName: "xmark.circle.fill")
-                                .font(.system(size: 20))
+                                .lexendFont(20)
                                 .foregroundColor(Color(hex: "999"))
                                 .frame(width: 24, height: 24)
                         }
@@ -116,7 +116,7 @@ struct RenameCartNamePopover: View {
                 // Arrow indicator when form is valid
                 if isValidName && !isInvalidName {
                     Image(systemName: "chevron.down.dotted.2")
-                        .font(.body)
+                        .lexend(.body)
                         .symbolEffect(.wiggle.down.byLayer, options: .repeat(.continuous))
                         .scaleEffect(1.0)
                         .padding(.vertical, 8)

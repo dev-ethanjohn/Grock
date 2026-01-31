@@ -117,6 +117,7 @@ struct VaultItemRow: View {
             .environment(vaultService)
             .presentationDetents([.medium, .fraction(0.75)])
             .presentationCornerRadius(24)
+            .presentationBackground(.white)
         }
         .contextMenu {
             Button(role: .destructive) {
@@ -297,7 +298,7 @@ struct VaultItemRow: View {
             handleMinus()
         } label: {
             Image(systemName: "minus")
-                .font(.footnote).bold()
+                .lexend(.footnote).bold()
                 .foregroundColor(Color(hex: "1E2A36"))
                 .frame(width: 24, height: 24)
                 .background(.white)
@@ -312,7 +313,7 @@ struct VaultItemRow: View {
     private var quantityTextField: some View {
         ZStack {
             Text(textValue)
-                .font(.system(size: 15, weight: .bold))
+                .lexendFont(15, weight: .bold)
                 .foregroundColor(Color(hex: "2C3E50"))
                 .multilineTextAlignment(.center)
                 .contentTransition(.numericText())
@@ -321,7 +322,7 @@ struct VaultItemRow: View {
 
             TextField("", text: $textValue)
                 .keyboardType(.decimalPad)
-                .font(.system(size: 15, weight: .bold))
+                .lexendFont(15, weight: .bold)
                 .foregroundColor(.clear)
                 .multilineTextAlignment(.center)
                 .autocorrectionDisabled()
@@ -359,7 +360,7 @@ struct VaultItemRow: View {
             }
         }) {
             Image(systemName: "plus")
-                .font(.footnote)
+                .lexend(.footnote)
                 .bold()
                 .foregroundColor(isActive ? Color(hex: "1E2A36") : Color(hex: "888888"))
         }

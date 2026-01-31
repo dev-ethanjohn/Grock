@@ -72,13 +72,14 @@ struct ItemNameInput: View {
                 }
                 
                 HStack {
-                    TextField("e.g. canned tuna", text: $itemName)
+                    TextField(selectedCategory?.placeholder ?? "e.g. Item name", text: $itemName)
                         .normalizedText($itemName)
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.never)
-                        .font(.subheadline)
+                        .lexend(.subheadline)
                         .bold()
                         .padding(12)
+                        .padding(.trailing, 42)
                         .background(backgroundView)
                         .cornerRadius(40)
                         .focused(itemNameFieldIsFocused)
@@ -120,16 +121,16 @@ struct ItemNameInput: View {
             if let category = selectedCategory {
                 HStack(spacing: 4) {
                     Text(category.title)
-                        .font(.caption2)
+                        .lexend(.caption2)
                         .foregroundColor(category.pastelColor.darker(by: 0.3))
                     
                     if !isCategoryEditable {
                         Image(systemName: "lock.fill")
-                            .font(.system(size: 8))
+                            .lexendFont(8)
                             .foregroundColor(.gray)
                         
                         Text("From Vault")
-                            .font(.caption2)
+                            .lexend(.caption2)
                             .foregroundColor(.gray)
                     }
                 }
@@ -216,7 +217,7 @@ struct ItemNameInput: View {
     }
     
     private func startFieldBounce() {
-        guard isCategoryEditable else { return } // Only bounce if editable
+        guard isCategoryEditable else { return }
         
         withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {
             fieldScale = 0.985
@@ -237,17 +238,16 @@ struct ItemNameInput: View {
 }
 
 // MARK: - Supporting Components
-
 struct CategoryLockedTooltip: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 8) {
                 Image(systemName: "lock.fill")
-                    .font(.caption)
+                    .lexend(.caption)
                     .foregroundColor(.gray)
                 
                 Text("Category locked in shopping mode")
-                    .font(.caption)
+                    .lexend(.caption)
                     .foregroundColor(.gray)
             }
             .padding(.horizontal, 12)

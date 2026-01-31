@@ -100,6 +100,28 @@ enum GroceryCategory: String, CaseIterable, Identifiable {
         }
     }
     
+    var placeholder: String {
+        switch self {
+        case .freshProduce: return "e.g. Apples, Bananas"
+        case .meatsSeafood: return "e.g. Chicken, Salmon"
+        case .dairyEggs: return "e.g. Milk, Eggs, Cheese"
+        case .frozen: return "e.g. Ice Cream, Pizza"
+        case .condimentsIngredients: return "e.g. Olive Oil, Spices"
+        case .pantry: return "e.g. Rice, Pasta, Canned Goods"
+        case .bakeryBread: return "e.g. Bread, Bagels"
+        case .beverages: return "e.g. Water, Juice, Soda"
+        case .readyMeals: return "e.g. Salad Kit, Sushi"
+        case .personalCare: return "e.g. Shampoo, Toothpaste"
+        case .health: return "e.g. Vitamins, Pain Relief"
+        case .cleaningHousehold: return "e.g. Paper Towels, Detergent"
+        case .pets: return "e.g. Dog Food, Cat Litter"
+        case .baby: return "e.g. Diapers, Wipes"
+        case .homeGarden: return "e.g. Light Bulbs, Batteries"
+        case .electronicsHobbies: return "e.g. Charger, Headphones"
+        case .stationery: return "e.g. Pens, Notebooks"
+        }
+    }
+    
     var pastelColor: Color {
         switch self {
         case .freshProduce:
@@ -137,5 +159,33 @@ enum GroceryCategory: String, CaseIterable, Identifiable {
         case .stationery:
             return Color(hex: "F3C7A3")
         }
+    }
+}
+
+
+//CART
+// MARK: - CartStatus Extension
+extension CartStatus {
+    var displayName: String {
+        switch self {
+        case .planning: return "Planning"
+        case .shopping: return "Shopping"
+        case .completed: return "Completed"
+        }
+    }
+    
+    var color: Color {
+        switch self {
+        case .planning: return .blue
+        case .shopping: return .orange
+        case .completed: return .green
+        }
+    }
+}
+
+// MARK: - GroceryCategory Helper Extension
+extension GroceryCategory {
+    static func fromTitle(_ title: String) -> GroceryCategory {
+        return GroceryCategory.allCases.first { $0.title == title } ?? .freshProduce
     }
 }

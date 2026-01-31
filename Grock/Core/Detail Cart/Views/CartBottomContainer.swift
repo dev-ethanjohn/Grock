@@ -23,7 +23,7 @@ struct CartBottomContainer: View {
     
     var body: some View {
         Text("Manage Cart")
-            .font(.headline)
+            .lexend(.headline)
             .foregroundColor(.white)
             .padding(.vertical, 12)
             .padding(.horizontal, 30)

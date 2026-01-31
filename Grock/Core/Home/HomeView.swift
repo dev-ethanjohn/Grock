@@ -67,7 +67,7 @@ struct HomeView: View {
     var body: some View {
         NavigationStack(path: $cartPath) {
             ZStack(alignment: .top) {
-                Color.white.ignoresSafeArea()
+                Color(hex: "#e0e0e0").ignoresSafeArea()
                 
                 MenuView()
                     .opacity(viewModel.showMenu ? 1 : 0)
@@ -284,7 +284,7 @@ struct HomeView: View {
     
     private var homeTabContent: some View {
         ZStack(alignment: .topLeading) {
-            Color.white.ignoresSafeArea()
+            Color(hex: "#ffffff").ignoresSafeArea()
             
             ActiveCarts(
                 viewModel: viewModel,
@@ -299,7 +299,7 @@ struct HomeView: View {
             )
             .environment(cartStateManager)
             ZStack(alignment: .topLeading) {
-                headerView
+                headerView //
                 homeMenu
          
             }
@@ -345,13 +345,14 @@ struct HomeView: View {
             .animation(.spring(response: 0.4, dampingFraction: 0.65), value: isVaultButtonExpanded)
             
             Text("Your Trip")
-                .lexendFont(12)
+                .lexendFont(13)
                 .foregroundStyle(.black)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 3)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 4)
                 .background(
                     Capsule()
-                        .fill(.ultraThickMaterial)
+                        .fill(.white)
+                        .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
                 )
                 .frame(maxWidth: .infinity, alignment: .center)
                 .padding(.bottom)

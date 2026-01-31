@@ -308,7 +308,7 @@ struct ManageCartSheet: View {
                 if showLeftChevron {
                     Button(action: navigateToPreviousCategory) {
                         Image(systemName: "chevron.left")
-                            .font(.system(size: 16, weight: .bold))
+                            .lexendFont(16, weight: .bold)
                             .foregroundColor(.black)
                             .frame(width: 44, height: 44)
                             .background(
@@ -382,7 +382,7 @@ struct ManageCartSheet: View {
                 if showRightChevron {
                     Button(action: navigateToNextCategory) {
                         Image(systemName: "chevron.right")
-                            .font(.system(size: 16, weight: .bold))
+                            .lexendFont(16, weight: .bold)
                             .foregroundColor(.black)
                             .frame(width: 44, height: 44)
                             .background(
@@ -410,15 +410,15 @@ struct ManageCartSheet: View {
             Spacer()
             
             Image(systemName: "shippingbox")
-                .font(.system(size: 60))
+                .lexendFont(60)
                 .foregroundColor(.gray)
             
             Text("Your vault is empty")
-                .font(.title2)
+                .lexend(.title2)
                 .foregroundColor(.gray)
             
             Text("No items available to add")
-                .font(.body)
+                .lexend(.body)
                 .foregroundColor(.gray.opacity(0.8))
             
             Spacer()
@@ -645,7 +645,7 @@ private struct CustomHeaderView: View {
             HStack {
                 Spacer()
                 Text("Manage Cart")
-                    .font(.headline)
+                    .lexend(.headline)
                     .foregroundColor(.black)
                 Spacer()
             }
@@ -679,7 +679,7 @@ private struct CustomHeaderView: View {
             if isSearching {
                 HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass")
-                        .font(.headline)
+                        .lexend(.headline)
                         .fontWeight(.medium)
                         .foregroundColor(.black)
                         .matchedGeometryEffect(id: "searchIcon", in: matchedNamespace, isSource: false)
@@ -731,7 +731,7 @@ private struct CustomHeaderView: View {
                                 .frame(height: 28)
                                 .frame(width: 36, alignment: .leading)
                             Image(systemName: "magnifyingglass")
-                                .font(.headline)
+                                .lexend(.headline)
                                 .fontWeight(.medium)
                                 .foregroundStyle(.black)
                                 .matchedGeometryEffect(id: "searchIcon", in: matchedNamespace, isSource: true)
@@ -1064,6 +1064,7 @@ struct ManageCartItemRow: View {
             .environment(vaultService)
             .presentationDetents([.medium, .fraction(0.75)])
             .presentationCornerRadius(24)
+            .presentationBackground(.white)
         }
         .contextMenu {
             Button(role: .destructive) {
@@ -1110,7 +1111,7 @@ struct ManageCartItemRow: View {
             handleMinus()
         } label: {
             Image(systemName: "minus")
-                .font(.footnote).bold()
+                .lexend(.footnote).bold()
                 .foregroundColor(Color(hex: "1E2A36"))
                 .frame(width: 24, height: 24)
                 .background(.white)
@@ -1125,7 +1126,7 @@ struct ManageCartItemRow: View {
     private var quantityTextField: some View {
         ZStack {
             Text(textValue)
-                .font(.system(size: 15, weight: .bold))
+                .lexendFont(15, weight: .bold)
                 .foregroundColor(Color(hex: "2C3E50"))
                 .multilineTextAlignment(.center)
                 .contentTransition(.numericText())
@@ -1134,7 +1135,7 @@ struct ManageCartItemRow: View {
             
             TextField("", text: $textValue)
                 .keyboardType(.decimalPad)
-                .font(.system(size: 15, weight: .bold))
+                .lexendFont(15, weight: .bold)
                 .foregroundColor(.clear)
                 .multilineTextAlignment(.center)
                 .autocorrectionDisabled()
@@ -1172,7 +1173,7 @@ struct ManageCartItemRow: View {
             }
         }) {
             Image(systemName: "plus")
-                .font(.footnote)
+                .lexend(.footnote)
                 .bold()
                 .foregroundColor(isActive ? Color(hex: "1E2A36") : Color(hex: "888888"))
         }

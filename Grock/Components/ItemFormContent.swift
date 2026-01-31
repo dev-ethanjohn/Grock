@@ -1,44 +1,5 @@
 import SwiftUI
 
-struct FirstItemForm: View {
-    @Bindable var viewModel: OnboardingViewModel
-    var itemNameFieldIsFocused: FocusState<Bool>.Binding
-    @Environment(VaultService.self) private var vaultService
-    
-    var body: some View {
-        VStack {
-            Spacer().frame(height: 12)
-            QuestionTitle(text: viewModel.questionText)
-            Spacer().frame(height: 32)
-            
-            ItemFormContent(
-                formViewModel: viewModel.formViewModel,
-                itemNameFieldIsFocused: itemNameFieldIsFocused,
-                showCategoryTooltip: viewModel.showCategoryTooltip,
-                duplicateError: viewModel.duplicateError,
-                isCheckingDuplicate: viewModel.isCheckingDuplicate,
-                onStoreChange: { 
-                    viewModel.checkForDuplicateItemName(viewModel.formViewModel.itemName, vaultService: vaultService)
-                }
-            )
-            
-            Spacer().frame(height: 80)
-        }
-        .padding()
-        .onChange(of: viewModel.formViewModel.itemName) { oldValue, newValue in
-            viewModel.checkForDuplicateItemName(newValue, vaultService: vaultService)
-        }
-        .onChange(of: viewModel.formViewModel.storeName) { oldValue, newValue in
-            viewModel.checkForDuplicateItemName(viewModel.formViewModel.itemName, vaultService: vaultService)
-        }
-        .onChange(of: viewModel.formViewModel.selectedCategory) { oldValue, newValue in
-            if newValue != nil {
-                viewModel.formViewModel.resetValidation()
-            }
-        }
-    }
-}
-
 struct ItemFormContent: View {
     @Bindable var formViewModel: ItemFormViewModel
     var itemNameFieldIsFocused: FocusState<Bool>.Binding
@@ -58,7 +19,7 @@ struct ItemFormContent: View {
     @State private var priceShakeOffset: CGFloat = 0
     
     var body: some View {
-        VStack {
+        VStack(spacing: 8) {
             VStack(alignment: .leading, spacing: 4) {
                 if formViewModel.attemptedSubmission && formViewModel.firstMissingField == "Item Name" {
                     validationError("Item name is required")
@@ -179,7 +140,7 @@ struct ItemFormContent: View {
             
             VStack(alignment: .trailing, spacing: 4) {
                 if !formViewModel.requiresPortion {
-                    HStack(spacing: 12) {
+                    WeightedHStack(spacing: 8, weights: [5, 6]) {
                         UnitButton(
                             unit: $formViewModel.unit,
                             hasError: formViewModel.attemptedSubmission && formViewModel.firstMissingField == "Unit"
@@ -291,5 +252,77 @@ struct ItemFormContent: View {
                     .combined(with: .opacity)
                     .animation(.spring(response: 0.3, dampingFraction: 0.75))
             ))
+    }
+}
+
+private struct WeightedHStack: Layout {
+    let spacing: CGFloat
+    let weights: [CGFloat]
+    
+    init(spacing: CGFloat = 0, weights: [CGFloat]) {
+        self.spacing = spacing
+        self.weights = weights
+    }
+    
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let measured = measure(proposal: proposal, subviews: subviews)
+        return CGSize(width: measured.width, height: measured.height)
+    }
+    
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        guard !subviews.isEmpty else { return }
+        
+        let weights = normalizedWeights(subviewsCount: subviews.count)
+        let totalSpacing = spacing * CGFloat(max(0, subviews.count - 1))
+        let availableWidth = max(0, bounds.width - totalSpacing)
+        
+        var x = bounds.minX
+        for (index, subview) in subviews.enumerated() {
+            let w = availableWidth * weights[index]
+            let size = subview.sizeThatFits(ProposedViewSize(width: w, height: bounds.height))
+            let y = bounds.minY + (bounds.height - size.height) / 2
+            subview.place(
+                at: CGPoint(x: x, y: y),
+                anchor: .topLeading,
+                proposal: ProposedViewSize(width: w, height: bounds.height)
+            )
+            x += w + spacing
+        }
+    }
+    
+    private func measure(proposal: ProposedViewSize, subviews: Subviews) -> (width: CGFloat, height: CGFloat) {
+        let weights = normalizedWeights(subviewsCount: subviews.count)
+        let totalSpacing = spacing * CGFloat(max(0, subviews.count - 1))
+        
+        if let proposedWidth = proposal.width {
+            let availableWidth = max(0, proposedWidth - totalSpacing)
+            var maxHeight: CGFloat = 0
+            for (index, subview) in subviews.enumerated() {
+                let w = availableWidth * weights[index]
+                let size = subview.sizeThatFits(ProposedViewSize(width: w, height: proposal.height))
+                maxHeight = max(maxHeight, size.height)
+            }
+            return (width: proposedWidth, height: maxHeight)
+        }
+        
+        var totalWidth: CGFloat = totalSpacing
+        var maxHeight: CGFloat = 0
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            totalWidth += size.width
+            maxHeight = max(maxHeight, size.height)
+        }
+        return (width: totalWidth, height: maxHeight)
+    }
+    
+    private func normalizedWeights(subviewsCount: Int) -> [CGFloat] {
+        guard subviewsCount > 0 else { return [] }
+        let weights = Array(self.weights.prefix(subviewsCount))
+        if weights.count == subviewsCount, weights.allSatisfy({ $0 > 0 }) {
+            let sum = weights.reduce(0, +)
+            return weights.map { $0 / sum }
+        }
+        let equal = 1.0 / CGFloat(subviewsCount)
+        return Array(repeating: equal, count: subviewsCount)
     }
 }

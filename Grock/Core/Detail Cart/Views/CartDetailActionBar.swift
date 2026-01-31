@@ -53,7 +53,7 @@ struct CartDetailActionBar: View {
                             .transition(.opacity)
                     } else {
                         Image(systemName: "plus")
-                            .font(.system(size: 16, weight: .semibold))
+                            .lexendFont(16, weight: .semibold)
                             .foregroundStyle(.black)
                             .frame(width: 40, height: 40)
                             .background(

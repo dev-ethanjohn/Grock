@@ -25,7 +25,7 @@ struct MenuView: View {
                             .frame(width: 20, height: 20)
                         
                         Text("Grock")
-                            .font(.headline)
+                            .lexend(.headline)
                             .bold()
                     }
                     
@@ -41,11 +41,11 @@ struct MenuView: View {
                         HStack {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("Hello,")
-                                    .font(.caption)
+                                    .lexend(.caption)
                                     .foregroundColor(.gray)
                                 
                                 Text(vaultService.currentUser?.name ?? "User")
-                                    .font(.title3)
+                                    .lexend(.title3)
                                     .bold()
                             }
                             
@@ -85,14 +85,14 @@ struct MenuView: View {
                                     .frame(width: 24, height: 24, alignment: .leading)
                                 
                                 Text("Currency")
-                                    .font(.system(size: 16))
+                                    .lexendFont(16)
                                     .fontWeight(.medium)
                                     .foregroundColor(Color.black)
                                 
                                 Spacer()
                                 
                                 Text(currencyManager.selectedCurrency.code)
-                                    .font(.system(size: 14))
+                                    .lexendFont(14)
                                     .foregroundColor(.gray)
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -109,14 +109,14 @@ struct MenuView: View {
                                     .frame(width: 24, height: 24, alignment: .leading)
                                 
                                 Text("Manage Stores")
-                                    .font(.system(size: 16))
+                                    .lexendFont(16)
                                     .fontWeight(.medium)
                                     .foregroundColor(Color.black)
                                 
                                 Spacer()
                                 
                                 Image(systemName: "chevron.right")
-                                    .font(.system(size: 14))
+                                    .lexendFont(14)
                                     .foregroundColor(.gray)
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -174,7 +174,7 @@ struct MenuRow: View {
                 .frame(width: 24, height: 24, alignment: .leading)
             
             Text(item.title)
-                .font(.system(size: 16))
+                .lexendFont(16)
                 .fontWeight(.medium)
                 .foregroundColor(Color.black)
                 .frame(alignment: .leading)

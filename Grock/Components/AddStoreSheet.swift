@@ -16,7 +16,7 @@ struct AddStoreSheet: View {
         NavigationView {
             VStack(spacing: 20) {
                 TextField("Enter store name", text: $storeName)
-                    .font(.subheadline)
+                    .lexend(.subheadline)
                     .bold()
                     .normalizedText($storeName)
                     .autocorrectionDisabled()

@@ -78,7 +78,7 @@ struct StoreSection: View {
             header: HStack {
             HStack(spacing: 2) {
                 Image(systemName: "storefront")
-                    .font(.system(size: 10))
+                    .lexendFont(10)
                     .foregroundStyle(.white)
                 
                 Text(storeName)

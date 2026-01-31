@@ -23,7 +23,7 @@ struct StoreManagerView: View {
                         Image(systemName: "storefront")
                             .foregroundColor(.gray)
                         Text(store)
-                            .font(.body)
+                            .lexend(.body)
                         Spacer()
                     }
                     .contentShape(Rectangle())

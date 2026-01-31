@@ -425,9 +425,9 @@ struct HomeCartRowView: View {
                               .frame(width: 18, height: 18)
                           
                           Text(category.emoji)
-                              .font(.system(size: 11))
-                      }
-                      .opacity(isFulfilled ? 1.0 : 0.5)
+                            .lexendFont(11)
+                    }
+                    .opacity(isFulfilled ? 1.0 : 0.5)
                   }
               }
               .padding(.horizontal, 4)

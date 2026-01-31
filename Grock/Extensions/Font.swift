@@ -71,6 +71,28 @@ extension View {
         self.modifier(LexendFont(size: size, weight: weight))
     }
 
+    func lexend(_ style: Font.TextStyle, weight: Font.Weight? = nil) -> some View {
+        let size: CGFloat
+        let defaultWeight: Font.Weight
+        
+        switch style {
+        case .largeTitle:  size = 34; defaultWeight = .regular
+        case .title:       size = 28; defaultWeight = .regular
+        case .title2:      size = 22; defaultWeight = .regular
+        case .title3:      size = 20; defaultWeight = .regular
+        case .headline:    size = 17; defaultWeight = .semibold
+        case .body:        size = 17; defaultWeight = .regular
+        case .callout:     size = 16; defaultWeight = .regular
+        case .subheadline: size = 15; defaultWeight = .regular
+        case .footnote:    size = 13; defaultWeight = .regular
+        case .caption:     size = 12; defaultWeight = .regular
+        case .caption2:    size = 11; defaultWeight = .regular
+        @unknown default:  size = 17; defaultWeight = .regular
+        }
+        
+        return self.lexendFont(size, weight: weight ?? defaultWeight)
+    }
+
     func fuzzyBubblesFont(_ size: CGFloat, weight: Font.Weight = .regular) -> some View {
         self.modifier(FuzzyBubblesFont(size: size, weight: weight))
     }
@@ -101,6 +123,28 @@ extension Text {
         }()
 
         return self.font(.custom(fontName, size: size))
+    }
+
+    func lexend(_ style: Font.TextStyle, weight: Font.Weight? = nil) -> Text {
+        let size: CGFloat
+        let defaultWeight: Font.Weight
+        
+        switch style {
+        case .largeTitle:  size = 34; defaultWeight = .regular
+        case .title:       size = 28; defaultWeight = .regular
+        case .title2:      size = 22; defaultWeight = .regular
+        case .title3:      size = 20; defaultWeight = .regular
+        case .headline:    size = 17; defaultWeight = .semibold
+        case .body:        size = 17; defaultWeight = .regular
+        case .callout:     size = 16; defaultWeight = .regular
+        case .subheadline: size = 15; defaultWeight = .regular
+        case .footnote:    size = 13; defaultWeight = .regular
+        case .caption:     size = 12; defaultWeight = .regular
+        case .caption2:    size = 11; defaultWeight = .regular
+        @unknown default:  size = 17; defaultWeight = .regular
+        }
+        
+        return self.lexendFont(size, weight: weight ?? defaultWeight)
     }
 
     func fuzzyBubblesFont(_ size: CGFloat, weight: Font.Weight = .regular) -> Text {

@@ -65,15 +65,15 @@ struct UnitButton: View {
         } label: {
             HStack {
                 Text("Unit")
-                    .font(.footnote)
+                    .lexend(.footnote)
                     .foregroundColor(.gray)
                 Spacer()
                 Text(unit.isEmpty ? "" : unit)
-                    .font(.subheadline)
+                    .lexend(.subheadline)
                     .bold()
                     .foregroundStyle(unit.isEmpty ? .gray : .black)
                 Image(systemName: "chevron.down")
-                    .font(.system(size: 12))
+                    .lexendFont(12)
                     .foregroundColor(.gray)
             }
             .padding(12)
@@ -97,11 +97,11 @@ struct UnitButton: View {
                 // Display format: "abbr - full" if they're different, or just "full" if they're the same
                 if unitOption.abbr != unitOption.full && !unitOption.full.isEmpty {
                     Text("\(unitOption.abbr) - \(unitOption.full)")
-                        .font(.subheadline)
+                        .lexend(.subheadline)
                         .foregroundColor(.primary)
                 } else {
                     Text(unitOption.full.isEmpty ? unitOption.abbr : unitOption.full)
-                        .font(.subheadline)
+                        .lexend(.subheadline)
                         .foregroundColor(.primary)
                 }
                 

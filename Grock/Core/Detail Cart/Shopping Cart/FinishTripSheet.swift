@@ -297,18 +297,16 @@ struct FinishTripSheet: View {
             ZStack(alignment: .top) {
                 VStack(spacing: 8) {
                         Color.clear.frame(height: headerHeight)
-                        
-
            
                     AccordionSectionView(
                             icon: "arrow.left.arrow.right",
                             title: "What changed (\(max(changedItemsList.count, 0)))",
                             subtitle: "Price or quantity differed from plan",
-                            accentDeep: Color(hex: "4F00B5"),
+                            accentDeep: .cartChangedDeep,
                             isExpanded: $showChangedSection,
                             hasContent: !changedItemsList.isEmpty
                         ) {
-                            ChangedItemsListView(items: changedItemsDisplay, background: Color(hex: "F8EBFF"))
+                            ChangedItemsListView(items: changedItemsDisplay, background: Color.cartChangedBackground)
                         }
                         .padding(.horizontal, 20)
                         
@@ -316,11 +314,11 @@ struct FinishTripSheet: View {
                             icon: "shippingbox.fill",
                             title: "Added during shopping (\(addedDuringShoppingVaultFulfilled.count))",
                             subtitle: "Saved items you decided to include mid-trip",
-                            accentDeep: Color(hex: "3A3A3A"),
+                            accentDeep: .cartAddedDeep,
                             isExpanded: $showAddedDuringShoppingSection,
                             hasContent: !addedDuringShoppingVaultFulfilled.isEmpty
                         ) {
-                            AddedDuringShoppingListView(items: addedDuringShoppingDisplay, background: Color(hex: "EFEFEF"))
+                            AddedDuringShoppingListView(items: addedDuringShoppingDisplay, background: Color.cartAddedBackground)
                         }
                         .padding(.horizontal, 20)
                         
@@ -328,11 +326,11 @@ struct FinishTripSheet: View {
                             icon: "minus.circle.fill",
                             title: "Skipped items (\(skippedPlannedItems.count))",
                             subtitle: "Planned items not bought",
-                            accentDeep: Color(hex: "D85C2E"),
+                            accentDeep: .cartSkippedDeep,
                             isExpanded: $showSkippedSection,
                             hasContent: !skippedPlannedItems.isEmpty
                         ) {
-                            SkippedItemsListView(items: skippedItemsDisplay, background: Color(hex: "FFE7D8"))
+                            SkippedItemsListView(items: skippedItemsDisplay, background: Color.cartSkippedBackground)
                         }
                         .padding(.horizontal, 20)
                         

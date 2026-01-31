@@ -7,35 +7,37 @@ struct PricePerUnitField: View {
     @FocusState private var isFocused: Bool
     
     var body: some View {
-        HStack {
+        HStack(spacing: 0) {
             Text("Price/unit")
-                .font(.footnote)
+                .lexend(.footnote)
                 .foregroundColor(.gray)
-            Spacer()
+            Spacer(minLength: 4)
             
             HStack(spacing: 4) {
                 Text(CurrencyManager.shared.selectedCurrency.symbol)
-                    .font(.system(size: 16))
+                    .lexendFont(16)
                     .foregroundStyle(price.isEmpty ? .gray : .black)
                     .contentTransition(.numericText())
                     .animation(.snappy, value: CurrencyManager.shared.selectedCurrency.symbol)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
                 
                 Text(price.isEmpty ? "0" : price)
-                    .normalizedNumber($price)
                     .foregroundStyle(price.isEmpty ? .gray : .black)
                     .scalableText()
+                    .lineLimit(1)
                     .overlay(
                         TextField("0", text: $price)
                             .scalableText()
                             .keyboardType(.decimalPad)
                             .autocorrectionDisabled(true)
                             .textInputAutocapitalization(.never)
-                            .numbersOnly($price, includeDecimal: true, maxDigits: 5)
+                            .numbersOnly($price, includeDecimal: true, maxDigits: 6)
                             .focused($isFocused)
                             .opacity(isFocused ? 1 : 0)
                     )
-                    .fixedSize(horizontal: true, vertical: false)
             }
+            .layoutPriority(1)
         }
         .padding(12)
         .background(Color(.systemGray6))

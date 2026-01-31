@@ -19,8 +19,7 @@ struct StoreSectionListView: View {
     
     @State private var animatingOutSkippedItems: Set<String> = []
     @State private var skippedItemOffsets: [String: CGFloat] = [:] // Track offsets per item
-    
-    // FIXED: Remove the old parameters and use stateManager instead
+
     
     private var displayItems: [(cartItem: CartItem, item: Item?)] {
         let filteredItems = items.filter { cartItem, _ in
@@ -87,9 +86,9 @@ struct StoreSectionListView: View {
         
         // Update totals AFTER animation completes
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-            measurePerformance(name: "SkipItem_UpdateTotals", context: "Item: \(cartItem.itemId)") {
+//            measurePerformance(name: "SkipItem_UpdateTotals", context: "Item: \(cartItem.itemId)") {
                 vaultService.updateCartTotals(cart: cart)
-            }
+//            }
         }
         
         // Remove from display after animation
@@ -114,9 +113,9 @@ struct StoreSectionListView: View {
         
         // Update totals after animation
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-            measurePerformance(name: "AddBackItem_UpdateTotals", context: "Item: \(cartItem.itemId)") {
+//            measurePerformance(name: "AddBackItem_UpdateTotals", context: "Item: \(cartItem.itemId)") {
                 vaultService.updateCartTotals(cart: cart)
-            }
+//            }
         }
     }
 }
@@ -271,9 +270,9 @@ private struct StoreSectionRow: View {
         
         // Update totals after animation
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-            measurePerformance(name: "MarkUnfulfilled_UpdateTotals", context: "Item: \(tuple.cartItem.itemId)") {
+//            measurePerformance(name: "MarkUnfulfilled_UpdateTotals", context: "Item: \(tuple.cartItem.itemId)") {
                 vaultService.updateCartTotals(cart: cart)
-            }
+//            }
         }
     }
 }
@@ -301,7 +300,7 @@ private struct StoreSectionHeader: View {
             HStack {
                 HStack(spacing: 2) {
                     Image(systemName: "storefront")
-                        .font(.system(size: 10))
+                        .lexendFont(10)
                         .foregroundColor(stateManager.hasBackgroundImage ? .black : .white)
                     
                     Text(displayStoreName)

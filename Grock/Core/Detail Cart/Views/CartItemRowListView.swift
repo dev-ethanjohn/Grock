@@ -825,7 +825,7 @@ private struct ItemPriceRow: View {
                 .opacity(isItemFulfilled ? 0.5 : 1.0)
             if !categoryEmoji.isEmpty && stateManager.showCategoryIcons {
                 Text(categoryEmoji)
-                    .font(.system(size: 10))
+                    .lexendFont(10)
                     .foregroundColor(stateManager.hasBackgroundImage ? .white.opacity(0.8) : Color(hex: "666"))
                     .transition(.scale.combined(with: .opacity))
             }
@@ -929,7 +929,7 @@ private struct FulfillmentButtonContent: View {
             // Checkmark for fulfilled state
             if cartItem.isFulfilled || cartItem.shouldShowCheckmark {
                 Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 22))
+                    .lexendFont(22)
                     .foregroundColor(checkmarkColor) // Always green!
                     .scaleEffect(checkmarkScale * circleScale)
                     .animation(

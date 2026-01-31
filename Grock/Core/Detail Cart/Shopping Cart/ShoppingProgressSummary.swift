@@ -142,6 +142,7 @@ struct ShoppingProgressSummary: View {
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
             .presentationCornerRadius(24)
+            .presentationBackground(.white)
         }
     }
     

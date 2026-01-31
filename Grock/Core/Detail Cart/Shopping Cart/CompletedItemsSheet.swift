@@ -100,25 +100,36 @@ private struct CompletedHeader: View {
                 .frame(height: 16)
             
             VStack(spacing: 8) {
-                HStack(spacing: 8) {
-                    if fulfilledCount > 0 {
+                if fulfilledCount > 0 {
+                    HStack(spacing: 6) {
                         Text("Fulfilled total so far:")
-                            .lexendFont(16)
-                            .foregroundStyle(.black)
+                            .fuzzyBubblesFont(16, weight: .bold)
+                            .foregroundStyle(Color(hex: "666666"))
                         
-                        + Text(" \(totalAmount.formattedCurrency)")
-                            .lexendFont(16)
-                            .foregroundStyle(.black)
-                    } else if skippedCount > 0 {
-                        Text("\(skippedCount) skipped item\(skippedCount == 1 ? "" : "s")")
-                            .lexendFont(16)
-                            .foregroundStyle(.orange.opacity(0.8))
-                    } else {
-                        
-                        Text("No fulfilled items yet")
-                            .lexendFont(16)
+                        Text(totalAmount.formattedCurrency)
+                            .fuzzyBubblesFont(20, weight: .bold)
                             .foregroundStyle(.black)
                     }
+                    .padding(.vertical, 12)
+                    .frame(maxWidth: .infinity)
+                    .background(Color(hex: "F5F5F5"))
+                    .cornerRadius(12)
+                } else if skippedCount > 0 {
+                    Text("\(skippedCount) skipped item\(skippedCount == 1 ? "" : "s")")
+                        .fuzzyBubblesFont(18, weight: .bold)
+                        .foregroundStyle(.orange)
+                        .padding(.vertical, 12)
+                        .frame(maxWidth: .infinity)
+                        .background(Color.orange.opacity(0.1))
+                        .cornerRadius(12)
+                } else {
+                    Text("No fulfilled items yet")
+                        .fuzzyBubblesFont(16, weight: .bold)
+                        .foregroundStyle(Color(hex: "999999"))
+                        .padding(.vertical, 12)
+                        .frame(maxWidth: .infinity)
+                        .background(Color(hex: "F5F5F5"))
+                        .cornerRadius(12)
                 }
             }
         }
@@ -145,17 +156,10 @@ private struct CompletedItemsList: View {
                                 cartItem: tuple.cartItem,
                                 item: tuple.item,
                                 isSkipped: false,
+                                showDivider: index < completedItems.count - 1,
                                 onAction: { onUnfulfillItem(tuple.cartItem) }
                             )
                             .id("completed-\(tuple.cartItem.itemId)-\(index)")
-                            
-                            if index < completedItems.count - 1 || !skippedItems.isEmpty {
-                                DashedLine()
-                                    .stroke(style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
-                                    .frame(height: 0.5)
-                                    .foregroundColor(Color(hex: "999").opacity(0.5))
-//                                    .padding(.horizontal, 12)
-                            }
                         }
                     }
                     
@@ -174,7 +178,7 @@ private struct CompletedItemsList: View {
                                     Text("(\(skippedItems.count))")
                                         .lexendFont(13)
                                     
-                                    Text("Skipped Items")
+                                    Text(skippedItems.count == 1 ? "Skipped Item" : "Skipped Items")
                                         .lexendFont(13)
         
                                     Image(systemName: "chevron.right")
@@ -189,10 +193,11 @@ private struct CompletedItemsList: View {
                                 .padding(.leading, 4)
                                 .frame(maxWidth: .infinity)
                                 .contentShape(Rectangle())
-                                .background(!showSkippedItems ? Color(hex: "F9F9F9") : Color.clear)
                             }
                             .buttonStyle(.plain)
+                            .background(Color(hex: "F9F9F9"))
                             .id("skipped-header-\(cart.id)")
+                            .zIndex(1)
                             
                             // Skipped items (collapsible)
                             if showSkippedItems {
@@ -202,25 +207,22 @@ private struct CompletedItemsList: View {
                                             cartItem: tuple.cartItem,
                                             item: tuple.item,
                                             isSkipped: true,
+                                            showDivider: index < skippedItems.count - 1,
                                             onAction: { onUnfulfillItem(tuple.cartItem) }
                                         )
                                         .id("skipped-\(tuple.cartItem.itemId)-\(index)")
-                                        
-                                        if index < skippedItems.count - 1 {
-                                            DashedLine()
-                                                .stroke(style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
-                                                .frame(height: 0.5)
-                                                .foregroundColor(Color(hex: "999").opacity(0.5))
-                                                .padding(.horizontal, 12)
-                                        }
                                     }
                                 }
-                                .offset(y: showSkippedItems ? 0 : -10)
-                                .opacity(showSkippedItems ? 1 : 0)
-                                .animation(.spring(response: 0.3, dampingFraction: 0.85), value: showSkippedItems)
+                                .transition(.opacity.combined(with: .move(edge: .top)))
                             }
                         }
-                        .background(showSkippedItems ? Color(hex: "F9F9F9") : Color.clear)
+                        .background(Color(hex: "F9F9F9"))
+                        .cornerRadius(12)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.gray.opacity(0.5), lineWidth: 1)
+                        )
+                        .padding(1)
                         .clipped()
                     }
                 }
@@ -255,7 +257,11 @@ private struct CompletedItemRow: View {
     let cartItem: CartItem
     let item: Item?
     let isSkipped: Bool
+    var showDivider: Bool = false
     let onAction: () -> Void
+    
+    @Environment(VaultService.self) private var vaultService
+    @Environment(CartStateManager.self) private var stateManager
     
     private var itemName: String {
         item?.name ?? "Unknown Item"
@@ -279,18 +285,28 @@ private struct CompletedItemRow: View {
     
     var body: some View {
         if isSkipped {
-            Text("Unskip \(itemName) item")
-                .lexendFont(15, weight: .medium)
-                .foregroundColor(Color(hex: "333333"))
-                .underline()
-                .frame(maxWidth: .infinity, alignment: .center)
-                .contentShape(Rectangle())
-                .onTapGesture(perform: onAction)
-                .padding(.bottom, 4)
-                .padding(.horizontal)
-                .padding(.vertical)
-                .background(Color(hex: "F9F9F9"))
-                .transition(.opacity)
+            VStack(spacing: 0) {
+                Text("Unskip \(itemName) item")
+                    .lexendFont(15, weight: .medium)
+                    .foregroundColor(Color(hex: "333333"))
+                    .underline()
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .contentShape(Rectangle())
+                    .onTapGesture(perform: onAction)
+                    .padding(.bottom, 4)
+                    .padding(.horizontal)
+                    .padding(.vertical)
+                    .background(Color(hex: "F9F9F9"))
+                
+                if showDivider {
+                    DashedLine()
+                        .stroke(style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
+                        .frame(height: 0.5)
+                        .foregroundColor(Color(hex: "999").opacity(0.5))
+                        .padding(.horizontal, 12)
+                }
+            }
+            .transition(.opacity)
         } else {
             HStack(alignment: .top, spacing: 8) {
                 Button(action: onAction) {
@@ -308,14 +324,36 @@ private struct CompletedItemRow: View {
                             .foregroundColor(.black)
                             .contentTransition(.numericText())
                         
-                        if cartItem.isShoppingOnlyItem || cartItem.addedDuringShopping {
+                        if cartItem.isShoppingOnlyItem {
                             Text("new")
                                 .lexendFont(11, weight: .semibold)
                                 .foregroundColor(.white)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 2)
-                                .background(Color(hex: "FF7F50"))
+                                .background(Color.cartNewDeep)
                                 .cornerRadius(10)
+                        } else if cartItem.addedDuringShopping {
+                            Text("added")
+                                .lexendFont(11, weight: .semibold)
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 2)
+                                .background(Color.cartAddedDeep)
+                                .cornerRadius(10)
+                        }
+                        
+                        if stateManager.showCategoryIcons {
+                            if let item = item,
+                               let category = vaultService.getCategory(for: item.id),
+                               let groceryCat = GroceryCategory.allCases.first(where: { $0.title == category.name }) {
+                                Text(groceryCat.emoji)
+                                    .font(.caption)
+                            } else if cartItem.isShoppingOnlyItem,
+                                      let raw = cartItem.shoppingOnlyCategory,
+                                      let cat = GroceryCategory(rawValue: raw) {
+                                Text(cat.emoji)
+                                    .font(.caption)
+                            }
                         }
                     }
                     
@@ -335,6 +373,14 @@ private struct CompletedItemRow: View {
                             .contentTransition(.numericText())
                     }
                     .lexendFont(12)
+                    
+                    if showDivider {
+                        DashedLine()
+                            .stroke(style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
+                            .frame(height: 0.5)
+                            .foregroundColor(Color(hex: "999").opacity(0.5))
+                            .padding(.top, 12)
+                    }
                 }
                 
             }

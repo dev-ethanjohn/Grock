@@ -1,10 +1,3 @@
-//
-//  Color.swift
-//  Grock
-//
-//  Created by Ethan John Paguntalan on 9/29/25.
-//
-
 import Foundation
 import SwiftUI
 
@@ -35,6 +28,16 @@ extension Color {
 }
 
 extension Color {
+    static let cartChangedDeep = Color(hex: "4F00B5")
+    static let cartChangedBackground = Color(hex: "F8EBFF")
+    static let cartAddedDeep = Color(hex: "3A3A3A")
+    static let cartAddedBackground = Color(hex: "EFEFEF")
+    static let cartSkippedDeep = Color(hex: "D85C2E")
+    static let cartSkippedBackground = Color(hex: "FFE7D8")
+    static let cartNewDeep = Color(hex: "FFB300")
+    static let cartNewBackground = Color(hex: "FFF9E6")
+    static let cartVaultDeep = Color(hex: "888888")
+    
     func saturated(by percentage: Double) -> Color {
         UIColor(self).saturated(by: percentage).map(Color.init) ?? self
     }

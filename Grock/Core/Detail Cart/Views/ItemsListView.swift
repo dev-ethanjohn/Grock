@@ -221,7 +221,7 @@ private struct ShoppingCompleteCelebrationView: View {
     var body: some View {
         VStack(spacing: 16) {
             Image(systemName: "party.popper.fill")
-            .font(.system(size: 50))
+            .lexendFont(50)
             .foregroundColor(Color(hex: "FF6B6B"))
             
             Text("Shopping Trip Complete! 🎉")
@@ -619,19 +619,19 @@ struct NoiseDemoView: View {
             VStack(alignment: .leading, spacing: 20) {
                 VStack(alignment: .leading) {
                     Text("Opacity: \(opacity, specifier: "%.2f")")
-                    .font(.caption)
+                    .lexend(.caption)
                     Slider(value: $opacity, in: 0.1...0.5, step: 0.05)
                 }
                 
                 VStack(alignment: .leading) {
                     Text("Density: \(density, specifier: "%.2f")")
-                    .font(.caption)
+                    .lexend(.caption)
                     Slider(value: $density, in: 0.05...0.4, step: 0.05)
                 }
                 
                 VStack(alignment: .leading) {
                     Text("Grain Size: \(grainSize, specifier: "%.1f")")
-                    .font(.caption)
+                    .lexend(.caption)
                     Slider(value: $grainSize, in: 0.5...2.0, step: 0.1)
                 }
                 

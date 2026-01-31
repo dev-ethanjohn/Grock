@@ -724,11 +724,7 @@ struct CompletedSheetContent: View {
 extension View {
     @ViewBuilder
     func conditionalPresentationBackground() -> some View {
-        if #available(iOS 26, *) {
-            self
-        } else {
-            self.presentationBackground(.white)
-        }
+        self.presentationBackground(.white)
     }
 }
 
@@ -1083,6 +1079,8 @@ extension View {
                     )
                     .environment(vaultService)
                     .environment(cartViewModel)
+                    .presentationDetents([.large])
+                    .presentationBackground(.white)
                     .onDisappear {
                         print("🔄 Shopping sheet dismissed, forcing refresh")
                         vaultService.updateCartTotals(cart: cart)
@@ -1140,6 +1138,7 @@ extension View {
                 )
                 .presentationDetents([.medium, .large])
                 .presentationCornerRadius(24)
+                .presentationBackground(.white)
                 .environment(vaultService)
             }
     }

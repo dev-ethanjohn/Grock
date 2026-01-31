@@ -41,8 +41,7 @@ struct HeaderView: View {
                 
                 Spacer()
                 
-                Text(tripDateLabel(cart: cart))
-                    .lexendFont(12)
+                tripDateLabel(cart: cart)
                     .foregroundColor(Color.black.opacity(0.7))
                 
                 Spacer()
@@ -79,7 +78,7 @@ struct HeaderView: View {
                     }
                 } label: {
                     Image(systemName: "ellipsis")
-                                         .font(.system(size: 20, weight: .medium)) // Slightly larger
+                                         .lexendFont(20, weight: .medium) // Slightly larger
                                          .foregroundColor(.black)
                                          .frame(width: 28, height: 28) // 👈 Minimum 44x44 tap target
                                          .contentShape(Rectangle())
@@ -162,47 +161,79 @@ struct HeaderView: View {
         }.count
     }
     
-    func tripDateLabel(cart: Cart) -> String {
+    func tripDateLabel(cart: Cart) -> Text {
         let calendar = Calendar.current
         let today = Date()
+        
+        func styled(_ str: String) -> Text {
+            Text(str).lexendFont(12)
+        }
         
         switch cart.status {
         case .planning:
             if calendar.isDate(cart.createdAt, equalTo: cart.updatedAt, toGranularity: .day) {
                 if calendar.isDate(cart.updatedAt, inSameDayAs: today) {
-                    return "Planning • Today"
+                    return styled("Planning • Today")
                 }
-                return "Planning • " + cart.createdAt.formatted(.dateTime.month(.abbreviated).day())
+                return styled("Planning • " + cart.createdAt.formatted(.dateTime.month(.abbreviated).day()))
             } else {
                 let dateRange = formatDateRange(start: cart.createdAt, end: cart.updatedAt)
-                return "Planning • \(dateRange)"
+                return styled("Planning • \(dateRange)")
             }
             
         case .shopping:
+            let symbol = timeOfDaySymbol(for: today)
+            // 20% smaller than 12 is 9.6
+            let symbolText = Text(Image(systemName: symbol)).lexendFont(9.6)
+            
+            func withSymbol(_ str: String) -> Text {
+                styled(str + " ") + symbolText
+            }
+            
+            let todayDateStr = today.formatted(.dateTime.month(.abbreviated).day())
+            
             guard let startedAt = cart.startedAt else {
-                return "Shopping • Today"
+                return withSymbol("Shopping • \(todayDateStr) Today")
             }
             
             if calendar.isDate(startedAt, inSameDayAs: today) {
-                return "Shopping • Today"
+                return withSymbol("Shopping • \(todayDateStr) Today")
             }
-            let dateRange = formatDateRange(start: startedAt, end: today)
-            return "Shopping • \(dateRange)"
+            
+            let startStr = startedAt.formatted(.dateTime.month(.abbreviated).day())
+            
+            if calendar.isDate(startedAt, equalTo: today, toGranularity: .month) {
+                // Same month: Jan 30-31
+                let endDayStr = today.formatted(.dateTime.day())
+                return withSymbol("Shopping • \(startStr)-\(endDayStr) Today")
+            } else {
+                 return withSymbol("Shopping • \(startStr) – \(todayDateStr) Today")
+            }
             
         case .completed:
             guard let startedAt = cart.startedAt, let completedAt = cart.completedAt else {
                 let endDate = cart.completedAt ?? cart.createdAt
-                return "Completed • " + endDate.formatted(.dateTime.month(.abbreviated).day())
+                return styled("Completed • " + endDate.formatted(.dateTime.month(.abbreviated).day()))
             }
             
             if calendar.isDate(startedAt, equalTo: completedAt, toGranularity: .day) {
-                return "Completed • " + startedAt.formatted(.dateTime.month(.abbreviated).day())
+                return styled("Completed • " + startedAt.formatted(.dateTime.month(.abbreviated).day()))
             }
             let dateRange = formatDateRange(start: startedAt, end: completedAt)
-            return "Completed • \(dateRange)"
+            return styled("Completed • \(dateRange)")
         }
     }
     
+    private func timeOfDaySymbol(for date: Date) -> String {
+        let hour = Calendar.current.component(.hour, from: date)
+        switch hour {
+        case 5..<12: return "sunrise.fill"
+        case 12..<17: return "sun.max.fill"
+        case 17..<20: return "sunset.fill"
+        default: return "moon.stars.fill"
+        }
+    }
+
     func formatDateRange(start: Date, end: Date) -> String {
         let calendar = Calendar.current
         let startDay = calendar.startOfDay(for: start)

@@ -14,8 +14,8 @@ struct EditItemSaveButton: View {
             Text(buttonTitle)
                 .fuzzyBubblesFont(16, weight: .bold)
                 .foregroundStyle(.white)
-                .padding(.vertical, 4)
                 .padding(.horizontal, 24)
+                .padding(.vertical, 12)
                 .background(
                     Capsule()
                         .fill(

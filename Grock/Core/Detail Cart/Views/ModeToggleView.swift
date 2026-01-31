@@ -378,7 +378,7 @@ struct ImagePickerCircle: View {
                         )
                     
                     Image(systemName: "photo")
-                        .font(.system(size: 16))
+                        .lexendFont(16)
                         .foregroundColor(.black.opacity(0.6))
                 }
             }
@@ -515,7 +515,7 @@ struct ColorCircleView: View {
                 
                 if isSelected {
                     Image(systemName: "checkmark")
-                        .font(.system(size: 12, weight: .bold))
+                        .lexendFont(12, weight: .bold)
                         .foregroundColor(.black.opacity(0.8))
                 }
             }

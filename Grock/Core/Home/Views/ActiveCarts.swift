@@ -146,15 +146,15 @@ struct ActiveCarts: View {
             Spacer()
             
             Image(systemName: "cart")
-                .font(.system(size: 60))
+                .lexendFont(60)
                 .foregroundColor(.gray.opacity(0.6))
             
             Text("No carts yet!")
-                .font(.title2)
+                .lexend(.title2)
                 .foregroundColor(.gray)
             
             Text("Create your first cart to start shopping")
-                .font(.body)
+                .lexend(.body)
                 .foregroundColor(.gray.opacity(0.8))
                 .multilineTextAlignment(.center)
             

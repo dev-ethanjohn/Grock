@@ -95,7 +95,7 @@ struct InsightsView: View {
         VStack(spacing: 16) {
             Spacer()
             Image(systemName: "chart.bar.xaxis")
-                .font(.system(size: 48))
+                .lexendFont(48)
                 .foregroundColor(.gray.opacity(0.5))
             Text("No completed trips yet")
                 .lexendFont(18, weight: .medium)
@@ -146,7 +146,7 @@ struct ProGatedSection<Content: View>: View {
                     if !isPro {
                         Spacer()
                         Image(systemName: "lock.fill")
-                            .font(.system(size: 14))
+                            .lexendFont(14)
                             .foregroundColor(.gray)
                     }
                 }
@@ -222,7 +222,7 @@ private struct SpendingOverviewSection: View {
                     .overlay {
                         VStack(spacing: 8) {
                             Image(systemName: "chart.line.uptrend.xyaxis")
-                                .font(.system(size: 24))
+                                .lexendFont(24)
                                 .foregroundColor(.gray.opacity(0.4))
                             Text("No recent activity")
                                 .lexendFont(14)

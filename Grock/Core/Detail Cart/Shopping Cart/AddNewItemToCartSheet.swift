@@ -19,18 +19,15 @@ struct AddNewItemToCartSheet: View {
     @State private var keyboardResponder = KeyboardResponder()
     @State private var focusedItemId: String?
     
-    // Pulse animation states - icons only
-    @State private var vaultIconScale: CGFloat = 1.0
-    @State private var addItemIconScale: CGFloat = 1.0
-    @State private var vaultIconOpacity: Double = 1.0
-    @State private var addItemIconOpacity: Double = 1.0
-    
     // Track if changes were made in BrowseVaultView
     @State private var hasUnsavedChanges = false
+    @State private var vaultSearchFocusToken = 0
     
-    enum AddItemPage {
-        case addNew
-        case browseVault
+    enum AddItemPage: String, CaseIterable, Identifiable {
+        case addNew = "Add New Item"
+        case browseVault = "Browse All Items"
+        
+        var id: String { rawValue }
     }
     
     var body: some View {
@@ -53,6 +50,7 @@ struct AddNewItemToCartSheet: View {
                     BrowseVaultView(
                         cart: cart,
                         selectedCategory: $selectedCategory,
+                        focusSearchToken: vaultSearchFocusToken,
                         onItemSelected: { item in
                             handleVaultItemSelection(item)
                             hasUnsavedChanges = true
@@ -74,108 +72,31 @@ struct AddNewItemToCartSheet: View {
                 }
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
-                    // Page indicator dots (shown on both pages)
+                    // Page indicator - Custom Segmented Control
                     ToolbarItem(placement: .principal) {
-                        HStack(spacing: 8) {
-                            Circle()
-                                .fill(currentPage == .addNew ? Color.black : Color.gray.opacity(0.3))
-                                .frame(width: 6, height: 6)
-                                .scaleEffect(currentPage == .addNew ? 1.2 : 1.0)
-                                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: currentPage)
-                            
-                            Circle()
-                                .fill(currentPage == .browseVault ? Color.black : Color.gray.opacity(0.3))
-                                .frame(width: 6, height: 6)
-                                .scaleEffect(currentPage == .browseVault ? 1.2 : 1.0)
-                                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: currentPage)
-                        }
+                        ModePicker(selectedPage: $currentPage)
                     }
                     
-                    // Left side buttons (different for each page)
-                    ToolbarItem(placement: .topBarLeading) {
+                    // Right side buttons (different for each page)
+                    ToolbarItem(placement: .topBarTrailing) {
                         Group {
                             if currentPage == .browseVault {
-                                // Done button for BrowseVault page - NOW ON THE LEFT
+                                // Done button for BrowseVault page
                                 Button(action: {
                                     // Save changes and dismiss
                                     vaultService.updateCartTotals(cart: cart)
                                     onItemAdded?()
                                     resetAndClose()
                                 }) {
-                                    Text("Done")
-                                        .fuzzyBubblesFont(14, weight: .bold)
-                                        .foregroundColor(.blue)
+                                    Image("done")
+                                        .resizable()
+                                        .renderingMode(.template)
+                                        .scaledToFit()
+                                        .frame(width: 24, height: 24)
+                                        .foregroundColor(.black)
                                 }
                                 .disabled(!hasUnsavedChanges)
-                                .opacity(hasUnsavedChanges ? 1.0 : 0.5)
-                                .transition(.asymmetric(
-                                    insertion: .move(edge: .leading).combined(with: .opacity),
-                                    removal: .move(edge: .leading).combined(with: .opacity)
-                                ))
-                            }
-                        }
-                        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: currentPage)
-                    }
-                    
-                    // Right side buttons (different for each page)
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Group {
-                            if currentPage == .addNew {
-                                // Vault button with icon pulse only - ON THE RIGHT FOR ADD NEW PAGE
-                                HStack(spacing: 8) {
-                                    Text("check vault?")
-                                        .fuzzyBubblesFont(14, weight: .bold)
-                                        .foregroundColor(.gray)
-                                        .contentTransition(.interpolate)
-                                    
-                                    // Pulsing vault icon only
-                                    Image(systemName: "shippingbox")
-                                        .resizable()
-                                        .frame(width: 18, height: 18)
-                                        .symbolRenderingMode(.monochrome)
-                                        .fontWeight(.bold)
-                                        .foregroundColor(.black)
-                                        .scaleEffect(vaultIconScale)
-                                        .opacity(vaultIconOpacity)
-                                        .onAppear {
-                                            startVaultPulse()
-                                        }
-                                        .onDisappear {
-                                            vaultIconScale = 1.0
-                                            vaultIconOpacity = 1.0
-                                        }
-                                }
-                                .onTapGesture {
-                                    withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
-                                        currentPage = .browseVault
-                                    }
-                                }
-                                .transition(.asymmetric(
-                                    insertion: .move(edge: .trailing).combined(with: .opacity),
-                                    removal: .move(edge: .trailing).combined(with: .opacity)
-                                ))
-                                
-                            } else if currentPage == .browseVault {
-                                // Add Item button - ON THE RIGHT FOR BROWSE VAULT PAGE
-                                Button(action: {
-                                    // Navigate back to Add New Item page
-                                    withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
-                                        currentPage = .addNew
-                                    }
-                                }) {
-                                    HStack(spacing: 4) {
-                                        Image(systemName: "plus.circle.fill")
-                                            .resizable()
-                                            .frame(width: 16, height: 16)
-                                            .symbolRenderingMode(.monochrome)
-                                            .fontWeight(.medium)
-                                            .foregroundColor(.blue)
-                                        
-                                        Text("Add Item")
-                                            .fuzzyBubblesFont(14, weight: .bold)
-                                            .foregroundColor(.blue)
-                                    }
-                                }
+                                .opacity(hasUnsavedChanges ? 1.0 : 0.3)
                                 .transition(.asymmetric(
                                     insertion: .move(edge: .trailing).combined(with: .opacity),
                                     removal: .move(edge: .trailing).combined(with: .opacity)
@@ -244,6 +165,12 @@ struct AddNewItemToCartSheet: View {
             focusedItemId = itemId
         }
         .ignoresSafeArea(.keyboard)
+        .onChange(of: currentPage) { _, newValue in
+            if newValue == .browseVault {
+                itemNameFieldIsFocused = false
+                vaultSearchFocusToken += 1
+            }
+        }
         .onChange(of: hasUnsavedChanges) { oldValue, newValue in
             if newValue {
                 print("🔄 hasUnsavedChanges set to true in BrowseVaultView")
@@ -251,56 +178,6 @@ struct AddNewItemToCartSheet: View {
         }
     }
     
-    
-    // MARK: - Pulse Animation Functions (Icons Only)
-    
-    private func startVaultPulse() {
-        // Reset to initial state
-        vaultIconScale = 1.0
-        vaultIconOpacity = 1.0
-        
-        // Pronounced scale pulse animation
-        withAnimation(
-            .easeInOut(duration: 0.9)
-            .repeatForever(autoreverses: true)
-        ) {
-            vaultIconScale = 1.25
-        }
-        
-        // Opacity pulse (slightly delayed)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-            withAnimation(
-                .easeInOut(duration: 1.1)
-                .repeatForever(autoreverses: true)
-            ) {
-                vaultIconOpacity = 0.7
-            }
-        }
-    }
-    
-    private func startAddItemPulse() {
-        // Reset to initial state
-        addItemIconScale = 1.0
-        addItemIconOpacity = 1.0
-        
-        // Pronounced scale pulse animation
-        withAnimation(
-            .easeInOut(duration: 1.0)
-            .repeatForever(autoreverses: true)
-        ) {
-            addItemIconScale = 1.22
-        }
-        
-        // Opacity pulse (slightly delayed)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-            withAnimation(
-                .easeInOut(duration: 1.2)
-                .repeatForever(autoreverses: true)
-            ) {
-                addItemIconOpacity = 0.75
-            }
-        }
-    }
     
     // MARK: - Business Logic Functions
     
@@ -492,6 +369,48 @@ struct AddNewItemToCartSheet: View {
     }
 }
 
+// MARK: - Mode Picker
+private struct ModePicker: View {
+    @Binding var selectedPage: AddNewItemToCartSheet.AddItemPage
+    @Namespace private var animation
+    
+    var body: some View {
+        HStack(spacing: 0) {
+            modeButton(title: "New Item", page: .addNew)
+            modeButton(title: "Vault", page: .browseVault)
+        }
+        .padding(2)
+        .background(Color(hex: "EEEEEE"))
+        .clipShape(Capsule())
+        .frame(width: 200, height: 32)
+    }
+    
+    private func modeButton(title: String, page: AddNewItemToCartSheet.AddItemPage) -> some View {
+        Button(action: {
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                selectedPage = page
+            }
+        }) {
+            ZStack {
+                if selectedPage == page {
+                    Capsule()
+                        .fill(Color.white)
+                        .shadow(color: Color.black.opacity(0.12), radius: 2, x: 0, y: 1)
+                        .matchedGeometryEffect(id: "selection", in: animation)
+                }
+                
+                Text(title)
+                    .lexendFont(13, weight: .medium)
+                    .foregroundColor(selectedPage == page ? .black : .gray)
+            }
+            .frame(maxWidth: .infinity)
+            .frame(maxHeight: .infinity)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+}
+
 // MARK: - Add New Item View (Page 1)
 struct AddNewItemView: View {
     let cart: Cart
@@ -535,9 +454,7 @@ struct AddNewItemView: View {
             }
         }
         .onAppear {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                itemNameFieldIsFocused = true
-            }
+            itemNameFieldIsFocused = true
         }
         .onChange(of: formViewModel.itemName) { oldValue, newValue in
             performRealTimeDuplicateCheck(newValue)
@@ -558,7 +475,7 @@ struct AddNewItemView: View {
                 .foregroundColor(.gray)
         }
         .padding(.horizontal)
-        .padding(.top, 32)
+        .padding(.top, 16)
         .padding(.bottom, 16)
     }
     
@@ -737,7 +654,7 @@ struct CategoryChip: View {
         Button(action: action) {
             VStack(spacing: 4) {
                 Text(category.emoji)
-                    .font(.system(size: 20))
+                    .lexendFont(20)
                 Text(category.title)
                     .lexendFont(10, weight: .medium)
                     .lineLimit(1)
@@ -766,5 +683,3 @@ struct CategoryChip: View {
         }
     }
 }
-
-

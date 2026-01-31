@@ -71,7 +71,7 @@ struct VaultToolbarView: View {
                                 .transition(.opacity)
                         } else {
                             Image(systemName: "plus")
-                                .font(.system(size: 15, weight: .bold))
+                                .lexendFont(15, weight: .bold)
                                 .foregroundStyle(.white)
                                 .matchedGeometryEffect(id: "buttonContent", in: buttonNamespace)
                                 .transition(.opacity)
@@ -99,7 +99,7 @@ struct VaultToolbarView: View {
             if showClearButton, let onDismissTapped = onDismissTapped {
                 Button(action: onDismissTapped) {
                     Image(systemName: "xmark")
-                        .font(.system(size: 16, weight: .bold))
+                        .lexendFont(16, weight: .bold)
                         .foregroundColor(.black)
                         .frame(width: 24, height: 24)
                 }
@@ -113,7 +113,7 @@ struct VaultToolbarView: View {
             if isSearching {
                 HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass")
-                        .font(.headline)
+                        .lexend(.headline)
                         .fontWeight(.medium)
                         .foregroundColor(.black)
                         .matchedGeometryEffect(id: "searchIcon", in: matchedNamespace, isSource: false)
@@ -188,7 +188,7 @@ struct VaultToolbarView: View {
                             .frame(width: 36, alignment: .leading)
                         
                         Image(systemName: "magnifyingglass")
-                            .font(.headline)
+                            .lexend(.headline)
                             .fontWeight(.medium)
                             .foregroundStyle(.black)
                             .matchedGeometryEffect(id: "searchIcon", in: matchedNamespace, isSource: true)
@@ -243,7 +243,7 @@ struct CustomActionSheet: View {
                             .multilineTextAlignment(.center)
                         
                         Text(message)
-                            .font(.system(size: 15, weight: .regular))
+                            .lexendFont(15, weight: .regular)
                             .foregroundColor(.secondary)
                             .multilineTextAlignment(.center)
                             .lineSpacing(4)
@@ -268,7 +268,7 @@ struct CustomActionSheet: View {
                         }
                     }) {
                         Text("Leave")
-                            .font(.system(size: 18, weight: .regular))
+                            .lexendFont(18, weight: .regular)
                             .foregroundColor(.red)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 16)
@@ -281,7 +281,7 @@ struct CustomActionSheet: View {
                     
                     Button(action: dismissSheet) {
                         Text("Cancel")
-                            .font(.system(size: 18, weight: .semibold))
+                            .lexendFont(18, weight: .semibold)
                             .foregroundColor(.blue)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 16)

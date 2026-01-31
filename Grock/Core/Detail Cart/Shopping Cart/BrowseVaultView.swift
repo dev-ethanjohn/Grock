@@ -8,6 +8,7 @@ extension Notification.Name {
 struct BrowseVaultView: View {
     let cart: Cart
     @Binding var selectedCategory: GroceryCategory?
+    let focusSearchToken: Int
     let onItemSelected: (Item) -> Void
     let onBack: () -> Void
     let onAddNewItem: () -> Void
@@ -16,11 +17,10 @@ struct BrowseVaultView: View {
     @Environment(VaultService.self) private var vaultService
     @State private var searchText = ""
     
-    // Add a debounced search text to prevent excessive recomputation
     @State private var debouncedSearchText = ""
-    
-    // Add a timer for debouncing
-    private let debounceTimer = Timer.publish(every: 0.3, on: .main, in: .common).autoconnect()
+    @State private var debounceTask: Task<Void, Never>?
+    @State private var cachedStoreGroups: [StoreGroup] = []
+    @FocusState private var searchFieldIsFocused: Bool
     
     // MARK: - StoreGroup Struct (Equatable)
     
@@ -37,34 +37,24 @@ struct BrowseVaultView: View {
     
     // MARK: - Computed Properties
     
-    private var itemsByStore: [StoreGroup] {
-        let itemManager = ItemManager(
-            vault: vaultService.vault,
-            cart: cart,
-            searchText: debouncedSearchText // Use debounced text
-        )
-        print("🔄 Computing itemsByStore for cart: \(cart.name)")
-        return itemManager.storeGroups
-    }
-    
     private var availableStores: [String] {
-        itemsByStore.map { $0.store }
+        cachedStoreGroups.map { $0.store }
     }
     
     private var showEndIndicator: Bool {
-        let totalItems = itemsByStore.reduce(0) { $0 + $1.items.count }
+        let totalItems = cachedStoreGroups.reduce(0) { $0 + $1.items.count }
         return totalItems >= 6
     }
     
     private var isEmptyState: Bool {
-        itemsByStore.isEmpty
+        cachedStoreGroups.isEmpty
     }
     
     // MARK: - Body
     
     var body: some View {
         VStack(spacing: 0) {
-            SearchBarView(searchText: $searchText)
+            SearchBarView(searchText: $searchText, focusBinding: $searchFieldIsFocused)
             
             // Items List organized by store
             if isEmptyState {
@@ -75,7 +65,7 @@ struct BrowseVaultView: View {
                 .frame(maxHeight: .infinity)
             } else {
                 StoreItemsListView(
-                    itemsByStore: itemsByStore,
+                    itemsByStore: cachedStoreGroups,
                     availableStores: availableStores,
                     showEndIndicator: showEndIndicator,
                     cart: cart,
@@ -87,14 +77,30 @@ struct BrowseVaultView: View {
                         hasUnsavedChanges = true
                     }
                 )
+                .padding(.top, 16)
             }
         }
-        .animation(.spring(response: 0.4, dampingFraction: 0.7), value: itemsByStore)
-        .onChange(of: searchText) { oldValue, newValue in
-            // Debounce the search text updates
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                debouncedSearchText = newValue
+        .animation(.spring(response: 0.4, dampingFraction: 0.7), value: cachedStoreGroups)
+        .onAppear {
+            recomputeStoreGroups()
+        }
+        .onChange(of: focusSearchToken) { _, _ in
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 150_000_000)
+                searchFieldIsFocused = true
             }
+        }
+        .onChange(of: searchText) { oldValue, newValue in
+            debounceTask?.cancel()
+            debounceTask = Task {
+                try? await Task.sleep(nanoseconds: 300_000_000)
+                await MainActor.run {
+                    debouncedSearchText = newValue
+                }
+            }
+        }
+        .onChange(of: debouncedSearchText) { _, _ in
+            recomputeStoreGroups()
         }
         .onChange(of: cart.cartItems) { oldItems, newItems in
             // Add a guard to prevent unnecessary updates
@@ -104,14 +110,22 @@ struct BrowseVaultView: View {
             let newQuantities = newItems.map { $0.quantity }
             
             if oldIds != newIds || oldQuantities != newQuantities {
-                print("🛒 Cart items changed in BrowseVaultView: \(newItems.count) items")
                 hasUnsavedChanges = true
+                recomputeStoreGroups()
             }
         }
-        // Clean up timer
         .onDisappear {
-            debounceTimer.upstream.connect().cancel()
+            debounceTask?.cancel()
         }
+    }
+    
+    private func recomputeStoreGroups() {
+        let itemManager = ItemManager(
+            vault: vaultService.vault,
+            cart: cart,
+            searchText: debouncedSearchText
+        )
+        cachedStoreGroups = itemManager.storeGroups
     }
 }
 
@@ -258,15 +272,17 @@ struct ItemManager {
 
 private struct SearchBarView: View {
     @Binding var searchText: String
+    let focusBinding: FocusState<Bool>.Binding
     
     var body: some View {
         HStack {
             Image(systemName: "magnifyingglass")
                 .foregroundColor(.gray)
-            TextField("Looking for something in your Vault", text: $searchText)
+            TextField("Search vault items...", text: $searchText)
                 .textFieldStyle(.plain)
                 .autocorrectionDisabled()
                 .textInputAutocapitalization(.never)
+                .focused(focusBinding)
             if !searchText.isEmpty {
                 Button(action: { searchText = "" }) {
                     Image(systemName: "xmark.circle.fill")
@@ -277,7 +293,7 @@ private struct SearchBarView: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .background(Color.gray.opacity(0.1))
-        .cornerRadius(12)
+        .clipShape(Capsule())
         .padding(.horizontal)
         .padding(.top)
     }
@@ -376,4 +392,3 @@ private struct BottomSpacerView: View {
             .listRowBackground(Color.clear)
     }
 }
-

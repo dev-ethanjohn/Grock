@@ -30,6 +30,8 @@ struct BrowseVaultItemRow: View {
     @State private var showingRemoveConfirmation = false
     @State private var pendingQuantityZero = false
     
+    @Environment(CartStateManager.self) private var stateManager
+    
     // MARK: - Initializer
     
     init(storeItem: StoreItem, cart: Cart, action: @escaping () -> Void, onQuantityChange: (() -> Void)? = nil) {
@@ -88,6 +90,9 @@ struct BrowseVaultItemRow: View {
         if let cartItem = findCartItem() {
             if cartItem.originalPlanningQuantity != nil {
                 return "Planned"
+            }
+            if cartItem.addedDuringShopping {
+                return "Added"
             } else {
                 return "Vault"
             }
@@ -144,6 +149,7 @@ struct BrowseVaultItemRow: View {
             appearScale: appearScale,
             appearOpacity: appearOpacity,
             currentQuantity: currentQuantity,
+            isNewItem: badgeText == "New",
             itemType: itemType,
             isFocused: isFocused,
             storeItemId: storeItem.item.id,
@@ -685,10 +691,12 @@ private struct ItemDetails: View {
                     .foregroundColor(priceColor)
                     .opacity(contentOpacity)
                 
-                Text(" • \(storeItem.categoryName)")
-                    .font(.caption)
-                    .foregroundColor(priceColor.opacity(0.7))
-                    .opacity(contentOpacity)
+                if let category = GroceryCategory.allCases.first(where: { $0.title == storeItem.categoryName }), stateManager.showCategoryIcons {
+                    Text(category.emoji)
+                        .font(.caption)
+                        .padding(.leading, 6)
+                        .opacity(contentOpacity)
+                }
                 
                 Spacer()
             }
@@ -696,11 +704,14 @@ private struct ItemDetails: View {
         }
     }
     
+    @Environment(CartStateManager.self) private var stateManager
+    
     private var badgeColor: Color {
         switch badgeText {
         case "Planned": return .blue
-        case "New": return .orange
-        default: return Color(hex: "888888")
+        case "New": return .cartNewDeep
+        case "Added": return .cartAddedDeep
+        default: return .cartVaultDeep
         }
     }
 }
@@ -907,6 +918,7 @@ private struct RowContainerModifier: ViewModifier {
     let appearScale: CGFloat
     let appearOpacity: Double
     let currentQuantity: Double
+    let isNewItem: Bool
     let itemType: ItemType
     let isFocused: Bool
     let storeItemId: String
@@ -919,15 +931,15 @@ private struct RowContainerModifier: ViewModifier {
             .padding(.bottom, 4)
             .padding(.horizontal)
             .padding(.vertical, 8)
-            .background(.white)
+            .background(isNewItem ? Color.cartNewBackground : .white)
             .overlay {
                 if isSkippedPlannedItem {
                     ZStack {
-                        Color(hex: "F9F9F9")
+                        Color.cartSkippedBackground
                         
                         Text("Unskip \(itemName) item")
                             .fuzzyBubblesFont(15, weight: .bold)
-                            .foregroundColor(Color(hex: "333333"))
+                            .foregroundColor(.cartSkippedDeep)
                             .underline()
                     }
                 }
