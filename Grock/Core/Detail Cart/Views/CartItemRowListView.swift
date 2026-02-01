@@ -546,9 +546,6 @@ private struct ItemDetailsSection: View {
                         item: item,
                         cart: cart,
                         currentQuantity: currentQuantity,
-                        shouldDisplayBadge: shouldDisplayBadge,
-                        badgeScale: badgeScale,
-                        badgeRotation: badgeRotation,
                         isItemFulfilled: isItemFulfilled,
                         isFirstItem: isFirstItem,
                         displayUnit: displayUnit
@@ -563,14 +560,24 @@ private struct ItemDetailsSection: View {
                     )
                 }
                 
-                
-                Text(currentTotalPrice.formattedCurrency)
-                    .lexendFont(13, weight: .semibold)
-                    .lineLimit(1)
-                    .contentTransition(.numericText())
-                    .animation(nil, value: currentTotalPrice)
-                    .foregroundColor(stateManager.hasBackgroundImage ? .white : .black)
-                    .opacity(isItemFulfilled ? 0.5 : 1.0)
+                VStack(alignment: .trailing, spacing: 2) {
+                    if shouldDisplayBadge {
+                        NewBadgeView(
+                            scale: badgeScale,
+                            rotation: badgeRotation
+                        )
+                        .transition(.scale.combined(with: .opacity))
+                        .opacity(isItemFulfilled ? 0.5 : 1.0)
+                    }
+                    
+                    Text(currentTotalPrice.formattedCurrency)
+                        .lexendFont(13, weight: .semibold)
+                        .lineLimit(1)
+                        .contentTransition(.numericText())
+                        .animation(nil, value: currentTotalPrice)
+                        .foregroundColor(stateManager.hasBackgroundImage ? .white : .black)
+                        .opacity(isItemFulfilled ? 0.5 : 1.0)
+                }
             }
             
             if !isLastItem {
@@ -589,9 +596,6 @@ private struct ItemNameRow: View {
     let item: Item?
     let cart: Cart
     let currentQuantity: Double
-    let shouldDisplayBadge: Bool
-    let badgeScale: CGFloat
-    let badgeRotation: Double
     let isItemFulfilled: Bool
     let isFirstItem: Bool
     let displayUnit: String
@@ -690,15 +694,6 @@ private struct ItemNameRow: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             
             Spacer()
-            
-            if shouldDisplayBadge {
-                NewBadgeView(
-                    scale: badgeScale,
-                    rotation: badgeRotation
-                )
-                .transition(.scale.combined(with: .opacity))
-                .opacity(isItemFulfilled ? 0.5 : 1.0)
-            }
         }
         .onChange(of: cartItem.shouldStrikethrough) { oldValue, newValue in
             handleStrikethroughAnimationChange(oldValue: oldValue, newValue: newValue)

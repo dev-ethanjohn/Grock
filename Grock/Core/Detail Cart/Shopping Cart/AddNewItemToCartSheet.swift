@@ -471,7 +471,7 @@ struct AddNewItemView: View {
                 .lexendFont(20, weight: .medium)
             
             Text("This wasn't on your plan, but you can add it to this trip")
-                .lexendFont(12, weight: .light)
+                .lexendFont(12)
                 .foregroundColor(.gray)
         }
         .padding(.horizontal)

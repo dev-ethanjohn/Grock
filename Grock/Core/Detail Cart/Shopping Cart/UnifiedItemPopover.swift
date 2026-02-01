@@ -1,5 +1,3 @@
-
-
 import SwiftUI
 
 struct UnifiedItemPopover: View {
@@ -123,7 +121,8 @@ struct UnifiedItemPopover: View {
                     storeName: storeName,
                     livePrice: livePrice,
                     plannedPrice: plannedPrice,
-                    plannedUnit: plannedUnit
+                    plannedUnit: plannedUnit,
+                    isShoppingOnlyItem: cartItem.isShoppingOnlyItem
                 )
                 
                 inputFieldsSection
@@ -159,6 +158,8 @@ struct UnifiedItemPopover: View {
             .animation(.spring(response: 0.2, dampingFraction: 0.7, blendDuration: 0.1), value: isFormValid)
             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: keyboardVisible)
             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: errorMessage)
+            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: price)
+            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: portion)
             .frame(maxHeight: .infinity, alignment: keyboardVisible ? .center : .center)
         }
         .onAppear {
@@ -187,33 +188,18 @@ struct UnifiedItemPopover: View {
     
     private var inputFieldsSection: some View {
         VStack(spacing: 6) {
-            if mode == .edit {
-                Text(currentPrompt.text)
-                    .lexendFont(13, weight: .medium)
+            HStack(spacing: 8) {
+                Text("Price per \(plannedUnit)")
+                    .lexendFont(13)
                     .foregroundColor(.secondary)
                     .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.leading, 4)
-                    .frame(height: 20)
-                    .animation(
-                        isPresented
-                            ? .spring(response: 0.3, dampingFraction: 0.7)
-                            : .none,
-                        value: currentPrompt
-                    )
-            } else {
-                HStack(spacing: 8) {
-                    Text("Price per \(plannedUnit)")
-                        .lexendFont(13)
-                        .foregroundColor(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .center)
-                    
-                    Text("Quantity")
-                        .lexendFont(13)
-                        .foregroundColor(.secondary)
-                        .frame(width: 120, alignment: .center)
-                }
-                .padding(.horizontal, 4)
+                
+                Text("Quantity")
+                    .lexendFont(13)
+                    .foregroundColor(.secondary)
+                    .frame(width: 120, alignment: .center)
             }
+            .padding(.horizontal, 4)
             
             HStack(spacing: 4) {
                 PriceField(
@@ -243,7 +229,7 @@ struct UnifiedItemPopover: View {
                 .frame(height: 0.5)
                 .foregroundColor(Color(hex: "999").opacity(0.5))
             
-            HStack {
+            HStack(alignment: .top) {
                 Text("Total Cost:")
                     .lexendFont(16)
                     .foregroundColor(.secondary)
@@ -252,12 +238,12 @@ struct UnifiedItemPopover: View {
                 
                 VStack(alignment: .trailing, spacing: 2) {
                     Text(totalCost.formattedCurrency)
-                        .lexendFont(18, weight: .bold)
+                        .lexendFont(28, weight: .bold)
                         .foregroundColor(.primary)
                         .contentTransition(.numericText())
                         .animation(.snappy, value: CurrencyManager.shared.selectedCurrency)
                     
-                    if abs(totalCostDelta) > 0.01 {
+                    if !cartItem.isShoppingOnlyItem && !cartItem.addedDuringShopping && abs(totalCostDelta) > 0.01 {
                         HStack(spacing: 2) {
                             Image(systemName: totalCostDelta > 0 ? "arrow.up" : "arrow.down")
                                 .lexend(.caption2)
@@ -273,8 +259,19 @@ struct UnifiedItemPopover: View {
                                 .lexendFont(12)
                                 .foregroundColor(totalCostDeltaColor)
                         }
+                        .transition(
+                            .asymmetric(
+                                insertion: .scale(scale: 0.8, anchor: .topTrailing)
+                                    .combined(with: .opacity)
+                                    .animation(.spring(response: 0.4, dampingFraction: 0.6, blendDuration: 0.2)),
+                                removal: .scale(scale: 0.8, anchor: .topTrailing)
+                                    .combined(with: .opacity)
+                                    .animation(.spring(response: 0.3, dampingFraction: 0.7, blendDuration: 0.1))
+                            )
+                        )
                     }
                 }
+                .animation(.spring(response: 0.2, dampingFraction: 0.7, blendDuration: 0.1), value: abs(totalCostDelta) > 0.01)
             }
             .padding(.top, 4)
         }
@@ -494,6 +491,7 @@ private struct ItemDescriptionText: View {
     let livePrice: Double
     let plannedPrice: Double
     let plannedUnit: String
+    let isShoppingOnlyItem: Bool
     
     // Computed properties for delta
     private var livePriceDelta: Double {
@@ -502,7 +500,7 @@ private struct ItemDescriptionText: View {
     
     private var showLivePriceDelta: Bool {
         let enteredPrice = livePrice
-        return enteredPrice > 0 && abs(livePriceDelta) > 0.01
+        return !isShoppingOnlyItem && enteredPrice > 0 && abs(livePriceDelta) > 0.01
     }
     
     private var livePriceDeltaColor: Color {

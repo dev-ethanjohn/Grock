@@ -279,6 +279,7 @@ struct ColorPickerButton: View {
             )
             .presentationCompactAdaptation(.popover)
             .presentationCornerRadius(16)
+            .presentationBackground(.white)
         }
     }
     

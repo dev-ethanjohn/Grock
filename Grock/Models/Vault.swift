@@ -252,6 +252,15 @@ class CartItem {
     var shouldShowCheckmark: Bool = false
     var shouldStrikethrough: Bool = false
     
+    // MARK: - Future Proofing Data
+    var isOnSale: Bool = false
+    var notes: String?
+    
+    // Detailed sale tracking
+    var saleType: String?       // e.g., "percent", "fixed_amount", "bogo", "multibuy"
+    var discountValue: Double?  // e.g., 20.0 for 20%, 5.0 for $5 off
+    var regularPrice: Double?   // The non-sale market price at time of purchase
+    
     init(
         itemId: String,
         quantity: Double,
@@ -275,7 +284,12 @@ class CartItem {
         fulfillmentAnimationState: Int = 0,
         fulfillmentStartTime: Date? = nil,
         shouldShowCheckmark: Bool = false,
-        shouldStrikethrough: Bool = false
+        shouldStrikethrough: Bool = false,
+        isOnSale: Bool = false,
+        notes: String? = nil,
+        saleType: String? = nil,
+        discountValue: Double? = nil,
+        regularPrice: Double? = nil
     ) {
         self.addedAt = Date()  // Set default value in initializer
         self.itemId = itemId
@@ -301,6 +315,11 @@ class CartItem {
         self.fulfillmentStartTime = fulfillmentStartTime
         self.shouldShowCheckmark = shouldShowCheckmark
         self.shouldStrikethrough = shouldStrikethrough
+        self.isOnSale = isOnSale
+        self.notes = notes
+        self.saleType = saleType
+        self.discountValue = discountValue
+        self.regularPrice = regularPrice
     }
     
     // Helper for animation state

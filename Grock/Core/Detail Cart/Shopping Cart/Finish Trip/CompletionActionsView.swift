@@ -7,7 +7,7 @@ struct CompletionActionsView: View {
     var body: some View {
         VStack(spacing: 6) {
             FormCompletionButton(
-                title: "Finish and Save Changes",
+                title: "Finish and Save Trip",
                 isEnabled: true,
                 cornerRadius: 100,
                 verticalPadding: 12,
