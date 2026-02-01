@@ -631,13 +631,13 @@ private struct ItemNameRow: View {
         HStack(spacing: 4) {
             ZStack(alignment: .leading) {
                 // Item name text
-                Text("\(currentQuantity.formattedQuantity)\(displayUnit) \(item?.name ?? cartItem.shoppingOnlyName ?? "Unknown Item") ")
+                Text("\(currentQuantity.formattedQuantity)\(displayUnit) \(item?.name ?? cartItem.shoppingOnlyName ?? cartItem.vaultItemNameSnapshot ?? "Unknown Item") ")
                     .lexendFont(16, weight: stateManager.hasBackgroundImage ? .semibold : .regular)
                     .lineLimit(3)
                     .fixedSize(horizontal: false, vertical: true)
                     .strikethrough(isItemFulfilled && !cartItem.shouldStrikethrough, color: staticStrikethroughColor)
                     .foregroundColor(textColor)
-                    .id(item?.name ?? cartItem.shoppingOnlyName ?? "Unknown")
+                    .id(item?.name ?? cartItem.shoppingOnlyName ?? cartItem.vaultItemNameSnapshot ?? "Unknown")
                     .contentTransition(.numericText())
                     .animation(nil, value: currentQuantity)
                     .opacity(cartItem.animationState == .removalAnimating ? 0.25 : 1.0)

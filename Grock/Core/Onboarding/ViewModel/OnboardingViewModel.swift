@@ -224,7 +224,7 @@ class OnboardingViewModel {
             return false
         }
         
-        let success = vaultService.addItem(
+        let createdItem = vaultService.addItem(
             name: formViewModel.itemName,
             to: category,
             store: formViewModel.storeName,
@@ -232,7 +232,7 @@ class OnboardingViewModel {
             unit: formViewModel.unit
         )
         
-        if success {
+        if createdItem != nil {
             print("✅ Item saved successfully!")
             return true
         } else {

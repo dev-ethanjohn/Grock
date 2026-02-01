@@ -32,6 +32,8 @@ class Vault: Equatable {
     var carts: [Cart] = []
     @Relationship(deleteRule: .cascade)
     var stores: [Store] = []
+    @Relationship(deleteRule: .cascade)
+    var deletedItems: [Item] = []
     
     init(uid: String = UUID().uuidString) {
         self.uid = uid
@@ -83,6 +85,22 @@ class Item: Identifiable {
     var shoppingPrice: Double?
     var shoppingUnit: String?
     
+    // MARK: - Future Proofing Data
+    var isOnSale: Bool = false
+    var notes: String?
+    
+    // Detailed sale tracking
+    var saleType: String?       // e.g., "percent", "fixed_amount", "bogo", "multibuy"
+    var discountValue: Double?  // e.g., 20.0 for 20%, 5.0 for $5 off
+    var regularPrice: Double?   // The non-sale market price at time of purchase
+
+    // MARK: - Soft Delete
+    var isDeleted: Bool = false
+    var deletedAt: Date?
+    var deletedFromCategoryName: String?
+    
+    @Relationship(deleteRule: .cascade, inverse: \DeletedCartItemSnapshot.item)
+    var deletedCartItemSnapshots: [DeletedCartItemSnapshot] = []
     
     init(
         id: String = UUID().uuidString,
@@ -91,7 +109,10 @@ class Item: Identifiable {
         createdAt: Date = Date(),
         isTemporaryShoppingItem: Bool = false,
         shoppingPrice: Double? = nil,
-        shoppingUnit: String? = nil
+        shoppingUnit: String? = nil,
+        isDeleted: Bool = false,
+        deletedAt: Date? = nil,
+        deletedFromCategoryName: String? = nil
     ) {
         self.id = id
         self.name = name
@@ -100,6 +121,9 @@ class Item: Identifiable {
         self.isTemporaryShoppingItem = isTemporaryShoppingItem
         self.shoppingPrice = shoppingPrice
         self.shoppingUnit = shoppingUnit
+        self.isDeleted = isDeleted
+        self.deletedAt = deletedAt
+        self.deletedFromCategoryName = deletedFromCategoryName
     }
 }
 
@@ -241,6 +265,10 @@ class CartItem {
     var shoppingOnlyPrice: Double?
     var shoppingOnlyUnit: String?
     var shoppingOnlyCategory: String?
+
+    // MARK: - Vault item snapshots (for completed carts)
+    var vaultItemNameSnapshot: String?
+    var vaultItemCategorySnapshot: String?
     
     // MARK: - Original planning quantity for restoration
     var originalPlanningQuantity: Double?
@@ -279,6 +307,8 @@ class CartItem {
         shoppingOnlyPrice: Double? = nil,
         shoppingOnlyUnit: String? = nil,
         shoppingOnlyCategory: String? = nil,
+        vaultItemNameSnapshot: String? = nil,
+        vaultItemCategorySnapshot: String? = nil,
         originalPlanningQuantity: Double? = nil,
         addedDuringShopping: Bool = false,
         fulfillmentAnimationState: Int = 0,
@@ -309,6 +339,8 @@ class CartItem {
         self.shoppingOnlyPrice = shoppingOnlyPrice
         self.shoppingOnlyUnit = shoppingOnlyUnit
         self.shoppingOnlyCategory = shoppingOnlyCategory
+        self.vaultItemNameSnapshot = vaultItemNameSnapshot
+        self.vaultItemCategorySnapshot = vaultItemCategorySnapshot
         self.originalPlanningQuantity = originalPlanningQuantity
         self.addedDuringShopping = addedDuringShopping
         self.fulfillmentAnimationState = fulfillmentAnimationState
@@ -402,6 +434,10 @@ class CartItem {
             if let item = category.items.first(where: { $0.id == itemId }) {
                 return item
             }
+        }
+        
+        if let deletedItem = vault.deletedItems.first(where: { $0.id == itemId }) {
+            return deletedItem
         }
         return nil
     }
@@ -595,6 +631,48 @@ class CartItem {
         quantity = originalQty
         originalPlanningQuantity = nil  // Clear after restoring
         return true
+    }
+}
+
+@Model
+class DeletedCartItemSnapshot {
+    var cartId: String
+    var quantity: Double
+    var plannedStore: String
+    var plannedPrice: Double?
+    var plannedUnit: String?
+    var actualStore: String?
+    var actualPrice: Double?
+    var actualQuantity: Double?
+    var actualUnit: String?
+    var wasEditedDuringShopping: Bool
+    var wasFulfilled: Bool
+    var item: Item?
+    
+    init(
+        cartId: String,
+        quantity: Double,
+        plannedStore: String,
+        plannedPrice: Double? = nil,
+        plannedUnit: String? = nil,
+        actualStore: String? = nil,
+        actualPrice: Double? = nil,
+        actualQuantity: Double? = nil,
+        actualUnit: String? = nil,
+        wasEditedDuringShopping: Bool = false,
+        wasFulfilled: Bool = false
+    ) {
+        self.cartId = cartId
+        self.quantity = quantity
+        self.plannedStore = plannedStore
+        self.plannedPrice = plannedPrice
+        self.plannedUnit = plannedUnit
+        self.actualStore = actualStore
+        self.actualPrice = actualPrice
+        self.actualQuantity = actualQuantity
+        self.actualUnit = actualUnit
+        self.wasEditedDuringShopping = wasEditedDuringShopping
+        self.wasFulfilled = wasFulfilled
     }
 }
 

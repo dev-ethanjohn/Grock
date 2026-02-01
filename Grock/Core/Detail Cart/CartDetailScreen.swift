@@ -285,6 +285,14 @@ struct CartDetailScreen: View {
     }
     
     private func initializeState() {
+        // Reset transient state to prevent bleeding from other carts (since StateManager is shared)
+        stateManager.showingEditBudget = false
+        stateManager.showingShoppingPopover = false
+        stateManager.showingFulfillPopover = false
+        stateManager.showingEditCartName = false
+        stateManager.selectedItemForPopover = nil
+        stateManager.selectedCartItemForPopover = nil
+        
         stateManager.localBudget = cart.budget
         stateManager.animatedBudget = cart.budget
         
@@ -316,6 +324,9 @@ struct CartDetailScreen: View {
             withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                 stateManager.showingCompletedSheet = true
             }
+        } else {
+            stateManager.showFinishTripButton = false
+            stateManager.showingCompletedSheet = false
         }
     }
     
@@ -331,6 +342,8 @@ struct CartDetailScreen: View {
         let isFirstCart = cartViewModel.carts.count == 1 || cartViewModel.isFirstCart(cart)
         
         if !hasSeenCelebration && isFirstCart {
+            stateManager.showCelebration = false
+            stateManager.manageCartButtonVisible = false
             stateManager.showCelebration = true
             UserDefaults.standard.set(true, forKey: "hasSeenFirstShoppingCartCelebration")
             
@@ -340,6 +353,7 @@ struct CartDetailScreen: View {
                 }
             }
         } else {
+            stateManager.showCelebration = false
             withAnimation {
                 stateManager.manageCartButtonVisible = true
             }
@@ -480,7 +494,8 @@ struct CartDetailAllModifiers: ViewModifier {
             .editItemSheet(
                 itemToEdit: $itemToEdit,
                 cart: cart,
-                vaultService: vaultService
+                vaultService: vaultService,
+                onRemoveFromCart: handleDeleteItem
             )
             .cartSheets(
                 cart: cart,
@@ -785,7 +800,9 @@ struct CartDetailContent: View {
                     
                     VStack(spacing: 12) {
                         // CORRECTED: Just pass cart, no bindings needed
-                        ModeToggleView(cart: cart)
+                        if hasItems {
+                            ModeToggleView(cart: cart)
+                        }
                         
                         ZStack {
                             if hasItems {
@@ -1122,7 +1139,8 @@ extension View {
     func editItemSheet(
         itemToEdit: Binding<Item?>,
         cart: Cart,
-        vaultService: VaultService
+        vaultService: VaultService,
+        onRemoveFromCart: ((CartItem) -> Void)? = nil
     ) -> some View {
         self
             .sheet(item: itemToEdit) { item in
@@ -1134,6 +1152,7 @@ extension View {
                         print("💾 EditItemSheet saved")
                         vaultService.updateCartTotals(cart: cart)
                     },
+                    onRemoveFromCart: onRemoveFromCart,
                     context: .cart
                 )
                 .presentationDetents([.medium, .large])

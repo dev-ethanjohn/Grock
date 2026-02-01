@@ -102,11 +102,18 @@ struct StoreSection: View {
                         item: tuple.item,
                         category: category
                     )
+                    .contextMenu {
+                        Button(role: .destructive) {
+                            onDeleteItem?(tuple.item)
+                        } label: {
+                            Label("Remove from Vault", systemImage: "trash")
+                        }
+                    }
                     .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                         Button(role: .destructive) {
                             onDeleteItem?(tuple.item)
                         } label: {
-                            Label("Delete", systemImage: "trash")
+                            Label("Remove", systemImage: "trash")
                         }
                     }
                     

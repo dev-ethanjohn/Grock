@@ -74,6 +74,14 @@ extension VaultService {
 
         for cartItem in cart.cartItems {
             cartItem.captureActualData()
+            if !cartItem.isShoppingOnlyItem {
+                if cartItem.vaultItemNameSnapshot == nil {
+                    cartItem.vaultItemNameSnapshot = findItemById(cartItem.itemId)?.name
+                }
+                if cartItem.vaultItemCategorySnapshot == nil {
+                    cartItem.vaultItemCategorySnapshot = getCategoryName(for: cartItem.itemId)
+                }
+            }
             updateVaultWithActualData(cartItem: cartItem)
         }
 
@@ -187,6 +195,7 @@ extension VaultService {
             existingCartItem.addedAt = Date()
             print("🔄 Updated existing vault item quantity: \(item.name)")
         } else {
+            let categoryName = getCategoryName(for: item.id)
             let cartItem = CartItem(
                 itemId: item.id,
                 quantity: quantity,
@@ -202,6 +211,8 @@ extension VaultService {
                 shoppingOnlyStore: nil,
                 shoppingOnlyPrice: nil,
                 shoppingOnlyUnit: nil,
+                vaultItemNameSnapshot: item.name,
+                vaultItemCategorySnapshot: categoryName,
                 originalPlanningQuantity: nil,
                 addedDuringShopping: cart.isShopping
             )

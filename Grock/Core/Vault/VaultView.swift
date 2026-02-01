@@ -77,6 +77,8 @@ struct VaultView: View {
     @State private var isKeyboardVisible = false
     
     @State private var showDismissConfirmation = false
+    @State private var showDeleteConfirmation = false
+    @State private var itemToDelete: Item?
     
     // ✅ Updated to use @State with @Observable macro
     @State private var keyboardResponder = KeyboardResponder()
@@ -149,6 +151,12 @@ struct VaultView: View {
                 cartViewModel: cartViewModel,
                 dismiss: dismiss
             )
+            .alert("Remove Item", isPresented: $showDeleteConfirmation) {
+                Button("Cancel", role: .cancel) { itemToDelete = nil }
+                Button("Remove", role: .destructive) { executeDelete() }
+            } message: {
+                Text("Are you sure you want to remove this item from your vault? This will also remove it from all carts.")
+            }
             .applySheetModifiers(
                 showCelebration: $showCelebration,
                 showCartConfirmation: $showCartConfirmation,
@@ -265,19 +273,13 @@ struct VaultView: View {
                     isPresented: $showAddItemPopover,
                     createCartButtonVisible: $createCartButtonVisible,
                     onSave: { itemName, category, store, unit, price in
-                        let success = vaultService.addItem(
+                        _ = vaultService.addItem(
                             name: itemName,
                             to: category,
                             store: store,
                             price: price,
                             unit: unit
                         )
-                        
-                        if success {
-                            print("✅ Item added to vault: \(itemName)")
-                        } else {
-                            print("❌ Failed to add item - duplicate name: \(itemName)")
-                        }
                     },
                     onDismiss: {
                         withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
@@ -572,7 +574,11 @@ struct VaultView: View {
             guard let vault = vaultService.vault,
                   let foundCategory = vault.categories.first(where: { $0.name == category.title })
             else { return [] }
-            let items = foundCategory.items.sorted { $0.createdAt > $1.createdAt }
+            // Filter out deleted items
+            let items = foundCategory.items
+                .filter { !$0.isDeleted }
+                .sorted { $0.createdAt > $1.createdAt }
+            
             let trimmed = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
             if trimmed.isEmpty {
                 return items
@@ -770,6 +776,13 @@ struct VaultView: View {
     }
     
     private func deleteItem(_ item: Item) {
+        itemToDelete = item
+        showDeleteConfirmation = true
+    }
+    
+    private func executeDelete() {
+        guard let item = itemToDelete else { return }
+        
         print("🗑️ Deleting item: '\(item.name)'")
         
         cartViewModel.activeCartItems.removeValue(forKey: item.id)
@@ -779,6 +792,7 @@ struct VaultView: View {
         }
         
         print("🔄 Active items after deletion: \(cartViewModel.activeCartItems.count)")
+        itemToDelete = nil
     }
     
     private func startButtonBounce() {

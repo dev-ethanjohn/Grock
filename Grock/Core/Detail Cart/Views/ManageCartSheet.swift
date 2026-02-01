@@ -111,14 +111,15 @@ struct ManageCartSheet: View {
                     isPresented: $showAddItemPopover,
                     createCartButtonVisible: $createCartButtonVisible,
                     onSave: { itemName, category, store, unit, price in
-                        _ = vaultService.addItem(
+                        if let newItem = vaultService.addItem(
                             name: itemName,
                             to: category,
                             store: store,
                             price: price,
                             unit: unit
-                        )
-                        
+                        ) {
+                            localActiveItems[newItem.id] = 1
+                        }
                     },
                     onDismiss: {
                         duplicateError = nil
@@ -282,18 +283,9 @@ struct ManageCartSheet: View {
                 CategoryItemsListView(
                     category: selectedCategory,
                     localActiveItems: $localActiveItems,
-                    searchText: searchText
+                    searchText: searchText,
+                    navigationDirection: navigationDirection
                 )
-                .id(selectedCategory.id)
-                .padding(.top, 8)
-                .transition(.asymmetric(
-                    insertion: navigationDirection == .right ?
-                        .move(edge: .trailing) :
-                        .move(edge: .leading),
-                    removal: navigationDirection == .right ?
-                        .move(edge: .leading) :
-                        .move(edge: .trailing)
-                ))
             }
         }
         .frame(maxHeight: .infinity)
@@ -752,19 +744,23 @@ struct CategoryItemsListView: View {
     let category: GroceryCategory
     @Binding var localActiveItems: [String: Double]
     let searchText: String
+    let navigationDirection: ManageCartSheet.NavigationDirection
     
     @Environment(VaultService.self) private var vaultService
     
     // Store availableStores as @State
     @State private var currentStores: [String] = []
-    @State private var refreshTick: Int = 0
     
     private var categoryItems: [Item] {
         guard let vault = vaultService.vault,
               let foundCategory = vault.categories.first(where: { $0.name == category.title })
         else { return [] }
         
-        let items = foundCategory.items.sorted { $0.createdAt > $1.createdAt }
+        // Filter out deleted items
+        let items = foundCategory.items
+            .filter { !$0.isDeleted }
+            .sorted { $0.createdAt > $1.createdAt }
+        
         let trimmed = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty {
             return items
@@ -782,9 +778,23 @@ struct CategoryItemsListView: View {
                     items: categoryItems,
                     availableStores: currentStores,
                     category: category,
-                    localActiveItems: $localActiveItems
+                    localActiveItems: $localActiveItems,
+                    onDeleteVaultItem: { item in
+                        let itemId = item.id
+                        localActiveItems.removeValue(forKey: itemId)
+                        vaultService.deleteItem(itemId: itemId)
+                    }
                 )
-                .id(refreshTick)
+                .id(category.id)
+                .padding(.top, 8)
+                .transition(.asymmetric(
+                    insertion: navigationDirection == .right ?
+                        .move(edge: .trailing) :
+                        .move(edge: .leading),
+                    removal: navigationDirection == .right ?
+                        .move(edge: .leading) :
+                        .move(edge: .trailing)
+                ))
             }
         }
         .onAppear {
@@ -799,18 +809,6 @@ struct CategoryItemsListView: View {
         }
         .onChange(of: searchText) { _, _ in
             updateStores()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("VaultItemUpdated"))) { _ in
-            updateStores()
-            refreshTick &+= 1
-        }
-        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("CartUpdated"))) { _ in
-            updateStores()
-            refreshTick &+= 1
-        }
-        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("DataUpdated"))) { _ in
-            updateStores()
-            refreshTick &+= 1
         }
     }
     
@@ -852,10 +850,15 @@ struct ManageCartItemsListView: View {
     let availableStores: [String]
     let category: GroceryCategory?
     @Binding var localActiveItems: [String: Double]
+    let onDeleteVaultItem: (Item) -> Void
     
+    @Environment(VaultService.self) private var vaultService
     @State private var focusedItemId: String?
-    
     @State private var previousStores: [String] = []
+    
+    // Alert state
+    @State private var itemToDelete: Item?
+    @State private var showDeleteConfirmation = false
     
     var body: some View {
         List {
@@ -871,7 +874,11 @@ struct ManageCartItemsListView: View {
                     storeName: store,
                     items: itemsForStore(store),
                     category: category,
-                    localActiveItems: $localActiveItems
+                    localActiveItems: $localActiveItems,
+                    onDeleteVaultItem: { item in
+                        itemToDelete = item
+                        showDeleteConfirmation = true
+                    }
                 )
                 .animation(
                     previousStores.contains(store) ? nil : .spring(response: 0.3, dampingFraction: 0.7),
@@ -895,6 +902,17 @@ struct ManageCartItemsListView: View {
             // Update previous stores
             previousStores = oldStores
         }
+        .alert("Remove Item", isPresented: $showDeleteConfirmation) {
+            Button("Cancel", role: .cancel) { itemToDelete = nil }
+            Button("Remove", role: .destructive) {
+                if let item = itemToDelete {
+                    onDeleteVaultItem(item)
+                }
+                itemToDelete = nil
+            }
+        } message: {
+            Text("Are you sure you want to remove this item from your vault? This will also remove it from all carts.")
+        }
     }
     
     private func itemsForStore(_ store: String) -> [Item] {
@@ -910,6 +928,7 @@ struct ManageCartStoreSection: View {
     let items: [Item]
     let category: GroceryCategory?
     @Binding var localActiveItems: [String: Double]
+    let onDeleteVaultItem: (Item) -> Void
     
     private var itemsWithStableIdentifiers: [(id: String, item: Item)] {
         items.map { ($0.id, $0) }
@@ -935,18 +954,9 @@ struct ManageCartStoreSection: View {
                     ManageCartItemRow(
                         item: tuple.item,
                         category: category,
-                        localActiveItems: $localActiveItems
+                        localActiveItems: $localActiveItems,
+                        onDeleteVaultItem: onDeleteVaultItem
                     )
-                    
-                    // Native swipe gesture using .swipeActions modifier
-                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                        Button(role: .destructive) {
-                            // Remove from local active items
-                            localActiveItems.removeValue(forKey: tuple.item.id)
-                        } label: {
-                            Label("Remove", systemImage: "trash")
-                        }
-                    }
                     
                     if tuple.id != itemsWithStableIdentifiers.last?.id {
                         DashedLine()
@@ -977,6 +987,7 @@ struct ManageCartItemRow: View {
     let item: Item
     let category: GroceryCategory?
     @Binding var localActiveItems: [String: Double]
+    let onDeleteVaultItem: (Item) -> Void
     
     @Environment(VaultService.self) private var vaultService
     @State private var showEditSheet = false
@@ -1073,13 +1084,27 @@ struct ManageCartItemRow: View {
                 Label("Remove from Cart", systemImage: "trash")
             }
             
+            Button(role: .destructive) {
+                onDeleteVaultItem(item)
+            } label: {
+                Label("Remove from Vault", systemImage: "trash.slash")
+            }
+            
             Button {
                 showEditSheet = true
             } label: {
                 Label("Edit", systemImage: "pencil")
             }
         }
-        .onChange(of: currentQuantity) { oldValue, newValue in
+        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+            Button(role: .destructive) {
+                onDeleteVaultItem(item)
+            } label: {
+                Label("Vault", systemImage: "trash.slash")
+            }
+            .tint(.red)
+        }
+        .onChange(of: currentQuantity) { _, newValue in
             if !isFocused {
                 textValue = formatValue(newValue)
             }

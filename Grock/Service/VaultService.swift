@@ -120,7 +120,7 @@ protocol VaultCategoryManaging {
 @MainActor
 /// Item operations: create/update/delete items and look them up.
 protocol VaultItemManaging {
-    func addItem(name: String, to category: GroceryCategory, store: String, price: Double, unit: String) -> Bool
+    func addItem(name: String, to category: GroceryCategory, store: String, price: Double, unit: String) -> Item?
     func updateItem(item: Item, newName: String, newCategory: GroceryCategory, newStore: String, newPrice: Double, newUnit: String) -> Bool
     func deleteItem(_ item: Item)
     func getAllItems() -> [Item]

@@ -123,6 +123,29 @@ struct MenuView: View {
                             .padding(.vertical, 4)
                         }
                         
+                        NavigationLink {
+                            TrashView()
+                        } label: {
+                            HStack(spacing: 16) {
+                                Image(systemName: "trash")
+                                    .foregroundColor(Color(hex: "999"))
+                                    .frame(width: 24, height: 24, alignment: .leading)
+                                
+                                Text("Trash")
+                                    .lexendFont(16)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(Color.black)
+                                
+                                Spacer()
+                                
+                                Image(systemName: "chevron.right")
+                                    .lexendFont(14)
+                                    .foregroundColor(.gray)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.vertical, 4)
+                        }
+                        
                         ForEach(MenuItem.userSettingsMenuItems) { item in
                             MenuRow(item: item)
                         }

@@ -264,7 +264,7 @@ private struct CompletedItemRow: View {
     @Environment(CartStateManager.self) private var stateManager
     
     private var itemName: String {
-        item?.name ?? "Unknown Item"
+        item?.name ?? cartItem.shoppingOnlyName ?? cartItem.vaultItemNameSnapshot ?? "Unknown Item"
     }
     
     private var price: Double {

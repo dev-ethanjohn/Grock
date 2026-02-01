@@ -163,13 +163,13 @@ extension VaultService {
         store: String,
         price: Double,
         unit: String
-    ) -> Bool {
-        guard let vault = vault else { return false }
+    ) -> Item? {
+        guard let vault = vault else { return nil }
 
         let validation = validateItemName(name, store: store)
         guard validation.isValid else {
             print("❌ Cannot add item: \(validation.errorMessage ?? "Unknown error")")
-            return false
+            return nil
         }
 
         let targetCategory: Category
@@ -189,7 +189,7 @@ extension VaultService {
         modelContext.insert(newItem)
         targetCategory.items.append(newItem)
         saveContext()
-        return true
+        return newItem
     }
 
     /// Updates an item’s name/category and replaces the first price option with the new store/price/unit.
@@ -320,24 +320,201 @@ extension VaultService {
         saveContext()
     }
 
-    /// Removes an item from the vault (and cache).
-    func deleteItem(_ item: Item) {
+    /// Removes an item from the vault by ID (moves it to Trash).
+    ///
+    /// Behavior:
+    /// - Moves item out of its Category into `vault.deletedItems`.
+    /// - Removes item from all ACTIVE carts (Planning/Shopping).
+    /// - Keeps item data available for historical (Completed) carts.
+    func deleteItem(itemId: String) {
         guard let vault = vault else { return }
-
-        for category in vault.categories {
-            if let index = category.items.firstIndex(where: { $0.id == item.id }) {
-                category.items.remove(at: index)
-                itemCache.removeValue(forKey: item.id)
-                saveContext()
-                break
+        guard let item = findVaultItemById(itemId) else { return }
+        
+        if item.isDeleted {
+            return
+        }
+        
+        print("🗑️ Soft deleting item: \(item.name)")
+        
+        if let category = getCategory(for: itemId),
+           let index = category.items.firstIndex(where: { $0.id == itemId }) {
+            category.items.remove(at: index)
+            item.deletedFromCategoryName = category.name
+        }
+        
+        item.category = nil
+        item.isDeleted = true
+        item.deletedAt = Date()
+        
+        if !vault.deletedItems.contains(where: { $0.id == itemId }) {
+            vault.deletedItems.append(item)
+        }
+        
+        for cart in vault.carts where cart.isActive {
+            if let index = cart.cartItems.firstIndex(where: { $0.itemId == itemId }) {
+                let cartItem = cart.cartItems[index]
+                
+                let snapshot = DeletedCartItemSnapshot(
+                    cartId: cart.id,
+                    quantity: cartItem.quantity,
+                    plannedStore: cartItem.plannedStore,
+                    plannedPrice: cartItem.plannedPrice,
+                    plannedUnit: cartItem.plannedUnit,
+                    actualStore: cartItem.actualStore,
+                    actualPrice: cartItem.actualPrice,
+                    actualQuantity: cartItem.actualQuantity,
+                    actualUnit: cartItem.actualUnit,
+                    wasEditedDuringShopping: cartItem.wasEditedDuringShopping,
+                    wasFulfilled: cartItem.isFulfilled
+                )
+                snapshot.item = item
+                modelContext.insert(snapshot)
+                item.deletedCartItemSnapshots.append(snapshot)
+                
+                cart.cartItems.remove(at: index)
+                updateCartTotals(cart: cart)
             }
         }
+        
+        itemCache.removeValue(forKey: itemId)
+        invalidateCategoryCache()
+        saveContext()
+        
+        NotificationCenter.default.post(
+            name: NSNotification.Name("DataUpdated"),
+            object: nil
+        )
+    }
+    
+    /// Removes an item from the vault (soft delete).
+    func deleteItem(_ item: Item) {
+        deleteItem(itemId: item.id)
+    }
+    
+    func restoreDeletedItem(itemId: String, restoreToActiveCarts: Bool = false) {
+        guard let vault = vault else { return }
+        guard let item = vault.deletedItems.first(where: { $0.id == itemId }) else { return }
+        
+        let categoryName = item.deletedFromCategoryName
+        
+        let targetCategory: Category = {
+            if let categoryName, let existing = vault.categories.first(where: { $0.name == categoryName }) {
+                return existing
+            }
+            if let categoryName {
+                let newCategory = Category(name: categoryName)
+                newCategory.sortOrder = vault.categories.count
+                modelContext.insert(newCategory)
+                vault.categories.append(newCategory)
+                return newCategory
+            }
+            let fallbackName = GroceryCategory.allCases.first?.title ?? "Other"
+            if let existing = vault.categories.first(where: { $0.name == fallbackName }) {
+                return existing
+            }
+            let newCategory = Category(name: fallbackName)
+            newCategory.sortOrder = vault.categories.count
+            modelContext.insert(newCategory)
+            vault.categories.append(newCategory)
+            return newCategory
+        }()
+        
+        if !targetCategory.items.contains(where: { $0.id == itemId }) {
+            targetCategory.items.append(item)
+        }
+        item.category = targetCategory
+        item.isDeleted = false
+        item.deletedAt = nil
+        item.deletedFromCategoryName = nil
+        
+        if let index = vault.deletedItems.firstIndex(where: { $0.id == itemId }) {
+            vault.deletedItems.remove(at: index)
+        }
+        
+        if restoreToActiveCarts {
+            for snapshot in item.deletedCartItemSnapshots {
+                guard let cart = vault.carts.first(where: { $0.id == snapshot.cartId && $0.isActive }) else { continue }
+                guard !cart.cartItems.contains(where: { $0.itemId == itemId }) else { continue }
+                
+                let cartItem = CartItem(
+                    itemId: itemId,
+                    quantity: snapshot.quantity,
+                    plannedStore: snapshot.plannedStore,
+                    isFulfilled: snapshot.wasFulfilled,
+                    plannedPrice: snapshot.plannedPrice,
+                    plannedUnit: snapshot.plannedUnit,
+                    actualStore: snapshot.actualStore,
+                    actualPrice: snapshot.actualPrice,
+                    actualQuantity: snapshot.actualQuantity,
+                    actualUnit: snapshot.actualUnit,
+                    isShoppingOnlyItem: false,
+                    shoppingOnlyName: nil,
+                    shoppingOnlyStore: nil,
+                    shoppingOnlyPrice: nil,
+                    shoppingOnlyUnit: nil,
+                    shoppingOnlyCategory: nil,
+                    vaultItemNameSnapshot: item.name,
+                    vaultItemCategorySnapshot: targetCategory.name,
+                    originalPlanningQuantity: nil,
+                    addedDuringShopping: cart.isShopping
+                )
+                cartItem.wasEditedDuringShopping = snapshot.wasEditedDuringShopping
+                cart.cartItems.append(cartItem)
+                updateCartTotals(cart: cart)
+            }
+        }
+        
+        let snapshotsToDelete = item.deletedCartItemSnapshots
+        item.deletedCartItemSnapshots.removeAll()
+        for snapshot in snapshotsToDelete {
+            modelContext.delete(snapshot)
+        }
+        
+        itemCache.removeValue(forKey: itemId)
+        invalidateCategoryCache()
+        saveContext()
+        
+        NotificationCenter.default.post(
+            name: NSNotification.Name("DataUpdated"),
+            object: nil
+        )
+    }
+    
+    func permanentlyDeleteItemFromTrash(itemId: String) {
+        guard let vault = vault else { return }
+        guard let index = vault.deletedItems.firstIndex(where: { $0.id == itemId }) else { return }
+        let item = vault.deletedItems.remove(at: index)
+        modelContext.delete(item)
+        itemCache.removeValue(forKey: itemId)
+        invalidateCategoryCache()
+        saveContext()
+        
+        NotificationCenter.default.post(
+            name: NSNotification.Name("DataUpdated"),
+            object: nil
+        )
+    }
+    
+    private func findVaultItemById(_ itemId: String) -> Item? {
+        guard let vault = vault else { return nil }
+        
+        for category in vault.categories {
+            if let item = category.items.first(where: { $0.id == itemId }) {
+                return item
+            }
+        }
+        
+        if let item = vault.deletedItems.first(where: { $0.id == itemId }) {
+            return item
+        }
+        
+        return nil
     }
 
     /// Returns every vault item across all categories (not including shopping-only cart items).
     func getAllItems() -> [Item] {
         guard let vault = vault else { return [] }
-        return vault.categories.flatMap { $0.items }
+        return vault.categories.flatMap { $0.items }.filter { !$0.isDeleted }
     }
 
     /// Finds an item by ID.
@@ -380,6 +557,10 @@ extension VaultService {
                 return item
             }
         }
+        
+        if let deletedItem = vault.deletedItems.first(where: { $0.id == itemId }) {
+            return deletedItem
+        }
         return nil
     }
 
@@ -391,6 +572,9 @@ extension VaultService {
 
         for category in vault.categories {
             for item in category.items {
+                // Skip deleted items
+                if item.isDeleted { continue }
+                
                 let itemName = item.name.lowercased()
                 if itemName.contains(searchTerm) {
                     foundItems.append(item)
@@ -528,6 +712,15 @@ extension VaultService {
             }
             Self.categoryLookupCache[vaultId]?[itemId] = category.name
             return category.name
+        }
+
+        if let deletedItem = vault.deletedItems.first(where: { $0.id == itemId }),
+           let categoryName = deletedItem.deletedFromCategoryName {
+            if Self.categoryLookupCache[vaultId] == nil {
+                Self.categoryLookupCache[vaultId] = [:]
+            }
+            Self.categoryLookupCache[vaultId]?[itemId] = categoryName
+            return categoryName
         }
 
         return nil

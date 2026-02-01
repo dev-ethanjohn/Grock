@@ -63,9 +63,7 @@ struct VaultItemRow: View {
     @Environment(VaultService.self) private var vaultService
     
     @State private var editItem: Item? = nil
-    @State private var isDeleting: Bool = false
     @State private var isNewlyAdded: Bool = true
-    @State private var deletionCompleted = false
     
     @State private var appearScale: CGFloat = 0.9
     @State private var appearOpacity: Double = 0
@@ -96,7 +94,6 @@ struct VaultItemRow: View {
         .scaleEffect(appearScale)
         .opacity(appearOpacity)
         .animation(.spring(response: 0.4, dampingFraction: 0.7), value: isActive)
-        .disabled(isDeleting)
         .onTapGesture {
             if isFocused {
                 // If text field is focused, tapping elsewhere should dismiss keyboard
@@ -120,12 +117,6 @@ struct VaultItemRow: View {
             .presentationBackground(.white)
         }
         .contextMenu {
-            Button(role: .destructive) {
-                triggerDeletion()
-            } label: {
-                Label("Remove", systemImage: "trash")
-            }
-
             Button {
                 editItem = item
             } label: {
@@ -138,9 +129,6 @@ struct VaultItemRow: View {
             }
         }
         .onAppear {
-            isDeleting = false
-            deletionCompleted = false
-
             if isNewlyAdded {
                 withAnimation(.spring(response: 0.25, dampingFraction: 0.75)) {
                     appearScale = 1.0
@@ -165,17 +153,6 @@ struct VaultItemRow: View {
             isNewlyAdded = true
         }
         .preference(key: TextFieldFocusPreferenceKey.self, value: isFocused ? item.id : nil)
-    }
-
-    private func triggerDeletion() {
-        guard !isDeleting && !deletionCompleted else { return }
-        
-        let generator = UIImpactFeedbackGenerator(style: .medium)
-        generator.impactOccurred()
-
-        withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
-            isDeleting = true
-        }
     }
 
     private func handlePlus() {

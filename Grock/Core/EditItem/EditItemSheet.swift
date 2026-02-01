@@ -114,6 +114,7 @@ struct EditItemSheet: View {
     let cart: Cart?
     let cartItem: CartItem?
     var onSave: ((Item) -> Void)?
+    var onRemoveFromCart: ((CartItem) -> Void)?
     var context: EditContext = .vault
     
     @Environment(VaultService.self) private var vaultService
@@ -123,6 +124,7 @@ struct EditItemSheet: View {
     @State private var duplicateError: String?
     @State private var validationTask: Task<Void, Never>?
     @FocusState private var itemNameFieldIsFocused: Bool
+    @State private var showRemoveFromVaultConfirmation = false
     
     // MARK: - Initializers
     
@@ -131,12 +133,14 @@ struct EditItemSheet: View {
         cart: Cart? = nil,
         cartItem: CartItem? = nil,
         onSave: ((Item) -> Void)? = nil,
+        onRemoveFromCart: ((CartItem) -> Void)? = nil,
         context: EditContext? = nil
     ) {
         self.item = item
         self.cart = cart
         self.cartItem = cartItem
         self.onSave = onSave
+        self.onRemoveFromCart = onRemoveFromCart
         
         // Determine context
         if cart != nil && cartItem != nil {
@@ -199,6 +203,20 @@ struct EditItemSheet: View {
                     }
                 }
             }
+        }
+        .alert("Remove Item", isPresented: $showRemoveFromVaultConfirmation) {
+            Button("Cancel", role: .cancel) {}
+            Button("Remove", role: .destructive) {
+                let generator = UINotificationFeedbackGenerator()
+                generator.notificationOccurred(.success)
+                dismiss()
+                let itemId = item.id
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                    vaultService.deleteItem(itemId: itemId)
+                }
+            }
+        } message: {
+            Text("Are you sure you want to remove this item from your vault? This will also remove it from all carts.")
         }
         .task {
             print("🟢 EditItemSheet appeared - context: \(context)")
@@ -557,33 +575,23 @@ struct EditItemSheet: View {
     
     private func removeFromCart() {
         guard let cart = cart else { return }
-        
+
+        if let cartItem, let onRemoveFromCart, cart.status == .planning {
+            onRemoveFromCart(cartItem)
+            dismiss()
+            let generator = UINotificationFeedbackGenerator()
+            generator.notificationOccurred(.success)
+            return
+        }
+
         vaultService.removeItemFromCart(cart: cart, itemId: item.id)
         dismiss()
-        
+
         let generator = UINotificationFeedbackGenerator()
         generator.notificationOccurred(.success)
     }
     
     private func removeFromVault() {
-        let alert = UIAlertController(
-            title: "Remove Item",
-            message: "Are you sure you want to remove this item from your vault? This will also remove it from all carts.",
-            preferredStyle: .alert
-        )
-        
-        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-        alert.addAction(UIAlertAction(title: "Remove", style: .destructive) { _ in
-            vaultService.deleteItem(item)
-            dismiss()
-            
-            let generator = UINotificationFeedbackGenerator()
-            generator.notificationOccurred(.success)
-        })
-        
-        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-           let rootViewController = windowScene.windows.first?.rootViewController {
-            rootViewController.present(alert, animated: true)
-        }
+        showRemoveFromVaultConfirmation = true
     }
 }

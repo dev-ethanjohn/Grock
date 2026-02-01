@@ -336,7 +336,7 @@ struct AddNewItemToCartSheet: View {
      }
     
     private func addNewItemToVaultAndCart(name: String, category: GroceryCategory, store: String, unit: String, price: Double) -> Bool {
-        let success = vaultService.addItem(
+        let newItem = vaultService.addItem(
             name: name,
             to: category,
             store: store,
@@ -344,19 +344,14 @@ struct AddNewItemToCartSheet: View {
             unit: unit
         )
         
-        if success {
-            let newItems = vaultService.findItemsByName(name)
-            if let newItem = newItems.first(where: { item in
-                item.priceOptions.contains { $0.store == store }
-            }) {
-                vaultService.addVaultItemToCart(
-                    item: newItem,
-                    cart: cart,
-                    quantity: 1,
-                    selectedStore: store
-                )
-                return true
-            }
+        if let newItem {
+            vaultService.addVaultItemToCart(
+                item: newItem,
+                cart: cart,
+                quantity: 1,
+                selectedStore: store
+            )
+            return true
         }
         return false
     }

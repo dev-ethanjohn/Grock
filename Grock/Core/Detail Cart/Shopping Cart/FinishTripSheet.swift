@@ -192,7 +192,9 @@ struct FinishTripSheet: View {
     // MARK: - Display models for subviews
     private var changedItemsDisplay: [ChangedItemDisplay] {
         changedItemsList.map { cartItem in
-            let itemName = vaultService.findItemById(cartItem.itemId)?.name ?? "Unknown Item"
+            let itemName = vaultService.findItemById(cartItem.itemId)?.name
+                ?? cartItem.vaultItemNameSnapshot
+                ?? "Unknown Item"
             let plannedPrice = cartItem.plannedPrice ?? 0
             let actualPrice = cartItem.actualPrice ?? plannedPrice
             let plannedQty = cartItem.originalPlanningQuantity ?? cartItem.quantity
@@ -212,7 +214,9 @@ struct FinishTripSheet: View {
     
     private var addedDuringShoppingDisplay: [AddedItemDisplay] {
         addedDuringShoppingVaultFulfilled.map { cartItem in
-            let itemName = vaultService.findItemById(cartItem.itemId)?.name ?? "Unknown Item"
+            let itemName = vaultService.findItemById(cartItem.itemId)?.name
+                ?? cartItem.vaultItemNameSnapshot
+                ?? "Unknown Item"
             let qty = cartItem.actualQuantity ?? cartItem.quantity
             return AddedItemDisplay(id: cartItem.itemId, name: itemName, qty: qty)
         }
@@ -220,7 +224,9 @@ struct FinishTripSheet: View {
     
     private var skippedItemsDisplay: [SkippedItemDisplay] {
         skippedPlannedItems.map { cartItem in
-            let itemName = vaultService.findItemById(cartItem.itemId)?.name ?? "Unknown Item"
+            let itemName = vaultService.findItemById(cartItem.itemId)?.name
+                ?? cartItem.vaultItemNameSnapshot
+                ?? "Unknown Item"
             let qty = cartItem.quantity
             return SkippedItemDisplay(id: cartItem.itemId, name: itemName, qty: qty)
         }
