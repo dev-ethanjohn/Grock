@@ -253,9 +253,7 @@ struct FinishTripSheet: View {
                 title = cat.title
             } else if let vaultItem = item, let category = vaultService.getCategory(for: vaultItem.id) {
                 title = category.name
-                if let groceryCat = GroceryCategory.allCases.first(where: { $0.title == category.name }) {
-                    emoji = groceryCat.emoji
-                }
+                emoji = vaultService.displayEmoji(forCategoryName: category.name)
             }
             return NewItemDisplay(id: cartItem.itemId, name: name, unit: unit, price: price, categoryEmoji: emoji, categoryTitle: title)
         }

@@ -43,7 +43,7 @@ struct VaultMainContent: View {
                             .padding(.top, categorySectionHeight)
                             .zIndex(0)
                         
-                        VaultCategorySectionView(selectedCategory: selectedCategory) {
+                        VaultCategorySectionView(selectedCategoryTitle: selectedCategory?.title) {
                             categoryScrollView
                         }
                         .onTapGesture {

@@ -61,14 +61,16 @@ class Store {
 class Category {
     var uid: String
     var name: String
+    var emoji: String?
     var sortOrder: Int
     
     @Relationship(deleteRule: .cascade, inverse: \Item.category)
     var items: [Item] = []
     
-    init(name: String) {
+    init(name: String, emoji: String? = nil) {
         self.uid = UUID().uuidString
         self.name = name
+        self.emoji = emoji
         self.sortOrder = 0
     }
 }

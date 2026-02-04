@@ -285,7 +285,7 @@ struct HomeView: View {
     private var homeTabContent: some View {
         ZStack(alignment: .topLeading) {
             Color(hex: "#ffffff").ignoresSafeArea()
-            
+
             ActiveCarts(
                 viewModel: viewModel,
                 onDeleteCart: { cart in
@@ -343,7 +343,7 @@ struct HomeView: View {
             .padding(.top, safeAreaTopPadding)
             .padding(.bottom, 32)
             .animation(.spring(response: 0.4, dampingFraction: 0.65), value: isVaultButtonExpanded)
-            
+
             Text("Your Trip")
                 .lexendFont(13)
                 .foregroundStyle(.black)
@@ -371,7 +371,7 @@ struct HomeView: View {
             }
         )
     }
-    
+
     private var currencyPicker: some View {
         Picker("Currency", selection: $viewModel.selectedCurrency) {
             ForEach(CurrencyManager.shared.availableCurrencies, id: \.self) { currency in

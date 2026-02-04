@@ -73,11 +73,7 @@ struct UnifiedItemPopover: View {
         vaultService.getCategoryName(for: item.id) ??
         "Uncategorized"
         
-        if let groceryCategory = GroceryCategory.allCases.first(where: { $0.title == categoryName }) {
-            return (groceryCategory.emoji, categoryName)
-        }
-        
-        return ("📦", categoryName)
+        return (vaultService.displayEmoji(forCategoryName: categoryName), categoryName)
     }
     
     private var currentPrompt: FieldPrompt {

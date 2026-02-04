@@ -13,7 +13,7 @@ struct VaultView: View {
     @Environment(CartViewModel.self) private var cartViewModel
     @Environment(\.dismiss) private var dismiss
     
-    @State private var selectedCategory: GroceryCategory?
+    @State private var selectedCategoryName: String?
     @State private var toolbarAppeared = false
     @State private var showAddItemPopover = false
     
@@ -51,6 +51,9 @@ struct VaultView: View {
     @State private var navigationDirection: NavigationDirection = .none
     
     @State private var categorySectionHeight: CGFloat = 0
+    @State private var showCategoryPickerSheet = false
+    
+    @AppStorage("visibleCategoryNames") private var visibleCategoryNamesData: Data = Data()
     
     enum NavigationDirection {
         case left, right, none
@@ -97,6 +100,59 @@ struct VaultView: View {
         !cartViewModel.activeCartItems.isEmpty
     }
     
+    private var defaultCategoryNames: [String] {
+        GroceryCategory.allCases.map(\.title)
+    }
+    
+    private var customCategoryNames: [String] {
+        guard let vault = vaultService.vault else { return [] }
+        let defaultSet = Set(defaultCategoryNames)
+        return vault.categories
+            .sorted { $0.sortOrder < $1.sortOrder }
+            .map(\.name)
+            .filter { !defaultSet.contains($0) }
+    }
+    
+    private var allCategoryNames: [String] {
+        var seen = Set<String>()
+        var results: [String] = []
+        
+        for name in defaultCategoryNames + customCategoryNames {
+            let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { continue }
+            guard !seen.contains(trimmed.lowercased()) else { continue }
+            seen.insert(trimmed.lowercased())
+            results.append(trimmed)
+        }
+        
+        return results
+    }
+    
+    private var visibleCategories: [String] {
+        let decoded = (try? JSONDecoder().decode([String].self, from: visibleCategoryNamesData))
+            .map {
+                $0.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                    .filter { !$0.isEmpty }
+            }
+        let configured = (decoded?.isEmpty == false) ? decoded! : defaultCategoryNames
+        let visibleSet = Set(configured.map { $0.lowercased() })
+        
+        let filtered = allCategoryNames.filter { visibleSet.contains($0.lowercased()) }
+        return filtered.isEmpty ? defaultCategoryNames : filtered
+    }
+    
+    private var visibleCategoriesBinding: Binding<[String]> {
+        Binding(
+            get: { visibleCategories },
+            set: { newValue in
+                let normalized = newValue
+                    .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                    .filter { !$0.isEmpty }
+                visibleCategoryNamesData = (try? JSONEncoder().encode(normalized)) ?? Data()
+            }
+        )
+    }
+    
     private func dismissKeyboard() {
         UIApplication.shared.endEditing()
     }
@@ -107,7 +163,8 @@ struct VaultView: View {
                 onAppear: handleOnAppear,
                 onDisappear: handleOnDisappear,
                 vaultService: vaultService,
-                selectedCategory: $selectedCategory,
+                visibleCategoryNames: visibleCategories,
+                selectedCategoryName: $selectedCategoryName,
                 showAddItemPopover: $showAddItemPopover,
                 updateChevronVisibility: updateChevronVisibility
             )
@@ -116,21 +173,42 @@ struct VaultView: View {
                 firstItemId: firstItemId,
                 showNameEntrySheet: $showNameEntrySheet
             )
+            .sheet(isPresented: $showCategoryPickerSheet) {
+                NavigationStack {
+                    CategoriesManagerSheet(
+                        title: "Categories",
+                        selectedCategoryName: $selectedCategoryName,
+                        visibleCategoryNames: visibleCategoriesBinding,
+                        activeItemCount: { getActiveItemCount(forCategoryNamed: $0) },
+                        hasItems: { hasItems(inCategoryNamed: $0) }
+                    )
+                }
+                .presentationDetents([.large])
+                .presentationCornerRadius(24)
+                .presentationBackground(.white)
+            }
             .onChange(of: searchText) { _, newValue in
                 let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !trimmed.isEmpty else { return }
-                guard let matchingCategory = matchCategoryForSearch(trimmed) else { return }
-                guard matchingCategory != selectedCategory else { return }
+                guard let matchingCategoryName = matchCategoryForSearch(trimmed) else { return }
+                guard matchingCategoryName != selectedCategoryName else { return }
 
-                let oldIndex = selectedCategory.flatMap { GroceryCategory.allCases.firstIndex(of: $0) }
-                let newIndex = GroceryCategory.allCases.firstIndex(of: matchingCategory)
+                let oldIndex = selectedCategoryName.flatMap { visibleCategories.firstIndex(of: $0) }
+                let newIndex = visibleCategories.firstIndex(of: matchingCategoryName)
                 if let oldIndex, let newIndex {
                     navigationDirection = newIndex > oldIndex ? .right : .left
                 }
 
                 withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                    selectedCategory = matchingCategory
+                    selectedCategoryName = matchingCategoryName
                 }
+            }
+            .onChange(of: visibleCategoryNamesData) { _, _ in
+                if let selectedCategoryName,
+                   !visibleCategories.contains(selectedCategoryName) {
+                    self.selectedCategoryName = visibleCategories.first
+                }
+                updateChevronVisibility()
             }
             .onChange(of: userName) { _, _ in
                 if hasEnteredName {
@@ -238,7 +316,7 @@ struct VaultView: View {
                 .padding(.top, categorySectionHeight)
                 .zIndex(0)
             
-            VaultCategorySectionView(selectedCategory: selectedCategory) {
+            VaultCategorySectionView(selectedCategoryTitle: selectedCategoryName) {
                 categoryScrollView
             }
             .onTapGesture {
@@ -405,8 +483,8 @@ struct VaultView: View {
         initializeActiveItemsFromExistingCart()
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            if selectedCategory == nil {
-                selectedCategory = firstCategoryWithItems ?? GroceryCategory.allCases.first
+            if selectedCategoryName == nil {
+                selectedCategoryName = firstVisibleCategoryWithItems ?? visibleCategories.first
             }
             updateChevronVisibility()
         }
@@ -453,9 +531,15 @@ struct VaultView: View {
             object: nil,
             queue: .main
         ) { notification in
-            if let newCategory = notification.userInfo?["newCategory"] as? GroceryCategory {
+            if let newCategoryName = notification.userInfo?["newCategoryName"] as? String {
                 withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                    selectedCategory = newCategory
+                    selectedCategoryName = newCategoryName
+                }
+                print("🔄 Auto-switched to category: \(newCategoryName)")
+                updateChevronVisibility()
+            } else if let newCategory = notification.userInfo?["newCategory"] as? GroceryCategory {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                    selectedCategoryName = newCategory.title
                 }
                 print("🔄 Auto-switched to category: \(newCategory.title)")
                 updateChevronVisibility()
@@ -483,54 +567,83 @@ struct VaultView: View {
     
     private var categoryScrollView: some View {
         ScrollViewReader { proxy in
-            ScrollView(.horizontal, showsIndicators: false) {
-                ZStack(alignment: .leading) {
-                    if let selectedCategory = selectedCategory,
-                       let selectedIndex = GroceryCategory.allCases.firstIndex(of: selectedCategory) {
-                        RoundedRectangle(cornerRadius: 10)
-                            .strokeBorder(Color.black, lineWidth: 2)
-                            .frame(width: 50, height: 50)
-                            .offset(x: CGFloat(selectedIndex) * 51)
-                            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: selectedCategory)
-                    }
-                    
-                    HStack(spacing: 1) {
-                        ForEach(GroceryCategory.allCases, id: \.self) { category in
-                            VaultCategoryIcon(
-                                category: category,
-                                isSelected: selectedCategory == category,
-                                itemCount: getActiveItemCount(for: category),
-                                hasItems: hasItems(in: category),
-                                action: {
-                                    dismissKeyboard()
-                                    
-                                    if let current = selectedCategory,
-                                       let currentIndex = GroceryCategory.allCases.firstIndex(of: current),
-                                       let newIndex = GroceryCategory.allCases.firstIndex(of: category) {
-                                        navigationDirection = newIndex > currentIndex ? .right : .left
-                                    }
-                                    selectCategory(category, proxy: proxy)
-                                }
-                            )
-                            .frame(width: 50, height: 50)
-                            .id(category.id)
+            let iconSize: CGFloat = 50
+            let iconSpacing: CGFloat = 0
+            HStack(spacing: 8) {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    ZStack(alignment: .leading) {
+                        if let selectedCategoryName,
+                           let selectedIndex = visibleCategories.firstIndex(of: selectedCategoryName) {
+                            RoundedRectangle(cornerRadius: 12)
+                                .strokeBorder(Color.black, lineWidth: 2)
+                                .frame(width: iconSize, height: iconSize)
+                                .offset(x: CGFloat(selectedIndex) * (iconSize + iconSpacing))
+                                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: selectedCategoryName)
                         }
+                        
+                        HStack(spacing: iconSpacing) {
+                            ForEach(visibleCategories, id: \.self) { categoryName in
+                                VaultCategoryNameIcon(
+                                    name: categoryName,
+                                    isSelected: selectedCategoryName == categoryName,
+                                    itemCount: getActiveItemCount(forCategoryNamed: categoryName),
+                                    hasItems: hasItems(inCategoryNamed: categoryName),
+                                    iconText: vaultService.displayEmoji(forCategoryName: categoryName),
+                                    action: {
+                                        dismissKeyboard()
+                                        
+                                        if let current = selectedCategoryName,
+                                           let currentIndex = visibleCategories.firstIndex(of: current),
+                                           let newIndex = visibleCategories.firstIndex(of: categoryName) {
+                                            navigationDirection = newIndex > currentIndex ? .right : .left
+                                        }
+                                        selectCategory(named: categoryName)
+                                    }
+                                )
+                                .frame(width: iconSize, height: iconSize)
+                                .id(categoryName)
+                            }
+
+                            Image(systemName: "plus.square.dashed")
+                                .font(.system(size: 44, weight: .ultraLight))
+                                .foregroundStyle(.gray)
+                                .offset(x: -2)
+                        }
+                        .padding(.trailing)
                     }
+                    .padding(.vertical, 1)
+                    .padding(.leading)
+                    .padding(.trailing, 4)
                 }
-                .padding(.horizontal)
+                .overlay(alignment: .trailing) {
+                    GroceryCategoryScrollRightOverlay(backgroundColor: .white)
+                }
+                
+                Button {
+                    dismissKeyboard()
+                    showCategoryPickerSheet = true
+                } label: {
+                    Image(systemName: "chevron.down.circle")
+                        .font(.system(size: 24, weight: .medium))
+                        .foregroundColor(.gray)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Show categories")
+                .padding(.vertical, 18)
+                .padding(.trailing)
             }
-            .onChange(of: selectedCategory) { oldValue, newValue in
-                if let newCategory = newValue {
+            .onChange(of: selectedCategoryName) { _, newValue in
+                if let newName = newValue {
                     withAnimation(.spring(response: 0.4, dampingFraction: 0.95)) {
-                        proxy.scrollTo(newCategory.id, anchor: .center)
+                        proxy.scrollTo(newName, anchor: .center)
                     }
                 }
             }
             .onAppear {
-                if let initialCategory = selectedCategory ?? firstCategoryWithItems ?? GroceryCategory.allCases.first {
+                if let initialCategory = selectedCategoryName ?? firstVisibleCategoryWithItems ?? visibleCategories.first {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
-                            proxy.scrollTo(initialCategory.id, anchor: .center)
+                            proxy.scrollTo(initialCategory, anchor: .center)
                         }
                     }
                 }
@@ -540,14 +653,14 @@ struct VaultView: View {
     
     private var categoryContentScrollView: some View {
         GeometryReader { geometry in
-            if let selectedCategory = selectedCategory {
+            if let selectedCategoryName {
                 CategoryItemsView(
-                    category: selectedCategory,
+                    categoryName: selectedCategoryName,
                     searchText: searchText,
                     onDeleteItem: deleteItem
                 )
                 .frame(width: geometry.size.width, height: geometry.size.height)
-                .id(selectedCategory.id)
+                .id(selectedCategoryName)
                 .transition(.asymmetric(
                     insertion: navigationDirection == .right ?
                         .move(edge: .trailing) :
@@ -559,21 +672,23 @@ struct VaultView: View {
             }
         }
         .frame(maxHeight: .infinity)
-        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: selectedCategory)
+        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: selectedCategoryName)
     }
     
     struct CategoryItemsView: View {
-        let category: GroceryCategory
+        let categoryName: String
         let searchText: String
         let onDeleteItem: (Item) -> Void
         
         @Environment(VaultService.self) private var vaultService
         @Environment(CartViewModel.self) private var cartViewModel
         
+        private var groceryCategory: GroceryCategory? {
+            GroceryCategory.allCases.first(where: { $0.title == categoryName })
+        }
+        
         private var categoryItems: [Item] {
-            guard let vault = vaultService.vault,
-                  let foundCategory = vault.categories.first(where: { $0.name == category.title })
-            else { return [] }
+            guard let foundCategory = vaultService.getCategory(named: categoryName) else { return [] }
             // Filter out deleted items
             let items = foundCategory.items
                 .filter { !$0.isDeleted }
@@ -602,7 +717,7 @@ struct VaultView: View {
                         items: categoryItems,
                         availableStores: availableStores,
                         selectedStore: .constant(nil),
-                        category: category,
+                        category: groceryCategory,
                         onDeleteItem: onDeleteItem
                     )
                 }
@@ -624,7 +739,7 @@ struct VaultView: View {
         private var emptyMessage: String {
             let trimmed = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
             return trimmed.isEmpty
-            ? "No items yet in \(category.title) \(category.emoji)"
+            ? "No items yet in \(categoryName) \(vaultService.displayEmoji(forCategoryName: categoryName))"
             : "No items found"
         }
     }
@@ -632,65 +747,59 @@ struct VaultView: View {
     // MARK: - Navigation Methods
     
     private func updateChevronVisibility() {
-        guard let currentCategory = selectedCategory,
-              let currentIndex = GroceryCategory.allCases.firstIndex(of: currentCategory) else {
+        guard let currentCategoryName = selectedCategoryName,
+              let currentIndex = visibleCategories.firstIndex(of: currentCategoryName) else {
             showLeftChevron = false
             showRightChevron = false
             return
         }
         
         showLeftChevron = currentIndex > 0
-        showRightChevron = currentIndex < GroceryCategory.allCases.count - 1
+        showRightChevron = currentIndex < visibleCategories.count - 1
     }
     
     private func navigateToPreviousCategory() {
         dismissKeyboard()
         
-        guard let currentCategory = selectedCategory,
-              let currentIndex = GroceryCategory.allCases.firstIndex(of: currentCategory),
+        guard let currentCategoryName = selectedCategoryName,
+              let currentIndex = visibleCategories.firstIndex(of: currentCategoryName),
               currentIndex > 0 else { return }
         
-        let previousCategory = GroceryCategory.allCases[currentIndex - 1]
+        let previousCategory = visibleCategories[currentIndex - 1]
         navigationDirection = .left
         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-            selectedCategory = previousCategory
+            selectedCategoryName = previousCategory
         }
     }
     
     private func navigateToNextCategory() {
         dismissKeyboard()
         
-        guard let currentCategory = selectedCategory,
-              let currentIndex = GroceryCategory.allCases.firstIndex(of: currentCategory),
-              currentIndex < GroceryCategory.allCases.count - 1 else { return }
+        guard let currentCategoryName = selectedCategoryName,
+              let currentIndex = visibleCategories.firstIndex(of: currentCategoryName),
+              currentIndex < visibleCategories.count - 1 else { return }
         
-        let nextCategory = GroceryCategory.allCases[currentIndex + 1]
+        let nextCategory = visibleCategories[currentIndex + 1]
         navigationDirection = .right
         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-            selectedCategory = nextCategory
+            selectedCategoryName = nextCategory
         }
     }
     
-    private func selectCategory(_ category: GroceryCategory, proxy: ScrollViewProxy) {
+    private func selectCategory(named categoryName: String) {
         withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-            selectedCategory = category
-        }
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                proxy.scrollTo(category.id, anchor: .center)
-            }
+            selectedCategoryName = categoryName
         }
     }
     
     // MARK: - Data Methods
 
-    private func matchCategoryForSearch(_ text: String) -> GroceryCategory? {
+    private func matchCategoryForSearch(_ text: String) -> String? {
         guard let vault = vaultService.vault else { return nil }
-        for category in GroceryCategory.allCases {
-            guard let foundCategory = vault.categories.first(where: { $0.name == category.title }) else { continue }
+        for categoryName in visibleCategories {
+            guard let foundCategory = vault.categories.first(where: { $0.name == categoryName }) else { continue }
             if foundCategory.items.contains(where: { $0.name.localizedCaseInsensitiveContains(text) }) {
-                return category
+                return categoryName
             }
         }
         return nil
@@ -740,21 +849,21 @@ struct VaultView: View {
         hasInitializedFromExistingCart = true
     }
     
-    private var firstCategoryWithItems: GroceryCategory? {
+    private var firstVisibleCategoryWithItems: String? {
         guard let vault = vaultService.vault else { return nil }
         
-        for groceryCategory in GroceryCategory.allCases {
-            if let vaultCategory = vault.categories.first(where: { $0.name == groceryCategory.title }),
+        for categoryName in visibleCategories {
+            if let vaultCategory = vault.categories.first(where: { $0.name == categoryName }),
                !vaultCategory.items.isEmpty {
-                return groceryCategory
+                return categoryName
             }
         }
         return nil
     }
     
-    private func getActiveItemCount(for category: GroceryCategory) -> Int {
+    private func getActiveItemCount(forCategoryNamed categoryName: String) -> Int {
         guard let vault = vaultService.vault else { return 0 }
-        guard let foundCategory = vault.categories.first(where: { $0.name == category.title }) else { return 0 }
+        guard let foundCategory = vault.categories.first(where: { $0.name == categoryName }) else { return 0 }
         
         let activeItemsCount = foundCategory.items.reduce(0) { count, item in
             let isActive = (cartViewModel.activeCartItems[item.id] ?? 0) > 0
@@ -764,15 +873,15 @@ struct VaultView: View {
         return activeItemsCount
     }
     
-    private func getTotalItemCount(for category: GroceryCategory) -> Int {
+    private func getTotalItemCount(forCategoryNamed categoryName: String) -> Int {
         guard let vault = vaultService.vault else { return 0 }
-        guard let foundCategory = vault.categories.first(where: { $0.name == category.title }) else { return 0 }
+        guard let foundCategory = vault.categories.first(where: { $0.name == categoryName }) else { return 0 }
         
         return foundCategory.items.count
     }
     
-    private func hasItems(in category: GroceryCategory) -> Bool {
-        return getTotalItemCount(for: category) > 0
+    private func hasItems(inCategoryNamed categoryName: String) -> Bool {
+        getTotalItemCount(forCategoryNamed: categoryName) > 0
     }
     
     private func deleteItem(_ item: Item) {
@@ -947,7 +1056,8 @@ extension View {
         onAppear: @escaping () -> Void,
         onDisappear: @escaping () -> Void,
         vaultService: VaultService,
-        selectedCategory: Binding<GroceryCategory?>,
+        visibleCategoryNames: [String],
+        selectedCategoryName: Binding<String?>,
         showAddItemPopover: Binding<Bool>,
         updateChevronVisibility: @escaping () -> Void
     ) -> some View {
@@ -955,16 +1065,19 @@ extension View {
             .onAppear(perform: onAppear)
             .onDisappear(perform: onDisappear)
             .onChange(of: vaultService.vault) { oldValue, newValue in
-                if selectedCategory.wrappedValue == nil {
-                    // Find first category with items
+                if selectedCategoryName.wrappedValue == nil {
                     if let vault = newValue {
-                        for groceryCategory in GroceryCategory.allCases {
-                            if let vaultCategory = vault.categories.first(where: { $0.name == groceryCategory.title }),
+                        for categoryName in visibleCategoryNames {
+                            if let vaultCategory = vault.categories.first(where: { $0.name == categoryName }),
                                !vaultCategory.items.isEmpty {
-                                selectedCategory.wrappedValue = groceryCategory
+                                selectedCategoryName.wrappedValue = categoryName
                                 break
                             }
                         }
+                    }
+                    
+                    if selectedCategoryName.wrappedValue == nil {
+                        selectedCategoryName.wrappedValue = visibleCategoryNames.first
                     }
                 }
                 updateChevronVisibility()
@@ -976,7 +1089,7 @@ extension View {
                     }
                 }
             }
-            .onChange(of: selectedCategory.wrappedValue) { oldValue, newValue in
+            .onChange(of: selectedCategoryName.wrappedValue) { oldValue, newValue in
                 updateChevronVisibility()
             }
     }

@@ -7,7 +7,6 @@
 
 import SwiftUI
 
-/*
 extension CGFloat {
     func interpolate(inputRange: [CGFloat], outputRange: [CGFloat]) -> CGFloat {
         /// If value less than it's initial input range
@@ -33,4 +32,3 @@ extension CGFloat {
         return outputRange[length]
     }
 }
-*/

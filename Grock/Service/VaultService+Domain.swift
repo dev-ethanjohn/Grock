@@ -118,7 +118,7 @@ extension VaultService {
         vault.categories.removeAll()
 
         for (index, groceryCategory) in GroceryCategory.allCases.enumerated() {
-            let category = Category(name: groceryCategory.title)
+            let category = Category(name: groceryCategory.title, emoji: groceryCategory.emoji)
             category.sortOrder = index
             vault.categories.append(category)
         }
@@ -129,13 +129,60 @@ extension VaultService {
     func addCategory(_ category: GroceryCategory) {
         guard let vault = vault else { return }
 
-        let newCategory = Category(name: category.title)
+        let newCategory = Category(name: category.title, emoji: category.emoji)
         vault.categories.append(newCategory)
         saveContext()
+    }
+    
+    func createCustomCategory(named name: String, emoji: String? = nil) -> Category? {
+        guard let vault = vault else { return nil }
+        
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        if let existing = vault.categories.first(where: { normalizedCategoryName($0.name) == normalizedCategoryName(trimmed) }) {
+            return existing
+        }
+        
+        let cleanedEmoji = emoji?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedEmoji: String? = {
+            guard let cleanedEmoji, !cleanedEmoji.isEmpty else { return nil }
+            return String(cleanedEmoji.prefix(1))
+        }()
+        let newCategory = Category(name: trimmed, emoji: normalizedEmoji)
+        let nextSortOrder = (vault.categories.map(\.sortOrder).max() ?? (GroceryCategory.allCases.count - 1)) + 1
+        newCategory.sortOrder = nextSortOrder
+        
+        modelContext.insert(newCategory)
+        vault.categories.append(newCategory)
+        saveContext()
+        
+        return newCategory
     }
 
     func getCategory(_ groceryCategory: GroceryCategory) -> Category? {
         vault?.categories.first { $0.name == groceryCategory.title }
+    }
+
+    func getCategory(named name: String) -> Category? {
+        guard let vault = vault else { return nil }
+        let normalized = normalizedCategoryName(name)
+        return vault.categories.first { normalizedCategoryName($0.name) == normalized }
+    }
+
+    func displayEmoji(forCategoryName name: String) -> String {
+        if let category = getCategory(named: name),
+           let emoji = category.emoji?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !emoji.isEmpty {
+            return String(emoji.prefix(1))
+        }
+
+        if let groceryCategory = GroceryCategory.allCases.first(where: { normalizedCategoryName($0.title) == normalizedCategoryName(name) }) {
+            return groceryCategory.emoji
+        }
+
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? "📦" : String(trimmed.prefix(1)).uppercased()
     }
 
     /// Finds the category that currently contains `itemId`.
@@ -149,6 +196,10 @@ extension VaultService {
         }
         return nil
     }
+}
+
+private func normalizedCategoryName(_ value: String) -> String {
+    value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
 }
 
 extension VaultService {

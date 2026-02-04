@@ -788,9 +788,8 @@ private struct ItemPriceRow: View {
             return cat.emoji
         }
         if let vaultItem = item,
-           let category = vaultService.getCategory(for: vaultItem.id),
-           let groceryCat = GroceryCategory.allCases.first(where: { $0.title == category.name }) {
-            return groceryCat.emoji
+           let category = vaultService.getCategory(for: vaultItem.id) {
+            return vaultService.displayEmoji(forCategoryName: category.name)
         }
         return ""
     }

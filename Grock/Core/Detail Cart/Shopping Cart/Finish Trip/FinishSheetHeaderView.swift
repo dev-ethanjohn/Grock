@@ -210,7 +210,7 @@ private struct BudgetCartFulfillmentGauge: View {
                     
                     ZStack {
                         ArcText(
-                            text: "CART VALUE \(cartTotal.formattedCurrency)",
+                            text: "Cart Value:  \(cartTotal.formattedCurrency)",
                             radius: labelRadius,
                             startAngle: labelStartAngle,
                             angleStep: labelAngleStep,

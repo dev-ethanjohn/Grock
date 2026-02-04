@@ -344,9 +344,8 @@ private struct CompletedItemRow: View {
                         
                         if stateManager.showCategoryIcons {
                             if let item = item,
-                               let category = vaultService.getCategory(for: item.id),
-                               let groceryCat = GroceryCategory.allCases.first(where: { $0.title == category.name }) {
-                                Text(groceryCat.emoji)
+                               let category = vaultService.getCategory(for: item.id) {
+                                Text(vaultService.displayEmoji(forCategoryName: category.name))
                                     .font(.caption)
                             } else if cartItem.isShoppingOnlyItem,
                                       let raw = cartItem.shoppingOnlyCategory,

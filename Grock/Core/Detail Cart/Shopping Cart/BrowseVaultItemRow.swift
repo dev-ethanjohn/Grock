@@ -651,6 +651,8 @@ private struct ItemDetails: View {
     let shouldShowNewBadge: Bool
     let badgeScale: CGFloat
     let badgeRotation: Double
+
+    @Environment(VaultService.self) private var vaultService
     
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -691,8 +693,8 @@ private struct ItemDetails: View {
                     .foregroundColor(priceColor)
                     .opacity(contentOpacity)
                 
-                if let category = GroceryCategory.allCases.first(where: { $0.title == storeItem.categoryName }), stateManager.showCategoryIcons {
-                    Text(category.emoji)
+                if stateManager.showCategoryIcons {
+                    Text(vaultService.displayEmoji(forCategoryName: storeItem.categoryName))
                         .font(.caption)
                         .padding(.leading, 6)
                         .opacity(contentOpacity)
