@@ -49,14 +49,14 @@ struct RenameCartNamePopover: View {
                         // Placeholder showing when field is empty
                         if cartName.isEmpty {
                             Text("Enter new name...")
-                                .shantellSansFont(20)
+                                .fuzzyBubblesFont(20, weight: .bold)
                                 .foregroundColor(Color(hex: "999"))
                         }
                         
                         TextField("", text: $cartName, onCommit: {
                             if isValidName { saveName() }
                         })
-                        .shantellSansFont(20)
+                        .fuzzyBubblesFont(20, weight: .bold)
                         .foregroundColor(.black)
                         .autocorrectionDisabled(true)
                         .textInputAutocapitalization(.never)

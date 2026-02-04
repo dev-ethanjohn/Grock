@@ -6,9 +6,8 @@ struct SkippedItemDisplay: Identifiable {
     let qty: Double
 }
 
-struct SkippedItemsListView<Background: View>: View {
+struct SkippedItemsListView: View {
     let items: [SkippedItemDisplay]
-    let background: Background
     
     var body: some View {
         VStack(spacing: 10) {
@@ -29,9 +28,9 @@ struct SkippedItemsListView<Background: View>: View {
                 }
             }
         }
-        .padding()
-        .background(background)
-        .clipShape(RoundedRectangle(cornerRadius: 18))
+        .padding(.horizontal, 12)
+        .padding(.bottom, 12)
+        .padding(.top, 2)
     }
 }
 
@@ -40,7 +39,7 @@ struct SkippedItemsListView<Background: View>: View {
         SkippedItemDisplay(id: "1", name: "Yogurt", qty: 3),
         SkippedItemDisplay(id: "2", name: "Granola", qty: 1)
     ]
-    return SkippedItemsListView(items: sample, background: Color.white)
+    return SkippedItemsListView(items: sample)
         .padding()
         .background(Color.white)
 }

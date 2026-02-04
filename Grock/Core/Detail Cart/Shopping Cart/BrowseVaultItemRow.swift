@@ -681,7 +681,7 @@ private struct ItemDetails: View {
                 let price = storeItem.priceOption.pricePerUnit.priceValue
                 let isValidPrice = !price.isNaN && price.isFinite
                 
-                Text("\(CurrencyManager.shared.selectedCurrency.symbol)\(isValidPrice ? price : 0, specifier: "%g")")
+                Text("\(CurrencyManager.shared.selectedCurrency.symbol)\((isValidPrice ? price : 0).formattedPricePerUnitValue)")
                     .foregroundColor(priceColor)
                     .opacity(contentOpacity)
                     .contentTransition(.numericText())

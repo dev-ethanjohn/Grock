@@ -66,11 +66,11 @@ struct ActiveCarts: View {
                         } label: {
                             HomeCartRowView(
                                 cart: cart,
-                                vaultService: viewModel.getVaultService(for: cart)
+                                vaultService: viewModel.getVaultService(for: cart),
+                                cartNamespace: cartNamespace
                             )
                             .contentShape(.interaction, RoundedRectangle(cornerRadius: 24))
                             .contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: 24))
-                            .matchedTransitionSource(id: cart.id, in: cartNamespace)
                         }
                         .buttonStyle(.plain)
                         .contextMenu {

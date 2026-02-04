@@ -10,9 +10,8 @@ struct ChangedItemDisplay: Identifiable, Equatable {
     let unit: String
 }
 
-struct ChangedItemsListView<Background: View>: View {
+struct ChangedItemsListView: View {
     let items: [ChangedItemDisplay]
-    let background: Background
     
     var body: some View {
         VStack(spacing: 10) {
@@ -28,9 +27,9 @@ struct ChangedItemsListView<Background: View>: View {
                 }
             }
         }
-        .padding()
-        .background(background)
-        .clipShape(RoundedRectangle(cornerRadius: 18))
+        .padding(.horizontal, 12)
+        .padding(.bottom, 12)
+        .padding(.top, 2)
     }
 }
 
@@ -41,7 +40,7 @@ struct ChangedItemsListView<Background: View>: View {
         ChangedItemDisplay(id: "3", name: "Bread", plannedPrice: 2.5, actualPrice: 2.9, plannedQty: 1, actualQty: 1, unit: "ea")
     ]
     return VStack {
-        ChangedItemsListView(items: sample, background: Color.white)
+        ChangedItemsListView(items: sample)
             .padding()
             .fixedSize(horizontal: false, vertical: true)
         Spacer()

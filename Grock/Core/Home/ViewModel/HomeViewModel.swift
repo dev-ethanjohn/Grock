@@ -145,7 +145,12 @@ final class HomeViewModel {
     // MARK: - Data Management
     func loadCarts() {
         cartViewModel.loadCarts()
-        print("🏠 Carts loaded: \(cartViewModel.carts.count)")
+        #if DEBUG
+        let total = cartViewModel.carts.count
+        let active = cartViewModel.activeCarts.count
+        let completed = cartViewModel.completedCarts.count
+        print("🏠 Carts loaded: \(total) (\(active) active, \(completed) completed)")
+        #endif
     }
     
     func getVaultService(for cart: Cart) -> VaultService? {

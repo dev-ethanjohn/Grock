@@ -47,6 +47,10 @@ struct FinishTripSheet: View {
             }
     }
     
+    private var cartTotal: Double {
+        vaultService.getTotalCartValue(for: cart)
+    }
+    
     // The cart's budget - now reacts to changes in cart.budget
     private var cartBudget: Double {
         cart.budget
@@ -258,7 +262,7 @@ struct FinishTripSheet: View {
     }
     
     // MARK: - Accordion states
-    @State private var showChangedSection: Bool = true
+    @State private var showChangedSection: Bool = false
     @State private var showAddedDuringShoppingSection: Bool = false
     @State private var showSkippedSection: Bool = false
     @State private var headerHeight: CGFloat = 0
@@ -302,17 +306,18 @@ struct FinishTripSheet: View {
         ZStack {
             ZStack(alignment: .top) {
                 VStack(spacing: 8) {
-                        Color.clear.frame(height: headerHeight)
+                        Color.white.frame(height: headerHeight)
            
-                    AccordionSectionView(
+                        AccordionSectionView(
                             icon: "arrow.left.arrow.right",
                             title: "What changed (\(max(changedItemsList.count, 0)))",
                             subtitle: "Price or quantity differed from plan",
                             accentDeep: .cartChangedDeep,
                             isExpanded: $showChangedSection,
-                            hasContent: !changedItemsList.isEmpty
+                            hasContent: !changedItemsList.isEmpty,
+                            background: Color.cartChangedBackground
                         ) {
-                            ChangedItemsListView(items: changedItemsDisplay, background: Color.cartChangedBackground)
+                            ChangedItemsListView(items: changedItemsDisplay)
                         }
                         .padding(.horizontal, 20)
                         
@@ -322,9 +327,10 @@ struct FinishTripSheet: View {
                             subtitle: "Saved items you decided to include mid-trip",
                             accentDeep: .cartAddedDeep,
                             isExpanded: $showAddedDuringShoppingSection,
-                            hasContent: !addedDuringShoppingVaultFulfilled.isEmpty
+                            hasContent: !addedDuringShoppingVaultFulfilled.isEmpty,
+                            background: Color.cartAddedBackground
                         ) {
-                            AddedDuringShoppingListView(items: addedDuringShoppingDisplay, background: Color.cartAddedBackground)
+                            AddedDuringShoppingListView(items: addedDuringShoppingDisplay)
                         }
                         .padding(.horizontal, 20)
                         
@@ -334,9 +340,10 @@ struct FinishTripSheet: View {
                             subtitle: "Planned items not bought",
                             accentDeep: .cartSkippedDeep,
                             isExpanded: $showSkippedSection,
-                            hasContent: !skippedPlannedItems.isEmpty
+                            hasContent: !skippedPlannedItems.isEmpty,
+                            background: Color.cartSkippedBackground
                         ) {
-                            SkippedItemsListView(items: skippedItemsDisplay, background: Color.cartSkippedBackground)
+                            SkippedItemsListView(items: skippedItemsDisplay)
                         }
                         .padding(.horizontal, 20)
                         
@@ -375,11 +382,6 @@ struct FinishTripSheet: View {
                         onFinish: {
                             mergeSelectedNewItemsToVault()
                             vaultService.completeShopping(cart: cart)
-                            NotificationCenter.default.post(
-                                name: NSNotification.Name("ShowInsightsAfterTrip"),
-                                object: nil,
-                                userInfo: ["cartId": cart.id]
-                            )
                         },
                         onContinue: {
                             dismiss()
@@ -392,10 +394,13 @@ struct FinishTripSheet: View {
                     headerSummaryText: headerSummaryText,
                     cart: cart,
                     cartBudget: cartBudget,
+                    cartTotal: cartTotal,
                     totalSpent: totalSpent
                 )
-                .background(.white)
-                .shadow(color: .black.opacity(0.16), radius: 7, x: 0, y: 3)
+                .background(
+                    Color.white
+                        .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
+                )
                 .background(
                     GeometryReader { proxy in
                         Color.clear.preference(key: HeaderHeightPreferenceKey.self, value: proxy.size.height)
@@ -420,8 +425,15 @@ struct FinishTripSheet: View {
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
         .presentationCornerRadius(24)
+        .presentationBackground(.white)
         .interactiveDismissDisabled(false) // Allow dismissal
         .background(Color.white)
+        .onAppear {
+            // Start collapsed every time the sheet is presented.
+            showChangedSection = false
+            showAddedDuringShoppingSection = false
+            showSkippedSection = false
+        }
         // Add this to observe cart changes
         .onChange(of: cart.budget) { oldValue, newValue in
             print("💰 Cart budget changed: \(oldValue) → \(newValue)")

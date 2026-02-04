@@ -319,7 +319,7 @@ private struct CompletedItemRow: View {
                 
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 4) {
-                        Text("\(quantity, specifier: "%g") \(unit) \(itemName)")
+                        Text("\(quantity.formattedQuantity) \(unit) \(itemName)")
                             .lexendFont(16, weight: .regular)
                             .foregroundColor(.black)
                             .contentTransition(.numericText())
@@ -358,7 +358,7 @@ private struct CompletedItemRow: View {
                     }
                     
                     HStack(spacing: 0) {
-                        Text("\(CurrencyManager.shared.selectedCurrency.symbol)\(price, specifier: "%g")")
+                        Text("\(CurrencyManager.shared.selectedCurrency.symbol)\(price.formattedPricePerUnitValue)")
                             .foregroundColor(.gray)
                             .contentTransition(.numericText())
                         

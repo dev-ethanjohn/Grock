@@ -180,25 +180,32 @@ struct CharacterRevealView: View {
     let text: String
     let delay: Double
     var animateOnChange: Bool = false
+    var animateOnAppear: Bool = true
+    var showsUnderline: Bool = true
+    var underlineColor: Color = Color(hex: "717171")
     @State private var revealedCharacters: Int = 0
     @State private var isAnimating = false
     @State private var underlineWidth: CGFloat = 0
     @State private var textWidth: CGFloat = 0
     @State private var didAppear = false
     
+    private func revealAnimation(for index: Int) -> Animation {
+        Animation.interpolatingSpring(stiffness: 240, damping: 14)
+            .delay(Double(index) * 0.01 + delay)
+    }
+    
     var body: some View {
+        let characters = Array(text)
+        let effectiveRevealedCharacters = animateOnAppear ? revealedCharacters : characters.count
+        
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 0) {
-                ForEach(Array(text.enumerated()), id: \.offset) { index, character in
-                    Text(String(character))
-                        .opacity(index < revealedCharacters ? 1 : 0)
-                        .offset(y: index < revealedCharacters ? 0 : 4)
+                ForEach(characters.indices, id: \.self) { index in
+                    Text(String(characters[index]))
+                        .opacity(index < effectiveRevealedCharacters ? 1 : 0)
+                        .offset(y: index < effectiveRevealedCharacters ? 0 : 4)
                         .animation(
-                            .interpolatingSpring(
-                                stiffness: 240,
-                                damping: 14
-                            )
-                            .delay(Double(index) * 0.01 + delay),
+                            revealAnimation(for: index),
                             value: revealedCharacters
                         )
                 }
@@ -214,21 +221,21 @@ struct CharacterRevealView: View {
                         }
                 }
             )
-            .onAppear {
-                // Ensure all characters are revealed after animation completes
-                DispatchQueue.main.asyncAfter(deadline: .now() + delay + (Double(text.count) * 0.01) + 0.5) {
-                    revealedCharacters = text.count
-                }
+            if showsUnderline {
+                Rectangle()
+                    .fill(underlineColor)
+                    .frame(width: underlineWidth, height: 1)
+                    .offset(y: -0.5)
             }
-            
-            Rectangle()
-                .fill(Color(hex: "717171"))
-                .frame(width: underlineWidth, height: 1)
-                .offset(y: -0.5)
         }
         .onAppear {
             guard !didAppear else { return }
             didAppear = true
+            
+            if !animateOnAppear {
+                return
+            }
+            
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
                 withAnimation(.easeOut(duration: 0.32)) {
                     revealedCharacters = text.count
@@ -250,8 +257,8 @@ struct CharacterRevealView: View {
                     underlineWidth = textWidth
                 }
             } else {
-                revealedCharacters = text.count
-                underlineWidth = textWidth
+                revealedCharacters = animateOnAppear ? text.count : revealedCharacters
+                underlineWidth = animateOnAppear ? textWidth : underlineWidth
                 isAnimating = false
             }
         }

@@ -494,19 +494,19 @@ private struct ListBackgroundView: View {
     let backgroundImage: UIImage?
     let backgroundColor: Color
     let geometry: GeometryProxy
-    var height: CGFloat? = nil // ✅ Optional height parameter
+    var height: CGFloat? = nil
     
     var body: some View {
         ZStack {
             if hasBackgroundImage, let backgroundImage = backgroundImage {
-                // Show image when loaded with noise overlay
                 ZStack {
                     Image(uiImage: backgroundImage)
                         .resizable()
                         .scaledToFill()
-                        .frame(width: geometry.size.width, height: height ?? geometry.size.height) // ✅ Use explicit height if provided
+                        .frame(width: geometry.size.width, height: height ?? geometry.size.height)
                         .clipped()
-                        .overlay(Color.black.opacity(0.4))
+                        .overlay(Color.black.opacity(0.55))
+                        .overlay(Color.gray.opacity(0.05))
                         .blur(radius: 2)
                     
                     VisibleNoiseView(
@@ -528,7 +528,6 @@ private struct ListBackgroundView: View {
     }
 }
 
-// MARK: - Visible Noise View
 struct VisibleNoiseView: View {
     let grainSize: CGFloat    // 0.5-1.5 for visible grain
     let density: CGFloat      // 0.1-0.3 for visible density

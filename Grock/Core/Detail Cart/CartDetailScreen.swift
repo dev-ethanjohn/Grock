@@ -89,6 +89,7 @@ struct CartDetailScreen: View {
             alertManager: $alertManager,
             hasItems: hasItems,
             currentFulfilledCount: currentFulfilledCount,
+            onDeleteItem: handleDeleteItem,
             cartStatusChanged: handleCartStatusChange,
             itemsChanged: handleItemsChange,
             checkAndShowCelebration: checkAndShowCelebration
@@ -158,8 +159,8 @@ struct CartDetailScreen: View {
                         stateManager.showingShoppingPopover = false
                     }
                 )
+                .id(stateManager.shoppingPopoverPresentationID)
                 .environment(vaultService)
-                .transition(.opacity)
                 .zIndex(100)
             }
             
@@ -186,8 +187,8 @@ struct CartDetailScreen: View {
                         stateManager.showingFulfillPopover = false
                     }
                 )
+                .id(stateManager.fulfillPopoverPresentationID)
                 .environment(vaultService)
-                .transition(.opacity)
                 .zIndex(101)
             }
             
@@ -292,6 +293,8 @@ struct CartDetailScreen: View {
         stateManager.showingEditCartName = false
         stateManager.selectedItemForPopover = nil
         stateManager.selectedCartItemForPopover = nil
+        stateManager.showTripCompletionCelebration = false
+        stateManager.tripCompletionMessage = ""
         
         stateManager.localBudget = cart.budget
         stateManager.animatedBudget = cart.budget
@@ -328,12 +331,27 @@ struct CartDetailScreen: View {
             stateManager.showFinishTripButton = false
             stateManager.showingCompletedSheet = false
         }
+        
+        NotificationCenter.default.post(
+            name: Notification.Name("CartDetailPresented"),
+            object: nil,
+            userInfo: ["cartId": cart.id]
+        )
     }
     
     private func saveStateOnDismiss() {
         if stateManager.localBudget != cart.budget {
             cart.budget = stateManager.localBudget
             vaultService.updateCartTotals(cart: cart)
+        }
+        
+        // Post on the next run loop so the destination (Home) view has a chance to re-attach observers.
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(
+                name: Notification.Name("CartDetailDismissed"),
+                object: nil,
+                userInfo: ["cartId": cart.id]
+            )
         }
     }
     
@@ -438,6 +456,8 @@ struct CartDetailAllModifiers: ViewModifier {
     let hasItems: Bool
     let currentFulfilledCount: Int
     
+    let onDeleteItem: (CartItem) -> Void
+    
     let cartStatusChanged: (CartStatus, CartStatus) -> Void
     let itemsChanged: (Bool, Bool) -> Void
     let checkAndShowCelebration: () -> Void
@@ -495,7 +515,7 @@ struct CartDetailAllModifiers: ViewModifier {
                 itemToEdit: $itemToEdit,
                 cart: cart,
                 vaultService: vaultService,
-                onRemoveFromCart: handleDeleteItem
+                onRemoveFromCart: onDeleteItem
             )
             .cartSheets(
                 cart: cart,
@@ -844,7 +864,7 @@ struct CartDetailContent: View {
                 }
                 
                 // Floating Action Bar
-                if !stateManager.showCelebration && stateManager.manageCartButtonVisible {
+                if !stateManager.showCelebration && !stateManager.showTripCompletionCelebration && stateManager.manageCartButtonVisible {
                     VStack {
                         Spacer()
                         
@@ -913,6 +933,29 @@ struct CartDetailContent: View {
                 .transition(.scale)
                 .zIndex(1001)
             }
+            
+            if stateManager.showTripCompletionCelebration {
+                TripCompletionCelebrationOverlay(
+                    isPresented: Binding(
+                        get: { stateManager.showTripCompletionCelebration },
+                        set: { stateManager.showTripCompletionCelebration = $0 }
+                    ),
+                    message: stateManager.tripCompletionMessage,
+                    autoDismissAfter: 3.0,
+                    onDismiss: {
+                        dismiss()
+                        DispatchQueue.main.async {
+                            NotificationCenter.default.post(
+                                name: NSNotification.Name("ShowInsightsAfterTrip"),
+                                object: nil,
+                                userInfo: ["cartId": cart.id]
+                            )
+                        }
+                    }
+                )
+                .transition(.opacity.combined(with: .scale))
+                .zIndex(1002)
+            }
         }
         .ignoresSafeArea(.keyboard)
         .onChange(of: cart.budget) { oldValue, newValue in
@@ -924,7 +967,7 @@ struct CartDetailContent: View {
             }
         }
         .onChange(of: cart.status) { oldValue, newValue in
-            handleCartStatusChange(newValue)
+            handleCartStatusChange(oldValue: oldValue, newValue: newValue)
         }
         .onChange(of: currentFulfilledCount) { oldValue, newValue in
             handleFulfilledCountChange(newValue)
@@ -938,10 +981,11 @@ struct CartDetailContent: View {
     }
     
     // MARK: - Event Handlers
-    private func handleCartStatusChange(_ newValue: CartStatus) {
-        // Auto-dismiss if cart is completed
-        if newValue == .completed {
-            dismiss()
+    private func handleCartStatusChange(oldValue: CartStatus, newValue: CartStatus) {
+        if oldValue != .completed && newValue == .completed {
+            showingCompleteAlert = false
+            stateManager.tripCompletionMessage = makeTripCompletionMessage()
+            stateManager.showTripCompletionCelebration = true
             return
         }
 
@@ -954,6 +998,100 @@ struct CartDetailContent: View {
                 stateManager.showingCompletedSheet = false
             }
         }
+    }
+
+    private func makeTripCompletionMessage() -> String {
+        let spent = fulfilledSpentTotal()
+        let budget = cart.budget
+        let epsilon = 0.01
+        
+        if budget <= 0 {
+            let spentText = formatCurrencyNoDecimals(spent)
+            return "Trip complete! \(spentText) spent — nice work."
+        }
+        
+        let delta = spent - budget
+        let spentText = formatCurrencyNoDecimals(spent)
+        let diffText = formatCurrencyNoDecimals(abs(delta))
+        
+        if delta < -epsilon {
+            let templates = [
+                "Nicely done! \(spentText) spent, \(diffText) under plan — every choice added up.",
+                "Great job! \(spentText) spent, \(diffText) saved — smart decisions made the difference.",
+                "On track! \(spentText) spent, \(diffText) under plan — careful planning paid off.",
+                "Smart move! \(spentText) spent, \(diffText) under plan — your choices added up.",
+                "Well done! \(spentText) spent, \(diffText) below plan — small actions, big result.",
+                "Success! \(spentText) spent, \(diffText) under plan — you stayed ahead of your budget.",
+                "Smooth trip! \(spentText) spent, \(diffText) under plan — your plan guided you well.",
+                "Excellent! \(spentText) spent, \(diffText) under plan — each item counted wisely.",
+                "You did it! \(spentText) spent, \(diffText) less than planned — thoughtful shopping wins.",
+                "Ahead of plan! \(spentText) spent, \(diffText) under — your choices added up perfectly."
+            ]
+            return templates.randomElement() ?? "Nice work! \(spentText) spent, \(diffText) under plan."
+        }
+        
+        if delta > epsilon {
+            let templates = [
+                "Reality check! \(spentText) spent, \(diffText) over plan — now you know what to adjust next time.",
+                "Heads up! \(spentText) spent, \(diffText) over plan — prices shifted, lessons learned.",
+                "Slightly over! \(spentText) spent, \(diffText) above plan — now your next trip can be smarter.",
+                "Take note! \(spentText) spent, \(diffText) over plan — insights gained for next time.",
+                "Learning moment! \(spentText) spent, \(diffText) over plan — now you know where to adjust.",
+                "Watch out! \(spentText) spent, \(diffText) over plan — prices changed, now you’re informed.",
+                "Important insight! \(spentText) spent, \(diffText) over plan — your plan vs reality revealed.",
+                "Lesson learned! \(spentText) spent, \(diffText) above plan — use it to shop smarter next time.",
+                "Slightly off track! \(spentText) spent, \(diffText) over plan — now you know the real cost.",
+                "Reality update! \(spentText) spent, \(diffText) above plan — planning next trip will be easier."
+            ]
+            return templates.randomElement() ?? "Trip complete! \(spentText) spent, \(diffText) over plan."
+        }
+        
+        let templates = [
+            "Perfect match! \(spentText) spent — your plan worked exactly as intended.",
+            "Spot on! \(spentText) spent — reality met your plan seamlessly.",
+            "Right on target! \(spentText) spent — your shopping went exactly as planned.",
+            "Exactly as planned! \(spentText) spent — smooth and precise trip.",
+            "Nailed it! \(spentText) spent — your plan was right on point.",
+            "Perfect trip! \(spentText) spent — your planning and execution aligned.",
+            "On point! \(spentText) spent — your shopping followed the plan perfectly.",
+            "Flawless! \(spentText) spent — your plan guided you accurately.",
+            "Just right! \(spentText) spent — the plan and reality matched.",
+            "All lined up! \(spentText) spent — your planning worked beautifully."
+        ]
+        
+        return templates.randomElement() ?? "On budget! \(spentText) spent."
+    }
+    
+    private func fulfilledSpentTotal() -> Double {
+        cart.cartItems
+            .filter { $0.quantity > 0 && $0.isFulfilled }
+            .reduce(0.0) { total, cartItem in
+                let price: Double
+                let quantity: Double
+                
+                if cartItem.isShoppingOnlyItem {
+                    price = cartItem.shoppingOnlyPrice ?? 0
+                    quantity = cartItem.actualQuantity ?? cartItem.quantity
+                } else {
+                    price = cartItem.actualPrice ?? cartItem.plannedPrice ?? 0
+                    quantity = cartItem.actualQuantity ?? cartItem.quantity
+                }
+                
+                return total + (price * quantity)
+            }
+    }
+    
+    private func formatCurrencyNoDecimals(_ amount: Double) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.locale = Locale.current
+        formatter.currencyCode = CurrencyManager.shared.selectedCurrency.code
+        formatter.currencySymbol = CurrencyManager.shared.selectedCurrency.symbol
+        formatter.minimumFractionDigits = 0
+        formatter.maximumFractionDigits = 0
+        
+        return formatter.string(from: NSNumber(value: amount))
+            ?? "\(CurrencyManager.shared.selectedCurrency.symbol)\(String(format: "%.0f", amount))"
     }
     
     private func handleFulfilledCountChange(_ newValue: Int) {
@@ -1038,9 +1176,12 @@ struct CartDetailContent: View {
         
         if let found = itemToUse {
             if cart.status == .shopping {
-                stateManager.selectedItemForPopover = found
-                stateManager.selectedCartItemForPopover = cartItem
-                stateManager.showingShoppingPopover = true
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    stateManager.shoppingPopoverPresentationID = UUID()
+                    stateManager.selectedItemForPopover = found
+                    stateManager.selectedCartItemForPopover = cartItem
+                    stateManager.showingShoppingPopover = true
+                }
             } else {
                 itemToEdit = found
             }
@@ -1049,9 +1190,12 @@ struct CartDetailContent: View {
     
     private func handleFulfillItem(cartItem: CartItem) {
         if let found = vaultService.findItemById(cartItem.itemId) {
-            stateManager.selectedItemForPopover = found
-            stateManager.selectedCartItemForPopover = cartItem
-            stateManager.showingFulfillPopover = true
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                stateManager.fulfillPopoverPresentationID = UUID()
+                stateManager.selectedItemForPopover = found
+                stateManager.selectedCartItemForPopover = cartItem
+                stateManager.showingFulfillPopover = true
+            }
         }
     }
 }

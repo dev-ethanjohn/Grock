@@ -22,7 +22,7 @@ struct UnifiedItemPopover: View {
     }
     
     @State private var overlayOpacity: Double = 0
-    @State private var contentScale: CGFloat = 0
+    @State private var contentScale: CGFloat = 0.8
     @State private var keyboardVisible: Bool = false
     
     private var storeName: String {
@@ -62,11 +62,22 @@ struct UnifiedItemPopover: View {
     }
     
     private var categoryInfo: (emoji: String, name: String) {
-        if let category = vaultService.getCategory(for: item.id),
-           let groceryCategory = GroceryCategory.allCases.first(where: { $0.title == category.name }) {
-            return (groceryCategory.emoji, category.name)
+        if cartItem.isShoppingOnlyItem,
+           let rawValue = cartItem.shoppingOnlyCategory,
+           let groceryCategory = GroceryCategory(rawValue: rawValue) {
+            return (groceryCategory.emoji, groceryCategory.title)
         }
-        return ("📦", "Uncategorized")
+        
+        let categoryName =
+        cartItem.vaultItemCategorySnapshot ??
+        vaultService.getCategoryName(for: item.id) ??
+        "Uncategorized"
+        
+        if let groceryCategory = GroceryCategory.allCases.first(where: { $0.title == categoryName }) {
+            return (groceryCategory.emoji, categoryName)
+        }
+        
+        return ("📦", categoryName)
     }
     
     private var currentPrompt: FieldPrompt {
@@ -126,10 +137,6 @@ struct UnifiedItemPopover: View {
                 )
                 
                 inputFieldsSection
-                    .onAppear {
-                        price = String(format: "%.2f", currentPrice)
-                        portion = String(format: currentQuantity.truncatingRemainder(dividingBy: 1) == 0 ? "%.0f" : "%.2f", currentQuantity)
-                    }
                 
                 if mode == .fulfill {
                     totalCostDisplay
@@ -162,13 +169,27 @@ struct UnifiedItemPopover: View {
             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: portion)
             .frame(maxHeight: .infinity, alignment: keyboardVisible ? .center : .center)
         }
+        // Some presentation contexts (notably swipe actions) can disable animations.
+        // Re-enable them so our scale transition behaves consistently everywhere.
+        .transaction { transaction in
+            transaction.disablesAnimations = false
+        }
         .onAppear {
+            price = String(format: "%.2f", currentPrice)
+            portion = String(format: currentQuantity.truncatingRemainder(dividingBy: 1) == 0 ? "%.0f" : "%.2f", currentQuantity)
+
+            overlayOpacity = 0
+            contentScale = 0.8
             focusedField = .price
-            withAnimation(.easeOut(duration: 0.2)) {
-                overlayOpacity = 1
-            }
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                contentScale = 1
+
+            // Escape any parent transactions (e.g. List row taps) that occasionally disable animations.
+            DispatchQueue.main.async {
+                withAnimation(.easeOut(duration: 0.2)) {
+                    overlayOpacity = 1
+                }
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    contentScale = 1
+                }
             }
         }
         .onDisappear {

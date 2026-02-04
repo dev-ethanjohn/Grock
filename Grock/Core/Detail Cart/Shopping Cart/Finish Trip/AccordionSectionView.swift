@@ -1,5 +1,14 @@
 import SwiftUI
 
+private struct AccordionHeaderButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        // Avoid the default "flash" on tap while still giving a tiny tactile response.
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.99 : 1.0)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+    }
+}
+
 struct AccordionSectionView<Content: View>: View {
     let icon: String
     let title: String
@@ -8,14 +17,50 @@ struct AccordionSectionView<Content: View>: View {
     let accentDeep: Color
     @Binding var isExpanded: Bool
     let hasContent: Bool
+    let background: Color
+    let borderColor: Color
+    let cornerRadius: CGFloat
     let content: () -> Content
+
+    init(
+        icon: String,
+        title: String,
+        subtitle: String,
+        accentDeep: Color,
+        isExpanded: Binding<Bool>,
+        hasContent: Bool,
+        background: Color = .clear,
+        borderColor: Color = Color.gray.opacity(0.35),
+        cornerRadius: CGFloat = 12,
+        @ViewBuilder content: @escaping () -> Content
+    ) {
+        self.icon = icon
+        self.title = title
+        self.subtitle = subtitle
+        self.accentDeep = accentDeep
+        self._isExpanded = isExpanded
+        self.hasContent = hasContent
+        self.background = background
+        self.borderColor = borderColor
+        self.cornerRadius = cornerRadius
+        self.content = content
+    }
     
     var body: some View {
         Group {
             if hasContent {
                 VStack(spacing: 0) {
                     Button(action: {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        let expanding = !isExpanded
+                        withAnimation(
+                            // Keep both expand + collapse fluid. Expand can be a bit bouncier,
+                            // collapse stays springy but slightly more damped.
+                            .spring(
+                                response: expanding ? 0.34 : 0.28,
+                                dampingFraction: expanding ? 0.78 : 0.86,
+                                blendDuration: 0.12
+                            )
+                        ) {
                             isExpanded.toggle()
                         }
                     }) {
@@ -51,23 +96,30 @@ struct AccordionSectionView<Content: View>: View {
                             }
                         }
                         .contentShape(Rectangle())
-                        .padding(.leading, 8)
+                        .padding(.vertical, 12)
+                        .padding(.horizontal, 12)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(AccordionHeaderButtonStyle())
                     .zIndex(1)
                     
-                    Group {
+                    // Clip the dropdown region so a `.move(edge: .top)` transition can't visually slide "over" the header.
+                    ZStack(alignment: .top) {
                         if isExpanded {
                             content()
-                                .padding(.top, 8)
-                                .transition(
-                                    .move(edge: .bottom).combined(with: .opacity)
-                                )
+                                .transition(.opacity.combined(with: .move(edge: .top)))
                         }
                     }
-                    .animation(.spring(response: 0.35, dampingFraction: 0.85), value: isExpanded)
                     .clipped()
                 }
+                .background(background)
+                .cornerRadius(cornerRadius)
+                .overlay(
+                    RoundedRectangle(cornerRadius: cornerRadius)
+                        .stroke(borderColor, lineWidth: 1)
+                )
+                .padding(1)
+                .clipped()
             } else {
                 EmptyView()
             }
@@ -85,7 +137,8 @@ private struct AccordionPreviewWrapper: View {
 //            accent: Color(hex: "6D6D6D"),
             accentDeep: Color(hex: "3A3A3A"),
             isExpanded: $expanded,
-            hasContent: true
+            hasContent: true,
+            background: Color(hex: "F9F9F9")
         ) {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Item 1")

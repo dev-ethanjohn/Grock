@@ -41,7 +41,7 @@ struct BlurScroll: ViewModifier {
                     .allowsHitTesting(false) // Let touches pass through to scroll
             }
         }
-        .ignoresSafeArea()
+        .ignoresSafeArea(edges: .bottom)
     }
 }
 

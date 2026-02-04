@@ -33,9 +33,58 @@ extension VaultService {
     }
 
     func deleteCart(_ cart: Cart) {
-        vault?.carts.removeAll { $0.id == cart.id }
+        guard let vault else { return }
+        
+        if cart.isCompleted {
+            if vault.deletedCarts.contains(where: { $0.id == cart.id }) {
+                return
+            }
+            
+            vault.carts.removeAll { $0.id == cart.id }
+            cart.isDeleted = true
+            cart.deletedAt = Date()
+            vault.deletedCarts.append(cart)
+            saveContext()
+            NotificationCenter.default.post(name: NSNotification.Name("DataUpdated"), object: nil)
+            print("🗑️ Moved completed cart to Trash: \(cart.name)")
+            return
+        }
+        
+        vault.carts.removeAll { $0.id == cart.id }
+        modelContext.delete(cart)
         saveContext()
+        NotificationCenter.default.post(name: NSNotification.Name("DataUpdated"), object: nil)
+        CartBackgroundImageManager.shared.deleteImage(forCartId: cart.id)
+        UserDefaults.standard.removeObject(forKey: "cartBackgroundColor_\(cart.id)")
         print("🗑️ Deleted cart: \(cart.name)")
+    }
+}
+
+extension VaultService {
+    func restoreDeletedCart(cartId: String) {
+        guard let vault else { return }
+        guard let index = vault.deletedCarts.firstIndex(where: { $0.id == cartId }) else { return }
+        
+        let cart = vault.deletedCarts.remove(at: index)
+        cart.isDeleted = false
+        cart.deletedAt = nil
+        if !vault.carts.contains(where: { $0.id == cartId }) {
+            vault.carts.append(cart)
+        }
+        saveContext()
+        NotificationCenter.default.post(name: NSNotification.Name("DataUpdated"), object: nil)
+    }
+    
+    func permanentlyDeleteCartFromTrash(cartId: String) {
+        guard let vault else { return }
+        guard let index = vault.deletedCarts.firstIndex(where: { $0.id == cartId }) else { return }
+        
+        let cart = vault.deletedCarts.remove(at: index)
+        modelContext.delete(cart)
+        saveContext()
+        NotificationCenter.default.post(name: NSNotification.Name("DataUpdated"), object: nil)
+        CartBackgroundImageManager.shared.deleteImage(forCartId: cartId)
+        UserDefaults.standard.removeObject(forKey: "cartBackgroundColor_\(cartId)")
     }
 }
 

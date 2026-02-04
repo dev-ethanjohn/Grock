@@ -13,8 +13,7 @@ struct HeaderView: View {
     
     private var progress: Double {
         guard stateManager.localBudget > 0 else { return 0 }
-        let spent = cart.totalSpent
-        return min(spent / stateManager.localBudget, 1.0)
+        return min(cart.totalSpent / stateManager.localBudget, 1.0)
     }
     
     @State private var headerHeight: CGFloat = 0
@@ -97,6 +96,7 @@ struct HeaderView: View {
                     Text(cart.name)
                         .fuzzyBubblesFont(22, weight: .bold)
                         .foregroundColor(.black)
+                        .padding(.trailing, 32)
 
                 
                 HStack {
@@ -130,6 +130,17 @@ struct HeaderView: View {
                         isHeader: true // 👈 Mark as header
                     )
                     .frame(height: 22)
+                    
+                    if cart.isShopping {
+                        EmptyView()
+                    } else if cart.isCompleted {
+                        HStack(spacing: 0) {
+                            Text("Final spent \((fulfilledSpentTotal() ?? cart.totalSpent).formattedCurrency)")
+                                .lexendFont(11, weight: .medium)
+                                .foregroundStyle(.black.opacity(0.55))
+                            Spacer()
+                        }
+                    }
                 }
             }
             .padding(.top, 8)
@@ -149,6 +160,18 @@ struct HeaderView: View {
                           }
                   }
               )
+    }
+    
+    private func fulfilledSpentTotal() -> Double? {
+        guard let vault = vaultService.vault else { return nil }
+        
+        return cart.cartItems
+            .filter { cartItem in
+                cartItem.quantity > 0 && cartItem.isFulfilled && !cartItem.isSkippedDuringShopping
+            }
+            .reduce(0.0) { total, cartItem in
+                total + cartItem.getTotalPrice(from: vault, cart: cart)
+            }
     }
     
     // Total items includes ONLY ACTIVE items (non-skipped, non-deleted)

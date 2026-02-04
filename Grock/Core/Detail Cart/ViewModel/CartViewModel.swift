@@ -36,19 +36,27 @@ class CartViewModel {
     }
     
     func loadCarts() {
+        #if DEBUG
         print("🔄 CartViewModel: Loading carts...")
+        #endif
         
         if let vault = vaultService.vault {
             // sort carts by creation date (newest first)
             let loadedCarts = vault.carts.sorted { $0.createdAt > $1.createdAt }
             self.carts = loadedCarts
             
-            print("🔄 CartViewModel: Loaded \(loadedCarts.count) carts")
+            #if DEBUG
+            let activeCount = loadedCarts.filter { $0.isActive }.count
+            let completedCount = loadedCarts.filter { $0.isCompleted }.count
+            print("🔄 CartViewModel: Loaded \(loadedCarts.count) carts (\(activeCount) active, \(completedCount) completed)")
             for cart in loadedCarts {
-                print("   - \(cart.name) (ID: \(cart.id), Items: \(cart.cartItems.count))")
+                print("   - \(cart.name) (ID: \(cart.id), Status: \(cart.status), Items: \(cart.cartItems.count))")
             }
+            #endif
         } else {
+            #if DEBUG
             print("❌ CartViewModel: No vault found when loading carts")
+            #endif
             self.carts = []
         }
     }
@@ -226,4 +234,3 @@ class CartViewModel {
         return vaultService.isCartNameDuplicate(name, excluding: cartId)
     }
 }
-

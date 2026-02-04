@@ -92,7 +92,7 @@ struct ModeToggleView: View {
             }
         }
         .onChange(of: stateManager.selectedColor) { oldValue, newValue in
-            UserDefaults.standard.set(newValue.hex, forKey: "cartBackgroundColor_\(cart.id)")
+            CartColorManager.shared.setColor(newValue, for: cart.id)
         }
     }
 }
@@ -576,13 +576,24 @@ class CartBackgroundImageManager: @unchecked Sendable {
            let image = UIImage(data: data) {
             // Cache it for next time
             ImageCacheManager.shared.saveImage(image, forCartId: cartId)
+            UserDefaults.standard.set(true, forKey: "hasBackgroundImage_\(cartId)")
             return image
         }
         return nil
     }
     
     func hasBackgroundImage(forCartId cartId: String) -> Bool {
-        return UserDefaults.standard.bool(forKey: "hasBackgroundImage_\(cartId)")
+        if UserDefaults.standard.bool(forKey: "hasBackgroundImage_\(cartId)") {
+            return true
+        }
+        
+        let filename = getDocumentsDirectory().appendingPathComponent("cart_background_\(cartId).jpg")
+        if fileManager.fileExists(atPath: filename.path) {
+            UserDefaults.standard.set(true, forKey: "hasBackgroundImage_\(cartId)")
+            return true
+        }
+        
+        return false
     }
     
     func deleteImage(forCartId cartId: String) {

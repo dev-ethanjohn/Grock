@@ -34,6 +34,8 @@ class Vault: Equatable {
     var stores: [Store] = []
     @Relationship(deleteRule: .cascade)
     var deletedItems: [Item] = []
+    @Relationship(deleteRule: .cascade)
+    var deletedCarts: [Cart] = []
     
     init(uid: String = UUID().uuidString) {
         self.uid = uid
@@ -167,6 +169,8 @@ class Cart {
     var startedAt: Date?
     var completedAt: Date?
     var status: CartStatus
+    var isDeleted: Bool = false
+    var deletedAt: Date?
     
     @Relationship(deleteRule: .cascade, inverse: \CartItem.cart)
     var cartItems: [CartItem] = []
@@ -179,7 +183,9 @@ class Cart {
         createdAt: Date = Date(),
         startedAt: Date? = nil,
         completedAt: Date? = nil,
-        status: CartStatus = .planning
+        status: CartStatus = .planning,
+        isDeleted: Bool = false,
+        deletedAt: Date? = nil
     ) {
         self.id = id
         self.name = name
@@ -190,6 +196,8 @@ class Cart {
         self.startedAt = startedAt
         self.completedAt = completedAt
         self.status = status
+        self.isDeleted = isDeleted
+        self.deletedAt = deletedAt
     }
     
     var isPlanning: Bool { status == .planning }

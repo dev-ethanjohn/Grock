@@ -1,15 +1,23 @@
 import SwiftUI
 import SwiftData
+import Lottie
+import UIKit
 
 struct HomeCartRowView: View {
     let cart: Cart
     let vaultService: VaultService?
+    let cartNamespace: Namespace.ID?
     
     @State private var viewModel: HomeCartRowViewModel
     @State private var appeared = false
     @State private var currentProgress: Double = 0
     @State private var backgroundImage: UIImage? = nil
     @State private var hasBackgroundImage = false
+    @State private var colorRefreshTick: Int = 0
+    
+    // Shopping overlay animation (used when returning from CartDetail zoom transition)
+    @State private var shoppingOverlayScale: CGFloat = 1.0
+    @State private var shoppingOverlayOffset: CGSize = CGSize(width: -4, height: -4)
     
     // Add this to observe currency changes
     @State private var currencyManager = CurrencyManager.shared
@@ -18,9 +26,10 @@ struct HomeCartRowView: View {
       @State private var cachedActiveCategories: [GroceryCategory] = []
       @State private var lastCartItemsCount: Int = 0
     
-    init(cart: Cart, vaultService: VaultService?) {
+    init(cart: Cart, vaultService: VaultService?, cartNamespace: Namespace.ID? = nil) {
         self.cart = cart
         self.vaultService = vaultService
+        self.cartNamespace = cartNamespace
         self._viewModel = State(initialValue: HomeCartRowViewModel(cart: cart))
         self._currentProgress = State(initialValue: cart.totalSpent / cart.budget)
     }
@@ -46,6 +55,7 @@ struct HomeCartRowView: View {
     }
     
     private var backgroundColor: Color {
+        _ = colorRefreshTick
         if hasBackgroundImage {
             return Color.clear
         } else {
@@ -63,12 +73,13 @@ struct HomeCartRowView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .clipped()
                         .blur(radius: 2)
-                        .overlay(Color.black.opacity(0.4))
+                        .overlay(Color.black.opacity(0.5))
+                        .overlay(Color.gray.opacity(0.1))
                     
                     VisibleNoiseView(
                         grainSize: 0.0001,
-                        density: 0.5,
-                        opacity: 0.20
+                        density: 0.7,
+                        opacity: 0.15
                     )
                 }
             } else {
@@ -79,16 +90,61 @@ struct HomeCartRowView: View {
         }
     }
     
-//    private var shoppingModeOverlay: some View {
-//        EmptyView()
-//    }
+    private var shoppingModeOverlay: some View {
+        Group {
+            if cart.isShopping {
+                LottieView(animation: .named("ShoppingMode"))
+                    .playing(.fromProgress(0, toProgress: 1, loopMode: .loop))
+//                    .valueProvider(
+//                        ColorValueProvider(LottieColor(r: 0, g: 0, b: 0, a: 1)),
+//                        for: AnimationKeypath(keypath: "**.Fill 1.Color")
+//                    )
+                    .allowsHitTesting(false)
+                    .frame(width: 24, height: 24)
+                    .padding(6)
+                    .background(
+                        Circle()
+                            .fill(Color.white)
+                            .overlay(
+                                Circle()
+                                    .stroke(Color.gray, lineWidth: hasBackgroundImage ? 0 : 0.5)
+                            )
+                    )
+                    .shadow(
+                        color: Color.black.opacity(hasBackgroundImage ? 0 : 0.12),
+                        radius: 4,
+                        x: 0,
+                        y: 2
+                    )
+                    .offset(shoppingOverlayOffset)
+                    .scaleEffect(shoppingOverlayScale, anchor: .topLeading)
+            }
+        }
+    }
     
     private var borderOverlay: some View {
         RoundedRectangle(cornerRadius: 24)
-            .stroke(
-                Color.gray.opacity(1),
-                lineWidth: 0.3
-            )
+            .stroke(Color.gray, lineWidth: 0.5)
+    }
+    
+    private var card: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            headerRow
+            progressSection
+        }
+        .padding()
+        .background(cardBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 24))
+        .overlay(borderOverlay)
+    }
+    
+    @ViewBuilder
+    private var transitionCard: some View {
+        if #available(iOS 18.0, *), let cartNamespace {
+            card.matchedTransitionSource(id: cart.id, in: cartNamespace)
+        } else {
+            card
+        }
     }
     
     // Total items includes ONLY ACTIVE items (non-skipped, non-deleted)
@@ -123,13 +179,7 @@ struct HomeCartRowView: View {
             return "\(selectedCurrency.symbol)0.00"
         }
         
-        let fulfilledTotal = cart.cartItems
-            .filter { cartItem in
-                cartItem.quantity > 0 && cartItem.isFulfilled
-            }
-            .reduce(0.0) { total, cartItem in
-                total + cartItem.getTotalPrice(from: vault, cart: cart)
-            }
+        let fulfilledTotal = fulfilledSpentTotal(from: vault)
         
         let selectedCurrency = CurrencyManager.shared.selectedCurrency
         let numberFormatter = NumberFormatter()
@@ -141,22 +191,26 @@ struct HomeCartRowView: View {
         return "\(selectedCurrency.symbol)\(formattedAmount)"
     }
     
+    private var fulfilledSpentValue: Double? {
+        guard let vault = vaultService?.vault else { return nil }
+        return fulfilledSpentTotal(from: vault)
+    }
+    
+    private func fulfilledSpentTotal(from vault: Vault) -> Double {
+        cart.cartItems
+            .filter { cartItem in
+                cartItem.quantity > 0 && cartItem.isFulfilled && !cartItem.isSkippedDuringShopping
+            }
+            .reduce(0.0) { total, cartItem in
+                total + cartItem.getTotalPrice(from: vault, cart: cart)
+            }
+    }
+    
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            headerRow
-            progressSection
+        ZStack(alignment: .topLeading) {
+            transitionCard
+            shoppingModeOverlay
         }
-        .padding()
-        .background(cardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 24))
-//        .overlay(shoppingModeOverlay)
-//        .shadow(
-//            color: Color.black.opacity(cart.isShopping ? 0.25 : 0),
-//            radius: 0.5,
-//            x: 0,
-//            y: 0.5
-//        )
-        .overlay(borderOverlay)
         .scaleEffect(appeared ? 1.0 : 0.95)
         .opacity(appeared ? 1.0 : 0)
         // ✅ Add drawingGroup to offload rendering to GPU
@@ -208,14 +262,43 @@ struct HomeCartRowView: View {
             // Also reload when color changes (in case image is removed)
             if let cartId = notification.userInfo?["cartId"] as? String,
                cartId == cart.id {
+                colorRefreshTick += 1
                 loadBackgroundImage()
             }
         }
-        .onChange(of: cart.status) { oldValue, newValue in
-            // Smooth transition when cart status changes
-            withAnimation(.easeInOut(duration: 0.5)) {
-                // Gradient will automatically appear/disappear based on cart.isShopping
-            }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("CartDetailPresented"))) { notification in
+            guard let cartId = notification.userInfo?["cartId"] as? String, cartId == cart.id else { return }
+            prepareShoppingOverlayForReturnAnimation()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("CartDetailDismissed"))) { notification in
+            guard let cartId = notification.userInfo?["cartId"] as? String, cartId == cart.id else { return }
+            animateShoppingOverlayAfterReturn()
+        }
+//        .onChange(of: cart.status) { oldValue, newValue in
+//            // Smooth transition when cart status changes
+//            withAnimation(.easeInOut(duration: 0.5)) {
+//                // Gradient will automatically appear/disappear based on cart.isShopping
+//            }
+//        }
+    }
+
+    private func prepareShoppingOverlayForReturnAnimation() {
+        guard cart.isShopping else { return }
+        // Hide + tuck the overlay inside the card so the zoom-back snapshot doesn't show it clipped.
+        withAnimation(.none) {
+            shoppingOverlayScale = 0.0
+            // (6,6) keeps the circle fully inside a 24pt rounded corner.
+            shoppingOverlayOffset = CGSize(width: 6, height: 6)
+        }
+    }
+    
+    private func animateShoppingOverlayAfterReturn() {
+        guard cart.isShopping else { return }
+
+        // Animate in with a subtle "pop" after return (scale-only, iOS-feel).
+        withAnimation(.spring(response: 0.42, dampingFraction: 0.9)) {
+            shoppingOverlayScale = 1.0
+            shoppingOverlayOffset = CGSize(width: -4, height: -4)
         }
     }
     
@@ -290,9 +373,9 @@ struct HomeCartRowView: View {
     
     private var headerRow: some View {
         HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 3) {
+//            VStack(alignment: .leading, spacing: 3) {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text(cart.name)
+                    Text(cart.isShopping ? "   \(cart.name)" : cart.name)
                         .fuzzyBubblesFont(18, weight: .bold)
                         .foregroundColor(hasBackgroundImage ? .white : .black)
                     if cart.isShopping {
@@ -306,18 +389,18 @@ struct HomeCartRowView: View {
                     }
                 }
                 
-                if cart.isShopping {
-                    Text("Shopping")
-                        .lexendFont(10, weight: .medium)
-                        .foregroundColor(
-                            hasBackgroundImage
-                            ? .white.opacity(0.8)
-                            : Color.black.opacity(0.5)
-                        )
-                        .offset(y: -4)
-                }
-            }
-            .offset(y: -2)
+//                if cart.isShopping {
+//                    Text("Shopping")
+//                        .lexendFont(10, weight: .medium)
+//                        .foregroundColor(
+//                            hasBackgroundImage
+//                            ? .white.opacity(0.8)
+//                            : Color.black.opacity(0.5)
+//                        )
+//                        .offset(y: -4)
+//                }
+//            }
+//            .offset(y: -2)
             
             Spacer()
             
@@ -343,6 +426,22 @@ struct HomeCartRowView: View {
 //                .padding(.leading, 4)
 //                .foregroundColor(hasBackgroundImage ? .white : .black)
 //            }
+            
+            if cart.isShopping {
+                let summaryColor = hasBackgroundImage ? Color.white.opacity(0.82) : Color(hex: "717171")
+                CharacterRevealView(
+                    text: "Spent so far: \(fulfilledItemsTotal)",
+                    delay: 0.15,
+                    animateOnChange: true,
+                    animateOnAppear: false,
+                    showsUnderline: false,
+                    underlineColor: summaryColor
+                )
+                .id("spent-\(fulfilledItemsTotal)")
+                .fuzzyBubblesFont(13, weight: .bold)
+                .foregroundColor(summaryColor)
+                .padding(.leading, 4)
+            }
             
             FluidBudgetPillView(
                 cart: cart,

@@ -1027,7 +1027,7 @@ struct ManageCartItemRow: View {
                 
                 if let priceOption = item.priceOptions.first {
                     HStack(spacing: 0) {
-                        Text("\(CurrencyManager.shared.selectedCurrency.symbol)\(priceOption.pricePerUnit.priceValue, specifier: "%g")")
+                        Text("\(CurrencyManager.shared.selectedCurrency.symbol)\(priceOption.pricePerUnit.priceValue.formattedPricePerUnitValue)")
                             .contentTransition(.numericText())
                             .animation(.snappy, value: CurrencyManager.shared.selectedCurrency.symbol)
                         Text("/\(priceOption.pricePerUnit.unit)")

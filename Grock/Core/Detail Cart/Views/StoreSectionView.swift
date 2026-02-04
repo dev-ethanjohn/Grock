@@ -326,6 +326,7 @@ private struct StoreSectionHeader: View {
             .padding(.leading)
         }
         .padding(.vertical, 4)
+        .padding(.top, isFirstStore ? -12 : 0)
         .offset(y: isFirstStore ? 0 : 10)
         .listRowInsets(EdgeInsets())
         .textCase(nil)

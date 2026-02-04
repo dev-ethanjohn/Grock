@@ -111,12 +111,12 @@ struct HomeView: View {
             }
             .fullScreenCover(isPresented: $showInsights) {
                 if #available(iOS 18.0, *) {
-                    InsightsView()
+                    HistoryView()
                         .environment(vaultService)
                         .environment(cartViewModel)
                         .navigationTransition(.zoom(sourceID: "insightsIcon", in: insightsNamespace))
                 } else {
-                    InsightsView()
+                    HistoryView()
                         .environment(vaultService)
                         .environment(cartViewModel)
                 }
@@ -590,6 +590,8 @@ struct HomeView: View {
                         .matchedTransitionSource(id: "insightsIcon", in: insightsNamespace)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("History")
+                .accessibilityHint("View your completed shopping trips")
             } else {
                 Button(action: {
                     showInsights = true
@@ -630,6 +632,8 @@ struct HomeView: View {
                         .contentShape(Circle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("History")
+                .accessibilityHint("View your completed shopping trips")
             }
         }
     }

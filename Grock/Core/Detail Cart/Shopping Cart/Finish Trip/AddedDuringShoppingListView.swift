@@ -6,9 +6,8 @@ struct AddedItemDisplay: Identifiable {
     let qty: Double
 }
 
-struct AddedDuringShoppingListView<Background: View>: View {
+struct AddedDuringShoppingListView: View {
     let items: [AddedItemDisplay]
-    let background: Background
     
     var body: some View {
         VStack(spacing: 10) {
@@ -29,9 +28,9 @@ struct AddedDuringShoppingListView<Background: View>: View {
                 }
             }
         }
-        .padding()
-        .background(background)
-        .clipShape(RoundedRectangle(cornerRadius: 18))
+        .padding(.horizontal, 12)
+        .padding(.bottom, 12)
+        .padding(.top, 2)
     }
 }
 
@@ -40,7 +39,7 @@ struct AddedDuringShoppingListView<Background: View>: View {
         AddedItemDisplay(id: "1", name: "Bananas", qty: 6),
         AddedItemDisplay(id: "2", name: "Sparkling Water", qty: 2)
     ]
-    return AddedDuringShoppingListView(items: sample, background: Color.white)
+    return AddedDuringShoppingListView(items: sample)
         .padding()
         .background(Color.white)
 }

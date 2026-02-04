@@ -38,9 +38,14 @@ final class CartStateManager {
     var showingEditCartName = false
     var selectedItemForPopover: Item? = nil
     var selectedCartItemForPopover: CartItem? = nil
+    // Used to force a fresh popover instance (and fresh @State) each presentation.
+    var shoppingPopoverPresentationID = UUID()
+    var fulfillPopoverPresentationID = UUID()
     
     // Celebration/Animation state
     var showCelebration = false
+    var showTripCompletionCelebration = false
+    var tripCompletionMessage: String = ""
     var manageCartButtonVisible = false
     var buttonScale: CGFloat = 1.0
     var shouldBounceAfterCelebration = false

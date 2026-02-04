@@ -12,9 +12,24 @@ struct TrashView: View {
     @State private var pendingPermanentDeleteItemName: String = ""
     @State private var showingPermanentDeleteAlert = false
     
+    @State private var pendingRestoreCartId: String?
+    @State private var pendingRestoreCartName: String = ""
+    @State private var showingRestoreCartAlert = false
+    
+    @State private var pendingPermanentDeleteCartId: String?
+    @State private var pendingPermanentDeleteCartName: String = ""
+    @State private var showingPermanentDeleteCartAlert = false
+    
     private var deletedItems: [Item] {
         guard let vault = vaultService.vault else { return [] }
         return vault.deletedItems.sorted {
+            ($0.deletedAt ?? .distantPast) > ($1.deletedAt ?? .distantPast)
+        }
+    }
+    
+    private var deletedCarts: [Cart] {
+        guard let vault = vaultService.vault else { return [] }
+        return vault.deletedCarts.sorted {
             ($0.deletedAt ?? .distantPast) > ($1.deletedAt ?? .distantPast)
         }
     }
@@ -31,13 +46,55 @@ struct TrashView: View {
     
     var body: some View {
         List {
-            if deletedItems.isEmpty {
+            if deletedItems.isEmpty && deletedCarts.isEmpty {
                 ContentUnavailableView(
                     "Trash is empty",
                     systemImage: "trash",
                     description: Text("Deleted items will appear here.")
                 )
             } else {
+                if !deletedCarts.isEmpty {
+                    Section("Trips") {
+                        ForEach(deletedCarts, id: \.id) { cart in
+                            HStack(spacing: 12) {
+                                Image(systemName: "clock.arrow.circlepath")
+                                    .foregroundColor(.gray)
+                                Text(cart.name)
+                                    .lexend(.body)
+                                Spacer()
+                            }
+                            .contentShape(Rectangle())
+                            .contextMenu {
+                                Button {
+                                    confirmRestore(cart)
+                                } label: {
+                                    Label("Restore", systemImage: "arrow.uturn.backward")
+                                }
+                                
+                                Button(role: .destructive) {
+                                    confirmPermanentDelete(cart)
+                                } label: {
+                                    Label("Delete Permanently", systemImage: "trash.slash")
+                                }
+                            }
+                            .swipeActions(edge: .trailing) {
+                                Button(role: .destructive) {
+                                    confirmPermanentDelete(cart)
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                                
+                                Button {
+                                    confirmRestore(cart)
+                                } label: {
+                                    Label("Restore", systemImage: "arrow.uturn.backward")
+                                }
+                                .tint(.green)
+                            }
+                        }
+                    }
+                }
+                
                 ForEach(deletedItemsGrouped, id: \.categoryName) { group in
                     Section(group.categoryName) {
                         ForEach(group.items, id: \.id) { item in
@@ -108,6 +165,32 @@ struct TrashView: View {
         } message: {
             Text("Permanently delete '\(pendingPermanentDeleteItemName)'? This cannot be undone.")
         }
+        .alert("Restore Trip", isPresented: $showingRestoreCartAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Restore") {
+                if let cartId = pendingRestoreCartId {
+                    withAnimation {
+                        vaultService.restoreDeletedCart(cartId: cartId)
+                    }
+                }
+                pendingRestoreCartId = nil
+            }
+        } message: {
+            Text("Restore '\(pendingRestoreCartName)' back to History?")
+        }
+        .alert("Delete Trip Permanently", isPresented: $showingPermanentDeleteCartAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete", role: .destructive) {
+                if let cartId = pendingPermanentDeleteCartId {
+                    withAnimation {
+                        vaultService.permanentlyDeleteCartFromTrash(cartId: cartId)
+                    }
+                }
+                pendingPermanentDeleteCartId = nil
+            }
+        } message: {
+            Text("Permanently delete '\(pendingPermanentDeleteCartName)'? This cannot be undone.")
+        }
     }
     
     private func confirmRestore(_ item: Item) {
@@ -121,5 +204,16 @@ struct TrashView: View {
         pendingPermanentDeleteItemName = item.name
         showingPermanentDeleteAlert = true
     }
+    
+    private func confirmRestore(_ cart: Cart) {
+        pendingRestoreCartId = cart.id
+        pendingRestoreCartName = cart.name
+        showingRestoreCartAlert = true
+    }
+    
+    private func confirmPermanentDelete(_ cart: Cart) {
+        pendingPermanentDeleteCartId = cart.id
+        pendingPermanentDeleteCartName = cart.name
+        showingPermanentDeleteCartAlert = true
+    }
 }
-
