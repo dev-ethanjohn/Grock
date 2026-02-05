@@ -30,5 +30,18 @@ extension View {
                 }
             }
     }
-}
 
+    @ViewBuilder
+    func rect(in coordinateSpace: CoordinateSpace, completion: @escaping (CGRect) -> ()) -> some View {
+        self
+            .overlay {
+                GeometryReader {
+                    let rect = $0.frame(in: coordinateSpace)
+
+                    Color.clear
+                        .preference(key: RectKey.self, value: rect)
+                        .onPreferenceChange(RectKey.self, perform: completion)
+                }
+            }
+    }
+}

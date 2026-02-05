@@ -36,8 +36,14 @@ struct ManageCartSheet: View {
     @State private var keyboardResponder = KeyboardResponder()
     @State private var focusedItemId: String?
     
+    private var activeItemCount: Int {
+        localActiveItems.values.reduce(0) { count, quantity in
+            count + (quantity > 0 ? 1 : 0)
+        }
+    }
+    
     private var hasActiveItems: Bool {
-        !localActiveItems.isEmpty
+        activeItemCount > 0
     }
     
     // Computed property that reacts to vault changes
@@ -85,10 +91,19 @@ struct ManageCartSheet: View {
                     .filter { !$0.isEmpty }
             }
         let configured = (decoded?.isEmpty == false) ? decoded! : defaultCategoryNames
-        let visibleSet = Set(configured.map { $0.lowercased() })
-        
-        let filtered = allCategoryNames.filter { visibleSet.contains($0.lowercased()) }
-        return filtered.isEmpty ? defaultCategoryNames : filtered
+
+        let canonicalByKey = Dictionary(uniqueKeysWithValues: allCategoryNames.map { ($0.lowercased(), $0) })
+        var seen = Set<String>()
+        var result: [String] = []
+
+        for name in configured {
+            let key = name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            guard let canonical = canonicalByKey[key], !seen.contains(key) else { continue }
+            seen.insert(key)
+            result.append(canonical)
+        }
+
+        return result.isEmpty ? defaultCategoryNames : result
     }
     
     private var visibleCategoriesBinding: Binding<[String]> {
@@ -106,6 +121,7 @@ struct ManageCartSheet: View {
     //switching category transition
     @State private var navigationDirection: NavigationDirection = .none
     @State private var showCategoryPickerSheet = false
+    @State private var categoryManagerStartOnHidden = false
     
     @AppStorage("visibleCategoryNames") private var visibleCategoryNamesData: Data = Data()
     
@@ -288,6 +304,7 @@ struct ManageCartSheet: View {
             NavigationStack {
                 CategoriesManagerSheet(
                     title: "Categories",
+                    startOnHiddenTab: categoryManagerStartOnHidden,
                     selectedCategoryName: $selectedCategoryName,
                     visibleCategoryNames: visibleCategoriesBinding,
                     activeItemCount: { getActiveItemCount(forCategoryNamed: $0) },
@@ -297,6 +314,11 @@ struct ManageCartSheet: View {
             .presentationDetents([.large])
             .presentationCornerRadius(24)
             .presentationBackground(.white)
+        }
+        .onChange(of: showCategoryPickerSheet) { _, isPresented in
+            if !isPresented {
+                categoryManagerStartOnHidden = false
+            }
         }
     }
     
@@ -309,7 +331,7 @@ struct ManageCartSheet: View {
                     ZStack(alignment: .leading) {
                         if let selectedCategoryName,
                            let selectedIndex = visibleCategories.firstIndex(of: selectedCategoryName) {
-                            RoundedRectangle(cornerRadius: 10)
+                            RoundedRectangle(cornerRadius: 12)
                                 .strokeBorder(Color.black, lineWidth: 2)
                                 .frame(width: iconSize, height: iconSize)
                                 .offset(x: CGFloat(selectedIndex) * (iconSize + iconSpacing))
@@ -340,7 +362,17 @@ struct ManageCartSheet: View {
                                 .frame(width: iconSize, height: iconSize)
                                 .id(categoryName)
                             }
+
+                            Image(systemName: "plus.square.dashed")
+                                .font(.system(size: 44, weight: .light))
+                                .foregroundStyle(.gray)
+                                .offset(x: -2)
+                                .onTapGesture {
+                                    categoryManagerStartOnHidden = true
+                                    showCategoryPickerSheet = true
+                                }
                         }
+                        .padding(.trailing)
                     }
                     .padding(.vertical, 1)
                     .padding(.leading)
@@ -354,20 +386,13 @@ struct ManageCartSheet: View {
                     UIApplication.shared.endEditing()
                     showCategoryPickerSheet = true
                 } label: {
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 16, weight: .black))
-                        .foregroundColor(.black)
-                        .frame(width: 40, height: 40)
-                        .background(Circle().fill(.white))
-                        .overlay(
-                            Circle()
-                                .stroke(.black, lineWidth: 2)
-                        )
+                    Image(systemName: "chevron.down.circle")
+                        .font(.system(size: 24, weight: .medium))
+                        .foregroundColor(.gray)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Show categories")
                 .padding(.vertical, 18)
-                .offset(y: 14)
                 .padding(.trailing)
             }
             .onChange(of: selectedCategoryName) { _, newValue in
@@ -463,10 +488,10 @@ struct ManageCartSheet: View {
                 }
                 .overlay(alignment: .topLeading, content: {
                     if hasActiveItems {
-                        Text("\(localActiveItems.count)")
+                        Text("\(activeItemCount)")
                             .fuzzyBubblesFont(16, weight: .bold)
                             .contentTransition(.numericText())
-                            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: localActiveItems.count)
+                            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: activeItemCount)
                             .foregroundColor(.black)
                             .frame(width: 25, height: 25)
                             .background(Color.white)

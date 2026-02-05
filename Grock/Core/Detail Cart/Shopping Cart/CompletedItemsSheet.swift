@@ -60,7 +60,8 @@ struct CompletedItemsSheet: View {
                 onUnfulfillItem: onUnfulfillItem
             )
         }
-        .padding()
+        .padding(.horizontal, 20)
+        .padding(.top, 16)
         .id(refreshKey)
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("CartItemFulfillmentToggled"))) { notification in
             guard let userInfo = notification.userInfo,

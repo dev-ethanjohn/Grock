@@ -1,5 +1,7 @@
 import SwiftUI
 import Observation
+import Lottie
+import UIKit
 
 struct ItemsListView: View {
     let cart: Cart
@@ -80,16 +82,20 @@ private struct MainContentView: View {
     
     var body: some View {
         GeometryReader { geometry in
-            let calculatedHeight = estimatedHeight
+            let calculatedHeight = estimatedHeight(containerWidth: geometry.size.width)
             let maxAllowedHeight = geometry.size.height * 0.8
             
             VStack(spacing: 0) {
                 if cart.isShopping && allItemsCompleted {
-                    ShoppingCompleteCelebrationView(
-                        backgroundColor: stateManager.effectiveBackgroundColor,
-                        rowBackgroundColor: stateManager.effectiveRowBackgroundColor,
-                        maxAllowedHeight: maxAllowedHeight
-                    )
+                    VStack {
+                        Spacer()
+                        ShoppingCompleteCelebrationView(
+                            backgroundColor: stateManager.effectiveBackgroundColor,
+                            rowBackgroundColor: stateManager.effectiveRowBackgroundColor,
+                            maxAllowedHeight: maxAllowedHeight
+                        )
+                        Spacer()
+                    }
                 } else if !hasDisplayItems && cart.isPlanning && totalItemCount == 0 {
                     EmptyCartView()
                         .transition(.scale)
@@ -143,37 +149,82 @@ private struct MainContentView: View {
         return storeTimestamps.sorted { $0.value > $1.value }.map { $0.key }
     }
     
-    private var availableWidth: CGFloat {
-        let screenWidth = UIScreen.main.bounds.width
-        let cartDetailPadding: CGFloat = 17
-        let itemRowPadding: CGFloat = cart.isShopping ? 36 : 28
-        let internalSpacing: CGFloat = 4
-        let safetyBuffer: CGFloat = 3
+    private func availableWidth(containerWidth: CGFloat) -> CGFloat {
+        let rowHorizontalPadding: CGFloat = 32
+        let safetyBuffer: CGFloat = 6
         
-        let totalPadding = cartDetailPadding + itemRowPadding + internalSpacing + safetyBuffer
-        let calculatedWidth = screenWidth - totalPadding
+        let calculatedWidth = containerWidth - rowHorizontalPadding - safetyBuffer
         
-        return max(min(calculatedWidth, 250), 150)
+        return max(min(calculatedWidth, 320), 160)
     }
     
-    private func estimateRowHeight(for itemName: String, isFirstInSection: Bool = true) -> CGFloat {
-        let averageCharWidth: CGFloat = 8.0
-        let estimatedTextWidth = CGFloat(itemName.count) * averageCharWidth
-        let numberOfLines = ceil(estimatedTextWidth / availableWidth)
+    private func estimateRowHeight(
+        for displayText: String,
+        isLastInSection: Bool,
+        containerWidth: CGFloat
+    ) -> CGFloat {
+        let itemFont = UIFont(name: "Lexend-Regular", size: 16) ?? .systemFont(ofSize: 16)
+        let priceFont = UIFont(name: "Lexend-Medium", size: 12) ?? .systemFont(ofSize: 12, weight: .medium)
+        let unitFont = UIFont(name: "Lexend-Regular", size: 11) ?? .systemFont(ofSize: 11)
         
-        let singleLineTextHeight: CGFloat = 22
-        let verticalPadding: CGFloat = 24
-        let internalSpacing: CGFloat = 10
+        let trailingColumnWidth: CGFloat = 70
+        let hStackSpacing: CGFloat = 20
+        let effectiveWidth = max(availableWidth(containerWidth: containerWidth) - trailingColumnWidth - hStackSpacing, 140)
         
-        let baseHeight = singleLineTextHeight + verticalPadding + internalSpacing
-        let additionalLineHeight: CGFloat = 24
-        let itemHeight = baseHeight + (max(0, numberOfLines - 1) * additionalLineHeight)
-        let dividerHeight: CGFloat = isFirstInSection ? 0 : 12.0
+        let itemTextHeight = textHeight(
+            for: displayText,
+            width: effectiveWidth,
+            font: itemFont,
+            maxLines: 3
+        )
         
-        return itemHeight + dividerHeight
+        let priceRowHeight = max(priceFont.lineHeight, unitFont.lineHeight)
+        let itemRowSpacing: CGFloat = 2
+        let topPadding: CGFloat = 12
+        let bottomPadding: CGFloat = isLastInSection ? 12 : 0
+        
+        let contentHeight = itemTextHeight + itemRowSpacing + priceRowHeight
+        let baseHeight = topPadding + contentHeight + bottomPadding
+        let dividerHeight: CGFloat = isLastInSection ? 0 : 12.5
+        
+        return baseHeight + dividerHeight
     }
     
-    private var estimatedHeight: CGFloat {
+    private func textHeight(for text: String, width: CGFloat, font: UIFont, maxLines: Int) -> CGFloat {
+        guard !text.isEmpty else { return font.lineHeight }
+        
+        let maxSize = CGSize(width: width, height: .greatestFiniteMagnitude)
+        let rect = (text as NSString).boundingRect(
+            with: maxSize,
+            options: [.usesLineFragmentOrigin, .usesFontLeading],
+            attributes: [.font: font],
+            context: nil
+        )
+        
+        let maxHeight = font.lineHeight * CGFloat(maxLines)
+        return min(ceil(rect.height), maxHeight)
+    }
+    
+    private func displayText(for cartItem: CartItem, item: Item?) -> String {
+        let name = item?.name
+            ?? cartItem.shoppingOnlyName
+            ?? cartItem.vaultItemNameSnapshot
+            ?? "Unknown Item"
+        
+        let unit: String
+        if cartItem.isShoppingOnlyItem {
+            unit = cartItem.shoppingOnlyUnit ?? ""
+        } else if let vault = vaultService.vault {
+            unit = cartItem.getUnit(from: vault, cart: cart)
+        } else {
+            unit = cartItem.actualUnit ?? cartItem.plannedUnit ?? ""
+        }
+        
+        let quantity = cartItem.actualQuantity ?? cartItem.quantity
+        return "\(quantity.formattedQuantity)\(unit) \(name)"
+    }
+    
+    private func estimatedHeight(containerWidth: CGFloat) -> CGFloat {
         let sectionHeaderHeight: CGFloat = 34
         let sectionSpacing: CGFloat = 10
         let listPadding: CGFloat = 24
@@ -193,10 +244,14 @@ private struct MainContentView: View {
             if !displayItems.isEmpty {
                 totalHeight += sectionHeaderHeight
                 
-                for (index, (_, item)) in displayItems.enumerated() {
-                    let itemName = item?.name ?? "Unknown"
-                    let isFirstInStore = index == 0
-                    totalHeight += estimateRowHeight(for: itemName, isFirstInSection: isFirstInStore)
+                for (index, tuple) in displayItems.enumerated() {
+                    let isLastInStore = index == displayItems.count - 1
+                    let itemText = displayText(for: tuple.cartItem, item: tuple.item)
+                    totalHeight += estimateRowHeight(
+                        for: itemText,
+                        isLastInSection: isLastInStore,
+                        containerWidth: containerWidth
+                    )
                     
                     // Check inside the loop for very large sections
                     if totalHeight > maxHeightCutoff { return totalHeight }
@@ -219,45 +274,53 @@ private struct ShoppingCompleteCelebrationView: View {
     let maxAllowedHeight: CGFloat
     
     var body: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "party.popper.fill")
-            .lexendFont(50)
-            .foregroundColor(Color(hex: "FF6B6B"))
+        VStack(spacing: 12) {
+            LottieView(animation: .named("ToFinish"))
+                .playing(.fromProgress(0, toProgress: 1, loopMode: .loop))
+                .allowsHitTesting(false)
+                .frame(width: 90, height: 90)
             
-            Text("Shopping Trip Complete! 🎉")
-            .lexendFont(18, weight: .bold)
-            .foregroundColor(Color(hex: "333"))
-            .multilineTextAlignment(.center)
-            
-            Text("Congratulations! You've checked off all items.")
-            .lexendFont(14)
-            .foregroundColor(Color(hex: "666"))
-            .multilineTextAlignment(.center)
-            .padding(.horizontal)
+            Text("All items fulfilled")
+                .fuzzyBubblesFont(20, weight: .bold)
+                .foregroundColor(.black)
+                .multilineTextAlignment(.center)
             
             Text("Ready to finish your trip?")
-            .lexendFont(12)
-            .foregroundColor(Color(hex: "999"))
-            .multilineTextAlignment(.center)
-            .padding(.horizontal)
-            .padding(.top, 4)
+                .lexendFont(13, weight: .medium)
+                .foregroundColor(.black.opacity(0.5))
+                .multilineTextAlignment(.center)
         }
         .frame(height: min(200, maxAllowedHeight))
         .frame(maxWidth: .infinity)
-        .background(
-            LinearGradient(
-                colors: [backgroundColor, rowBackgroundColor],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        )
-        .cornerRadius(24)
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-            .stroke(Color(hex: "FF6B6B").opacity(0.3), lineWidth: 2)
-        )
+        .background(backgroundCard)
         .transition(.opacity.combined(with: .scale))
     }
+    
+    private var backgroundCard: some View {
+        RoundedRectangle(cornerRadius: 24)
+            .fill(
+                LinearGradient(
+                    colors: [
+                        backgroundColor.opacity(0.9),
+                        rowBackgroundColor.opacity(0.8)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .overlay(
+                LinearGradient(
+                    colors: [
+                        Color.white.opacity(0.35),
+                        Color.white.opacity(0.0)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 24))
+            )
+    }
+    
 }
 
 // MARK: - Items List Content

@@ -39,15 +39,13 @@ struct NewItemsListView: View {
                 HStack(spacing: 12) {
                     VStack(alignment: .leading, spacing: 2) {
                         HStack(spacing: 4) {
-                            if let emoji = item.categoryEmoji {
-                                Text("\(emoji)")
-                                    .lexendFont(12)
-                            }
                             Text(item.name)
-                                .lexendFont(14, weight: .medium)
+                                .lexendFont(16, weight: .regular)
                                 .foregroundColor(.black)
                         }
-                        Text("\(item.price.formattedCurrency) / \(item.unit)")
+                        let categoryText = item.categoryTitle?.trimmingCharacters(in: .whitespacesAndNewlines)
+                        let suffix = (categoryText?.isEmpty == false) ? " • \(categoryText!)" : ""
+                        Text("\(item.price.formattedCurrency) / \(item.unit)\(suffix)")
                             .lexendFont(12)
                             .foregroundColor(Color(hex: "888"))
                     }

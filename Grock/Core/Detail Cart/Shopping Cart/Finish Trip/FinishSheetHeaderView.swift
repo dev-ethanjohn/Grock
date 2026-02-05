@@ -36,6 +36,13 @@ private struct BudgetCartFulfillmentGauge: View {
     let fulfilledTotal: Double
     
     @State private var isShowingSpent: Bool = true
+    @State private var displayedCartRatio: Double = 0
+    @State private var displayedFulfilledRatio: Double = 0
+    @State private var hasAnimatedIn: Bool = false
+    @State private var showCartValueLabel: Bool = false
+    @State private var labelRevealTask: DispatchWorkItem?
+    @State private var displayedPrimaryAmount: Double = 0
+    @State private var showSpentValueLabel: Bool = false
     
     private var hasBudget: Bool { budget > 0 }
     
@@ -52,6 +59,22 @@ private struct BudgetCartFulfillmentGauge: View {
     private var cartRatio: Double {
         guard denominator > 0 else { return 0 }
         return cartTotal / denominator
+    }
+
+    private var targetCartRatio: Double {
+        min(max(cartRatio, 0), 1)
+    }
+
+    private var targetFulfilledRatio: Double {
+        min(max(fulfilledRatio, 0), 1)
+    }
+
+    private var springAnimation: Animation {
+        .spring(response: 0.6, dampingFraction: 0.8)
+    }
+
+    private var labelRevealDelay: Double {
+        0.6
     }
     
     private var fulfilledArcColor: Color {
@@ -76,6 +99,13 @@ private struct BudgetCartFulfillmentGauge: View {
             return abs(remainingBudget).formattedCurrency
         }
         return fulfilledTotal.formattedCurrency
+    }
+
+    private var primaryAmountValue: Double {
+        if hasBudget, !isShowingSpent {
+            return abs(remainingBudget)
+        }
+        return fulfilledTotal
     }
 
     private var accessibilitySummaryValue: String {
@@ -155,7 +185,7 @@ private struct BudgetCartFulfillmentGauge: View {
                 )
                 
                 HalfCircleTickRing(
-                    progress: min(cartRatio, 1),
+                    progress: displayedCartRatio,
                     filledColor: cartProgressColor,
                     unfilledColor: .clear,
                     tickCount: tickCount,
@@ -165,7 +195,7 @@ private struct BudgetCartFulfillmentGauge: View {
                 )
                 
                 HalfCircleRing(
-                    progress: min(fulfilledRatio, 1),
+                    progress: displayedFulfilledRatio,
                     color: fulfilledArcColor,
                     lineWidth: innerLineWidth
                 )
@@ -178,16 +208,23 @@ private struct BudgetCartFulfillmentGauge: View {
                         .contentTransition(.opacity)
                         .frame(width: spentValueFrame)
                         .offset(y: gaugeSize * 0.02)
+                        .opacity(showSpentValueLabel ? 1 : 0)
+                        .scaleEffect(showSpentValueLabel ? 1 : 0.96)
+                        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: showSpentValueLabel)
                     
-                    Text(primaryAmountText)
+                    Text(displayedPrimaryAmount.formattedCurrency)
                         .lexendFont(30, weight: .bold)
                         .foregroundStyle(isShowingSpent ? .black : spentProgressColor)
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
                         .allowsTightening(true)
                         .contentTransition(.numericText())
+                        .animation(.spring(response: 0.45, dampingFraction: 0.85), value: displayedPrimaryAmount)
                         .frame(width: spentValueFrame)
                         .offset(y: gaugeSize * 0.02)
+                        .opacity(showSpentValueLabel ? 1 : 0)
+                        .scaleEffect(showSpentValueLabel ? 1 : 0.96)
+                        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: showSpentValueLabel)
                 }
                 .offset(y: -gaugeSize * 0.12)
             }
@@ -198,11 +235,20 @@ private struct BudgetCartFulfillmentGauge: View {
             .overlay {
                 GeometryReader { proxy in
                     let springOuterRadius = tickRadius + tickHeight / 2
-                    let labelStartAngle: Double = -90
-                    let labelFontSize: CGFloat = 11
+                    let labelEndAngle: Double = -90 + (min(cartRatio, 1) * 180)
+                    let labelFontSize: CGFloat = 12
+                    let valueFontSize: CGFloat = 14
                     let labelRadius: CGFloat = springOuterRadius + 14
                     let labelArcLengthPerCharacter: CGFloat = labelFontSize * 0.62
                     let labelAngleStep: Double = Double(labelArcLengthPerCharacter / labelRadius) * 180 / .pi
+                    let labelText = "Cart Value:  \(cartTotal.formattedCurrency)"
+                    let valueText = cartTotal.formattedCurrency
+                    let highlightRange: Range<Int>? = {
+                        guard let range = labelText.range(of: valueText, options: .backwards) else { return nil }
+                        let start = labelText.distance(from: labelText.startIndex, to: range.lowerBound)
+                        let end = labelText.distance(from: labelText.startIndex, to: range.upperBound)
+                        return start..<end
+                    }()
                     let center = CGPoint(
                         x: proxy.size.width / 2,
                         y: (strokeAllowance / 2 + clipInset) + (gaugeSize / 2)
@@ -210,13 +256,20 @@ private struct BudgetCartFulfillmentGauge: View {
                     
                     ZStack {
                         ArcText(
-                            text: "Cart Value:  \(cartTotal.formattedCurrency)",
+                            text: labelText,
                             radius: labelRadius,
-                            startAngle: labelStartAngle,
+                            startAngle: -90,
+                            endAngle: labelEndAngle,
                             angleStep: labelAngleStep,
-                            fontSize: labelFontSize,
-                            weight: .medium,
-                            color: Color(hex: "231F30").opacity(0.75)
+                            baseFontSize: labelFontSize,
+                            baseWeight: .medium,
+                            baseColor: Color(hex: "231F30").opacity(0.65),
+                            highlightRange: highlightRange,
+                            highlightFontSize: valueFontSize,
+                            highlightWeight: .semibold,
+                            highlightColor: Color(hex: "231F30").opacity(0.85),
+                            revealTrigger: showCartValueLabel,
+                            revealDelay: 0
                         )
                         .position(center)
                     }
@@ -232,6 +285,68 @@ private struct BudgetCartFulfillmentGauge: View {
             .accessibilityHint(canTogglePrimaryMetric ? "Double-tap to toggle between spent and unspent." : "")
             .accessibilityAddTraits(canTogglePrimaryMetric ? .isButton : [])
             .accessibilityAction { togglePrimaryMetric() }
+            .onAppear {
+                if !hasAnimatedIn {
+                    hasAnimatedIn = true
+                    displayedCartRatio = 0
+                    displayedFulfilledRatio = 0
+                    animateToTargets()
+                } else {
+                    displayedCartRatio = targetCartRatio
+                    displayedFulfilledRatio = targetFulfilledRatio
+                    showCartValueLabel = true
+                    displayedPrimaryAmount = primaryAmountValue
+                    showSpentValueLabel = true
+                }
+            }
+            .onChange(of: budget) { _, _ in
+                animateToTargets()
+            }
+            .onChange(of: cartTotal) { _, _ in
+                animateToTargets()
+            }
+            .onChange(of: fulfilledTotal) { _, _ in
+                animateToTargets()
+            }
+            .onChange(of: primaryAmountValue) { _, newValue in
+                animatePrimaryAmount(to: newValue)
+            }
+        }
+    }
+
+    private func animateToTargets() {
+        scheduleLabelReveal()
+        withAnimation(springAnimation) {
+            displayedCartRatio = targetCartRatio
+            displayedFulfilledRatio = targetFulfilledRatio
+        }
+        animatePrimaryAmount(to: primaryAmountValue, delay: labelRevealDelay)
+    }
+
+    private func scheduleLabelReveal() {
+        showCartValueLabel = false
+        showSpentValueLabel = false
+        labelRevealTask?.cancel()
+        let task = DispatchWorkItem {
+            showCartValueLabel = true
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                showSpentValueLabel = true
+            }
+        }
+        labelRevealTask = task
+        DispatchQueue.main.asyncAfter(deadline: .now() + labelRevealDelay, execute: task)
+    }
+
+    private func animatePrimaryAmount(to value: Double, delay: Double = 0) {
+        let task = DispatchWorkItem {
+            withAnimation(.interpolatingSpring(stiffness: 220, damping: 22)) {
+                displayedPrimaryAmount = value
+            }
+        }
+        if delay > 0 {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: task)
+        } else {
+            task.perform()
         }
     }
 }
@@ -240,10 +355,52 @@ private struct ArcText: View {
     let text: String
     let radius: CGFloat
     let startAngle: Double
+    let endAngle: Double
     let angleStep: Double
-    let fontSize: CGFloat
-    let weight: Font.Weight
-    let color: Color
+    let baseFontSize: CGFloat
+    let baseWeight: Font.Weight
+    let baseColor: Color
+    let highlightRange: Range<Int>?
+    let highlightFontSize: CGFloat
+    let highlightWeight: Font.Weight
+    let highlightColor: Color
+    let revealTrigger: Bool
+    let revealDelay: Double
+
+    @State private var revealedCharacters: Int = 0
+    @State private var didAppear = false
+
+    init(
+        text: String,
+        radius: CGFloat,
+        startAngle: Double,
+        endAngle: Double,
+        angleStep: Double,
+        baseFontSize: CGFloat,
+        baseWeight: Font.Weight,
+        baseColor: Color,
+        highlightRange: Range<Int>? = nil,
+        highlightFontSize: CGFloat? = nil,
+        highlightWeight: Font.Weight? = nil,
+        highlightColor: Color? = nil,
+        revealTrigger: Bool = true,
+        revealDelay: Double = 0
+    ) {
+        self.text = text
+        self.radius = radius
+        self.startAngle = startAngle
+        self.endAngle = endAngle
+        self.angleStep = angleStep
+        self.baseFontSize = baseFontSize
+        self.baseWeight = baseWeight
+        self.baseColor = baseColor
+        self.highlightRange = highlightRange
+        self.highlightFontSize = highlightFontSize ?? baseFontSize
+        self.highlightWeight = highlightWeight ?? baseWeight
+        self.highlightColor = highlightColor ?? baseColor
+        self.revealTrigger = revealTrigger
+        self.revealDelay = revealDelay
+    }
     
     var body: some View {
         let characters = Array(text)
@@ -251,29 +408,85 @@ private struct ArcText: View {
         
         ZStack {
             ForEach(characters.indices, id: \.self) { index in
+                let style = styleForIndex(index)
                 Text(String(characters[index]))
-                    .lexendFont(fontSize, weight: weight)
-                    .foregroundStyle(color)
-                    .offset(y: -radius)
+                    .lexendFont(style.fontSize, weight: style.weight)
+                    .foregroundStyle(style.color)
+                    .opacity(index < revealedCharacters ? 1 : 0)
+                    .offset(y: index < revealedCharacters ? -radius : -radius + 4)
                     .rotationEffect(.degrees(angles[index]))
+                    .animation(
+                        revealAnimation(for: index),
+                        value: revealedCharacters
+                    )
             }
         }
         .frame(width: radius * 2, height: radius * 2)
         .accessibilityHidden(true)
+        .onAppear {
+            guard !didAppear else { return }
+            didAppear = true
+            if revealTrigger {
+                startReveal()
+            }
+        }
+        .onChange(of: revealTrigger) { _, newValue in
+            if newValue {
+                startReveal()
+            } else {
+                revealedCharacters = 0
+            }
+        }
+        .onChange(of: text) { _, _ in
+            if revealTrigger {
+                startReveal()
+            }
+        }
     }
-    
+
     private func characterAngles(for characters: [Character]) -> [Double] {
-        let maxEndAngle: Double = 90
-        let weights: [Double] = characters.map { $0 == " " ? 0.55 : 1 }
+        let weights: [Double] = characters.enumerated().map { index, char in
+            let base = char == " " ? 0.55 : 1.0
+            let sizeScale = Double(styleForIndex(index).fontSize / baseFontSize)
+            return base * sizeScale
+        }
         let weightSum = weights.dropLast().reduce(0.0, +)
-        let maxStep = weightSum > 0 ? (maxEndAngle - startAngle) / weightSum : angleStep
-        let step = max(0, min(angleStep, maxStep))
+
+        guard weightSum > 0 else {
+            return characters.map { _ in startAngle }
+        }
+
+        let desiredStart = endAngle - (angleStep * weightSum)
+        let resolvedStart = max(startAngle, desiredStart)
+        let maxStep = (endAngle - resolvedStart) / weightSum
+        let finalStep = max(0, min(angleStep, maxStep))
         
-        var currentAngle = startAngle
+        var currentAngle = resolvedStart
         return weights.map { weight in
             let angle = currentAngle
-            currentAngle += step * weight
+            currentAngle += finalStep * weight
             return angle
+        }
+    }
+
+    private func styleForIndex(_ index: Int) -> (fontSize: CGFloat, weight: Font.Weight, color: Color) {
+        if let highlightRange, highlightRange.contains(index) {
+            return (highlightFontSize, highlightWeight, highlightColor)
+        }
+        return (baseFontSize, baseWeight, baseColor)
+    }
+
+    private func revealAnimation(for index: Int) -> Animation {
+        Animation.interpolatingSpring(stiffness: 240, damping: 14)
+            .delay(Double(index) * 0.01 + revealDelay)
+    }
+
+    private func startReveal() {
+        revealedCharacters = 0
+        DispatchQueue.main.asyncAfter(deadline: .now() + revealDelay) {
+            withAnimation(.easeOut(duration: 0.32)) {
+                revealedCharacters = text.count
+            }
         }
     }
 }
@@ -294,8 +507,8 @@ private struct HalfCircleRing: View {
     }
 }
 
-private struct HalfCircleTickRing: View {
-    let progress: Double
+private struct HalfCircleTickRing: View, Animatable {
+    var progress: Double
     let filledColor: Color
     let unfilledColor: Color
     let tickCount: Int
@@ -304,6 +517,11 @@ private struct HalfCircleTickRing: View {
     let radius: CGFloat
     var startAngle: Double = -90
     var endAngle: Double = 90
+
+    var animatableData: Double {
+        get { progress }
+        set { progress = newValue }
+    }
     
     var body: some View {
         let clampedProgress = max(0, min(progress, 1))

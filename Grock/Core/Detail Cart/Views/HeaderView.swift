@@ -68,10 +68,6 @@ struct HeaderView: View {
                         Button("Start Shopping", systemImage: "cart") {
                             stateManager.showingStartShoppingAlert = true
                         }
-                    } else if cart.isShopping {
-                        Button("Complete Shopping", systemImage: "checkmark.circle") {
-                            // This will be handled via the Floating Action Bar
-                        }
                     } else if cart.isCompleted {
                         Button("Reactivate Cart", systemImage: "arrow.clockwise") {
                             vaultService.reopenCart(cart: cart)

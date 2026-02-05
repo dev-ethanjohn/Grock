@@ -7,6 +7,7 @@ struct CartDetailActionBar: View {
     let namespace: Namespace.ID
     
     @State private var buttonScale: CGFloat = 1.0
+    @State private var finishPulseScale: CGFloat = 1.0
     
     var body: some View {
         HStack(spacing: 6) {
@@ -32,11 +33,18 @@ struct CartDetailActionBar: View {
                     RoundedRectangle(cornerRadius: 100)
                         .fill(Color.black)
                 )
+                .scaleEffect(finishPulseScale)
                 .transition(
                     .scale(scale: 0.5, anchor: .center)
                     //                    .combined(with: .opacity)
                 )
                 .animation(.spring(response: 0.45, dampingFraction: 0.7), value: showFinishTrip)
+                .onAppear {
+                    startFinishPulse()
+                }
+                .onChange(of: showFinishTrip) { _, _ in
+                    startFinishPulse()
+                }
             }
             
             Button(action: {
@@ -91,6 +99,16 @@ struct CartDetailActionBar: View {
             }
         }
     }
+    
+    private func startFinishPulse() {
+        guard showFinishTrip else {
+            finishPulseScale = 1.0
+            return
+        }
+        
+        finishPulseScale = 1.0
+        withAnimation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true)) {
+            finishPulseScale = 1.04
+        }
+    }
 }
-
-

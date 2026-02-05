@@ -52,6 +52,7 @@ struct VaultView: View {
     
     @State private var categorySectionHeight: CGFloat = 0
     @State private var showCategoryPickerSheet = false
+    @State private var categoryManagerStartOnHidden = false
     
     @AppStorage("visibleCategoryNames") private var visibleCategoryNamesData: Data = Data()
     
@@ -135,10 +136,19 @@ struct VaultView: View {
                     .filter { !$0.isEmpty }
             }
         let configured = (decoded?.isEmpty == false) ? decoded! : defaultCategoryNames
-        let visibleSet = Set(configured.map { $0.lowercased() })
-        
-        let filtered = allCategoryNames.filter { visibleSet.contains($0.lowercased()) }
-        return filtered.isEmpty ? defaultCategoryNames : filtered
+
+        let canonicalByKey = Dictionary(uniqueKeysWithValues: allCategoryNames.map { ($0.lowercased(), $0) })
+        var seen = Set<String>()
+        var result: [String] = []
+
+        for name in configured {
+            let key = name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            guard let canonical = canonicalByKey[key], !seen.contains(key) else { continue }
+            seen.insert(key)
+            result.append(canonical)
+        }
+
+        return result.isEmpty ? defaultCategoryNames : result
     }
     
     private var visibleCategoriesBinding: Binding<[String]> {
@@ -177,6 +187,7 @@ struct VaultView: View {
                 NavigationStack {
                     CategoriesManagerSheet(
                         title: "Categories",
+                        startOnHiddenTab: categoryManagerStartOnHidden,
                         selectedCategoryName: $selectedCategoryName,
                         visibleCategoryNames: visibleCategoriesBinding,
                         activeItemCount: { getActiveItemCount(forCategoryNamed: $0) },
@@ -184,8 +195,13 @@ struct VaultView: View {
                     )
                 }
                 .presentationDetents([.large])
-                .presentationCornerRadius(24)
-                .presentationBackground(.white)
+            .presentationCornerRadius(24)
+            .presentationBackground(.white)
+            }
+            .onChange(of: showCategoryPickerSheet) { _, isPresented in
+                if !isPresented {
+                    categoryManagerStartOnHidden = false
+                }
             }
             .onChange(of: searchText) { _, newValue in
                 let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -605,9 +621,13 @@ struct VaultView: View {
                             }
 
                             Image(systemName: "plus.square.dashed")
-                                .font(.system(size: 44, weight: .ultraLight))
+                                .font(.system(size: 44, weight: .light))
                                 .foregroundStyle(.gray)
                                 .offset(x: -2)
+                                .onTapGesture {
+                                    categoryManagerStartOnHidden = true
+                                    showCategoryPickerSheet = true
+                                }
                         }
                         .padding(.trailing)
                     }

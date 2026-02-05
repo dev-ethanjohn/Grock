@@ -1,5 +1,6 @@
 import SwiftUI
 import Foundation
+import UniformTypeIdentifiers
 
 struct VaultCategorySectionView: View {
     let selectedCategoryTitle: String?
@@ -50,13 +51,14 @@ private struct CategoryTabsModel: Identifiable {
     var minX: CGFloat = .zero
     
     enum Tab: String, CaseIterable {
-        case shown = "Visible"
-        case hidden = "Hidden"
+        case shown = "My Bar"
+        case hidden = "More"
     }
 }
 
 struct CategoriesManagerSheet: View {
     let title: String
+    let startOnHiddenTab: Bool
     @Binding var selectedCategoryName: String?
     @Binding var visibleCategoryNames: [String]
     let activeItemCount: (String) -> Int
@@ -69,6 +71,7 @@ struct CategoriesManagerSheet: View {
     @State private var newCategoryName = ""
     @State private var newCategoryEmoji = ""
     @State private var createCategoryError: String?
+    @State private var draggedCategoryName: String?
     
     @State private var tabs: [CategoryTabsModel] = [
         .init(id: .shown),
@@ -79,9 +82,30 @@ struct CategoriesManagerSheet: View {
     @State private var progress: CGFloat = .zero
     @State private var isDragging: Bool = false
     @State private var delayTask: DispatchWorkItem?
+
+    init(
+        title: String,
+        startOnHiddenTab: Bool = false,
+        selectedCategoryName: Binding<String?>,
+        visibleCategoryNames: Binding<[String]>,
+        activeItemCount: @escaping (String) -> Int,
+        hasItems: @escaping (String) -> Bool
+    ) {
+        self.title = title
+        self.startOnHiddenTab = startOnHiddenTab
+        self._selectedCategoryName = selectedCategoryName
+        self._visibleCategoryNames = visibleCategoryNames
+        self.activeItemCount = activeItemCount
+        self.hasItems = hasItems
+
+        let initialTab: CategoryTabsModel.Tab = startOnHiddenTab ? .hidden : .shown
+        self._activeTab = State(initialValue: initialTab)
+        self._tabBarScrollState = State(initialValue: initialTab)
+        self._progress = State(initialValue: startOnHiddenTab ? 1 : 0)
+    }
     
     private var normalizedVisibleNames: Set<String> {
-        Set(visibleCategoryNames.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) })
+        Set(visibleNamesOrdered.map { normalizedKey($0) })
     }
     
     private var defaultCategoryNames: [String] {
@@ -113,11 +137,22 @@ struct CategoriesManagerSheet: View {
     }
     
     private var shownNames: [String] {
-        allCategoryNames.filter { normalizedVisibleNames.contains($0) }
+        visibleNamesOrdered
     }
     
     private var hiddenNames: [String] {
-        allCategoryNames.filter { !normalizedVisibleNames.contains($0) }
+        allCategoryNames.filter { !normalizedVisibleNames.contains(normalizedKey($0)) }
+    }
+
+    private var visibleNamesOrdered: [String] {
+        normalizedVisibleNames(from: visibleCategoryNames)
+    }
+
+    private var visibleNamesBinding: Binding<[String]> {
+        Binding(
+            get: { visibleNamesOrdered },
+            set: { visibleCategoryNames = normalizedVisibleNames(from: $0) }
+        )
     }
     
     var body: some View {
@@ -132,8 +167,8 @@ struct CategoriesManagerSheet: View {
                 
                 TabView(selection: $activeTab) {
                     tabColumn(
-                        title: "Shown",
-                        subtitle: "Visible in your categories bar",
+                        title: "My Bar",
+                        subtitle: "Drag to reorder, tap X to remove",
                         names: shownNames,
                         isShownColumn: true
                     )
@@ -142,8 +177,8 @@ struct CategoriesManagerSheet: View {
                     .rect { tabProgress(.shown, rect: $0, size: size) }
                     
                     tabColumn(
-                        title: "Hidden",
-                        subtitle: "Not shown in your bar",
+                        title: "More",
+                        subtitle: "Tap + to add to your bar",
                         names: hiddenNames,
                         isShownColumn: false
                     )
@@ -192,31 +227,28 @@ struct CategoriesManagerSheet: View {
         } message: {
             Text(createCategoryError ?? "Create a custom category you can add to your bar.")
         }
+        .onAppear {
+            let index = tabs.firstIndex(where: { $0.id == activeTab }) ?? 0
+            progress = CGFloat(index)
+            tabBarScrollState = activeTab
+        }
     }
 
     private var tabBar: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
+        HStack {
+            Spacer(minLength: 0)
             HStack(spacing: 22) {
                 tabButtons()
             }
-            .scrollTargetLayout()
-            .padding(.horizontal, 2)
-            .frame(maxWidth: .infinity, alignment: .center)
+            Spacer(minLength: 0)
         }
-        .frame(maxWidth: .infinity, alignment: .center)
-        .scrollPosition(
-            id: .init(
-                get: { tabBarScrollState },
-                set: { _ in }
-            ),
-            anchor: .center
-        )
+        .coordinateSpace(name: "categoryTabs")
         .overlay(alignment: .bottom) {
             ZStack(alignment: .leading) {
                 Rectangle()
                     .fill(.clear)
                     .frame(height: 0.5)
-                
+
                 let inputRange = tabs.indices.compactMap { CGFloat($0) }
                 let outputRange = tabs.compactMap { $0.size.width }
                 let outputPositionRange = tabs.compactMap { $0.minX }
@@ -228,14 +260,13 @@ struct CategoriesManagerSheet: View {
                     inputRange: inputRange,
                     outputRange: outputPositionRange
                 )
-                
+
                 Capsule()
                     .fill(Color.black)
                     .frame(width: indicatorWidth, height: 2)
                     .offset(x: indicatorPosition)
             }
         }
-        .scrollIndicators(.hidden)
     }
 
     private func tabButtons() -> some View {
@@ -278,7 +309,7 @@ struct CategoriesManagerSheet: View {
                     )
             }
             .buttonStyle(.plain)
-            .rect { rect in
+            .rect(in: .named("categoryTabs")) { rect in
                 tab.size = rect.size
                 tab.minX = rect.minX
             }
@@ -350,13 +381,13 @@ struct CategoriesManagerSheet: View {
             VStack(spacing: 8) {
                 ForEach(names, id: \.self) { name in
                     let iconText = vaultService.displayEmoji(forCategoryName: name)
-                    CategoryManagerRow(
+                    let row = CategoryManagerRow(
                         name: name,
                         iconText: iconText,
                         isSelected: selectedCategoryName == name,
                         activeCount: activeItemCount(name),
                         hasItems: hasItems(name),
-                        actionSymbol: isShownColumn ? "checkmark.circle.fill" : "plus.circle.fill",
+                        actionSymbol: isShownColumn ? "xmark" : "plus",
                         actionEnabled: isShownColumn ? shownNames.count > 1 : true,
                         action: {
                             if isShownColumn {
@@ -373,6 +404,24 @@ struct CategoriesManagerSheet: View {
                             }
                         }
                     )
+                    
+                    if isShownColumn {
+                        row
+                            .onDrag {
+                                draggedCategoryName = name
+                                return NSItemProvider(object: name as NSString)
+                            }
+                            .onDrop(
+                                of: [UTType.text],
+                                delegate: CategoryDropDelegate(
+                                    item: name,
+                                    items: visibleNamesBinding,
+                                    draggedItem: $draggedCategoryName
+                                )
+                            )
+                    } else {
+                        row
+                    }
                 }
             }
         }
@@ -380,9 +429,12 @@ struct CategoriesManagerSheet: View {
     }
     
     private func showCategory(named name: String, select: Bool) {
-        var visible = normalizedVisibleNames
-        visible.insert(name)
-        visibleCategoryNames = allCategoryNames.filter { visible.contains($0) }
+        var ordered = visibleNamesOrdered
+        let key = normalizedKey(name)
+        if !ordered.contains(where: { normalizedKey($0) == key }) {
+            ordered.append(name)
+        }
+        visibleCategoryNames = normalizedVisibleNames(from: ordered)
         
         if select {
             selectedCategoryName = name
@@ -390,15 +442,13 @@ struct CategoriesManagerSheet: View {
     }
     
     private func hideCategory(named name: String) {
-        var visible = normalizedVisibleNames
-        visible.remove(name)
-        
-        let ordered = allCategoryNames.filter { visible.contains($0) }
+        let key = normalizedKey(name)
+        let ordered = visibleNamesOrdered.filter { normalizedKey($0) != key }
         guard !ordered.isEmpty else { return }
         
-        visibleCategoryNames = ordered
+        visibleCategoryNames = normalizedVisibleNames(from: ordered)
         
-        if selectedCategoryName == name {
+        if selectedCategoryName.map(normalizedKey) == key {
             selectedCategoryName = ordered.first
         }
     }
@@ -429,6 +479,55 @@ struct CategoriesManagerSheet: View {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let first = trimmed.first else { return "" }
         return String(first)
+    }
+
+    private func normalizedKey(_ value: String) -> String {
+        value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+
+    private func normalizedVisibleNames(from names: [String]) -> [String] {
+        let canonicalByKey = Dictionary(
+            uniqueKeysWithValues: allCategoryNames.map { (normalizedKey($0), $0) }
+        )
+        var seen = Set<String>()
+        var result: [String] = []
+        for name in names {
+            let key = normalizedKey(name)
+            guard let canonical = canonicalByKey[key], !seen.contains(key) else { continue }
+            seen.insert(key)
+            result.append(canonical)
+        }
+        return result
+    }
+}
+
+private struct CategoryDropDelegate: DropDelegate {
+    let item: String
+    @Binding var items: [String]
+    @Binding var draggedItem: String?
+
+    func dropEntered(info: DropInfo) {
+        guard let draggedItem, draggedItem != item else { return }
+        guard let fromIndex = items.firstIndex(of: draggedItem),
+              let toIndex = items.firstIndex(of: item) else { return }
+
+        if items[toIndex] != draggedItem {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                items.move(
+                    fromOffsets: IndexSet(integer: fromIndex),
+                    toOffset: toIndex > fromIndex ? toIndex + 1 : toIndex
+                )
+            }
+        }
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        draggedItem = nil
+        return true
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        DropProposal(operation: .move)
     }
 }
 
@@ -509,7 +608,7 @@ private struct CategoryManagerRow: View {
                 Button(action: action) {
                     Image(systemName: actionSymbol)
                         .font(.system(size: 18, weight: .bold))
-                        .foregroundStyle(actionEnabled ? .black : .gray.opacity(0.5))
+                        .foregroundStyle(.black)
                         .frame(width: 28, height: 28)
                 }
                 .buttonStyle(.plain)

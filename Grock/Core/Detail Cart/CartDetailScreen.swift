@@ -92,7 +92,8 @@ struct CartDetailScreen: View {
             onDeleteItem: handleDeleteItem,
             cartStatusChanged: handleCartStatusChange,
             itemsChanged: handleItemsChange,
-            checkAndShowCelebration: checkAndShowCelebration
+            checkAndShowCelebration: checkAndShowCelebration,
+            onShoppingDataUpdated: handleShoppingDataRefresh
         ))
         .onAppear(perform: initializeState)
         .task(id: cart.id) {
@@ -100,12 +101,9 @@ struct CartDetailScreen: View {
         }
         .onDisappear(perform: saveStateOnDismiss)
         .onChange(of: cart.cartItems) { _, _ in
-            // Only reload if the counts mismatch (e.g. item added via sheet)
-            // This prevents reloading during delete animation since we manually updated state
-            let currentCount = itemsByStore.values.reduce(0) { $0 + $1.count }
-            if currentCount != cart.cartItems.count {
+            if shouldReloadForItemChanges() {
                 Task {
-                     await loadData(animate: true)
+                    await loadData(animate: true)
                 }
             }
         }
@@ -438,6 +436,38 @@ struct CartDetailScreen: View {
             vaultService.updateCartTotals(cart: cart)
         }
     }
+    
+    private func handleShoppingDataRefresh() {
+        if shouldReloadForItemChanges() {
+            Task {
+                await loadData(animate: true)
+            }
+        }
+    }
+    
+    private func shouldReloadForItemChanges() -> Bool {
+        let displayedSignature = displayedItemsSignature()
+        let cartSignature = cartItemsSignature(from: cart.cartItems)
+        return displayedSignature != cartSignature
+    }
+    
+    private func displayedItemsSignature() -> [String] {
+        itemsByStore
+            .flatMap { store, items in
+                items.map { "\(store)|\($0.cartItem.itemId)" }
+            }
+            .sorted()
+    }
+    
+    private func cartItemsSignature(from items: [CartItem]) -> [String] {
+        items
+            .map { cartItem in
+                let store = cartItem.getStore(cart: cart)
+                let resolvedStore = store.isEmpty ? "Unknown Store" : store
+                return "\(resolvedStore)|\(cartItem.itemId)"
+            }
+            .sorted()
+    }
 }
 // Put this in a separate file or at the bottom of CartDetailScreen.swift (outside the struct)
 
@@ -461,6 +491,7 @@ struct CartDetailAllModifiers: ViewModifier {
     let cartStatusChanged: (CartStatus, CartStatus) -> Void
     let itemsChanged: (Bool, Bool) -> Void
     let checkAndShowCelebration: () -> Void
+    let onShoppingDataUpdated: () -> Void
     
     func body(content: Content) -> some View {
         content
@@ -600,6 +631,16 @@ struct CartDetailAllModifiers: ViewModifier {
     }
     
     private func handleShoppingDataUpdated(_ notification: Notification) {
+        if let cartId = notification.userInfo?["cartItemId"] as? String,
+           cartId != cart.id {
+            return
+        }
+        if let cartId = notification.userInfo?["cartId"] as? String,
+           cartId != cart.id {
+            return
+        }
+        
+        onShoppingDataUpdated()
         DispatchQueue.main.async {
             vaultService.updateCartTotals(cart: cart)
         }
