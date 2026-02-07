@@ -13,12 +13,26 @@ struct VaultCategoryNameIcon: View {
     @State private var fillAnimation: CGFloat = 0.0
     @State private var iconScale: Double = 1.0
     
+    @Environment(VaultService.self) private var vaultService
+
     private var groceryCategory: GroceryCategory? {
         GroceryCategory.allCases.first(where: { $0.title == name })
     }
     
     private var baseColor: Color {
-        groceryCategory?.pastelColor ?? name.generatedPastelColor
+        // PRIORITY 1: Check if there's a custom override in Vault
+        if let customCategory = vaultService.getCategory(named: name),
+           let hex = customCategory.colorHex {
+            return Color(hex: hex)
+        }
+        
+        // PRIORITY 2: Default GroceryCategory color
+        if let groceryCategory {
+            return groceryCategory.pastelColor
+        }
+        
+        // PRIORITY 3: Fallback generated color
+        return name.generatedPastelColor
     }
     
     private var resolvedIconText: String {

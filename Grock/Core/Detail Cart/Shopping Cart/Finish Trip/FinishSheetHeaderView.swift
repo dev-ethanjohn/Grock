@@ -241,8 +241,8 @@ private struct BudgetCartFulfillmentGauge: View {
                     let labelRadius: CGFloat = springOuterRadius + 14
                     let labelArcLengthPerCharacter: CGFloat = labelFontSize * 0.62
                     let labelAngleStep: Double = Double(labelArcLengthPerCharacter / labelRadius) * 180 / .pi
-                    let labelText = "Cart Value:  \(cartTotal.formattedCurrency)"
-                    let valueText = cartTotal.formattedCurrency
+                    let labelText = "Cart Value:  \(cartTotal.formattedCurrencySpaced)"
+                    let valueText = cartTotal.formattedCurrencySpaced
                     let highlightRange: Range<Int>? = {
                         guard let range = labelText.range(of: valueText, options: .backwards) else { return nil }
                         let start = labelText.distance(from: labelText.startIndex, to: range.lowerBound)

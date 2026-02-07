@@ -30,6 +30,14 @@ extension Double {
         
         return "\(symbol)\(formatted)"
     }
+
+    var formattedCurrencySpaced: String {
+        let symbol = CurrencyManager.shared.selectedCurrency.symbol
+        let formatted = formattedCurrency
+        guard formatted.hasPrefix(symbol) else { return formatted }
+        let amount = formatted.dropFirst(symbol.count)
+        return "\(symbol) \(amount)"
+    }
     
     var formattedQuantity: String {
         let fractionDigits: Int

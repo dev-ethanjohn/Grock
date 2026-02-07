@@ -127,7 +127,7 @@ struct VaultBottomContent: View {
                 .fuzzyBubblesFont(16, weight: .bold)
                 .foregroundColor(.white)
                 .padding(.horizontal, 24)
-                .padding(.vertical, 12)
+                .frame(height: 44)
                 .background(buttonBackground)
                 .cornerRadius(25)
         }

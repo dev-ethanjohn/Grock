@@ -14,6 +14,7 @@ struct ManageCartSheet: View {
     @State private var searchText: String = ""
     @State private var isSearching: Bool = false
     @Namespace private var searchNamespace
+    @Namespace private var categoryManagerNamespace
     
     // Use LOCAL state for active items in this sheet
     @State private var localActiveItems: [String: Double] = [:]
@@ -117,6 +118,15 @@ struct ManageCartSheet: View {
             }
         )
     }
+
+    private func openCategoryManager() {
+        showCategoryPickerSheet = true
+    }
+
+    private func closeCategoryManager() {
+        showCategoryPickerSheet = false
+        categoryManagerStartOnHidden = false
+    }
     
     //switching category transition
     @State private var navigationDirection: NavigationDirection = .none
@@ -130,6 +140,116 @@ struct ManageCartSheet: View {
     }
     
     var body: some View {
+        baseContent
+            .navigationBarHidden(true) // Hide native navigation bar
+            .background(.white)
+            .ignoresSafeArea(.keyboard)
+            .onPreferenceChange(TextFieldFocusPreferenceKey.self) { itemId in
+                focusedItemId = itemId
+            }
+            .onAppear {
+                initializeActiveItemsFromCart()
+                if selectedCategoryName == nil {
+                    selectedCategoryName = firstVisibleCategoryWithItems ?? visibleCategories.first
+                }
+                updateChevronVisibility()
+            }
+            .onChange(of: vaultService.vault) { oldValue, newValue in
+                print("🔄 ManageCartSheet: Vault updated, refreshing view")
+                vaultUpdateTrigger += 1
+                
+                // Update selected category if the current one no longer has items
+                if let currentCategoryName = selectedCategoryName,
+                   !hasItems(inCategoryNamed: currentCategoryName) {
+                    selectedCategoryName = firstVisibleCategoryWithItems ?? visibleCategories.first
+                }
+            }
+            .onChange(of: vaultUpdateTrigger) { oldValue, newValue in
+                // This forces the view to refresh when vault changes
+                print("🔄 ManageCartSheet: Refreshing view due to vault changes")
+            }
+            .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ItemCategoryChanged"))) { notification in
+                if let newCategoryName = notification.userInfo?["newCategoryName"] as? String {
+                    print("🔄 ManageCartSheet: Received category change notification - switching to \(newCategoryName)")
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                        selectedCategoryName = newCategoryName
+                    }
+                } else if let newCategory = notification.userInfo?["newCategory"] as? GroceryCategory {
+                    print("🔄 ManageCartSheet: Received category change notification - switching to \(newCategory.title)")
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                        selectedCategoryName = newCategory.title
+                    }
+                }
+            }
+            .onChange(of: selectedCategoryName) { oldValue, newValue in
+                updateChevronVisibility()
+            }
+            .onChange(of: searchText) { oldValue, newValue in
+                let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmed.isEmpty, let vault = vaultService.vault else { return }
+                if let matched = matchCategoryForSearch(trimmed, vault: vault) {
+                    if let current = selectedCategoryName,
+                       let currentIndex = visibleCategories.firstIndex(of: current),
+                       let newIndex = visibleCategories.firstIndex(of: matched) {
+                        navigationDirection = newIndex > currentIndex ? .right : .left
+                    }
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                        selectedCategoryName = matched
+                    }
+                }
+            }
+            .onChange(of: visibleCategoryNamesData) { _, _ in
+                if let selectedCategoryName,
+                   !visibleCategories.contains(selectedCategoryName) {
+                    self.selectedCategoryName = visibleCategories.first
+                }
+                updateChevronVisibility()
+            }
+            .onChange(of: hasActiveItems) { oldValue, newValue in
+                if newValue {
+                    if !oldValue {
+                        withAnimation(.spring(duration: 0.4)) {
+                            fillAnimation = 1.0
+                        }
+                    }
+                } else {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        fillAnimation = 0.0
+                    }
+                }
+            }
+            .onAppear {
+                if hasActiveItems {
+                    fillAnimation = 1.0
+                }
+            }
+            .fullScreenCover(isPresented: $showCategoryPickerSheet) {
+                NavigationStack {
+                    categoriesManagerDestination
+                }
+            }
+            .presentationDragIndicator(.visible)
+            .presentationCornerRadius(24)
+            .onChange(of: showCategoryPickerSheet) { _, isPresented in
+                if !isPresented {
+                    categoryManagerStartOnHidden = false
+                }
+            }
+    }
+
+    private var categoriesManagerDestination: some View {
+        CategoriesManagerSheet(
+            title: "Categories",
+            startOnHiddenTab: categoryManagerStartOnHidden,
+            selectedCategoryName: $selectedCategoryName,
+            visibleCategoryNames: visibleCategoriesBinding,
+            activeItemCount: { getActiveItemCount(forCategoryNamed: $0) },
+            hasItems: { hasItems(inCategoryNamed: $0) },
+            onClose: closeCategoryManager
+        )
+    }
+
+    private var baseContent: some View {
         ZStack(alignment: .bottom) {
             // Main content
             VStack(spacing: 0) {
@@ -163,7 +283,6 @@ struct ManageCartSheet: View {
                 }
             }
             
-            
             // Bottom action bar with chevrons
             if currentVault != nil && !showAddItemPopover {
                 bottomActionBar
@@ -178,7 +297,6 @@ struct ManageCartSheet: View {
                         }
                     }
                 
-
                 AddItemPopover(
                     isPresented: $showAddItemPopover,
                     createCartButtonVisible: $createCartButtonVisible,
@@ -215,110 +333,6 @@ struct ManageCartSheet: View {
                 }
             }
             .frame(maxHeight: .infinity)
-        }
-        .navigationBarHidden(true) // Hide native navigation bar
-        .background(.white)
-        .ignoresSafeArea(.keyboard)
-        .onPreferenceChange(TextFieldFocusPreferenceKey.self) { itemId in
-            focusedItemId = itemId
-        }
-        .onAppear {
-            initializeActiveItemsFromCart()
-            if selectedCategoryName == nil {
-                selectedCategoryName = firstVisibleCategoryWithItems ?? visibleCategories.first
-            }
-            updateChevronVisibility()
-        }
-        .onChange(of: vaultService.vault) { oldValue, newValue in
-            print("🔄 ManageCartSheet: Vault updated, refreshing view")
-            vaultUpdateTrigger += 1
-            
-            // Update selected category if the current one no longer has items
-            if let currentCategoryName = selectedCategoryName,
-               !hasItems(inCategoryNamed: currentCategoryName) {
-                selectedCategoryName = firstVisibleCategoryWithItems ?? visibleCategories.first
-            }
-        }
-        .onChange(of: vaultUpdateTrigger) { oldValue, newValue in
-            // This forces the view to refresh when vault changes
-            print("🔄 ManageCartSheet: Refreshing view due to vault changes")
-        }
-        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ItemCategoryChanged"))) { notification in
-            if let newCategoryName = notification.userInfo?["newCategoryName"] as? String {
-                print("🔄 ManageCartSheet: Received category change notification - switching to \(newCategoryName)")
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                    selectedCategoryName = newCategoryName
-                }
-            } else if let newCategory = notification.userInfo?["newCategory"] as? GroceryCategory {
-                print("🔄 ManageCartSheet: Received category change notification - switching to \(newCategory.title)")
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                    selectedCategoryName = newCategory.title
-                }
-            }
-        }
-        .onChange(of: selectedCategoryName) { oldValue, newValue in
-            updateChevronVisibility()
-        }
-        .onChange(of: searchText) { oldValue, newValue in
-            let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !trimmed.isEmpty, let vault = vaultService.vault else { return }
-            if let matched = matchCategoryForSearch(trimmed, vault: vault) {
-                if let current = selectedCategoryName,
-                   let currentIndex = visibleCategories.firstIndex(of: current),
-                   let newIndex = visibleCategories.firstIndex(of: matched) {
-                    navigationDirection = newIndex > currentIndex ? .right : .left
-                }
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                    selectedCategoryName = matched
-                }
-            }
-        }
-        .onChange(of: visibleCategoryNamesData) { _, _ in
-            if let selectedCategoryName,
-               !visibleCategories.contains(selectedCategoryName) {
-                self.selectedCategoryName = visibleCategories.first
-            }
-            updateChevronVisibility()
-        }
-        .onChange(of: hasActiveItems) { oldValue, newValue in
-            if newValue {
-                if !oldValue {
-                    withAnimation(.spring(duration: 0.4)) {
-                        fillAnimation = 1.0
-                    }
-                }
-            } else {
-                withAnimation(.easeInOut(duration: 0.3)) {
-                    fillAnimation = 0.0
-                }
-            }
-        }
-        .onAppear {
-            if hasActiveItems {
-                fillAnimation = 1.0
-            }
-        }
-        .presentationDragIndicator(.visible)
-        .presentationCornerRadius(24)
-        .sheet(isPresented: $showCategoryPickerSheet) {
-            NavigationStack {
-                CategoriesManagerSheet(
-                    title: "Categories",
-                    startOnHiddenTab: categoryManagerStartOnHidden,
-                    selectedCategoryName: $selectedCategoryName,
-                    visibleCategoryNames: visibleCategoriesBinding,
-                    activeItemCount: { getActiveItemCount(forCategoryNamed: $0) },
-                    hasItems: { hasItems(inCategoryNamed: $0) }
-                )
-            }
-            .presentationDetents([.large])
-            .presentationCornerRadius(24)
-            .presentationBackground(.white)
-        }
-        .onChange(of: showCategoryPickerSheet) { _, isPresented in
-            if !isPresented {
-                categoryManagerStartOnHidden = false
-            }
         }
     }
     
@@ -364,36 +378,31 @@ struct ManageCartSheet: View {
                             }
 
                             Image(systemName: "plus.square.dashed")
-                                .font(.system(size: 44, weight: .light))
-                                .foregroundStyle(.gray)
+                                .font(.system(size: 46, weight: .light))
+                                .foregroundStyle(Color(.systemGray3))
                                 .offset(x: -2)
                                 .onTapGesture {
                                     categoryManagerStartOnHidden = true
-                                    showCategoryPickerSheet = true
+                                    openCategoryManager()
                                 }
                         }
-                        .padding(.trailing)
+                        .padding(.trailing, 80)
                     }
                     .padding(.vertical, 1)
                     .padding(.leading)
                     .padding(.trailing, 4)
                 }
                 .overlay(alignment: .trailing) {
-                    GroceryCategoryScrollRightOverlay(backgroundColor: .white)
+                    GroceryCategoryScrollRightOverlay(
+                        backgroundColor: .white,
+                        namespace: categoryManagerNamespace,
+                        isExpanded: showCategoryPickerSheet
+                    ) {
+                        UIApplication.shared.endEditing()
+                        categoryManagerStartOnHidden = false
+                        openCategoryManager()
+                    }
                 }
-                
-                Button {
-                    UIApplication.shared.endEditing()
-                    showCategoryPickerSheet = true
-                } label: {
-                    Image(systemName: "chevron.down.circle")
-                        .font(.system(size: 24, weight: .medium))
-                        .foregroundColor(.gray)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Show categories")
-                .padding(.vertical, 18)
-                .padding(.trailing)
             }
             .onChange(of: selectedCategoryName) { _, newValue in
                 if let newName = newValue {

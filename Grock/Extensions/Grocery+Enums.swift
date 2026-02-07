@@ -122,43 +122,30 @@ enum GroceryCategory: String, CaseIterable, Identifiable {
         }
     }
     
-    var pastelColor: Color {
+    var pastelHex: String {
         switch self {
-        case .freshProduce:
-            return Color(hex: "AAFF72")
-        case .meatsSeafood:
-            return Color(hex: "FFBEBE")
-        case .dairyEggs:
-            return Color(hex: "FFE481")
-        case .frozen:
-            return Color(hex: "C5F9FF")
-        case .condimentsIngredients:
-            return Color(hex: "949494")
-        case .pantry:
-            return Color(hex: "FFF7AA")
-        case .bakeryBread:
-            return Color(hex: "F5DEB3")
-        case .beverages:
-            return Color(hex: "AAB3E0")
-        case .readyMeals:
-            return Color(hex: "FFDAB9")
-        case .personalCare:
-            return Color(hex: "FFC0CB")
-        case .health:
-            return Color(hex: "CBCAFF")
-        case .cleaningHousehold:
-            return Color(hex: "D8BFD8")
-        case .pets:
-            return Color(hex: "CAA484")
-        case .baby:
-            return Color(hex: "B0E0E6")
-        case .homeGarden:
-            return Color(hex: "AED470")
-        case .electronicsHobbies:
-            return Color(hex: "FF96CA")
-        case .stationery:
-            return Color(hex: "F3C7A3")
+        case .freshProduce: return "AAFF72"
+        case .meatsSeafood: return "FFBEBE"
+        case .dairyEggs: return "FFE481"
+        case .frozen: return "C5F9FF"
+        case .condimentsIngredients: return "949494"
+        case .pantry: return "FFF7AA"
+        case .bakeryBread: return "F5DEB3"
+        case .beverages: return "AAB3E0"
+        case .readyMeals: return "FFDAB9"
+        case .personalCare: return "FFC0CB"
+        case .health: return "CBCAFF"
+        case .cleaningHousehold: return "D8BFD8"
+        case .pets: return "CAA484"
+        case .baby: return "B0E0E6"
+        case .homeGarden: return "AED470"
+        case .electronicsHobbies: return "FF96CA"
+        case .stationery: return "F3C7A3"
         }
+    }
+
+    var pastelColor: Color {
+        return Color(hex: pastelHex)
     }
 }
 

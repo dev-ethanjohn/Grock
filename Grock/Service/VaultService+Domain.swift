@@ -52,6 +52,8 @@ extension VaultService {
 }
 
 extension VaultService {
+    static let removedEmojiSentinel = "__removed__"
+
     /// Ensures the default grocery categories exist (without deleting user-created categories).
     ///
     /// Side effects:
@@ -134,13 +136,17 @@ extension VaultService {
         saveContext()
     }
     
-    func createCustomCategory(named name: String, emoji: String? = nil) -> Category? {
+    func createCustomCategory(named name: String, emoji: String? = nil, colorHex: String? = nil) -> Category? {
         guard let vault = vault else { return nil }
         
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
 
         if let existing = vault.categories.first(where: { normalizedCategoryName($0.name) == normalizedCategoryName(trimmed) }) {
+            // Update color/emoji if provided and different? 
+            // For now, let's assume we just return existing, or maybe update if fields are provided?
+            // The user wants to CREATE, but if it exists, maybe they want to EDIT?
+            // Existing logic just returns existing. I'll stick to that to avoid side effects.
             return existing
         }
         
@@ -149,7 +155,9 @@ extension VaultService {
             guard let cleanedEmoji, !cleanedEmoji.isEmpty else { return nil }
             return String(cleanedEmoji.prefix(1))
         }()
-        let newCategory = Category(name: trimmed, emoji: normalizedEmoji)
+        
+        // Updated to include colorHex
+        let newCategory = Category(name: trimmed, emoji: normalizedEmoji, colorHex: colorHex)
         let nextSortOrder = (vault.categories.map(\.sortOrder).max() ?? (GroceryCategory.allCases.count - 1)) + 1
         newCategory.sortOrder = nextSortOrder
         
@@ -171,13 +179,29 @@ extension VaultService {
     }
 
     func displayEmoji(forCategoryName name: String) -> String {
-        if let category = getCategory(named: name),
-           let emoji = category.emoji?.trimmingCharacters(in: .whitespacesAndNewlines),
-           !emoji.isEmpty {
-            return String(emoji.prefix(1))
+        if let category = getCategory(named: name) {
+            let emoji = category.emoji?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            if emoji == Self.removedEmojiSentinel {
+                let trimmed = category.name.trimmingCharacters(in: .whitespacesAndNewlines)
+                return trimmed.isEmpty ? "📦" : String(trimmed.prefix(1)).uppercased()
+            }
+            if !emoji.isEmpty {
+                return String(emoji.prefix(1))
+            }
+
+            if let groceryCategory = GroceryCategory.allCases.first(
+                where: { normalizedCategoryName($0.title) == normalizedCategoryName(category.name) }
+            ) {
+                return groceryCategory.emoji
+            }
+
+            let trimmed = category.name.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? "📦" : String(trimmed.prefix(1)).uppercased()
         }
 
-        if let groceryCategory = GroceryCategory.allCases.first(where: { normalizedCategoryName($0.title) == normalizedCategoryName(name) }) {
+        if let groceryCategory = GroceryCategory.allCases.first(
+            where: { normalizedCategoryName($0.title) == normalizedCategoryName(name) }
+        ) {
             return groceryCategory.emoji
         }
 

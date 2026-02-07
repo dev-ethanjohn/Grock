@@ -42,19 +42,14 @@ struct FluidBudgetPillView: View {
     
     // Text color for text INSIDE the pill
     private var insidePillTextColor: Color {
-        // Text inside the green pill should be black (or dark) for contrast
-        return budgetProgressColor.darker(by: 0.5).saturated(by: 0.4)
+        // Darker variant of the small pill background color
+        budgetProgressColor.darker(by: 0.4).saturated(by: 0.2)
     }
     
     // Text color for text OUTSIDE the pill
     private var outsidePillTextColor: Color {
-        if isHeader {
-            return Color(hex: "007B02") // Header always uses dark green (on white background)
-        } else if hasBackgroundImage {
-            return .white // White on background images (HomeCartRowView)
-        } else {
-            return Color(hex: "007B02") // Dark green on solid color backgrounds
-        }
+        // Darker variant of the small pill background color
+        budgetProgressColor.darker(by: 0.4).saturated(by: 0.2)
     }
     
     // Budget button text color
@@ -66,6 +61,14 @@ struct FluidBudgetPillView: View {
         } else {
             return .black // Black on solid color backgrounds
         }
+    }
+
+    private var trackBorderColor: Color {
+        isHeader ? Color(hex: "cacaca") : .black
+    }
+
+    private var trackBorderWidth: CGFloat {
+        0.5
     }
     
     private var shouldShowTextInside: Bool {
@@ -100,11 +103,11 @@ struct FluidBudgetPillView: View {
                     
                     // Background track
                     Capsule()
-                        .fill(Color.white.opacity(0.3))
+                        .fill(Color.white)
                         .frame(height: 20)
                         .overlay(
                             Capsule()
-                                .stroke(Color(hex: "cacaca"), lineWidth: 1)
+                                .stroke(trackBorderColor, lineWidth: trackBorderWidth)
                         )
                         .offset(y: barTopOffset + 1)
                     

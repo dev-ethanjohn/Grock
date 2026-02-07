@@ -63,15 +63,17 @@ class Category {
     var name: String
     var emoji: String?
     var sortOrder: Int
+    var colorHex: String?
     
     @Relationship(deleteRule: .cascade, inverse: \Item.category)
     var items: [Item] = []
     
-    init(name: String, emoji: String? = nil) {
+    init(name: String, emoji: String? = nil, colorHex: String? = nil) {
         self.uid = UUID().uuidString
         self.name = name
         self.emoji = emoji
         self.sortOrder = 0
+        self.colorHex = colorHex
     }
 }
 

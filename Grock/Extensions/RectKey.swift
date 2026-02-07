@@ -7,8 +7,6 @@
 
 import SwiftUI
 
-import SwiftUI
-
 struct RectKey: PreferenceKey {
     static var defaultValue: CGRect = .zero
     static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
@@ -28,6 +26,7 @@ extension View {
                         .preference(key: RectKey.self, value: rect)
                         .onPreferenceChange(RectKey.self, perform: completion)
                 }
+                .allowsHitTesting(false)
             }
     }
 
@@ -42,6 +41,7 @@ extension View {
                         .preference(key: RectKey.self, value: rect)
                         .onPreferenceChange(RectKey.self, perform: completion)
                 }
+                .allowsHitTesting(false)
             }
     }
 }

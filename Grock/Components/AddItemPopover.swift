@@ -32,7 +32,7 @@ struct AddItemPopover: View {
                 HStack {
                     HStack {
                         Text("Add new item to vault")
-                            .lexendFont(13, weight: .medium)
+                            .fuzzyBubblesFont(13, weight: .bold)
                         Image(systemName: "shippingbox")
                             .resizable()
                             .frame(width: 16.5, height: 16.5)

@@ -53,6 +53,7 @@ struct VaultView: View {
     @State private var categorySectionHeight: CGFloat = 0
     @State private var showCategoryPickerSheet = false
     @State private var categoryManagerStartOnHidden = false
+    @State private var showCategoryManagerContent = false
     
     @AppStorage("visibleCategoryNames") private var visibleCategoryNamesData: Data = Data()
     
@@ -91,6 +92,7 @@ struct VaultView: View {
     @State private var searchText: String = ""
     @State private var isSearching: Bool = false
     @Namespace private var searchNamespace
+    @Namespace private var categoryManagerNamespace
     
     private var totalVaultItemsCount: Int {
         guard let vault = vaultService.vault else { return 0 }
@@ -166,9 +168,58 @@ struct VaultView: View {
     private func dismissKeyboard() {
         UIApplication.shared.endEditing()
     }
+
+    private func openCategoryManager() {
+        showCategoryManagerContent = false
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+            showCategoryPickerSheet = true
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                showCategoryManagerContent = true
+            }
+        }
+    }
+
+    private func closeCategoryManager() {
+        withAnimation(.easeInOut(duration: 0.15)) {
+            showCategoryManagerContent = false
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.9)) {
+                showCategoryPickerSheet = false
+            }
+        }
+        categoryManagerStartOnHidden = false
+    }
+
+    private var categoryManagerOverlay: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 0)
+                .fill(Color.white)
+                .matchedGeometryEffect(id: "categoryManagerMorph", in: categoryManagerNamespace, isSource: false)
+                .ignoresSafeArea()
+
+            NavigationStack {
+                CategoriesManagerSheet(
+                    title: "Categories",
+                    startOnHiddenTab: categoryManagerStartOnHidden,
+                    selectedCategoryName: $selectedCategoryName,
+                    visibleCategoryNames: visibleCategoriesBinding,
+                    activeItemCount: { getActiveItemCount(forCategoryNamed: $0) },
+                    hasItems: { hasItems(inCategoryNamed: $0) },
+                    onClose: closeCategoryManager
+                )
+            }
+            .ignoresSafeArea()
+            .opacity(showCategoryManagerContent ? 1 : 0)
+            .animation(.easeInOut(duration: 0.2), value: showCategoryManagerContent)
+        }
+        .zIndex(10)
+    }
     
     var body: some View {
-        baseContent
+        contentWithCategoryManager
             .applyLifecycleModifiers(
                 onAppear: handleOnAppear,
                 onDisappear: handleOnDisappear,
@@ -183,21 +234,6 @@ struct VaultView: View {
                 firstItemId: firstItemId,
                 showNameEntrySheet: $showNameEntrySheet
             )
-            .sheet(isPresented: $showCategoryPickerSheet) {
-                NavigationStack {
-                    CategoriesManagerSheet(
-                        title: "Categories",
-                        startOnHiddenTab: categoryManagerStartOnHidden,
-                        selectedCategoryName: $selectedCategoryName,
-                        visibleCategoryNames: visibleCategoriesBinding,
-                        activeItemCount: { getActiveItemCount(forCategoryNamed: $0) },
-                        hasItems: { hasItems(inCategoryNamed: $0) }
-                    )
-                }
-                .presentationDetents([.large])
-            .presentationCornerRadius(24)
-            .presentationBackground(.white)
-            }
             .onChange(of: showCategoryPickerSheet) { _, isPresented in
                 if !isPresented {
                     categoryManagerStartOnHidden = false
@@ -231,6 +267,36 @@ struct VaultView: View {
                     isCelebrationSequenceActive = false
                 }
             }
+    }
+    
+    @ViewBuilder
+    private var contentWithCategoryManager: some View {
+        if #available(iOS 18.0, *) {
+            baseContent
+                .fullScreenCover(isPresented: $showCategoryPickerSheet) {
+                    NavigationStack {
+                        CategoriesManagerSheet(
+                            title: "Categories",
+                            startOnHiddenTab: categoryManagerStartOnHidden,
+                            selectedCategoryName: $selectedCategoryName,
+                            visibleCategoryNames: visibleCategoriesBinding,
+                            activeItemCount: { getActiveItemCount(forCategoryNamed: $0) },
+                            hasItems: { hasItems(inCategoryNamed: $0) },
+                            onClose: closeCategoryManager
+                        )
+                        .navigationTransition(.zoom(sourceID: "customizeIcon", in: categoryManagerNamespace))
+                    }
+                }
+        } else {
+            ZStack {
+                baseContent
+                    .disabled(showCategoryPickerSheet)
+
+                if showCategoryPickerSheet {
+                    categoryManagerOverlay
+                }
+            }
+        }
     }
     
     private var baseContent: some View {
@@ -621,36 +687,31 @@ struct VaultView: View {
                             }
 
                             Image(systemName: "plus.square.dashed")
-                                .font(.system(size: 44, weight: .light))
-                                .foregroundStyle(.gray)
+                                .font(.system(size: 46, weight: .light))
+                                .foregroundStyle(Color(.systemGray3))
                                 .offset(x: -2)
                                 .onTapGesture {
                                     categoryManagerStartOnHidden = true
-                                    showCategoryPickerSheet = true
+                                    openCategoryManager()
                                 }
                         }
-                        .padding(.trailing)
+                        .padding(.trailing, 80)
                     }
                     .padding(.vertical, 1)
                     .padding(.leading)
                     .padding(.trailing, 4)
                 }
                 .overlay(alignment: .trailing) {
-                    GroceryCategoryScrollRightOverlay(backgroundColor: .white)
+                    GroceryCategoryScrollRightOverlay(
+                        backgroundColor: .white,
+                        namespace: categoryManagerNamespace,
+                        isExpanded: showCategoryPickerSheet
+                    ) {
+                        dismissKeyboard()
+                        categoryManagerStartOnHidden = false
+                        openCategoryManager()
+                    }
                 }
-                
-                Button {
-                    dismissKeyboard()
-                    showCategoryPickerSheet = true
-                } label: {
-                    Image(systemName: "chevron.down.circle")
-                        .font(.system(size: 24, weight: .medium))
-                        .foregroundColor(.gray)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Show categories")
-                .padding(.vertical, 18)
-                .padding(.trailing)
             }
             .onChange(of: selectedCategoryName) { _, newValue in
                 if let newName = newValue {

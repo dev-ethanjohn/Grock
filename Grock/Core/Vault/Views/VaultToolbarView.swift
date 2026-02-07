@@ -22,7 +22,7 @@ struct VaultToolbarView: View {
             HStack {
                 Spacer()
                 Text("vault")
-                    .lexendFont(16, weight: .bold)
+                    .fuzzyBubblesFont(20, weight: .bold)
                     .opacity(toolbarAppeared ? 1 : 0)
                     .offset(y: toolbarAppeared ? 0 : -10)
                     .animation(.spring(response: 0.4, dampingFraction: 0.7, blendDuration: 0).delay(0.1), value: toolbarAppeared)

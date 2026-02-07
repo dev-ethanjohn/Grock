@@ -1252,7 +1252,7 @@ extension View {
         vaultService: VaultService,
         cartViewModel: CartViewModel
     ) -> some View {
-        self
+        return self
             .sheet(isPresented: showingCartSheet) {
                 if cart.isPlanning {
                     ManageCartSheet(cart: cart)
