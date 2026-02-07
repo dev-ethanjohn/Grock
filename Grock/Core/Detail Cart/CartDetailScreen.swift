@@ -338,6 +338,10 @@ struct CartDetailScreen: View {
     }
     
     private func saveStateOnDismiss() {
+        // Prevent action bar state from bleeding into the next cart detail view.
+        stateManager.showFinishTripButton = false
+        stateManager.showingCompletedSheet = false
+
         if stateManager.localBudget != cart.budget {
             cart.budget = stateManager.localBudget
             vaultService.updateCartTotals(cart: cart)
@@ -852,6 +856,10 @@ struct CartDetailContent: View {
     private var currentFulfilledCount: Int {
         cart.cartItems.filter { $0.isFulfilled }.count
     }
+
+    private var shouldShowFinishTripButton: Bool {
+        cart.isShopping && hasItems
+    }
     
     var body: some View {
         GeometryReader { geometry in
@@ -910,7 +918,7 @@ struct CartDetailContent: View {
                         Spacer()
                         
                         CartDetailActionBar(
-                            showFinishTrip: stateManager.showFinishTripButton,
+                            showFinishTrip: shouldShowFinishTripButton,
                             onManageCart: {
                                 stateManager.showingCartSheet = true
                             },
