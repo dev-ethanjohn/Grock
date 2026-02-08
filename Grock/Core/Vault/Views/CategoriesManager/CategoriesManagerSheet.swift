@@ -1,4 +1,5 @@
 import SwiftUI
+import Lottie
 import UniformTypeIdentifiers
 import UIKit
 import SwiftData
@@ -16,6 +17,12 @@ struct CategoriesManagerSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var viewModel: CategoriesManagerViewModel
     @FocusState private var categoryNameFocused: Bool
+    @State private var closeButtonScale: CGFloat = 0.0
+    @State private var closeButtonPressed = false
+    @State private var closeButtonDidAppear = false
+    @State private var showCompactAddButton = false
+    @State private var addButtonDidAppear = false
+    @Namespace private var addButtonNamespace
 
     init(
         title: String,
@@ -239,17 +246,26 @@ struct CategoriesManagerSheet: View {
             let index = viewModel.tabs.firstIndex(where: { $0.id == viewModel.activeTab }) ?? 0
             viewModel.progress = CGFloat(index)
             updateCachedCategories()
+            showCompactAddButton = false
+            if !addButtonDidAppear {
+                addButtonDidAppear = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                    withAnimation(.interactiveSpring(response: 0.55, dampingFraction: 0.6, blendDuration: 0.25)) {
+                        showCompactAddButton = true
+                    }
+                }
+            }
         }
         .onChange(of: vaultService.vault?.categories) { _, _ in
             updateCachedCategories()
         }
     }
-
+    
     private var header: some View {
         VStack(spacing: 0) {
             HStack {
                 Text(title)
-                    .fuzzyBubblesFont(20, weight: .bold)
+                    .fuzzyBubblesFont(24, weight: .bold)
                     .foregroundStyle(.black)
                 Spacer()
                 closeButton
@@ -264,6 +280,30 @@ struct CategoriesManagerSheet: View {
                 .padding(.bottom, 16)
         }
         .background(headerBackground)
+//        .overlay(alignment: .topTrailing) {
+//            debugMinYOverlay
+//                .padding(.trailing, 16)
+//                .padding(.top, 8)
+//        }
+    }
+
+    private var debugMinYOverlay: some View {
+        let minY = viewModel.activeTab == .shown
+            ? viewModel.shownScrollOffset
+            : viewModel.hiddenScrollOffset
+        return Text("minY: \(String(format: "%.1f", minY))")
+            .lexendFont(12, weight: .semibold)
+            .foregroundStyle(Color.black.opacity(0.8))
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(
+                Capsule()
+                    .fill(Color.white.opacity(0.8))
+            )
+            .overlay(
+                Capsule()
+                    .stroke(Color.black.opacity(0.08), lineWidth: 1)
+            )
     }
 
     private var categoryPopover: some View {
@@ -296,7 +336,6 @@ struct CategoriesManagerSheet: View {
             
             // Input Row
             HStack(spacing: 12) {
-                // Icon Preview / Emoji Selector
                 Button(action: {
                     viewModel.showEmojiPicker = true
                 }) {
@@ -386,7 +425,7 @@ struct CategoriesManagerSheet: View {
                 }
             }
             .tabViewStyle(.page(indexDisplayMode: .always))
-            .frame(height: 120) // Adjust height for 2 rows + page indicator
+            .frame(height: 120)
             .onAppear {
                 UIPageControl.appearance().currentPageIndicatorTintColor = .black
                 UIPageControl.appearance().pageIndicatorTintColor = .systemGray4
@@ -491,9 +530,9 @@ struct CategoriesManagerSheet: View {
                 LinearGradient(
                     stops: [
                         .init(color: .white, location: 0),
-                        .init(color: .white, location: 0.7),
-                        .init(color: .white.opacity(0.9), location: 0.85),
-                        .init(color: .white.opacity(0.5), location: 0.9),
+                        .init(color: .white, location: 0.85),
+                        .init(color: .white.opacity(0.7), location: 0.9),
+                        .init(color: .white.opacity(0.2), location: 0.95),
                         .init(color: .white.opacity(0), location: 1),
                     ],
                     startPoint: .top,
@@ -509,6 +548,7 @@ struct CategoriesManagerSheet: View {
         HStack(spacing: 22) {
             tabButtons()
         }
+        .padding(.leading, 4)
         .frame(maxWidth: .infinity, alignment: .leading)
         .coordinateSpace(name: "categoryTabs")
         .overlay(alignment: .bottom) {
@@ -535,6 +575,7 @@ struct CategoriesManagerSheet: View {
                     .offset(x: indicatorPosition)
             }
             .allowsHitTesting(false)
+            .offset(y: -4)
         }
     }
 
@@ -547,14 +588,11 @@ struct CategoriesManagerSheet: View {
             HapticManager.shared.playButtonTap()
             viewModel.showCategoryPopover = true
         }) {
-            Image(systemName: "plus")
-                .font(.system(size: 16, weight: .bold))
-                .foregroundStyle(.black)
-                .frame(width: 44, height: 44)
-                .background(
-                    Circle()
-                        .fill(Color(.systemGray6))
-                )
+            if showCompactAddButton {
+                addCategoryButtonCapsule(isCompact: true)
+            } else {
+                addCategoryButtonCapsule(isCompact: false)
+            }
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Create category")
@@ -562,25 +600,76 @@ struct CategoriesManagerSheet: View {
         .padding(.bottom, safeAreaBottomPadding + 16)
     }
 
+    @ViewBuilder
+    private func addCategoryButtonCapsule(isCompact: Bool) -> some View {
+        ZStack {
+            if isCompact {
+                Image(systemName: "plus")
+                    .lexendFont(18, weight: .bold)
+                    .foregroundStyle(.white)
+                    .matchedGeometryEffect(id: "addButtonContent", in: addButtonNamespace)
+            } else {
+                Text("Add New Category")
+                    .fuzzyBubblesFont(18, weight: .bold)
+                    .foregroundColor(.white)
+                    .matchedGeometryEffect(id: "addButtonContent", in: addButtonNamespace)
+            }
+        }
+        .padding(.horizontal, isCompact ? 0 : 20)
+        .frame(width: isCompact ? 44 : nil, height: 44)
+        .background(
+            ZStack {
+                Capsule()
+                    .fill(.ultraThinMaterial)
+                Capsule()
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                .black.opacity(0.85),
+                                .black.opacity(1)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            }
+            .matchedGeometryEffect(id: "addButtonBackground", in: addButtonNamespace)
+        )
+        .clipShape(Capsule())
+        .overlay(
+            Capsule()
+                .stroke(
+                    LinearGradient(
+                        colors: [.white.opacity(0.3), .white.opacity(0.1)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
+        )
+    }
+
     private var closeButton: some View {
         Button(action: {
-            if let onClose {
-                onClose()
-            } else {
-                dismiss()
-            }
+            handleCloseButtonTap()
         }) {
             Image(systemName: "xmark")
                 .font(.system(size: 14, weight: .bold))
                 .foregroundColor(.black)
-                .frame(width: 32, height: 32)
+                .frame(width: 28, height: 28)
                 .background(
                     Circle()
-                        .fill(Color(.systemGray6))
+                        .fill(.white)
                 )
         }
         .buttonStyle(.plain)
+        .scaleEffect(closeButtonScale * (closeButtonPressed ? 0.9 : 1.0))
+        .animation(.spring(response: 0.35, dampingFraction: 0.55), value: closeButtonScale)
+        .animation(.spring(response: 0.25, dampingFraction: 0.6), value: closeButtonPressed)
         .accessibilityLabel("Close")
+        .onAppear {
+            animateCloseButtonIn()
+        }
     }
 
     private func tabButtons() -> some View {
@@ -597,19 +686,31 @@ struct CategoriesManagerSheet: View {
                     viewModel.progress = CGFloat(targetIndex)
                 }
             }) {
-                Text(tab.id.rawValue)
-                    .lexendFont(14, weight: .medium)
-                    .padding(.top, 6)
-                    .padding(.bottom, 10)
-                    .foregroundStyle(
-                        viewModel.activeTab == tab.id ? Color.black : Color(.systemGray)
-                    )
-                    .contentShape(.rect)
-                    .scaleEffect(viewModel.activeTab == tab.id ? 1.05 : 1.0)
-                    .animation(
-                        .spring(response: 0.4, dampingFraction: 0.4),
-                        value: viewModel.activeTab
-                    )
+                let isActive = viewModel.activeTab == tab.id
+                let labelColor = isActive ? Color.black : Color(.systemGray)
+
+                HStack(spacing: 6) {
+                    Text(tab.id.rawValue)
+                        .lexendFont(14, weight: .medium)
+                        .foregroundStyle(labelColor)
+                    
+                    if tab.id == .shown {
+                        Image("star")
+                            .renderingMode(.original)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 16, height: 16)
+                            .saturation(isActive ? 1 : 0)
+                            .opacity(isActive ? 1 : 0.6)
+                    }
+                }
+                .padding(.top, 6)
+                .padding(.bottom, 10)
+                .scaleEffect(isActive ? 1.05 : 1.0)
+                .animation(
+                    .spring(response: 0.4, dampingFraction: 0.4),
+                    value: viewModel.activeTab
+                )
             }
             .buttonStyle(.plain)
             .rect(in: .named("categoryTabs")) { rect in
@@ -622,29 +723,73 @@ struct CategoriesManagerSheet: View {
 
     @ViewBuilder
     private func tabColumn(names: [String], isShownColumn: Bool) -> some View {
-        ScrollView {
-            VStack(spacing: 0) {
-                Color.clear
-                    .frame(height: max(0, viewModel.headerHeight - 16))
-
-                column(
-                    names: names,
-                    isShownColumn: isShownColumn
+        let scrollSpaceName = isShownColumn ? "categoriesShownScroll" : "categoriesHiddenScroll"
+        GeometryReader { containerProxy in
+            ScrollView {
+                VStack(spacing: 0) {
+                    // Initial offset spacer
+                    Color.clear
+                        .frame(height: max(0, viewModel.headerHeight - 16))
+                    
+                    // Your column content
+                    column(
+                        names: names,
+                        isShownColumn: isShownColumn,
+                        scrollSpaceName: scrollSpaceName
+                    )
+                    .padding(.horizontal, 16)
+                    .padding(.top, 12)
+                    .padding(.bottom, safeAreaBottomPadding + (UIScreen.main.bounds.height * 0.08))
+                }
+                .background(
+                    GeometryReader { contentProxy in
+                        Color.clear
+//                            .onAppear {
+//                                print("Initial minY: \(contentProxy.frame(in: .global).minY)")
+//                            }
+//                            .onChange(of: contentProxy.frame(in: .global).minY) { oldValue, newValue in
+//                                print("Scroll minY changed: \(newValue)")
+//                                updateScrollOffset(newValue, isShownColumn: isShownColumn)
+//                            }
+                            .preference(
+                                key: CategoryScrollContentHeightPreferenceKey.self,
+                                value: contentProxy.size.height
+                            )
+                    }
                 )
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
-                .padding(.bottom, safeAreaBottomPadding + 80)
+            }
+            .scrollIndicators(.hidden)
+            .onAppear {
+                updateScrollViewHeight(containerProxy.size.height, isShownColumn: isShownColumn)
+            }
+            .onChange(of: containerProxy.size.height) { _, newValue in
+                updateScrollViewHeight(newValue, isShownColumn: isShownColumn)
+            }
+            .onPreferenceChange(CategoryScrollContentHeightPreferenceKey.self) { value in
+                updateContentHeight(value, isShownColumn: isShownColumn)
             }
         }
-        .scrollIndicators(.hidden)
         .padding(.bottom, -safeAreaBottomPadding)
         .ignoresSafeArea(.container, edges: .bottom)
     }
     
     @ViewBuilder
-    private func column(names: [String], isShownColumn: Bool) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            LazyVStack(spacing: 8) {
+    private func column(names: [String], isShownColumn: Bool, scrollSpaceName: String) -> some View {
+        let rowHeight: CGFloat = 62
+        let rowSpacing: CGFloat = 8
+        let selectionOutset: CGFloat = 2
+        let rowTransition: AnyTransition = isShownColumn
+            ? .asymmetric(
+                insertion: .move(edge: .trailing).combined(with: .opacity),
+                removal: .move(edge: .trailing).combined(with: .opacity).combined(with: .scale(scale: 0.96, anchor: .center))
+            )
+            : .asymmetric(
+                insertion: .move(edge: .leading).combined(with: .opacity),
+                removal: .move(edge: .leading).combined(with: .opacity).combined(with: .scale(scale: 0.96, anchor: .center))
+            )
+
+        VStack(spacing: 16) {
+            LazyVStack(spacing: rowSpacing) {
                 ForEach(names, id: \.self) { name in
                     let iconText = vaultService.displayEmoji(forCategoryName: name)
                     let row = CategoryManagerRow(
@@ -657,20 +802,24 @@ struct CategoriesManagerSheet: View {
                         actionEnabled: isShownColumn ? shownNames.count > 1 : true,
                         action: {
                             if isShownColumn {
-                                hideCategory(named: name)
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                    hideCategory(named: name)
+                                }
                             } else {
-                                showCategory(named: name, select: true)
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                    showCategory(named: name, select: true)
+                                }
                             }
                         },
                         onTap: {
                             if isShownColumn {
                                 selectedCategoryName = name
-                            } else {
-                                showCategory(named: name, select: true)
                             }
                         }
                     )
-                    
+                    .frame(height: rowHeight)
+                    .transition(rowTransition)
+
                     if isShownColumn {
                         row
                             .onDrag {
@@ -690,10 +839,77 @@ struct CategoriesManagerSheet: View {
                     }
                 }
             }
+
+            if isShownColumn {
+                let shouldShowAddPrompt = showCompactAddButton && !names.isEmpty
+                VStack(spacing: 8) {
+                    Text("Add new category")
+                        .fuzzyBubblesFont(16, weight: .bold)
+                        .foregroundStyle(Color.black.opacity(0.55))
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .multilineTextAlignment(.center)
+                    LottieView(animation: .named("Arrow"))
+                        .playing(.fromProgress(0, toProgress: 0.5, loopMode: .playOnce))
+                        .scaleEffect(x: -0.8, y: -0.8)
+                        .allowsHitTesting(false)
+                        .frame(height: 80)
+                        .frame(width: 92)
+                        .rotationEffect(.degrees(224))
+                }
+                .opacity(shouldShowAddPrompt ? 0.7 : 0)
+                .accessibilityHidden(!shouldShowAddPrompt)
+                .allowsHitTesting(false)
+            }
+        }
+        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: names)
+        .overlay(alignment: .topLeading) {
+            GeometryReader { geo in
+                if isShownColumn,
+                   let selectedCategoryName,
+                   let selectedIndex = names.firstIndex(of: selectedCategoryName) {
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(Color.black, lineWidth: 2)
+                        .frame(
+                            width: max(0, geo.size.width + (selectionOutset * 2)),
+                            height: max(0, rowHeight + (selectionOutset * 2))
+                        )
+                        .offset(
+                            x: -selectionOutset,
+                            y: CGFloat(selectedIndex) * (rowHeight + rowSpacing) - selectionOutset
+                        )
+                        .animation(.spring(response: 0.35, dampingFraction: 0.7), value: selectedCategoryName)
+                        .allowsHitTesting(false)
+                        .zIndex(1)
+                }
+            }
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
     }
-    
+
+    private func updateScrollOffset(_ value: CGFloat, isShownColumn: Bool) {
+        if isShownColumn {
+            viewModel.shownScrollOffset = value
+        } else {
+            viewModel.hiddenScrollOffset = value
+        }
+    }
+
+    private func updateContentHeight(_ value: CGFloat, isShownColumn: Bool) {
+        if isShownColumn {
+            viewModel.shownContentHeight = value
+        } else {
+            viewModel.hiddenContentHeight = value
+        }
+    }
+
+    private func updateScrollViewHeight(_ value: CGFloat, isShownColumn: Bool) {
+        if isShownColumn {
+            viewModel.shownScrollViewHeight = value
+        } else {
+            viewModel.hiddenScrollViewHeight = value
+        }
+    }
+
     private func showCategory(named name: String, select: Bool) {
         var ordered = visibleNamesOrdered
         let key = normalizedKey(name)
@@ -830,6 +1046,112 @@ struct CategoriesManagerSheet: View {
         names
     }
 
+    private func animateCloseButtonIn() {
+        guard !closeButtonDidAppear else { return }
+        closeButtonDidAppear = true
+        closeButtonScale = 0.0
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.55)) {
+                closeButtonScale = 1.0
+            }
+        }
+    }
+
+    private func handleCloseButtonTap() {
+        withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+            closeButtonPressed = true
+        }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.06) {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                closeButtonPressed = false
+                closeButtonScale = 0.7
+            }
+        }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+            if let onClose {
+                onClose()
+            } else {
+                dismiss()
+            }
+        }
+    }
+
+}
+
+private struct CharacterRevealLabel: View {
+    let text: String
+    let delay: Double
+    let fontSize: CGFloat
+    let weight: Font.Weight
+    let color: Color
+    let revealTrigger: Bool
+
+    @State private var revealedCharacters: Int = 0
+    @State private var didAppear = false
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(Array(text.enumerated()), id: \.offset) { index, character in
+                Text(String(character))
+                    .fuzzyBubblesFont(fontSize, weight: weight)
+                    .foregroundStyle(color)
+                    .opacity(index < revealedCharacters ? 1 : 0)
+                    .offset(y: index < revealedCharacters ? 0 : 4)
+                    .animation(
+                        .interpolatingSpring(stiffness: 240, damping: 14)
+                        .delay(Double(index) * 0.01 + delay),
+                        value: revealedCharacters
+                    )
+            }
+        }
+        .onAppear {
+            guard !didAppear else { return }
+            didAppear = true
+            if revealTrigger {
+                startReveal()
+            }
+        }
+        .onChange(of: revealTrigger) { _, newValue in
+            if newValue {
+                startReveal()
+            } else {
+                revealedCharacters = 0
+            }
+        }
+        .onChange(of: text) { _, _ in
+            if revealTrigger {
+                startReveal()
+            }
+        }
+    }
+
+    private func startReveal() {
+        revealedCharacters = 0
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+            withAnimation(.easeOut(duration: 0.32)) {
+                revealedCharacters = text.count
+            }
+        }
+    }
+}
+
+private struct CategoryScrollOffsetPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
+}
+
+private struct CategoryScrollContentHeightPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
 }
 
 @MainActor

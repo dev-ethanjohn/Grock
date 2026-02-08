@@ -19,6 +19,13 @@ final class CategoriesManagerViewModel {
     var cachedAllCategoryNames: [String] = []
     var selectedColorHex: String? = nil
     var showEmojiPicker: Bool = false
+    var shownScrollOffset: CGFloat = 0
+    var hiddenScrollOffset: CGFloat = 0
+    var shownScrollViewHeight: CGFloat = 0
+    var hiddenScrollViewHeight: CGFloat = 0
+    var shownContentHeight: CGFloat = 0
+    var hiddenContentHeight: CGFloat = 0
+
 
     let backgroundColors: [String]
 

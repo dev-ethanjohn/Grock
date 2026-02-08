@@ -111,26 +111,17 @@ struct GroceryCategoryScrollRightOverlay: View {
                         if let namespace {
                             RoundedRectangle(cornerRadius: 999)
                                 .fill(Color.white)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 999)
-                                        .stroke(Color.gray.opacity(0.75), lineWidth: 1)
-                                )
-                                .shadow(color: Color.black.opacity(0.16), radius: 4, x: 0, y: 3)
+                                .shadow(color: Color.black.opacity(0.18), radius: 3, x: 0, y: 1)
                                 .matchedGeometryEffect(id: "categoryManagerMorph", in: namespace, isSource: true)
                         } else {
                             RoundedRectangle(cornerRadius: 999)
                                 .fill(Color.white)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 999)
-                                        .stroke(Color.gray.opacity(0.75), lineWidth: 1)
-                                )
-                                .shadow(color: Color.black.opacity(0.16), radius: 4, x: 0, y: 3)
+                                .shadow(color: Color.black.opacity(0.18), radius: 3, x: 0, y: 1)
                         }
                     }
                 )
                 .opacity(shouldHideIcon ? 0 : 1)
                 .padding(.trailing)
-                .applyZoomSource(id: "customizeIcon", namespace: namespace)
             }
         }
         .frame(width: showsIcon ? 86 : 70)
@@ -141,16 +132,5 @@ struct GroceryCategoryScrollRightOverlay: View {
             return false
         }
         return isExpanded
-    }
-}
-
-extension View {
-    @ViewBuilder
-    func applyZoomSource(id: String, namespace: Namespace.ID?) -> some View {
-        if #available(iOS 18.0, *), let namespace {
-            self.matchedTransitionSource(id: id, in: namespace)
-        } else {
-            self
-        }
     }
 }

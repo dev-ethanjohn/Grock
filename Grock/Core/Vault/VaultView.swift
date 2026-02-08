@@ -284,7 +284,6 @@ struct VaultView: View {
                             hasItems: { hasItems(inCategoryNamed: $0) },
                             onClose: closeCategoryManager
                         )
-                        .navigationTransition(.zoom(sourceID: "customizeIcon", in: categoryManagerNamespace))
                     }
                 }
         } else {

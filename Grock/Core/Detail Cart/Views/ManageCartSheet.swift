@@ -29,6 +29,7 @@ struct ManageCartSheet: View {
     @State private var showLeftChevron = false
     @State private var showRightChevron = false
     @State private var fillAnimation: CGFloat = 0.0
+    @State private var buttonScale: CGFloat = 0
     
     // Track keyboard state
     @FocusState private var isAnyFieldFocused: Bool
@@ -211,16 +212,21 @@ struct ManageCartSheet: View {
                         withAnimation(.spring(duration: 0.4)) {
                             fillAnimation = 1.0
                         }
+                        startButtonBounce()
                     }
                 } else {
                     withAnimation(.easeInOut(duration: 0.3)) {
                         fillAnimation = 0.0
+                        buttonScale = 0
                     }
                 }
             }
             .onAppear {
                 if hasActiveItems {
                     fillAnimation = 1.0
+                    buttonScale = 1.0
+                } else {
+                    buttonScale = 0
                 }
             }
             .fullScreenCover(isPresented: $showCategoryPickerSheet) {
@@ -474,45 +480,19 @@ struct ManageCartSheet: View {
                         .fuzzyBubblesFont(16, weight: .bold)
                         .foregroundColor(.white)
                         .padding(.horizontal, 24)
-                        .padding(.vertical, 12)
-                        .background(
-                            Capsule()
-                                .fill(
-                                    hasActiveItems
-                                    ? RadialGradient(
-                                        colors: [Color.black, Color.gray.opacity(0.3)],
-                                        center: .center,
-                                        startRadius: 0,
-                                        endRadius: fillAnimation * 300
-                                    )
-                                    : RadialGradient(
-                                        colors: [Color.gray.opacity(0.3), Color.gray.opacity(0.3)],
-                                        center: .center,
-                                        startRadius: 0,
-                                        endRadius: 0
-                                    )
-                                )
-                        )
+                        .frame(height: 44)
+                        .background(saveButtonBackground)
                         .cornerRadius(25)
                 }
-                .overlay(alignment: .topLeading, content: {
+                .overlay(alignment: .topLeading) {
                     if hasActiveItems {
-                        Text("\(activeItemCount)")
-                            .fuzzyBubblesFont(16, weight: .bold)
-                            .contentTransition(.numericText())
-                            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: activeItemCount)
-                            .foregroundColor(.black)
-                            .frame(width: 25, height: 25)
-                            .background(Color.white)
-                            .clipShape(Circle())
-                            .overlay(
-                                Circle()
-                                    .stroke(Color.black, lineWidth: 2)
-                            )
-                            .offset(x: -8, y: -4)
+                        saveBadge
                     }
-                })
+                }
                 .buttonStyle(.solid)
+                .scaleEffect(createCartButtonVisible ? buttonScale : 0)
+                .animation(.spring(response: 0.3, dampingFraction: 0.6), value: createCartButtonVisible)
+                .animation(.spring(response: 0.3, dampingFraction: 0.6), value: buttonScale)
                 .disabled(!hasActiveItems)
                 
                 Spacer()
@@ -541,6 +521,43 @@ struct ManageCartSheet: View {
             .padding(.bottom, 40)
         }
         .ignoresSafeArea(.all, edges: .bottom)
+    }
+
+    private var saveButtonBackground: some View {
+        Capsule()
+            .fill(
+                hasActiveItems
+                ? RadialGradient(
+                    colors: [Color.black, Color.gray.opacity(0.3)],
+                    center: .center,
+                    startRadius: 0,
+                    endRadius: fillAnimation * 300
+                )
+                : RadialGradient(
+                    colors: [Color.gray.opacity(0.3), Color.gray.opacity(0.3)],
+                    center: .center,
+                    startRadius: 0,
+                    endRadius: 0
+                )
+            )
+    }
+
+    private var saveBadge: some View {
+        Text("\(activeItemCount)")
+            .fuzzyBubblesFont(16, weight: .bold)
+            .contentTransition(.numericText())
+            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: activeItemCount)
+            .foregroundColor(.black)
+            .frame(width: 25, height: 25)
+            .background(Color.white)
+            .clipShape(Circle())
+            .overlay(
+                Circle()
+                    .stroke(Color.black, lineWidth: 2)
+            )
+            .offset(x: -8, y: -4)
+            .scaleEffect(createCartButtonVisible ? 1 : 0)
+            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: createCartButtonVisible)
     }
     
     private var emptyVaultView: some View {
@@ -764,6 +781,24 @@ struct ManageCartSheet: View {
     
     private func hasItems(inCategoryNamed name: String) -> Bool {
         return getTotalItemCount(forCategoryNamed: name) > 0
+    }
+
+    private func startButtonBounce() {
+        withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {
+            buttonScale = 0.95
+        }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.5)) {
+                buttonScale = 1.1
+            }
+        }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                buttonScale = 1.0
+            }
+        }
     }
 }
 
