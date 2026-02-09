@@ -87,6 +87,22 @@ struct CategoriesManagerSheet: View {
         viewModel.backgroundColors = categoryBackgroundColors(from: names)
     }
 
+    private var usedColorNamesByHex: [String: [String]] {
+        let names = computeAllCategoryNames()
+        var result: [String: [String]] = [:]
+        for name in names {
+            guard let hex = backgroundHex(for: name) else { continue }
+            let normalized = normalizedHex(hex)
+            guard !normalized.isEmpty else { continue }
+            result[normalized, default: []].append(name)
+        }
+        return result
+    }
+
+    private func normalizedHex(_ hex: String) -> String {
+        hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted).uppercased()
+    }
+
     private func categoryBackgroundColors(from names: [String]) -> [String] {
         let items = names.enumerated().compactMap { index, name -> (hex: String, hue: CGFloat, brightness: CGFloat, index: Int)? in
             guard let hex = backgroundHex(for: name) else { return nil }
@@ -393,6 +409,7 @@ struct CategoriesManagerSheet: View {
     private var categoryPopover: some View {
         CreateCategorySheet(
             viewModel: viewModel,
+            usedColorNamesByHex: usedColorNamesByHex,
             onSave: createCategoryFromPopover
         )
     }

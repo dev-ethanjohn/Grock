@@ -4,10 +4,15 @@ import UIKit
 
 struct CreateCategorySheet: View {
     @Bindable var viewModel: CategoriesManagerViewModel
+    let usedColorNamesByHex: [String: [String]]
     let onSave: () -> Void
     @FocusState private var isNameFocused: Bool
     @State private var didRequestInitialFocus = false
     @State private var colorPage = 0
+    @State private var toastMessage: String?
+    @State private var showToast = false
+    @State private var toastHideWorkItem: DispatchWorkItem?
+    @State private var toastScale: CGFloat = 0.95
 
     var body: some View {
         VStack(spacing: 24) {
@@ -89,9 +94,11 @@ struct CreateCategorySheet: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
 
-            Rectangle()
-                .fill(Color.gray.opacity(0.2))
+            DashedLine()
+                .stroke(style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
                 .frame(height: 1)
+                .foregroundColor(Color(hex: "ddd"))
+                .padding(.horizontal, 32)
 
             // Content (Color Grid with Pagination)
             colorGridSection
@@ -121,36 +128,61 @@ struct CreateCategorySheet: View {
         let layout = colorGridLayout
         let pages = palettePages
         let gradients = indicatorGradients
-        return VStack(spacing: 4) {
-            TabView(selection: $colorPage) {
-                ForEach(0..<pages.count, id: \.self) { pageIndex in
-                    ColorGridPage(
-                        colors: pages[pageIndex],
-                        defaultHexes: defaultColorSet,
-                        cellSize: layout.cellSize,
-                        columnsCount: layout.columnsCount,
-                        columnSpacing: layout.columnSpacing,
-                        rowSpacing: layout.rowSpacing,
-                        leftPadding: pageIndex == 0 ? 0 : layout.pageHorizontalPadding,
-                        rightPadding: layout.pageHorizontalPadding,
-                        selectedColorHex: $viewModel.selectedColorHex,
-                        onSelect: { _ in
-                            HapticManager.shared.playButtonTap()
-                        }
-                    )
-                    .frame(maxWidth: .infinity, minHeight: layout.gridHeight, alignment: .top)
-                    .tag(pageIndex)
+        return ZStack(alignment: .top) {
+            VStack(spacing: 0) {
+                TabView(selection: $colorPage) {
+                    ForEach(0..<pages.count, id: \.self) { pageIndex in
+                        ColorGridPage(
+                            colors: pages[pageIndex],
+                            usedHexes: usedColorSet,
+                            cellSize: layout.cellSize,
+                            columnsCount: layout.columnsCount,
+                            columnSpacing: layout.columnSpacing,
+                            rowSpacing: layout.rowSpacing,
+                            leftPadding: pageIndex == 0 ? 0 : layout.pageHorizontalPadding,
+                            rightPadding: layout.pageHorizontalPadding,
+                            contentPadding: layout.selectionPadding,
+                            selectedColorHex: $viewModel.selectedColorHex,
+                            onSelect: { _ in
+                                HapticManager.shared.playButtonTap()
+                            },
+                            onUnavailableTap: { hex in
+                                showUsedColorToast(for: hex)
+                            }
+                        )
+                        .frame(maxWidth: .infinity, minHeight: layout.gridHeight, alignment: .top)
+                        .tag(pageIndex)
+                    }
+                }
+                .tabViewStyle(.page(indexDisplayMode: .never))
+                .frame(height: layout.gridHeight)
+
+                if pages.count > 1 {
+                    PageDotsView(currentPage: $colorPage, gradients: gradients)
+                        .frame(height: 18)
+                        .offset(y: -4)
                 }
             }
-            .tabViewStyle(.page(indexDisplayMode: .never))
-            .frame(height: layout.gridHeight)
-            .padding(.vertical, 2)
-
-            if pages.count > 1 {
-                PageDotsView(currentPage: $colorPage, gradients: gradients)
-                    .frame(height: 18)
+            if showToast, let message = toastMessage {
+                let dotsHeight: CGFloat = pages.count > 1 ? 18 : 0
+                let dotsOffset: CGFloat = pages.count > 1 ? -4 : 0
+                let toastYOffset = layout.gridHeight + dotsHeight + dotsOffset + 32
+                Text(message)
+                    .lexendFont(10)
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(
+                        Capsule()
+                            .fill(Color.black.opacity(0.9))
+                    )
+                    .scaleEffect(showToast ? toastScale : 0)
+                    .offset(y: toastYOffset)
+                    .frame(maxWidth: .infinity, alignment: .top)
+                    .allowsHitTesting(false)
             }
         }
+        .animation(.spring(response: 0.3, dampingFraction: 0.85), value: showToast)
     }
 
     private var colorGridLayout: ColorGridLayout {
@@ -161,11 +193,13 @@ struct CreateCategorySheet: View {
         let rowSpacing: CGFloat = 10
         let outerHorizontalPadding: CGFloat = 12
         let pageHorizontalPadding: CGFloat = 4
+        let selectionPadding: CGFloat = 4
         let availableWidth = UIScreen.main.bounds.width
             - (outerHorizontalPadding * 2)
             - (pageHorizontalPadding * 2)
+            - (selectionPadding * 2)
         let cellSize = max(0, floor((availableWidth - (columnSpacing * CGFloat(columnsCount - 1))) / CGFloat(columnsCount)))
-        let gridHeight = (cellSize * CGFloat(rowsCount)) + (rowSpacing * CGFloat(rowsCount - 1))
+        let gridHeight = (cellSize * CGFloat(rowsCount)) + (rowSpacing * CGFloat(rowsCount - 1)) + (selectionPadding * 2)
         return ColorGridLayout(
             columnsCount: columnsCount,
             rowsCount: rowsCount,
@@ -174,12 +208,13 @@ struct CreateCategorySheet: View {
             rowSpacing: rowSpacing,
             cellSize: cellSize,
             gridHeight: gridHeight,
-            pageHorizontalPadding: pageHorizontalPadding
+            pageHorizontalPadding: pageHorizontalPadding,
+            selectionPadding: selectionPadding
         )
     }
 
-    private var defaultColorSet: Set<String> {
-        Set(CategoryPalette.defaultHexes.map { $0.normalizedHex })
+    private var usedColorSet: Set<String> {
+        Set(usedColorNamesByHex.keys)
     }
 
     private var palettePages: [[String]] {
@@ -206,6 +241,41 @@ struct CreateCategorySheet: View {
         return result
     }
 
+    private func showUsedColorToast(for hex: String) {
+        let normalized = hex.normalizedHex
+        let names = usedColorNamesByHex[normalized] ?? []
+        let message: String
+        if names.isEmpty {
+            message = "That color is already in use."
+        } else if names.count == 1 {
+            message = "Used by \(names[0])."
+        } else if names.count == 2 {
+            message = "Used by \(names[0]) and \(names[1])."
+        } else {
+            message = "Used by \(names[0]), \(names[1]) and \(names.count - 2) more."
+        }
+
+        toastHideWorkItem?.cancel()
+        toastMessage = message
+        if !showToast {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                showToast = true
+            }
+        }
+        toastScale = 0
+        withAnimation(.spring(response: 0.24, dampingFraction: 0.6)) {
+            toastScale = 1.0
+        }
+
+        let workItem = DispatchWorkItem {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                showToast = false
+            }
+        }
+        toastHideWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.8, execute: workItem)
+    }
+
 }
 
 private struct ColorGridLayout {
@@ -217,19 +287,22 @@ private struct ColorGridLayout {
     let cellSize: CGFloat
     let gridHeight: CGFloat
     let pageHorizontalPadding: CGFloat
+    let selectionPadding: CGFloat
 }
 
 private struct ColorGridPage: View {
     let colors: [String]
-    let defaultHexes: Set<String>
+    let usedHexes: Set<String>
     let cellSize: CGFloat
     let columnsCount: Int
     let columnSpacing: CGFloat
     let rowSpacing: CGFloat
     let leftPadding: CGFloat
     let rightPadding: CGFloat
+    let contentPadding: CGFloat
     @Binding var selectedColorHex: String?
     let onSelect: (String) -> Void
+    let onUnavailableTap: (String) -> Void
 
     var body: some View {
         return VStack(spacing: 0) {
@@ -237,24 +310,21 @@ private struct ColorGridPage: View {
                 let availableWidth = geo.size.width
                 let totalSpacing = columnSpacing * CGFloat(columnsCount - 1)
                 let computedCell = max(0, floor((availableWidth - totalSpacing) / CGFloat(columnsCount)))
+                let gridWidth = (computedCell * CGFloat(columnsCount)) + totalSpacing
                 let columns = Array(repeating: GridItem(.fixed(computedCell), spacing: columnSpacing), count: columnsCount)
-                LazyVGrid(columns: columns, spacing: rowSpacing) {
-                    ForEach(Array(colors.enumerated()), id: \.offset) { _, colorHex in
-                        let normalizedHex = colorHex.normalizedHex
-                        let isSelected = selectedColorHex?.normalizedHex == normalizedHex
-                        let isDefault = defaultHexes.contains(normalizedHex)
-                        Button(action: {
-                            selectedColorHex = colorHex
-                            onSelect(colorHex)
-                        }) {
+                ZStack(alignment: .topLeading) {
+                    LazyVGrid(columns: columns, alignment: .leading, spacing: rowSpacing) {
+                        ForEach(Array(colors.enumerated()), id: \.offset) { _, colorHex in
+                            let normalizedHex = colorHex.normalizedHex
+                            let isUsed = usedHexes.contains(normalizedHex)
                             ZStack {
                                 RoundedRectangle(cornerRadius: 8)
                                     .fill(Color(hex: colorHex).darker(by: 0.2))
                                     .frame(width: computedCell, height: computedCell)
 
-                                if isDefault {
+                                if isUsed {
                                     Image(systemName: "checkmark")
-                                        .font(.system(size: 12, weight: .bold))
+                                        .font(.system(size: 9, weight: .black))
                                         .foregroundStyle(.black)
                                         .padding(4)
                                         .background(
@@ -262,23 +332,49 @@ private struct ColorGridPage: View {
                                                 .fill(.white)
                                         )
                                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-                                        .padding(2)
-                                }
-
-                                if isSelected {
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .strokeBorder(Color.black.opacity(0.7), lineWidth: 2)
+                                        .offset(x: 2, y: 2)
                                 }
                             }
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                guard !isUsed else {
+                                    onUnavailableTap(colorHex)
+                                    return
+                                }
+                                selectedColorHex = colorHex
+                                onSelect(colorHex)
+                            }
                         }
-                        .buttonStyle(.plain)
+                    }
+                    .frame(width: gridWidth, alignment: .leading)
+
+                    if let selectedIndex = selectedIndex(in: colors) {
+                        let row = selectedIndex / columnsCount
+                        let col = selectedIndex % columnsCount
+                        let xOffset = CGFloat(col) * (computedCell + columnSpacing)
+                        let yOffset = CGFloat(row) * (computedCell + rowSpacing)
+                        let outerInset: CGFloat = 4
+                        let borderCornerRadius: CGFloat = 8 + outerInset
+
+                        RoundedRectangle(cornerRadius: borderCornerRadius)
+                            .strokeBorder(Color.black.opacity(0.7), lineWidth: 2)
+                            .frame(width: computedCell + (outerInset * 2), height: computedCell + (outerInset * 2))
+                            .offset(x: xOffset - outerInset, y: yOffset - outerInset)
+                            .animation(.spring(response: 0.22, dampingFraction: 0.8), value: selectedIndex)
+                            .allowsHitTesting(false)
                     }
                 }
             }
             
         }
-        .padding(.leading, leftPadding + 1)
-        .padding(.trailing, rightPadding + 1)
+        .padding(.leading, leftPadding + 1 + contentPadding)
+        .padding(.trailing, rightPadding + 1 + contentPadding)
+        .padding(.vertical, contentPadding)
+    }
+
+    private func selectedIndex(in colors: [String]) -> Int? {
+        guard let selected = selectedColorHex?.normalizedHex else { return nil }
+        return colors.firstIndex(where: { $0.normalizedHex == selected })
     }
 }
 
@@ -344,6 +440,7 @@ private struct CreateCategorySheetPreview: View {
     var body: some View {
         CreateCategorySheet(
             viewModel: viewModel,
+            usedColorNamesByHex: [:],
             onSave: {}
         )
         .padding()
