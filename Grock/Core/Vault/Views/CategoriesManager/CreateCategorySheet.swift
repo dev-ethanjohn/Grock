@@ -5,6 +5,7 @@ import UIKit
 struct CreateCategorySheet: View {
     @Bindable var viewModel: CategoriesManagerViewModel
     let usedColorNamesByHex: [String: [String]]
+    let usedEmojis: Set<String>
     let onSave: () -> Void
     @FocusState private var isNameFocused: Bool
     @State private var didRequestInitialFocus = false
@@ -13,6 +14,7 @@ struct CreateCategorySheet: View {
     @State private var showToast = false
     @State private var toastHideWorkItem: DispatchWorkItem?
     @State private var toastScale: CGFloat = 0.95
+    @State private var showEmojiPicker = false
 
     var body: some View {
         VStack(spacing: 24) {
@@ -45,8 +47,9 @@ struct CreateCategorySheet: View {
 
             // Input Row
             HStack(spacing: 12) {
+                //EMOJI CONTAINER
                 Button(action: {
-                    viewModel.showEmojiPicker = true
+                    showEmojiPicker = true
                 }) {
                     ZStack {
                         RoundedRectangle(cornerRadius: 12)
@@ -60,20 +63,27 @@ struct CreateCategorySheet: View {
                         if !viewModel.newCategoryEmoji.isEmpty {
                             Text(viewModel.newCategoryEmoji)
                                 .font(.system(size: 24))
-                        } else if let first = viewModel.newCategoryName.trimmingCharacters(in: .whitespacesAndNewlines).first {
-                            Text(String(first).uppercased())
-                                .font(.system(size: 24, weight: .bold))
-                                .foregroundStyle(.black)
                         } else {
-                            Image(systemName: "plus")
-                                .font(.system(size: 20, weight: .medium))
+                            Image("no_emoji")
+                                .renderingMode(.template)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 22, height: 22)
                                 .foregroundStyle(.gray)
                         }
                     }
                     .frame(width: 48, height: 48)
                 }
                 .buttonStyle(.plain)
-
+                .popover(isPresented: $showEmojiPicker, arrowEdge: .top) {
+                    EmojiPickerSheet(selectedEmoji: $viewModel.selectedEmoji, usedEmojis: usedEmojis) { emoji in
+                        viewModel.newCategoryEmoji = emoji
+                        HapticManager.shared.playButtonTap()
+                        showEmojiPicker = false
+                    }
+                    .presentationCompactAdaptation(.popover)
+                }
+                
                 TextField("Category name...", text: $viewModel.newCategoryName)
                     .lexendFont(16, weight: .medium)
                     .foregroundStyle(.black)
@@ -132,17 +142,17 @@ struct CreateCategorySheet: View {
             VStack(spacing: 0) {
                 TabView(selection: $colorPage) {
                     ForEach(0..<pages.count, id: \.self) { pageIndex in
-                        ColorGridPage(
-                            colors: pages[pageIndex],
-                            usedHexes: usedColorSet,
-                            cellSize: layout.cellSize,
-                            columnsCount: layout.columnsCount,
-                            columnSpacing: layout.columnSpacing,
-                            rowSpacing: layout.rowSpacing,
-                            leftPadding: pageIndex == 0 ? 0 : layout.pageHorizontalPadding,
-                            rightPadding: layout.pageHorizontalPadding,
-                            contentPadding: layout.selectionPadding,
-                            selectedColorHex: $viewModel.selectedColorHex,
+                    ColorGridPage(
+                        colors: pages[pageIndex],
+                        usedHexes: usedColorSet,
+                        cellSize: layout.cellSize,
+                        columnsCount: layout.columnsCount,
+                        columnSpacing: layout.columnSpacing,
+                        rowSpacing: layout.rowSpacing,
+                        leftPadding: layout.pageHorizontalPadding,
+                        rightPadding: layout.pageHorizontalPadding,
+                        contentPadding: layout.selectionPadding,
+                        selectedColorHex: $viewModel.selectedColorHex,
                             onSelect: { _ in
                                 HapticManager.shared.playButtonTap()
                             },
@@ -163,12 +173,12 @@ struct CreateCategorySheet: View {
                         .offset(y: -4)
                 }
             }
-            if showToast, let message = toastMessage {
+            if let message = toastMessage {
                 let dotsHeight: CGFloat = pages.count > 1 ? 18 : 0
                 let dotsOffset: CGFloat = pages.count > 1 ? -4 : 0
-                let toastYOffset = layout.gridHeight + dotsHeight + dotsOffset + 32
+                let toastYOffset = layout.gridHeight + dotsHeight + dotsOffset + 28
                 Text(message)
-                    .lexendFont(10)
+                    .lexendFont(10, weight: .semibold)
                     .foregroundStyle(.white)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 8)
@@ -182,7 +192,6 @@ struct CreateCategorySheet: View {
                     .allowsHitTesting(false)
             }
         }
-        .animation(.spring(response: 0.3, dampingFraction: 0.85), value: showToast)
     }
 
     private var colorGridLayout: ColorGridLayout {
@@ -192,7 +201,7 @@ struct CreateCategorySheet: View {
         let columnSpacing: CGFloat = 10
         let rowSpacing: CGFloat = 10
         let outerHorizontalPadding: CGFloat = 12
-        let pageHorizontalPadding: CGFloat = 4
+        let pageHorizontalPadding: CGFloat = 0
         let selectionPadding: CGFloat = 4
         let availableWidth = UIScreen.main.bounds.width
             - (outerHorizontalPadding * 2)
@@ -258,17 +267,18 @@ struct CreateCategorySheet: View {
         toastHideWorkItem?.cancel()
         toastMessage = message
         if !showToast {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
-                showToast = true
-            }
+            showToast = true
         }
         toastScale = 0
-        withAnimation(.spring(response: 0.24, dampingFraction: 0.6)) {
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
             toastScale = 1.0
         }
 
         let workItem = DispatchWorkItem {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                toastScale = 0
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                 showToast = false
             }
         }
@@ -441,6 +451,7 @@ private struct CreateCategorySheetPreview: View {
         CreateCategorySheet(
             viewModel: viewModel,
             usedColorNamesByHex: [:],
+            usedEmojis: [],
             onSave: {}
         )
         .padding()

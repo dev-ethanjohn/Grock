@@ -333,15 +333,6 @@ struct CategoriesManagerSheet: View {
                 .presentationDragIndicator(.visible)
                 .ignoresSafeArea(.keyboard)
         }
-        .sheet(isPresented: $viewModel.showEmojiPicker) {
-            EmojiPickerSheet(selectedEmoji: $viewModel.selectedEmoji) { emoji in
-                viewModel.newCategoryEmoji = emoji
-                HapticManager.shared.playButtonTap()
-                viewModel.showEmojiPicker = false
-            }
-            .presentationDetents([.medium, .large])
-            .presentationDragIndicator(.visible)
-        }
         .onAppear {
             let index = viewModel.tabs.firstIndex(where: { $0.id == viewModel.activeTab }) ?? 0
             viewModel.progress = CGFloat(index)
@@ -410,6 +401,7 @@ struct CategoriesManagerSheet: View {
         CreateCategorySheet(
             viewModel: viewModel,
             usedColorNamesByHex: usedColorNamesByHex,
+            usedEmojis: usedIconSet,
             onSave: createCategoryFromPopover
         )
     }
