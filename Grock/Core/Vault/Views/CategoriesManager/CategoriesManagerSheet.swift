@@ -82,7 +82,102 @@ struct CategoriesManagerSheet: View {
     }
 
     private func updateCachedCategories() {
-        viewModel.cachedAllCategoryNames = computeAllCategoryNames()
+        let names = computeAllCategoryNames()
+        viewModel.cachedAllCategoryNames = names
+        viewModel.backgroundColors = categoryBackgroundColors(from: names)
+    }
+
+    private func categoryBackgroundColors(from names: [String]) -> [String] {
+        let items = names.enumerated().compactMap { index, name -> (hex: String, hue: CGFloat, brightness: CGFloat, index: Int)? in
+            guard let hex = backgroundHex(for: name) else { return nil }
+            let components = colorComponents(forHex: hex) ?? (hue: 1.0, brightness: 1.0)
+            return (hex: hex, hue: components.hue, brightness: components.brightness, index: index)
+        }
+
+        return items.sorted {
+            if $0.hue != $1.hue { return $0.hue < $1.hue }
+            if $0.brightness != $1.brightness { return $0.brightness < $1.brightness }
+            return $0.index < $1.index
+        }
+        .map(\.hex)
+    }
+
+    private func backgroundHex(for name: String) -> String? {
+        if let customCategory = vaultService.getCategory(named: name),
+           let hex = customCategory.colorHex,
+           !hex.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return hex
+        }
+
+        if let groceryCategory = GroceryCategory.allCases.first(where: { $0.title == name }) {
+            return groceryCategory.pastelHex
+        }
+
+        return generatedPastelHex(for: name)
+    }
+
+    private func generatedPastelHex(for name: String) -> String? {
+        let color = UIColor(name.generatedPastelColor)
+        return hexString(for: color)
+    }
+
+    private func colorComponents(forHex hex: String) -> (hue: CGFloat, brightness: CGFloat)? {
+        guard let rgb = rgbComponents(forHex: hex) else { return nil }
+        var hue: CGFloat = 0
+        var saturation: CGFloat = 0
+        var brightness: CGFloat = 0
+        var alpha: CGFloat = 0
+        let uiColor = UIColor(red: rgb.red, green: rgb.green, blue: rgb.blue, alpha: 1)
+        guard uiColor.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha) else {
+            return nil
+        }
+        return (hue, brightness)
+    }
+
+    private func rgbComponents(forHex hex: String) -> (red: CGFloat, green: CGFloat, blue: CGFloat)? {
+        let cleaned = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        guard !cleaned.isEmpty else { return nil }
+        var int: UInt64 = 0
+        guard Scanner(string: cleaned).scanHexInt64(&int) else { return nil }
+
+        let r, g, b: UInt64
+        switch cleaned.count {
+        case 3:
+            (r, g, b) = (
+                (int >> 8) * 17,
+                (int >> 4 & 0xF) * 17,
+                (int & 0xF) * 17
+            )
+        case 6:
+            (r, g, b) = (
+                int >> 16,
+                int >> 8 & 0xFF,
+                int & 0xFF
+            )
+        case 8:
+            (r, g, b) = (
+                int >> 16 & 0xFF,
+                int >> 8 & 0xFF,
+                int & 0xFF
+            )
+        default:
+            return nil
+        }
+
+        return (
+            red: CGFloat(r) / 255.0,
+            green: CGFloat(g) / 255.0,
+            blue: CGFloat(b) / 255.0
+        )
+    }
+
+    private func hexString(for color: UIColor) -> String? {
+        var red: CGFloat = 0
+        var green: CGFloat = 0
+        var blue: CGFloat = 0
+        var alpha: CGFloat = 0
+        guard color.getRed(&red, green: &green, blue: &blue, alpha: &alpha) else { return nil }
+        return String(format: "%02X%02X%02X", Int(red * 255), Int(green * 255), Int(blue * 255))
     }
     
     private var shownNames: [String] {

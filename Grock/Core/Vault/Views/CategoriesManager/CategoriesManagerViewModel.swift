@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import Observation
 
 @MainActor
@@ -27,7 +28,7 @@ final class CategoriesManagerViewModel {
     var hiddenContentHeight: CGFloat = 0
 
 
-    let backgroundColors: [String]
+    var backgroundColors: [String]
 
     init(startOnHiddenTab: Bool) {
         self.tabs = [
@@ -46,36 +47,20 @@ final class CategoriesManagerViewModel {
     }
 
     private static func buildBackgroundColors() -> [String] {
-        var colors = GroceryCategory.allCases.map { $0.pastelHex }
-
-        let additionalColors = [
-            "#E8E8E8", // Light Grey
-            "#FFF59D", // Pale Yellow
-            "#A5D6A7", // Mint Green
-            "#FFCCBC", // Pale Pink
-            "#C5E1A5", // Light Lime
-            "#9FA8DA", // Periwinkle
-            "#F48FB1", // Hot Pink
-            "#CCFF90", // Lime Green
-            "#EF5350", // Coral Red
-            "#FFAB91", // Salmon
-            "#FF8A65", // Peach
-            "#4FC3F7", // Cyan
-            "#42A5F5", // Blue
-            "#AB47BC"  // Purple
-        ]
-
-        colors.append(contentsOf: additionalColors)
-
-        var seen = Set<String>()
-        var unique: [String] = []
-        for color in colors {
-            let normalized = color.replacingOccurrences(of: "#", with: "").uppercased()
-            if !seen.contains(normalized) {
-                seen.insert(normalized)
-                unique.append(color)
-            }
+        let hexes = GroceryCategory.allCases.map { $0.pastelHex }
+        return hexes.sorted { a, b in
+            let ah = hsb(forHex: a)
+            let bh = hsb(forHex: b)
+            let aKey = ah.map { ($0.s < 0.08 ? 2 + $0.h : $0.h) } ?? 3
+            let bKey = bh.map { ($0.s < 0.08 ? 2 + $0.h : $0.h) } ?? 3
+            return aKey < bKey
         }
-        return unique
+    }
+
+    private static func hsb(forHex hex: String) -> (h: CGFloat, s: CGFloat, b: CGFloat)? {
+        let uiColor = UIColor(Color(hex: hex))
+        var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        guard uiColor.getHue(&h, saturation: &s, brightness: &b, alpha: &a) else { return nil }
+        return (h, s, b)
     }
 }
