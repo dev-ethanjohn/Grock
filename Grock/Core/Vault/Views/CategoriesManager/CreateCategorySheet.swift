@@ -7,6 +7,7 @@ struct CreateCategorySheet: View {
     let usedColorNamesByHex: [String: [String]]
     let usedEmojis: Set<String>
     let usedEmojiNamesByEmoji: [String: [String]]
+    let existingCategoryKeys: Set<String>
     let onSave: () -> Void
     @FocusState private var isNameFocused: Bool
     @State private var didRequestInitialFocus = false
@@ -27,24 +28,20 @@ struct CreateCategorySheet: View {
 
                 Spacer()
 
-                Button(action: {
+                FormCompletionButton(
+                    title: "Save",
+                    isEnabled: canSave,
+                    cornerRadius: 50,
+                    verticalPadding: 8,
+                    maxRadius: 1000,
+                    bounceScale: (0.98, 1.05, 1.0),
+                    bounceTiming: (0.1, 0.3, 0.3)
+                ) {
+                    guard canSave else { return }
                     onSave()
-                }) {
-                    Text("Save")
-                        .lexendFont(14, weight: .bold)
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 8)
-                        .background(
-                            Capsule()
-                                .fill(Color.black)
-                        )
                 }
-                .buttonStyle(.plain)
-                .disabled(!viewModel.popoverCanCreate)
-                .opacity(viewModel.popoverCanCreate ? 1 : 0.5)
+                .allowsHitTesting(canSave)
             }
-            .padding(.top)
 
             // Input Row
             HStack(spacing: 12) {
@@ -112,23 +109,20 @@ struct CreateCategorySheet: View {
                     .stroke(Color.gray.opacity(0.25), lineWidth: 1)
             )
 
-            if let createCategoryError = viewModel.createCategoryError {
-                Text(createCategoryError)
-                    .lexendFont(12, weight: .medium)
-                    .foregroundStyle(.red)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+            Group {
+                if let errorMessage = nameValidationMessage ?? viewModel.createCategoryError {
+                    validationError(errorMessage)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .multilineTextAlignment(.center)
+                }
+                colorGridSection
             }
-
-            // Content (Color Grid with Pagination)
-            colorGridSection
+            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: (nameValidationMessage ?? viewModel.createCategoryError) != nil)
 
             Spacer(minLength: 0)
         }
         .padding(24)
         .background(Color.white)
-        .safeAreaInset(edge: .top, spacing: 0) {
-            Color.clear.frame(height: 12)
-        }
         .onAppear {
             requestInitialFocusIfNeeded()
         }
@@ -141,6 +135,58 @@ struct CreateCategorySheet: View {
         DispatchQueue.main.async {
             isNameFocused = true
         }
+    }
+
+    private var trimmedCategoryName: String {
+        viewModel.newCategoryName.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var isNameDuplicate: Bool {
+        let trimmed = trimmedCategoryName
+        guard !trimmed.isEmpty else { return false }
+        return existingCategoryKeys.contains(normalizedKey(trimmed))
+    }
+
+    private var nameValidationMessage: String? {
+        isNameDuplicate ? "That category already exists." : nil
+    }
+
+    private var isNameValid: Bool {
+        !trimmedCategoryName.isEmpty && !isNameDuplicate
+    }
+
+    private var isEmojiValid: Bool {
+        !viewModel.newCategoryEmoji.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var isColorValid: Bool {
+        guard let hex = viewModel.selectedColorHex?.trimmingCharacters(in: .whitespacesAndNewlines) else {
+            return false
+        }
+        return !hex.isEmpty
+    }
+
+    private var canSave: Bool {
+        isNameValid && isEmojiValid && isColorValid
+    }
+
+    private func normalizedKey(_ value: String) -> String {
+        value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+
+    private func validationError(_ message: String) -> some View {
+        Text(message)
+            .font(.caption)
+            .foregroundColor(Color(hex: "#FA003F"))
+            .padding(.bottom, 4)
+            .transition(.asymmetric(
+                insertion: .scale(scale: 0.9, anchor: .center)
+                    .combined(with: .opacity)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.55)),
+                removal: .scale(scale: 0.9, anchor: .center)
+                    .combined(with: .opacity)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.75))
+            ))
     }
 
     private var colorGridSection: some View {
@@ -468,6 +514,7 @@ private struct CreateCategorySheetPreview: View {
             usedColorNamesByHex: [:],
             usedEmojis: [],
             usedEmojiNamesByEmoji: [:],
+            existingCategoryKeys: [],
             onSave: {}
         )
         .padding()

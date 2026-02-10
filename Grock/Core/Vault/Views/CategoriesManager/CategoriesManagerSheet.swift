@@ -233,6 +233,10 @@ struct CategoriesManagerSheet: View {
         return result
     }
 
+    private var existingCategoryKeys: Set<String> {
+        Set(allCategoryNames.map { normalizedKey($0) })
+    }
+
     private var usedIconSet: Set<String> {
         Set(usedEmojiNamesByEmoji.keys)
     }
@@ -412,6 +416,7 @@ struct CategoriesManagerSheet: View {
             usedColorNamesByHex: usedColorNamesByHex,
             usedEmojis: usedIconSet,
             usedEmojiNamesByEmoji: usedEmojiNamesByEmoji,
+            existingCategoryKeys: existingCategoryKeys,
             onSave: createCategoryFromPopover
         )
     }
@@ -815,6 +820,25 @@ struct CategoriesManagerSheet: View {
             }
 
             if isShownColumn {
+                let shouldShowAddPrompt = showCompactAddButton && !names.isEmpty
+                VStack(spacing: 8) {
+                    Text("Add new category")
+                        .fuzzyBubblesFont(16, weight: .bold)
+                        .foregroundStyle(Color.black.opacity(0.55))
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .multilineTextAlignment(.center)
+                    LottieView(animation: .named("Arrow"))
+                        .playing(.fromProgress(0, toProgress: 0.5, loopMode: .playOnce))
+                        .scaleEffect(x: -0.8, y: -0.8)
+                        .allowsHitTesting(false)
+                        .frame(height: 80)
+                        .frame(width: 92)
+                        .rotationEffect(.degrees(224))
+                }
+                .opacity(shouldShowAddPrompt ? 0.7 : 0)
+                .accessibilityHidden(!shouldShowAddPrompt)
+                .allowsHitTesting(false)
+            } else {
                 let shouldShowAddPrompt = showCompactAddButton && !names.isEmpty
                 VStack(spacing: 8) {
                     Text("Add new category")

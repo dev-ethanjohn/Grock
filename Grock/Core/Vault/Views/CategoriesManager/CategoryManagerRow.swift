@@ -41,6 +41,16 @@ struct CategoryManagerRow: View {
         return name.generatedPastelColor
     }
 
+    private var isSystemCategory: Bool {
+        groceryCategory != nil
+    }
+
+    private var systemBadge: some View {
+        Image(systemName: "lock.fill")
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(Color.black.opacity(0.35))
+    }
+
     var body: some View {
         HStack(spacing: 10) {
             ZStack(alignment: .topTrailing) {
@@ -65,10 +75,15 @@ struct CategoryManagerRow: View {
 
             }
 
-            Text(name)
-                .lexendFont(14, weight: .medium)
-                .foregroundStyle(.black)
-                .lineLimit(2)
+            HStack(spacing: 6) {
+                Text(name)
+                    .lexendFont(14, weight: .medium)
+                    .foregroundStyle(.black)
+                    .lineLimit(2)
+                if isSystemCategory {
+                    systemBadge
+                }
+            }
 
             Spacer()
 
