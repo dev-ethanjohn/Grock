@@ -235,13 +235,16 @@ private struct BudgetCartFulfillmentGauge: View {
             .overlay {
                 GeometryReader { proxy in
                     let springOuterRadius = tickRadius + tickHeight / 2
-                    let labelEndAngle: Double = -90 + (min(cartRatio, 1) * 180)
                     let labelFontSize: CGFloat = 12
                     let valueFontSize: CGFloat = 14
                     let labelRadius: CGFloat = springOuterRadius + 14
                     let labelArcLengthPerCharacter: CGFloat = labelFontSize * 0.62
                     let labelAngleStep: Double = Double(labelArcLengthPerCharacter / labelRadius) * 180 / .pi
                     let labelText = "Cart Value:  \(cartTotal.formattedCurrencySpaced)"
+                    let progressAngle: Double = max(0, min(cartRatio, 1)) * 180
+                    let requiredAngle: Double = Double(max(labelText.count - 1, 0)) * labelAngleStep
+                    let labelSpanAngle: Double = min(180, max(progressAngle, requiredAngle))
+                    let labelEndAngle: Double = -90 + labelSpanAngle
                     let valueText = cartTotal.formattedCurrencySpaced
                     let highlightRange: Range<Int>? = {
                         guard let range = labelText.range(of: valueText, options: .backwards) else { return nil }

@@ -231,7 +231,7 @@ struct FinishTripSheet: View {
             let itemName = vaultService.findItemById(cartItem.itemId)?.name
                 ?? cartItem.vaultItemNameSnapshot
                 ?? "Unknown Item"
-            let qty = cartItem.quantity
+            let qty = max(1, cartItem.actualQuantity ?? cartItem.originalPlanningQuantity ?? cartItem.quantity)
             return SkippedItemDisplay(id: cartItem.itemId, name: itemName, qty: qty)
         }
     }

@@ -78,6 +78,9 @@ struct StoreSectionListView: View {
         // Update skip state after a tiny delay (so animation starts first)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
             withAnimation(.easeOut(duration: 0.25)) {
+                if cartItem.actualQuantity == nil {
+                    cartItem.actualQuantity = cartItem.quantity
+                }
                 cartItem.isSkippedDuringShopping = true
                 cartItem.isFulfilled = false
                 cartItem.quantity = 0

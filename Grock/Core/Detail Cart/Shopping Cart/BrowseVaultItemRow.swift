@@ -422,9 +422,12 @@ struct BrowseVaultItemRow: View {
         
         switch itemType {
         case .plannedCart:
+            if cartItem.actualQuantity == nil {
+                cartItem.actualQuantity = cartItem.quantity
+            }
             cartItem.quantity = 0
-            cartItem.syncQuantities(cart: cart)
             cartItem.isSkippedDuringShopping = true
+            cartItem.syncQuantities(cart: cart)
             vaultService.updateCartTotals(cart: cart)
             textValue = formatValue(0)
             onQuantityChange?()

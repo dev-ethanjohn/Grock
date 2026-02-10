@@ -228,6 +228,9 @@ class Cart {
                 quantity = cartItem.quantity
                 
             case .shopping:
+                if cartItem.isSkippedDuringShopping {
+                    return total
+                }
                 if cartItem.isFulfilled {
                     price = cartItem.actualPrice ?? cartItem.plannedPrice ?? 0
                     quantity = cartItem.actualQuantity ?? cartItem.quantity
@@ -240,6 +243,9 @@ class Cart {
                 }
                 
             case .completed:
+                if cartItem.isSkippedDuringShopping {
+                    return total
+                }
                 price = cartItem.actualPrice ?? cartItem.plannedPrice ?? 0
                 quantity = cartItem.actualQuantity ?? cartItem.quantity
             }
@@ -553,6 +559,9 @@ class CartItem {
         case .shopping, .completed:
             // In shopping/completed, quantity is the primary source
             // Only update actualQuantity if it's different
+            if isSkippedDuringShopping {
+                return
+            }
             if actualQuantity != quantity {
                 actualQuantity = quantity
             }
