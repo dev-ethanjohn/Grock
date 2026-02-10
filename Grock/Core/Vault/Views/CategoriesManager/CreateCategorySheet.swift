@@ -49,6 +49,7 @@ struct CreateCategorySheet: View {
             HStack(spacing: 12) {
                 //EMOJI CONTAINER
                 Button(action: {
+                    viewModel.selectedEmoji = viewModel.newCategoryEmoji.isEmpty ? nil : viewModel.newCategoryEmoji
                     showEmojiPicker = true
                 }) {
                     ZStack {
@@ -60,29 +61,33 @@ struct CreateCategorySheet: View {
                                 .stroke(Color.gray.opacity(0.3), lineWidth: 1)
                         }
 
-                        if !viewModel.newCategoryEmoji.isEmpty {
-                            Text(viewModel.newCategoryEmoji)
-                                .font(.system(size: 24))
-                        } else {
-                            Image("no_emoji")
-                                .renderingMode(.template)
-                                .resizable()
-                                .scaledToFit()
-                                .frame(width: 22, height: 22)
-                                .foregroundStyle(.gray)
+                        Group {
+                            if !viewModel.newCategoryEmoji.isEmpty {
+                                Text(viewModel.newCategoryEmoji)
+                                    .font(.system(size: 24))
+                            } else {
+                                Image("no_emoji")
+                                    .renderingMode(.template)
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 22, height: 22)
+                                    .foregroundStyle(.gray)
+                            }
+                        }
+                        .popover(isPresented: $showEmojiPicker, arrowEdge: .top) {
+                            EmojiPickerSheet(selectedEmoji: $viewModel.selectedEmoji, usedEmojis: usedEmojis) { emoji in
+                                viewModel.selectedEmoji = emoji
+                                viewModel.newCategoryEmoji = emoji
+                                HapticManager.shared.playButtonTap()
+                                showEmojiPicker = false
+                            }
+                            .presentationCompactAdaptation(.popover)
                         }
                     }
                     .frame(width: 48, height: 48)
                 }
                 .buttonStyle(.plain)
-                .popover(isPresented: $showEmojiPicker, arrowEdge: .top) {
-                    EmojiPickerSheet(selectedEmoji: $viewModel.selectedEmoji, usedEmojis: usedEmojis) { emoji in
-                        viewModel.newCategoryEmoji = emoji
-                        HapticManager.shared.playButtonTap()
-                        showEmojiPicker = false
-                    }
-                    .presentationCompactAdaptation(.popover)
-                }
+              
                 
                 TextField("Category name...", text: $viewModel.newCategoryName)
                     .lexendFont(16, weight: .medium)
@@ -96,6 +101,11 @@ struct CreateCategorySheet: View {
                     .focused($isNameFocused)
                     .submitLabel(.done)
             }
+            .padding(12)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(Color.gray.opacity(0.25), lineWidth: 1)
+            )
 
             if let createCategoryError = viewModel.createCategoryError {
                 Text(createCategoryError)
@@ -227,7 +237,12 @@ struct CreateCategorySheet: View {
     }
 
     private var palettePages: [[String]] {
-        CategoryPalette.pages
+        let defaultHexes = Set(CategoryPalette.defaultHexes.map { $0.normalizedHex })
+        return CategoryPalette.basePages.map { page in
+            page
+                .map { $0.normalizedHex }
+                .filter { !defaultHexes.contains($0) }
+        }
     }
 
     private var indicatorGradients: [[Color]] {

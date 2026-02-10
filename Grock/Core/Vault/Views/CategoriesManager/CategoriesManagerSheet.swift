@@ -88,9 +88,8 @@ struct CategoriesManagerSheet: View {
     }
 
     private var usedColorNamesByHex: [String: [String]] {
-        let names = computeAllCategoryNames()
         var result: [String: [String]] = [:]
-        for name in names {
+        for name in customCategoryNames {
             guard let hex = backgroundHex(for: name) else { continue }
             let normalized = normalizedHex(hex)
             guard !normalized.isEmpty else { continue }
@@ -225,7 +224,7 @@ struct CategoriesManagerSheet: View {
     }
 
     private var usedIconSet: Set<String> {
-        Set(currentCategoryIcons.map(\.icon))
+        Set(customCategoryNames.map { vaultService.displayEmoji(forCategoryName: $0) })
     }
 
     private var emojiCandidates: [String] {
