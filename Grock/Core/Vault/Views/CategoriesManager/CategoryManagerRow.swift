@@ -9,9 +9,34 @@ struct CategoryManagerRow: View {
     let actionSymbol: String
     let actionEnabled: Bool
     let action: () -> Void
+    let onEdit: (() -> Void)?
     let onTap: () -> Void
 
     @Environment(VaultService.self) private var vaultService
+
+    init(
+        name: String,
+        iconText: String,
+        isSelected: Bool,
+        activeCount: Int,
+        hasItems: Bool,
+        actionSymbol: String,
+        actionEnabled: Bool,
+        action: @escaping () -> Void,
+        onEdit: (() -> Void)? = nil,
+        onTap: @escaping () -> Void
+    ) {
+        self.name = name
+        self.iconText = iconText
+        self.isSelected = isSelected
+        self.activeCount = activeCount
+        self.hasItems = hasItems
+        self.actionSymbol = actionSymbol
+        self.actionEnabled = actionEnabled
+        self.action = action
+        self.onEdit = onEdit
+        self.onTap = onTap
+    }
 
     private var groceryCategory: GroceryCategory? {
         GroceryCategory.allCases.first(where: { $0.title == name })
@@ -87,16 +112,41 @@ struct CategoryManagerRow: View {
 
             Spacer()
 
-            Button(action: {
-                guard actionEnabled else { return }
-                action()
-            }) {
-                Image(systemName: actionSymbol)
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(.black)
+            HStack(spacing: 10) {
+                if let onEdit, !isSystemCategory {
+                    Button(action: {
+                        onEdit()
+                    }) {
+                        Text("Edit")
+                            .lexendFont(12, weight: .semibold)
+                            .foregroundStyle(Color.black.opacity(0.7))
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4)
+                            .background(
+                                Capsule()
+                                    .fill(Color.black.opacity(0.06))
+                            )
+                            .overlay(
+                                Capsule()
+                                    .stroke(Color.black.opacity(0.12), lineWidth: 1)
+                            )
+                            .fixedSize()
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                Button(action: {
+                    guard actionEnabled else { return }
+                    action()
+                }) {
+                    Image(systemName: actionSymbol)
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(.black)
+                }
+                .buttonStyle(.plain)
+                .allowsHitTesting(actionEnabled)
             }
-            .buttonStyle(.plain)
-            .allowsHitTesting(actionEnabled)
+            .layoutPriority(1)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 10)

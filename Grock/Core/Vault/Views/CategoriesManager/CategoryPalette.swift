@@ -2,6 +2,30 @@ import UIKit
 
 enum CategoryPalette {
     // 7 columns x 3 rows = 21 colors per page.
+    static let sunny: [String] = [
+        "FFF06B", // punchy lemon
+        "FFE84F", // bright dandelion
+        "FFDF3C", // golden yellow
+        "FFD633", // marigold
+        "FFCC2B", // sunflower
+        "FFC024", // warm yellow
+        "FFB61F", // amber yellow
+        "FFB24A", // tangerine
+        "FFAA3A", // orange yellow
+        "FFA030", // orange
+        "FF962D", // soft orange
+        "FF8D2A", // vibrant orange
+        "FF8430", // orange coral
+        "FF7B3A", // coral orange
+        "FF7347", // coral
+        "FF6C55", // coral pink
+        "FF7A6A", // salmon
+        "FF8A7B", // pink coral
+        "FF9B8A", // peach pink
+        "FFAD9A", // warm peach
+        "FFBCA8"  // soft peach
+    ]
+
     static let warm: [String] = [
         "FFF9D4", // pale butter yellow
         "FFF4C8", // soft cream
@@ -147,6 +171,7 @@ enum CategoryPalette {
     ]
 
     static let basePages: [[String]] = [
+        sunny,
         warm,
         pinks,
         greens,

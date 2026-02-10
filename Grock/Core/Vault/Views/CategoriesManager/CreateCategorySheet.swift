@@ -8,7 +8,10 @@ struct CreateCategorySheet: View {
     let usedEmojis: Set<String>
     let usedEmojiNamesByEmoji: [String: [String]]
     let existingCategoryKeys: Set<String>
+    let editingCategoryName: String?
+    let deleteMessage: String?
     let onSave: () -> Void
+    let onDelete: (() -> Void)?
     @FocusState private var isNameFocused: Bool
     @State private var didRequestInitialFocus = false
     @State private var colorPage = 0
@@ -17,114 +20,147 @@ struct CreateCategorySheet: View {
     @State private var toastHideWorkItem: DispatchWorkItem?
     @State private var toastScale: CGFloat = 0.95
     @State private var showEmojiPicker = false
+    @State private var showDeleteAlert = false
 
     var body: some View {
-        VStack(spacing: 24) {
-            // Header
-            HStack {
-                Text("Create New Category")
-                    .fuzzyBubblesFont(18, weight: .bold)
-                    .foregroundStyle(.black)
+        ZStack {
+            VStack(spacing: 24) {
+                // Header
+                HStack(spacing: 10) {
+                    Text(isEditingCategory ? "Edit Category" : "Create New Category")
+                        .fuzzyBubblesFont(18, weight: .bold)
+                        .foregroundStyle(.black)
 
-                Spacer()
+                    Spacer()
 
-                FormCompletionButton(
-                    title: "Save",
-                    isEnabled: canSave,
-                    cornerRadius: 50,
-                    verticalPadding: 8,
-                    maxRadius: 1000,
-                    bounceScale: (0.98, 1.05, 1.0),
-                    bounceTiming: (0.1, 0.3, 0.3)
-                ) {
-                    guard canSave else { return }
-                    onSave()
-                }
-                .allowsHitTesting(canSave)
-            }
-
-            // Input Row
-            HStack(spacing: 12) {
-                //EMOJI CONTAINER
-                Button(action: {
-                    viewModel.selectedEmoji = viewModel.newCategoryEmoji.isEmpty ? nil : viewModel.newCategoryEmoji
-                    showEmojiPicker = true
-                }) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(viewModel.selectedColorHex != nil ? Color(hex: viewModel.selectedColorHex!).darker(by: 0.2) : Color.clear)
-
-                        if viewModel.selectedColorHex == nil {
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                    if isEditingCategory, onDelete != nil {
+                        Button {
+                            showDeleteAlert = true
+                        } label: {
+                            Image(systemName: "trash")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundStyle(.white)
+                                .frame(width: 34, height: 34)
+                                .background(
+                                    Circle()
+                                        .fill(Color(hex: "#FA003F"))
+                                )
                         }
-
-                        Group {
-                            if !viewModel.newCategoryEmoji.isEmpty {
-                                Text(viewModel.newCategoryEmoji)
-                                    .font(.system(size: 24))
-                            } else {
-                                Image("no_emoji")
-                                    .renderingMode(.template)
-                                    .resizable()
-                                    .scaledToFit()
-                                    .frame(width: 22, height: 22)
-                                    .foregroundStyle(.gray)
-                            }
-                        }
-                        .popover(isPresented: $showEmojiPicker, arrowEdge: .top) {
-                            EmojiPickerSheet(
-                                selectedEmoji: $viewModel.selectedEmoji,
-                                usedEmojis: usedEmojis,
-                                usedEmojiNamesByEmoji: usedEmojiNamesByEmoji
-                            ) { emoji in
-                                viewModel.selectedEmoji = emoji
-                                viewModel.newCategoryEmoji = emoji
-                                HapticManager.shared.playButtonTap()
-                                showEmojiPicker = false
-                            }
-                            .presentationCompactAdaptation(.popover)
-                        }
+                        .buttonStyle(.plain)
                     }
-                    .frame(width: 48, height: 48)
-                }
-                .buttonStyle(.plain)
-              
-                
-                TextField("Category name...", text: $viewModel.newCategoryName)
-                    .lexendFont(16, weight: .medium)
-                    .foregroundStyle(.black)
-                    .padding(.horizontal, 16)
-                    .frame(height: 48)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color(.systemGray6))
-                    )
-                    .focused($isNameFocused)
-                    .submitLabel(.done)
-            }
-            .padding(12)
-            .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(Color.gray.opacity(0.25), lineWidth: 1)
-            )
 
-            Group {
-                if let errorMessage = nameValidationMessage ?? viewModel.createCategoryError {
-                    validationError(errorMessage)
-                        .frame(maxWidth: .infinity, alignment: .center)
-                        .multilineTextAlignment(.center)
+                    FormCompletionButton(
+                        title: "Save",
+                        isEnabled: canSave,
+                        cornerRadius: 50,
+                        verticalPadding: 8,
+                        maxRadius: 1000,
+                        bounceScale: (0.98, 1.05, 1.0),
+                        bounceTiming: (0.1, 0.3, 0.3)
+                    ) {
+                        guard canSave else { return }
+                        onSave()
+                    }
+                    .allowsHitTesting(canSave)
                 }
-                colorGridSection
-            }
-            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: (nameValidationMessage ?? viewModel.createCategoryError) != nil)
 
-            Spacer(minLength: 0)
+                // Input Row
+                HStack(spacing: 12) {
+                    //EMOJI CONTAINER
+                    Button(action: {
+                        viewModel.selectedEmoji = viewModel.newCategoryEmoji.isEmpty ? nil : viewModel.newCategoryEmoji
+                        showEmojiPicker = true
+                    }) {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(viewModel.selectedColorHex != nil ? Color(hex: viewModel.selectedColorHex!).darker(by: 0.2) : Color.clear)
+
+                            if viewModel.selectedColorHex == nil {
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                            }
+
+                            Group {
+                                if !viewModel.newCategoryEmoji.isEmpty {
+                                    Text(viewModel.newCategoryEmoji)
+                                        .font(.system(size: 24))
+                                } else {
+                                    Image("no_emoji")
+                                        .renderingMode(.template)
+                                        .resizable()
+                                        .scaledToFit()
+                                        .frame(width: 22, height: 22)
+                                        .foregroundStyle(.gray)
+                                }
+                            }
+                            .popover(isPresented: $showEmojiPicker, arrowEdge: .top) {
+                                EmojiPickerSheet(
+                                    selectedEmoji: $viewModel.selectedEmoji,
+                                    usedEmojis: usedEmojis,
+                                    usedEmojiNamesByEmoji: usedEmojiNamesByEmoji
+                                ) { emoji in
+                                    viewModel.selectedEmoji = emoji
+                                    viewModel.newCategoryEmoji = emoji
+                                    HapticManager.shared.playButtonTap()
+                                    showEmojiPicker = false
+                                }
+                                .presentationCompactAdaptation(.popover)
+                            }
+                        }
+                        .frame(width: 48, height: 48)
+                    }
+                    .buttonStyle(.plain)
+                  
+                    
+                    TextField("Category name...", text: $viewModel.newCategoryName)
+                        .lexendFont(16, weight: .medium)
+                        .foregroundStyle(.black)
+                        .padding(.horizontal, 16)
+                        .frame(height: 48)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(Color(.systemGray6))
+                        )
+                        .focused($isNameFocused)
+                        .submitLabel(.done)
+                }
+                .padding(12)
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(Color.gray.opacity(0.25), lineWidth: 1)
+                )
+
+                Group {
+                    if let errorMessage = nameValidationMessage ?? viewModel.createCategoryError {
+                        validationError(errorMessage)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .multilineTextAlignment(.center)
+                    }
+                    colorGridSection
+                }
+                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: (nameValidationMessage ?? viewModel.createCategoryError) != nil)
+
+                Spacer(minLength: 0)
+            }
+            .padding(24)
+            .background(Color.white)
+            .onAppear {
+                requestInitialFocusIfNeeded()
+            }
+
         }
-        .padding(24)
-        .background(Color.white)
-        .onAppear {
-            requestInitialFocusIfNeeded()
+        .alert(
+            "Delete \(editingCategoryName ?? "category")?",
+            isPresented: $showDeleteAlert
+        ) {
+            if let onDelete {
+                Button("Delete", role: .destructive) {
+                    onDelete()
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(deleteMessage ?? "This will remove the category.")
         }
     }
 
@@ -168,6 +204,10 @@ struct CreateCategorySheet: View {
 
     private var canSave: Bool {
         isNameValid && isEmojiValid && isColorValid
+    }
+
+    private var isEditingCategory: Bool {
+        editingCategoryName != nil
     }
 
     private func normalizedKey(_ value: String) -> String {
@@ -515,7 +555,10 @@ private struct CreateCategorySheetPreview: View {
             usedEmojis: [],
             usedEmojiNamesByEmoji: [:],
             existingCategoryKeys: [],
-            onSave: {}
+            editingCategoryName: nil,
+            deleteMessage: nil,
+            onSave: {},
+            onDelete: nil
         )
         .padding()
         .background(Color(.systemGray6))

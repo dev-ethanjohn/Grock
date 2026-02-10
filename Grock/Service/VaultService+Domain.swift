@@ -168,6 +168,79 @@ extension VaultService {
         return newCategory
     }
 
+    func updateCustomCategory(originalName: String, newName: String, emoji: String? = nil, colorHex: String? = nil) -> Category? {
+        guard let vault = vault else { return nil }
+
+        let normalizedOriginal = normalizedCategoryName(originalName)
+        guard let category = vault.categories.first(where: { normalizedCategoryName($0.name) == normalizedOriginal }) else {
+            return nil
+        }
+
+        let isSystemCategory = GroceryCategory.allCases.contains {
+            normalizedCategoryName($0.title) == normalizedCategoryName(category.name)
+        }
+        guard !isSystemCategory else { return nil }
+
+        let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        let normalizedNew = normalizedCategoryName(trimmed)
+        if normalizedNew != normalizedOriginal {
+            if vault.categories.contains(where: { normalizedCategoryName($0.name) == normalizedNew }) {
+                return nil
+            }
+        }
+
+        let cleanedEmoji = emoji?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedEmoji: String? = {
+            guard let cleanedEmoji, !cleanedEmoji.isEmpty else { return nil }
+            return String(cleanedEmoji.prefix(1))
+        }()
+
+        let cleanedColor = colorHex?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedColor: String? = {
+            guard let cleanedColor, !cleanedColor.isEmpty else { return nil }
+            return cleanedColor
+        }()
+
+        category.name = trimmed
+        category.emoji = normalizedEmoji
+        category.colorHex = normalizedColor
+
+        invalidateCategoryCache()
+        saveContext()
+
+        return category
+    }
+
+    func deleteCustomCategory(named name: String) -> Bool {
+        guard let vault = vault else { return false }
+        let normalized = normalizedCategoryName(name)
+        guard let category = vault.categories.first(where: { normalizedCategoryName($0.name) == normalized }) else {
+            return false
+        }
+
+        let isSystemCategory = GroceryCategory.allCases.contains {
+            normalizedCategoryName($0.title) == normalizedCategoryName(category.name)
+        }
+        guard !isSystemCategory else { return false }
+
+        let itemIds = category.items.map(\.id)
+        for itemId in itemIds {
+            deleteItem(itemId: itemId)
+        }
+
+        if let index = vault.categories.firstIndex(where: { $0.uid == category.uid }) {
+            vault.categories.remove(at: index)
+        }
+        modelContext.delete(category)
+
+        invalidateCategoryCache()
+        saveContext()
+
+        return true
+    }
+
     func getCategory(_ groceryCategory: GroceryCategory) -> Category? {
         vault?.categories.first { $0.name == groceryCategory.title }
     }

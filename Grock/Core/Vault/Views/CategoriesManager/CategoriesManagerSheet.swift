@@ -16,6 +16,7 @@ struct CategoriesManagerSheet: View {
     @Environment(VaultService.self) private var vaultService
     @Environment(\.dismiss) private var dismiss
     @State private var viewModel: CategoriesManagerViewModel
+    @State private var editingCategoryName: String? = nil
     @State private var closeButtonScale: CGFloat = 0.0
     @State private var closeButtonPressed = false
     @State private var closeButtonDidAppear = false
@@ -96,6 +97,23 @@ struct CategoriesManagerSheet: View {
             result[normalized, default: []].append(name)
         }
         return result
+    }
+
+    private func filteredUsedNames(_ map: [String: [String]], excluding name: String?) -> [String: [String]] {
+        guard let name else { return map }
+        let excludedKey = normalizedKey(name)
+        var result: [String: [String]] = [:]
+        for (key, names) in map {
+            let filtered = names.filter { normalizedKey($0) != excludedKey }
+            if !filtered.isEmpty {
+                result[key] = filtered
+            }
+        }
+        return result
+    }
+
+    private var sheetUsedColorNamesByHex: [String: [String]] {
+        filteredUsedNames(usedColorNamesByHex, excluding: editingCategoryName)
     }
 
     private func normalizedHex(_ hex: String) -> String {
@@ -237,8 +255,36 @@ struct CategoriesManagerSheet: View {
         Set(allCategoryNames.map { normalizedKey($0) })
     }
 
+    private var sheetUsedEmojiNamesByEmoji: [String: [String]] {
+        filteredUsedNames(usedEmojiNamesByEmoji, excluding: editingCategoryName)
+    }
+
+    private var sheetExistingCategoryKeys: Set<String> {
+        var keys = existingCategoryKeys
+        if let editingCategoryName {
+            keys.remove(normalizedKey(editingCategoryName))
+        }
+        return keys
+    }
+
     private var usedIconSet: Set<String> {
         Set(usedEmojiNamesByEmoji.keys)
+    }
+
+    private var sheetUsedIconSet: Set<String> {
+        Set(sheetUsedEmojiNamesByEmoji.keys)
+    }
+
+    private var editingDeleteMessage: String? {
+        guard let name = editingCategoryName else { return nil }
+        let count = activeItemCount(name)
+        if count <= 0 {
+            return "This will remove the category from your list."
+        }
+        if count == 1 {
+            return "This will remove 1 item from your vault."
+        }
+        return "This will remove \(count) items from your vault."
     }
 
     private var emojiCandidates: [String] {
@@ -341,7 +387,7 @@ struct CategoriesManagerSheet: View {
         }
         .ignoresSafeArea(.all, edges: .bottom)
         .navigationBarHidden(true)
-        .sheet(isPresented: $viewModel.showCategoryPopover) {
+        .sheet(isPresented: $viewModel.showCategoryPopover, onDismiss: resetCategoryPopoverState) {
             categoryPopover
                 .presentationDragIndicator(.visible)
                 .ignoresSafeArea(.keyboard)
@@ -411,14 +457,33 @@ struct CategoriesManagerSheet: View {
     }
 
     private var categoryPopover: some View {
-        CreateCategorySheet(
-            viewModel: viewModel,
-            usedColorNamesByHex: usedColorNamesByHex,
-            usedEmojis: usedIconSet,
-            usedEmojiNamesByEmoji: usedEmojiNamesByEmoji,
-            existingCategoryKeys: existingCategoryKeys,
-            onSave: createCategoryFromPopover
-        )
+        Group {
+            if let editingCategoryName {
+                EditCategorySheet(
+                    viewModel: viewModel,
+                    usedColorNamesByHex: sheetUsedColorNamesByHex,
+                    usedEmojis: sheetUsedIconSet,
+                    usedEmojiNamesByEmoji: sheetUsedEmojiNamesByEmoji,
+                    existingCategoryKeys: sheetExistingCategoryKeys,
+                    categoryName: editingCategoryName,
+                    deleteMessage: editingDeleteMessage,
+                    onSave: saveCategoryFromPopover,
+                    onDelete: deleteCategoryFromPopover
+                )
+            } else {
+                CreateCategorySheet(
+                    viewModel: viewModel,
+                    usedColorNamesByHex: sheetUsedColorNamesByHex,
+                    usedEmojis: sheetUsedIconSet,
+                    usedEmojiNamesByEmoji: sheetUsedEmojiNamesByEmoji,
+                    existingCategoryKeys: sheetExistingCategoryKeys,
+                    editingCategoryName: nil,
+                    deleteMessage: nil,
+                    onSave: saveCategoryFromPopover,
+                    onDelete: nil
+                )
+            }
+        }
     }
 
     private var currentIconsGrid: some View {
@@ -564,6 +629,8 @@ struct CategoriesManagerSheet: View {
             viewModel.newCategoryName = ""
             viewModel.newCategoryEmoji = ""
             viewModel.selectedEmoji = nil
+            viewModel.selectedColorHex = nil
+            editingCategoryName = nil
             HapticManager.shared.playButtonTap()
             viewModel.showCategoryPopover = true
         }) {
@@ -769,8 +836,9 @@ struct CategoriesManagerSheet: View {
 
         VStack(spacing: 16) {
             LazyVStack(spacing: rowSpacing) {
-                ForEach(names, id: \.self) { name in
+                ForEach(names, id: \.self) { (name: String) in
                     let iconText = vaultService.displayEmoji(forCategoryName: name)
+                    let isSystemCategory = defaultCategoryNames.contains { normalizedKey($0) == normalizedKey(name) }
                     let row = CategoryManagerRow(
                         name: name,
                         iconText: iconText,
@@ -789,6 +857,9 @@ struct CategoriesManagerSheet: View {
                                     showCategory(named: name, select: true)
                                 }
                             }
+                        },
+                        onEdit: isSystemCategory ? nil : {
+                            beginEditingCategory(named: name)
                         },
                         onTap: {
                             if isShownColumn {
@@ -932,6 +1003,38 @@ struct CategoriesManagerSheet: View {
             selectedCategoryName = ordered.first
         }
     }
+
+    private func beginEditingCategory(named name: String) {
+        guard let category = vaultService.getCategory(named: name) else { return }
+        let isSystemCategory = GroceryCategory.allCases.contains { normalizedKey($0.title) == normalizedKey(category.name) }
+        guard !isSystemCategory else { return }
+
+        editingCategoryName = category.name
+        viewModel.newCategoryName = category.name
+
+        let storedEmoji = category.emoji?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if storedEmoji.isEmpty || storedEmoji == VaultService.removedEmojiSentinel {
+            viewModel.newCategoryEmoji = ""
+            viewModel.selectedEmoji = nil
+        } else {
+            let normalizedEmoji = String(storedEmoji.prefix(1))
+            viewModel.newCategoryEmoji = normalizedEmoji
+            viewModel.selectedEmoji = normalizedEmoji
+        }
+
+        viewModel.selectedColorHex = category.colorHex
+        viewModel.createCategoryError = nil
+        HapticManager.shared.playButtonTap()
+        viewModel.showCategoryPopover = true
+    }
+
+    private func saveCategoryFromPopover() {
+        if let editingCategoryName {
+            updateCategoryFromPopover(originalName: editingCategoryName)
+        } else {
+            createCategoryFromPopover()
+        }
+    }
     
     private func createCategory() {
         viewModel.createCategoryError = nil
@@ -983,9 +1086,89 @@ struct CategoriesManagerSheet: View {
         dismissCategoryPopover()
     }
 
+    private func updateCategoryFromPopover(originalName: String) {
+        let trimmed = viewModel.newCategoryName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+
+        let oldKey = normalizedKey(originalName)
+        let newKey = normalizedKey(trimmed)
+
+        if oldKey != newKey, existingCategoryKeys.contains(newKey) {
+            viewModel.createCategoryError = "That category already exists."
+            HapticManager.shared.playMedium()
+            return
+        }
+
+        let emoji = viewModel.newCategoryEmoji.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedEmoji = emoji.isEmpty ? nil : String(emoji.prefix(1))
+
+        guard vaultService.updateCustomCategory(
+            originalName: originalName,
+            newName: trimmed,
+            emoji: normalizedEmoji,
+            colorHex: viewModel.selectedColorHex
+        ) != nil else {
+            viewModel.createCategoryError = "Couldn’t update that category."
+            HapticManager.shared.playMedium()
+            return
+        }
+
+        let updatedVisible = normalizedVisibleNames(from: visibleCategoryNames.map {
+            normalizedKey($0) == oldKey ? trimmed : $0
+        })
+        visibleCategoryNames = updatedVisible.isEmpty ? [trimmed] : updatedVisible
+
+        if selectedCategoryName.map(normalizedKey) == oldKey {
+            selectedCategoryName = trimmed
+        }
+
+        HapticManager.shared.playSuccess()
+        updateCachedCategories()
+        dismissCategoryPopover()
+    }
+
+    private func deleteCategoryFromPopover() {
+        guard let name = editingCategoryName else { return }
+        let key = normalizedKey(name)
+
+        dismissCategoryPopover()
+
+        guard vaultService.deleteCustomCategory(named: name) else {
+            viewModel.createCategoryError = "Couldn’t delete that category."
+            HapticManager.shared.playMedium()
+            return
+        }
+
+        var updatedVisible = normalizedVisibleNames(from: visibleCategoryNames.filter { normalizedKey($0) != key })
+        if updatedVisible.isEmpty {
+            let fallback = computeAllCategoryNames().first ?? GroceryCategory.allCases.first?.title
+            if let fallback {
+                updatedVisible = [fallback]
+            }
+        }
+        visibleCategoryNames = updatedVisible
+
+        if selectedCategoryName.map(normalizedKey) == key {
+            selectedCategoryName = updatedVisible.first
+        }
+
+        HapticManager.shared.playSuccess()
+        updateCachedCategories()
+    }
+
     private func dismissCategoryPopover() {
         UIApplication.shared.endEditing()
         viewModel.showCategoryPopover = false
+        resetCategoryPopoverState()
+    }
+
+    private func resetCategoryPopoverState() {
+        viewModel.createCategoryError = nil
+        viewModel.newCategoryName = ""
+        viewModel.newCategoryEmoji = ""
+        viewModel.selectedEmoji = nil
+        viewModel.selectedColorHex = nil
+        editingCategoryName = nil
     }
 
     private func removeEmojiFromCategories(_ emoji: String) {
