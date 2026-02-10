@@ -223,8 +223,18 @@ struct CategoriesManagerSheet: View {
         }
     }
 
+    private var usedEmojiNamesByEmoji: [String: [String]] {
+        var result: [String: [String]] = [:]
+        for name in customCategoryNames {
+            let emoji = vaultService.displayEmoji(forCategoryName: name).trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !emoji.isEmpty else { continue }
+            result[emoji, default: []].append(name)
+        }
+        return result
+    }
+
     private var usedIconSet: Set<String> {
-        Set(customCategoryNames.map { vaultService.displayEmoji(forCategoryName: $0) })
+        Set(usedEmojiNamesByEmoji.keys)
     }
 
     private var emojiCandidates: [String] {
@@ -401,6 +411,7 @@ struct CategoriesManagerSheet: View {
             viewModel: viewModel,
             usedColorNamesByHex: usedColorNamesByHex,
             usedEmojis: usedIconSet,
+            usedEmojiNamesByEmoji: usedEmojiNamesByEmoji,
             onSave: createCategoryFromPopover
         )
     }

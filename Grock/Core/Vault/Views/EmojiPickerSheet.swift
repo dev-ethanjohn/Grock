@@ -3,6 +3,7 @@ import SwiftUI
 struct EmojiPickerSheet: View {
     @Binding var selectedEmoji: String?
     let usedEmojis: Set<String>
+    let usedEmojiNamesByEmoji: [String: [String]]
     let onSelect: (String) -> Void
     @Environment(\.dismiss) private var dismiss
 
@@ -23,6 +24,10 @@ struct EmojiPickerSheet: View {
     private let targetGridHeight: CGFloat = 210
 
     @State private var currentPage: Int = 0
+    @State private var toastMessage: String?
+    @State private var showToast = false
+    @State private var toastHideWorkItem: DispatchWorkItem?
+    @State private var toastScale: CGFloat = 0.95
 
     private struct EmojiGroup {
         let title: String
@@ -96,75 +101,95 @@ struct EmojiPickerSheet: View {
 
             // Grid pages
             TabView(selection: $currentPage) {
-                ForEach(groups.indices, id: \.self) { index in
-                    let page = groups[index].emojis
-                    GeometryReader { geo in
-                        let availableWidth = geo.size.width - (horizontalPadding * 2)
-                        let totalSpacing = columnSpacing * CGFloat(columnsCount - 1)
-                        let cellSize = max(0, floor((availableWidth - totalSpacing) / CGFloat(columnsCount)))
-                        let gridWidth = (cellSize * CGFloat(columnsCount)) + totalSpacing
-                        let columns = Array(repeating: GridItem(.fixed(cellSize), spacing: columnSpacing), count: columnsCount)
+                    ForEach(groups.indices, id: \.self) { index in
+                        let page = groups[index].emojis
+                        GeometryReader { geo in
+                            let availableWidth = geo.size.width - (horizontalPadding * 2)
+                            let totalSpacing = columnSpacing * CGFloat(columnsCount - 1)
+                            let cellSize = max(0, floor((availableWidth - totalSpacing) / CGFloat(columnsCount)))
+                            let gridWidth = (cellSize * CGFloat(columnsCount)) + totalSpacing
+                            let columns = Array(repeating: GridItem(.fixed(cellSize), spacing: columnSpacing), count: columnsCount)
 
-                        ScrollView(.vertical, showsIndicators: false) {
-                            ZStack(alignment: .topLeading) {
-                                LazyVGrid(columns: columns, spacing: rowSpacing) {
-                                    ForEach(page, id: \.self) { emoji in
-                                        let isUsed = usedEmojis.contains(emoji)
-                                        Button {
-                                            selectedEmoji = emoji
-                                            onSelect(emoji)
-                                        } label: {
-                                            ZStack(alignment: .bottomTrailing) {
-                                                RoundedRectangle(cornerRadius: 12)
-                                                    .fill(selectedEmoji == emoji ? Color(.systemGray5) : Color.clear)
-                                                    .frame(width: cellSize, height: cellSize)
-                                                    .overlay(
-                                                        Text(emoji)
-                                                            .font(.system(size: 28))
-                                                    )
+                            ScrollView(.vertical, showsIndicators: false) {
+                                ZStack(alignment: .topLeading) {
+                                    LazyVGrid(columns: columns, spacing: rowSpacing) {
+                                        ForEach(page, id: \.self) { emoji in
+                                            let isUsed = usedEmojis.contains(emoji)
+                                            Button {
+                                                guard !isUsed else {
+                                                    showUsedEmojiToast(for: emoji)
+                                                    return
+                                                }
+                                                selectedEmoji = emoji
+                                                onSelect(emoji)
+                                            } label: {
+                                                ZStack(alignment: .bottomTrailing) {
+                                                    RoundedRectangle(cornerRadius: 12)
+                                                        .fill(selectedEmoji == emoji ? Color(.systemGray5) : Color.clear)
+                                                        .frame(width: cellSize, height: cellSize)
+                                                        .overlay(
+                                                            Text(emoji)
+                                                                .font(.system(size: 28))
+                                                        )
 
-                                                if isUsed {
-                                                    Image(systemName: "checkmark")
-                                                        .font(.system(size: 10, weight: .bold))
-                                                        .foregroundStyle(.black)
-                                                        .padding(3)
-                                                        .background(Circle().fill(.white))
-                                                        .offset(x: 2, y: 2)
+                                                    if isUsed {
+                                                        Image(systemName: "checkmark")
+                                                            .font(.system(size: 10, weight: .bold))
+                                                            .foregroundStyle(.black)
+                                                            .padding(3)
+                                                            .background(Circle().fill(.white))
+                                                            .offset(x: 2, y: 2)
+                                                    }
                                                 }
                                             }
+                                            .buttonStyle(.plain)
                                         }
-                                        .buttonStyle(.plain)
+                                    }
+                                    .frame(width: gridWidth, alignment: .leading)
+
+                                    if let selectedIndex = selectedIndex(in: page) {
+                                        let row = selectedIndex / columnsCount
+                                        let col = selectedIndex % columnsCount
+                                        let xOffset = CGFloat(col) * (cellSize + columnSpacing)
+                                        let yOffset = CGFloat(row) * (cellSize + rowSpacing)
+                                        let outerInset: CGFloat = selectionInset
+                                        let borderCornerRadius: CGFloat = 12 + outerInset
+
+                                        RoundedRectangle(cornerRadius: borderCornerRadius)
+                                            .strokeBorder(Color.black.opacity(0.7), lineWidth: 2)
+                                            .frame(width: cellSize + (outerInset * 2), height: cellSize + (outerInset * 2))
+                                            .offset(x: xOffset - outerInset, y: yOffset - outerInset)
+                                            .animation(.spring(response: 0.22, dampingFraction: 0.8), value: selectedIndex)
+                                            .allowsHitTesting(false)
                                     }
                                 }
-                                .frame(width: gridWidth, alignment: .leading)
-
-                                if let selectedIndex = selectedIndex(in: page) {
-                                    let row = selectedIndex / columnsCount
-                                    let col = selectedIndex % columnsCount
-                                    let xOffset = CGFloat(col) * (cellSize + columnSpacing)
-                                    let yOffset = CGFloat(row) * (cellSize + rowSpacing)
-                                    let outerInset: CGFloat = selectionInset
-                                    let borderCornerRadius: CGFloat = 12 + outerInset
-
-                                    RoundedRectangle(cornerRadius: borderCornerRadius)
-                                        .strokeBorder(Color.black.opacity(0.7), lineWidth: 2)
-                                        .frame(width: cellSize + (outerInset * 2), height: cellSize + (outerInset * 2))
-                                        .offset(x: xOffset - outerInset, y: yOffset - outerInset)
-                                        .animation(.spring(response: 0.22, dampingFraction: 0.8), value: selectedIndex)
-                                        .allowsHitTesting(false)
-                                }
+                                .padding(.horizontal, horizontalPadding)
+                                .padding(.top, selectionInset)
+                                .padding(.bottom, verticalGridPadding)
+                                .frame(maxWidth: .infinity, alignment: .topLeading)
                             }
-                            .padding(.horizontal, horizontalPadding)
-                            .padding(.top, selectionInset)
-                            .padding(.bottom, verticalGridPadding)
-                            .frame(maxWidth: .infinity, alignment: .topLeading)
                         }
+                        .tag(index)
                     }
-                    .tag(index)
                 }
-            }
-            .tabViewStyle(.page(indexDisplayMode: .always))
-            .frame(height: gridHeight)
+                .tabViewStyle(.page(indexDisplayMode: .always))
+                .frame(height: gridHeight)
+                .overlay(alignment: .bottom) {
+                    Text(toastMessage ?? "")
+                        .lexendFont(10, weight: .semibold)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(
+                            Capsule()
+                                .fill(Color.black.opacity(showToast ? 0.9 : 0))
+                        )
+                        .scaleEffect(showToast ? toastScale : 0)
+                        .opacity(showToast ? 1 : 0)
+                        .padding(.bottom, pageDotsHeight + 4)
+                        .allowsHitTesting(false)
+                        .offset(y: 12)
+                }
         }
         .frame(width: popoverWidth)
         .background(Color.white)
@@ -184,5 +209,40 @@ struct EmojiPickerSheet: View {
     private func selectedIndex(in emojis: [String]) -> Int? {
         guard let selected = selectedEmoji else { return nil }
         return emojis.firstIndex(of: selected)
+    }
+
+    private func showUsedEmojiToast(for emoji: String) {
+        let names = usedEmojiNamesByEmoji[emoji] ?? []
+        let message: String
+        if names.isEmpty {
+            message = "Oops — that emoji is already taken."
+        } else if names.count == 1 {
+            message = "Already claimed by \(names[0])."
+        } else if names.count == 2 {
+            message = "Claimed by \(names[0]) and \(names[1])."
+        } else {
+            message = "Claimed by \(names[0]), \(names[1]) and \(names.count - 2) more."
+        }
+
+        toastHideWorkItem?.cancel()
+        toastMessage = message
+        if !showToast {
+            showToast = true
+        }
+        toastScale = 0
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+            toastScale = 1.0
+        }
+
+        let workItem = DispatchWorkItem {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                toastScale = 0
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                showToast = false
+            }
+        }
+        toastHideWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.8, execute: workItem)
     }
 }

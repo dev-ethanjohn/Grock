@@ -6,6 +6,7 @@ struct CreateCategorySheet: View {
     @Bindable var viewModel: CategoriesManagerViewModel
     let usedColorNamesByHex: [String: [String]]
     let usedEmojis: Set<String>
+    let usedEmojiNamesByEmoji: [String: [String]]
     let onSave: () -> Void
     @FocusState private var isNameFocused: Bool
     @State private var didRequestInitialFocus = false
@@ -75,7 +76,11 @@ struct CreateCategorySheet: View {
                             }
                         }
                         .popover(isPresented: $showEmojiPicker, arrowEdge: .top) {
-                            EmojiPickerSheet(selectedEmoji: $viewModel.selectedEmoji, usedEmojis: usedEmojis) { emoji in
+                            EmojiPickerSheet(
+                                selectedEmoji: $viewModel.selectedEmoji,
+                                usedEmojis: usedEmojis,
+                                usedEmojiNamesByEmoji: usedEmojiNamesByEmoji
+                            ) { emoji in
                                 viewModel.selectedEmoji = emoji
                                 viewModel.newCategoryEmoji = emoji
                                 HapticManager.shared.playButtonTap()
@@ -113,12 +118,6 @@ struct CreateCategorySheet: View {
                     .foregroundStyle(.red)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
-
-            DashedLine()
-                .stroke(style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
-                .frame(height: 1)
-                .foregroundColor(Color(hex: "ddd"))
-                .padding(.horizontal, 32)
 
             // Content (Color Grid with Pagination)
             colorGridSection
@@ -183,23 +182,24 @@ struct CreateCategorySheet: View {
                         .offset(y: -4)
                 }
             }
-            if let message = toastMessage {
-                let dotsHeight: CGFloat = pages.count > 1 ? 18 : 0
-                let dotsOffset: CGFloat = pages.count > 1 ? -4 : 0
-                let toastYOffset = layout.gridHeight + dotsHeight + dotsOffset + 28
-                Text(message)
-                    .lexendFont(10, weight: .semibold)
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
-                    .background(
-                        Capsule()
-                            .fill(Color.black.opacity(0.9))
-                    )
-                    .scaleEffect(showToast ? toastScale : 0)
-                    .offset(y: toastYOffset)
-                    .frame(maxWidth: .infinity, alignment: .top)
-                    .allowsHitTesting(false)
+            .overlay(alignment: .bottom) {
+                if let message = toastMessage {
+                    let dotsHeight: CGFloat = pages.count > 1 ? 18 : 0
+                    Text(message)
+                        .lexendFont(10, weight: .semibold)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(
+                            Capsule()
+                                .fill(Color.black.opacity(0.9))
+                        )
+                        .scaleEffect(showToast ? toastScale : 0)
+                        .padding(.bottom, dotsHeight + 4)
+                        .frame(maxWidth: .infinity, alignment: .top)
+                        .allowsHitTesting(false)
+                        .offset(y: 24)
+                }
             }
         }
     }
@@ -270,13 +270,13 @@ struct CreateCategorySheet: View {
         let names = usedColorNamesByHex[normalized] ?? []
         let message: String
         if names.isEmpty {
-            message = "That color is already in use."
+            message = "Oops — that color is already taken."
         } else if names.count == 1 {
-            message = "Used by \(names[0])."
+            message = "Already claimed by \(names[0])."
         } else if names.count == 2 {
-            message = "Used by \(names[0]) and \(names[1])."
+            message = "Claimed by \(names[0]) and \(names[1])."
         } else {
-            message = "Used by \(names[0]), \(names[1]) and \(names.count - 2) more."
+            message = "Claimed by \(names[0]), \(names[1]) and \(names.count - 2) more."
         }
 
         toastHideWorkItem?.cancel()
@@ -467,6 +467,7 @@ private struct CreateCategorySheetPreview: View {
             viewModel: viewModel,
             usedColorNamesByHex: [:],
             usedEmojis: [],
+            usedEmojiNamesByEmoji: [:],
             onSave: {}
         )
         .padding()
