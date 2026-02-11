@@ -50,93 +50,93 @@ struct ActiveCarts: View {
                     .frame(height: max(0, viewModel.headerHeight - 16))
                 
                 ForEach(viewModel.displayedCarts) { cart in
-                    if #available(iOS 18.0, *) {
-                        NavigationLink {
-                            CartDetailScreen(cart: cart)
-                                .environment(vaultService)
-                                .environment(cartViewModel)
-                                .environment(stateManager)
-                                .navigationTransition(.zoom(sourceID: cart.id, in: cartNamespace))
-                                .onDisappear {
-                                    viewModel.loadCarts()
-                                    if viewModel.pendingCartToShow != nil {
-                                        viewModel.completePendingCartDisplay()
+                    Group {
+                        if #available(iOS 18.0, *) {
+                            NavigationLink {
+                                CartDetailScreen(cart: cart)
+                                    .environment(vaultService)
+                                    .environment(cartViewModel)
+                                    .environment(stateManager)
+                                    .navigationTransition(.zoom(sourceID: cart.id, in: cartNamespace))
+                                    .onDisappear {
+                                        viewModel.loadCarts()
+                                        if viewModel.pendingCartToShow != nil {
+                                            viewModel.completePendingCartDisplay()
+                                        }
                                     }
+                            } label: {
+                                HomeCartRowView(
+                                    cart: cart,
+                                    vaultService: viewModel.getVaultService(for: cart),
+                                    cartNamespace: cartNamespace
+                                )
+                                .contentShape(.interaction, RoundedRectangle(cornerRadius: 24))
+                                .contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: 24))
+                            }
+                            .buttonStyle(.plain)
+                            .contextMenu {
+                                Button {
+                                    onRenameCart(cart)
+                                } label: {
+                                    Label("Rename Cart", systemImage: "pencil")
                                 }
-                        } label: {
+                                
+                                Button(role: .destructive) {
+                                    onDeleteCart(cart)
+                                } label: {
+                                    Label("Delete Cart", systemImage: "trash")
+                                }
+                            }
+                            .onLongPressGesture {
+                                let generator = UIImpactFeedbackGenerator(style: .medium)
+                                generator.impactOccurred()
+                            }
+                        } else {
+                            // Fallback for older iOS versions
                             HomeCartRowView(
                                 cart: cart,
-                                vaultService: viewModel.getVaultService(for: cart),
-                                cartNamespace: cartNamespace
+                                vaultService: viewModel.getVaultService(for: cart)
                             )
                             .contentShape(.interaction, RoundedRectangle(cornerRadius: 24))
                             .contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: 24))
-                        }
-                        .buttonStyle(.plain)
-                        .contextMenu {
-                            Button {
-                                onRenameCart(cart)
-                            } label: {
-                                Label("Rename Cart", systemImage: "pencil")
+                            .onTapGesture {
+                                viewModel.selectCart(cart)
                             }
-                            
-                            Button(role: .destructive) {
-                                onDeleteCart(cart)
-                            } label: {
-                                Label("Delete Cart", systemImage: "trash")
+                            .contextMenu {
+                                Button {
+                                    onRenameCart(cart)
+                                } label: {
+                                    Label("Rename Cart", systemImage: "pencil")
+                                }
+                                
+                                Button(role: .destructive) {
+                                    onDeleteCart(cart)
+                                } label: {
+                                    Label("Delete Cart", systemImage: "trash")
+                                }
                             }
-                        }
-                        .onLongPressGesture {
-                            let generator = UIImpactFeedbackGenerator(style: .medium)
-                            generator.impactOccurred()
-                        }
-                    } else {
-                        // Fallback for older iOS versions
-                        HomeCartRowView(
-                            cart: cart,
-                            vaultService: viewModel.getVaultService(for: cart)
-                        )
-                        .contentShape(.interaction, RoundedRectangle(cornerRadius: 24))
-                        .contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: 24))
-                        .onTapGesture {
-                            viewModel.selectCart(cart)
-                        }
-                        .contextMenu {
-                            Button {
-                                onRenameCart(cart)
-                            } label: {
-                                Label("Rename Cart", systemImage: "pencil")
+                            .onLongPressGesture {
+                                let generator = UIImpactFeedbackGenerator(style: .medium)
+                                generator.impactOccurred()
                             }
-                            
-                            Button(role: .destructive) {
-                                onDeleteCart(cart)
-                            } label: {
-                                Label("Delete Cart", systemImage: "trash")
-                            }
-                        }
-                        .onLongPressGesture {
-                            let generator = UIImpactFeedbackGenerator(style: .medium)
-                            generator.impactOccurred()
                         }
                     }
+                    .transition(.asymmetric(
+                        insertion: .opacity.combined(with: .scale(scale: 0.0, anchor: .top)),
+                        removal: .opacity.combined(with: .scale(scale: 0.0, anchor: .top))
+                    ))
                 }
-                .transition(.asymmetric(
-                    insertion: .scale(scale: 0.8).combined(with: .opacity),
-                    removal: .scale(scale: 0.9).combined(with: .opacity)
-                ))
-                .animation(
-                    .spring(response: 0.5, dampingFraction: 0.7),
-                    value: viewModel.displayedCarts.count
-                )
-                .padding(.horizontal)
                 
                 Color.clear
                     .frame(height: 80)
             }
-            // ✅ Add scrollTargetLayout for better performance
+            .animation(
+                .spring(response: 0.5, dampingFraction: 0.7),
+                value: viewModel.displayedCarts.count
+            )
+            .padding(.horizontal)
             .scrollTargetLayout()
         }
-        // ✅ Optimize scroll behavior
         .scrollIndicators(.hidden)
         .blurScroll()
     }

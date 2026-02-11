@@ -6,6 +6,7 @@ struct HeaderView: View {
     let cart: Cart
     let dismiss: DismissAction
     var onBudgetTap: (() -> Void)?
+    var onDeleteCart: (() -> Void)?
     
     @Environment(VaultService.self) private var vaultService
     @Environment(CartStateManager.self) private var stateManager
@@ -76,7 +77,7 @@ struct HeaderView: View {
                     Divider()
                     
                     Button("Delete Cart", systemImage: "trash", role: .destructive) {
-                        // This binding will come from CartDetailContent
+                        onDeleteCart?()
                     }
                 } label: {
                     Image(systemName: "ellipsis")

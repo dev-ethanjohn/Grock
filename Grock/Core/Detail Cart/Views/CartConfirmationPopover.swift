@@ -395,11 +395,7 @@ struct CartConfirmationPopover: View {
             }
             
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                onCancel()
-                
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                    onConfirm(cartTitle, budgetValue)
-                }
+                onConfirm(cartTitle, budgetValue)
             }
         }
     }

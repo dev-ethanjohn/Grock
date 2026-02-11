@@ -1353,7 +1353,7 @@ private struct CategoriesManagerPreviewContent: View {
 
     var body: some View {
         CategoriesManagerSheet(
-            title: "Categories",
+            title: "Manage Categories",
             startOnHiddenTab: false,
             selectedCategoryName: $selectedCategoryName,
             visibleCategoryNames: $visibleCategoryNames,

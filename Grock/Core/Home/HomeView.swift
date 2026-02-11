@@ -200,6 +200,7 @@ struct HomeView: View {
                         .environment(cartViewModel)
                         .environment(cartStateManager)
                         .onDisappear {
+                            viewModel.selectedCart = nil
                             viewModel.loadCarts()
                             if viewModel.pendingCartToShow != nil {
                                 viewModel.completePendingCartDisplay()
@@ -757,7 +758,7 @@ struct HomeView: View {
               !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         
         // 4. We are on HomeView (Vault dismissed, Cart Detail dismissed)
-        if !viewModel.showVault && viewModel.selectedCart == nil {
+        if !viewModel.showVault && viewModel.selectedCart == nil && viewModel.pendingSelectedCart == nil {
             print("🎁 Showing Pro Welcome Sheet")
             showProWelcomeSheet = true
         }

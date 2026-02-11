@@ -44,9 +44,14 @@ struct HistoryView: View {
             .padding(.top, 8)
             .blurScroll(scale: 1.8)
             .background(Color(hex: "#F9F9F9"))
-            .navigationTitle("History")
-            .navigationBarTitleDisplayMode(.large)
+            .navigationTitle("")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text("History")
+                        .fuzzyBubblesFont(20, weight: .bold)
+                        .foregroundStyle(.black)
+                }
                 ToolbarItem(placement: .topBarLeading) {
                     Button {
                         dismiss()

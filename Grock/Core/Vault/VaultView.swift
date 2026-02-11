@@ -8,6 +8,11 @@ extension UIApplication {
     }
 }
 
+struct PendingCartConfirmation: Equatable {
+    let title: String
+    let budget: Double
+}
+
 struct VaultView: View {
     @Environment(VaultService.self) private var vaultService
     @Environment(CartViewModel.self) private var cartViewModel
@@ -60,6 +65,8 @@ struct VaultView: View {
     enum NavigationDirection {
         case left, right, none
     }
+
+    @State private var pendingCartConfirmation: PendingCartConfirmation?
     
     // guide
     @State private var showFirstItemTooltip = false
@@ -319,6 +326,7 @@ struct VaultView: View {
             .applySheetModifiers(
                 showCelebration: $showCelebration,
                 showCartConfirmation: $showCartConfirmation,
+                pendingCartConfirmation: $pendingCartConfirmation,
                 showNameEntrySheet: $showNameEntrySheet,
                 createCartButtonVisible: $createCartButtonVisible,
                 cartViewModel: cartViewModel,
@@ -1070,6 +1078,7 @@ extension View {
     func applySheetModifiers(
         showCelebration: Binding<Bool>,
         showCartConfirmation: Binding<Bool>,
+        pendingCartConfirmation: Binding<PendingCartConfirmation?>,
         showNameEntrySheet: Binding<Bool>,
         createCartButtonVisible: Binding<Bool>,
         cartViewModel: CartViewModel,
@@ -1105,23 +1114,31 @@ extension View {
                 )
                 .presentationBackground(.clear)
             }
-            .fullScreenCover(isPresented: showCartConfirmation) {
+            .fullScreenCover(isPresented: showCartConfirmation, onDismiss: {
+                guard let pending = pendingCartConfirmation.wrappedValue else { return }
+                pendingCartConfirmation.wrappedValue = nil
+
+                print("🛒 Creating cart...")
+                if let newCart = cartViewModel.createCartWithActiveItems(name: pending.title, budget: pending.budget) {
+                    print("✅ Cart created: \(newCart.name)")
+                    onCreateCart?(newCart)
+                } else {
+                    print("❌ Failed to create cart")
+                }
+            }) {
                 CartConfirmationPopover(
                     isPresented: showCartConfirmation,
                     activeCartItems: cartViewModel.activeCartItems,
                     vaultService: vaultService,
                     onConfirm: { title, budget in
-                        print("🛒 Creating cart...")
-                        
-                        if let newCart = cartViewModel.createCartWithActiveItems(name: title, budget: budget) {
-                            print("✅ Cart created: \(newCart.name)")
-                            cartViewModel.activeCartItems.removeAll()
-                            onCreateCart?(newCart)
-                        } else {
-                            print("❌ Failed to create cart")
-                        }
+                        pendingCartConfirmation.wrappedValue = PendingCartConfirmation(
+                            title: title,
+                            budget: budget
+                        )
+                        showCartConfirmation.wrappedValue = false
                     },
                     onCancel: {
+                        pendingCartConfirmation.wrappedValue = nil
                         showCartConfirmation.wrappedValue = false
                     }
                 )

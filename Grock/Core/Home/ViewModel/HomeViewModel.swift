@@ -169,14 +169,8 @@ final class HomeViewModel {
         
         // Store the pending cart immediately
         if let exactCart = cartViewModel.carts.first(where: { $0.id == createdCart.id }) {
-            print("🎯 HomeViewModel: Found exact cart in list - HIDING and setting as pending")
-            
-            // 🎯 CRITICAL: Use the same hiding mechanism as createEmptyCart
-            hiddenCartIds.insert(exactCart.id)  // HIDE FROM LIST
-            pendingCartToShow = exactCart
-            
-            // 🎯 CRITICAL: Auto-select to open detail screen (this triggers the reveal flow)
-            selectedCart = exactCart
+            print("🎯 HomeViewModel: Found exact cart in list - Setting as pending")
+            self.pendingSelectedCart = exactCart
         } else {
             print("⚠️ HomeViewModel: Cart not found in list, queuing created cart")
             self.pendingSelectedCart = createdCart
@@ -184,7 +178,7 @@ final class HomeViewModel {
         
         showVault = false
         
-        print("✅ HomeViewModel: Vault closed, cart is HIDDEN and detail screen will open")
+        print("✅ HomeViewModel: Vault closed, cart is pending and detail screen will open")
     }
     
     func transferPendingCart() {
@@ -195,8 +189,14 @@ final class HomeViewModel {
             hiddenCartIds.insert(pending.id)
             pendingCartToShow = pending
             
-            selectedCart = pending
-            pendingSelectedCart = nil
+            // Delay selection to allow Vault sheet to dismiss completely
+            // This prevents "abrupt" transitions and navigation conflicts
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                withAnimation {
+                    self?.selectedCart = pending
+                    self?.pendingSelectedCart = nil
+                }
+            }
         }
     }
     

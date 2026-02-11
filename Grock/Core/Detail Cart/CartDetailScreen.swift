@@ -87,6 +87,7 @@ struct CartDetailScreen: View {
             itemToEdit: $itemToEdit,
             previousHasItems: $previousHasItems,
             alertManager: $alertManager,
+            dismiss: dismiss,
             hasItems: hasItems,
             currentFulfilledCount: currentFulfilledCount,
             onDeleteItem: handleDeleteItem,
@@ -487,6 +488,7 @@ struct CartDetailAllModifiers: ViewModifier {
     @Binding var previousHasItems: Bool
     @Binding var alertManager: AlertManager
     
+    let dismiss: DismissAction
     let hasItems: Bool
     let currentFulfilledCount: Int
     
@@ -540,6 +542,7 @@ struct CartDetailAllModifiers: ViewModifier {
                 Button("Cancel", role: .cancel) { }
                 Button("Delete", role: .destructive) {
                     vaultService.deleteCart(cart)
+                    dismiss()
                 }
             } message: {
                 Text("Are you sure you want to delete this cart? This action cannot be undone.")
@@ -908,6 +911,9 @@ struct CartDetailContent: View {
                         dismiss: dismiss,
                         onBudgetTap: {
                             stateManager.showingEditBudget = true
+                        },
+                        onDeleteCart: {
+                            showingDeleteAlert = true
                         }
                     )
                 }
