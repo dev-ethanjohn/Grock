@@ -315,6 +315,47 @@ extension VaultService {
         print("   Shopping-only items: \(cart.cartItems.filter { $0.isShoppingOnlyItem }.count)")
     }
 
+    func addShoppingItemToCart(
+        name: String,
+        store: String,
+        price: Double,
+        unit: String,
+        cart: Cart,
+        quantity: Double = 1,
+        categoryName: String?
+    ) {
+        print("🛍️ Adding shopping-only item: \(name)")
+
+        let normalizedName = categoryName?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let groceryCategory = normalizedName.flatMap { name in
+            GroceryCategory.allCases.first(where: { $0.title.caseInsensitiveCompare(name) == .orderedSame })
+        }
+
+        let cartItem = CartItem.createShoppingOnlyItem(
+            name: name,
+            store: store,
+            price: price,
+            unit: unit,
+            quantity: quantity,
+            category: groceryCategory,
+            categoryName: normalizedName
+        )
+
+        cart.cartItems.append(cartItem)
+        updateCartTotals(cart: cart)
+        saveContext()
+
+        NotificationCenter.default.post(
+            name: NSNotification.Name("ShoppingDataUpdated"),
+            object: nil,
+            userInfo: ["cartItemId": cart.id]
+        )
+
+        print("✅ Added Shopping-only item to cart: \(name) ×\(quantity)")
+        print("   Cart now has \(cart.cartItems.count) items")
+        print("   Shopping-only items: \(cart.cartItems.filter { $0.isShoppingOnlyItem }.count)")
+    }
+
     /// Removes or skips an item depending on cart status and item type.
     ///
     /// Rules:

@@ -15,6 +15,7 @@ struct FirstItemForm: View {
             ItemFormContent(
                 formViewModel: viewModel.formViewModel,
                 itemNameFieldIsFocused: itemNameFieldIsFocused,
+                categoryPickerSource: .defaultsOnly,
                 showCategoryTooltip: viewModel.showCategoryTooltip,
                 duplicateError: viewModel.duplicateError,
                 isCheckingDuplicate: viewModel.isCheckingDuplicate,
@@ -32,7 +33,7 @@ struct FirstItemForm: View {
         .onChange(of: viewModel.formViewModel.storeName) { oldValue, newValue in
             viewModel.checkForDuplicateItemName(viewModel.formViewModel.itemName, vaultService: vaultService)
         }
-        .onChange(of: viewModel.formViewModel.selectedCategory) { oldValue, newValue in
+        .onChange(of: viewModel.formViewModel.selectedCategoryName) { oldValue, newValue in
             if newValue != nil {
                 viewModel.formViewModel.resetValidation()
             }

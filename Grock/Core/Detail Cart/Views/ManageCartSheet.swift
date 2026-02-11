@@ -245,7 +245,7 @@ struct ManageCartSheet: View {
 
     private var categoriesManagerDestination: some View {
         CategoriesManagerSheet(
-            title: "Categories",
+            title: "Manage Categories",
             startOnHiddenTab: categoryManagerStartOnHidden,
             selectedCategoryName: $selectedCategoryName,
             visibleCategoryNames: visibleCategoriesBinding,
@@ -306,10 +306,10 @@ struct ManageCartSheet: View {
                 AddItemPopover(
                     isPresented: $showAddItemPopover,
                     createCartButtonVisible: $createCartButtonVisible,
-                    onSave: { itemName, category, store, unit, price in
+                    onSave: { itemName, categoryName, store, unit, price in
                         if let newItem = vaultService.addItem(
                             name: itemName,
-                            to: category,
+                            toCategoryName: categoryName,
                             store: store,
                             price: price,
                             unit: unit

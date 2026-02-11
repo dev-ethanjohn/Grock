@@ -33,7 +33,7 @@ struct OnboardingFirstItemView: View {
             }
             viewModel.showCategoryTooltipWithDelay()
         }
-        .onChange(of: formViewModel.selectedCategory) { _, newValue in
+        .onChange(of: formViewModel.selectedCategoryName) { _, newValue in
             if newValue != nil {
                 viewModel.showCategoryTooltip = false
             }

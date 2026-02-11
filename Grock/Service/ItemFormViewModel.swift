@@ -10,7 +10,7 @@ class ItemFormViewModel {
     var storeName: String = ""
     var itemPrice: String = ""
     var unit: String = "g"
-    var selectedCategory: GroceryCategory?
+    var selectedCategoryName: String?
     var portion: Double?
     
     // MARK: - Mode-Aware Properties
@@ -43,7 +43,7 @@ class ItemFormViewModel {
                    Double(itemPrice) != nil &&
                    Double(itemPrice) ?? 0 > 0 &&
                    !unit.isEmpty &&
-                   selectedCategory != nil
+                   selectedCategoryName != nil
         
         if requiresStore {
             valid = valid && isValidStoreName
@@ -56,17 +56,13 @@ class ItemFormViewModel {
         return valid
     }
     
-    var selectedCategoryEmoji: String {
-        selectedCategory?.emoji ?? "plus.circle.fill"
-    }
-    
     // MARK: - Validation Methods
     func validateAndGetFirstMissingField() -> String? {
         if itemName.isEmpty {
             return "Item Name"
         }
         
-        if selectedCategory == nil {
+        if selectedCategoryName == nil {
             return "Category"
         }
         
@@ -150,11 +146,8 @@ class ItemFormViewModel {
         // Load category from vault
         if let categoryName = vaultService.vault?.categories.first(where: {
             $0.items.contains(where: { $0.id == item.id })
-        })?.name,
-        let groceryCategory = GroceryCategory.allCases.first(where: {
-            $0.title == categoryName
-        }) {
-            selectedCategory = groceryCategory
+        })?.name {
+            selectedCategoryName = categoryName
         }
     }
     
@@ -163,7 +156,7 @@ class ItemFormViewModel {
         storeName = ""
         itemPrice = ""
         unit = "g"
-        selectedCategory = nil
+        selectedCategoryName = nil
         portion = nil
         shouldUpdateVault = true
         resetValidation()

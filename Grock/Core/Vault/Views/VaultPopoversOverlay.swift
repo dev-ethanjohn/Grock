@@ -12,10 +12,10 @@ struct VaultPopoversOverlay: View {
                 AddItemPopover(
                     isPresented: $showAddItemPopover,
                     createCartButtonVisible: $createCartButtonVisible,
-                    onSave: { itemName, category, store, unit, price in
+                    onSave: { itemName, categoryName, store, unit, price in
                         _ = vaultService.addItem(
                             name: itemName,
-                            to: category,
+                            toCategoryName: categoryName,
                             store: store,
                             price: price,
                             unit: unit

@@ -1,13 +1,24 @@
 import SwiftUI
+import UIKit
+
+enum CategoryPickerSource {
+    case myBar
+    case defaultsOnly
+}
 
 struct CategoryCircularButton: View {
-    @Binding var selectedCategory: GroceryCategory?
+    @Binding var selectedCategoryName: String?
     let selectedCategoryEmoji: String
     let hasError: Bool
+    var categoryPickerSource: CategoryPickerSource = .myBar
     var isEditable: Bool = true
     var onTap: (() -> Void)? = nil
     
+    @Environment(VaultService.self) private var vaultService
+    @AppStorage("visibleCategoryNames") private var visibleCategoryNamesData: Data = Data()
     @State private var showLockTooltip = false
+    @State private var showCreateCategorySheet = false
+    @State private var createCategoryViewModel = CategoriesManagerViewModel(startOnHiddenTab: true)
     
     var body: some View {
         HStack {
@@ -17,18 +28,27 @@ struct CategoryCircularButton: View {
                 // Editable category button (Menu)
                 Menu {
                     Section {
-                        Text("Grocery Categories")
+                        Text(categoryPickerSource == .defaultsOnly ? "Grocery Categories" : "Your Categories")
                             .font(.headline)
                             .foregroundColor(.primary)
                     }
                     
-                    Picker("Category", selection: $selectedCategory) {
-                        ForEach(GroceryCategory.allCases) { category in
-                            Text("\(category.title) \(category.emoji)")
-                                .tag(category as GroceryCategory?)
+                    Picker("Category", selection: $selectedCategoryName) {
+                        ForEach(availableCategoryNames, id: \.self) { categoryName in
+                            Text("\(categoryName) \(emojiForCategoryName(categoryName))")
+                                .tag(categoryName as String?)
                         }
                     }
                     .pickerStyle(.inline)
+
+                    if categoryPickerSource == .myBar {
+                        Divider()
+                        Button {
+                            presentCreateCategorySheet()
+                        } label: {
+                            Label("Add New Category", systemImage: "plus.circle")
+                        }
+                    }
                 } label: {
                     categoryButtonContent
                 }
@@ -76,24 +96,39 @@ struct CategoryCircularButton: View {
                 )
             }
         }
+        .sheet(isPresented: $showCreateCategorySheet, onDismiss: resetCreateCategoryForm) {
+            CreateCategorySheet(
+                viewModel: createCategoryViewModel,
+                usedColorNamesByHex: usedColorNamesByHex,
+                usedEmojis: usedEmojiSet,
+                usedEmojiNamesByEmoji: usedEmojiNamesByEmoji,
+                existingCategoryKeys: existingCategoryKeys,
+                editingCategoryName: nil,
+                deleteMessage: nil,
+                onSave: saveCategoryFromQuickCreateSheet,
+                onDelete: nil
+            )
+            .presentationDragIndicator(.visible)
+            .ignoresSafeArea(.keyboard)
+        }
     }
     
     private var categoryButtonContent: some View {
         ZStack {
             // Main circle that morphs
             Circle()
-                .fill(selectedCategory == nil
+                .fill(selectedCategoryName == nil
                       ? .gray.opacity(0.2)
-                      : selectedCategory!.pastelColor)
+                      : (selectedCategoryColor ?? .gray))
                 .frame(width: 34, height: 34)
                 .opacity(isEditable ? 1.0 : 0.8) // Dim when not editable
             
             // Outer stroke (non-animating)
             Circle()
                 .stroke(
-                    selectedCategory == nil
+                    selectedCategoryName == nil
                     ? Color.gray
-                    : selectedCategory!.pastelColor.darker(by: 0.2),
+                    : (selectedCategoryColor ?? Color.gray).darker(by: 0.2),
                     lineWidth: 1.5
                 )
                 .frame(width: 34, height: 34)
@@ -107,7 +142,7 @@ struct CategoryCircularButton: View {
             }
             
             // Content
-            if selectedCategory == nil {
+            if selectedCategoryName == nil {
                 Image(systemName: "plus")
                     .font(.system(size: 18, weight: .bold))
                     .foregroundColor(.gray)
@@ -120,6 +155,224 @@ struct CategoryCircularButton: View {
         }
         .frame(width: 40, height: 40)
         .contentShape(Circle())
+    }
+
+    private var availableCategoryNames: [String] {
+        let defaultCategoryNames = GroceryCategory.allCases.map(\.title)
+        guard categoryPickerSource == .myBar else {
+            return defaultCategoryNames
+        }
+
+        let decoded = (try? JSONDecoder().decode([String].self, from: visibleCategoryNamesData)) ?? []
+        let customCategoryNames = (vaultService.vault?.categories ?? [])
+            .sorted { $0.sortOrder < $1.sortOrder }
+            .map(\.name)
+        let allCategoryNames = defaultCategoryNames + customCategoryNames
+
+        var canonicalByKey: [String: String] = [:]
+        for name in allCategoryNames {
+            let key = name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            if !key.isEmpty, canonicalByKey[key] == nil {
+                canonicalByKey[key] = name
+            }
+        }
+
+        let myBarConfigured = decoded.isEmpty ? defaultCategoryNames : decoded
+        var seen = Set<String>()
+        var myBarNames: [String] = []
+
+        // My Bar categories first, preserving configured order.
+        for name in myBarConfigured {
+            let key = name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            guard let canonical = canonicalByKey[key], !seen.contains(key) else { continue }
+            seen.insert(key)
+            myBarNames.append(canonical)
+        }
+
+        // Then append More categories in canonical full-order.
+        var moreNames: [String] = []
+        for name in allCategoryNames {
+            let key = name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            guard !key.isEmpty, !seen.contains(key) else { continue }
+            guard let canonical = canonicalByKey[key] else { continue }
+            seen.insert(key)
+            moreNames.append(canonical)
+        }
+
+        var result = myBarNames + moreNames
+
+        if let selected = selectedCategoryName {
+            let selectedKey = selected.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            if !selectedKey.isEmpty && !seen.contains(selectedKey) {
+                result.append(canonicalByKey[selectedKey] ?? selected)
+            }
+        }
+
+        return result
+    }
+
+    private var selectedCategoryColor: Color? {
+        guard let name = selectedCategoryName else { return nil }
+        if let groceryCategory = GroceryCategory.allCases.first(where: { $0.title == name }) {
+            return groceryCategory.pastelColor
+        }
+        if let customCategory = vaultService.getCategory(named: name),
+           let hex = customCategory.colorHex,
+           !hex.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return Color(hex: hex)
+        }
+        return name.generatedPastelColor
+    }
+
+    private func emojiForCategoryName(_ name: String) -> String {
+        vaultService.displayEmoji(forCategoryName: name)
+    }
+
+    private func presentCreateCategorySheet() {
+        dismissKeyboard()
+        // Wait for the Menu to close before presenting the sheet.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            showCreateCategorySheet = true
+        }
+    }
+
+    private func dismissKeyboard() {
+        UIApplication.shared.sendAction(
+            #selector(UIResponder.resignFirstResponder),
+            to: nil,
+            from: nil,
+            for: nil
+        )
+    }
+
+    private var decodedVisibleCategoryNames: [String] {
+        let decoded = (try? JSONDecoder().decode([String].self, from: visibleCategoryNamesData)) ?? []
+        if decoded.isEmpty {
+            return GroceryCategory.allCases.map(\.title)
+        }
+        return normalizedVisibleNames(from: decoded)
+    }
+
+    private var customCategoryNames: [String] {
+        let defaultNameKeys = Set(GroceryCategory.allCases.map { normalizedKey($0.title) })
+        return (vaultService.vault?.categories ?? [])
+            .sorted { $0.sortOrder < $1.sortOrder }
+            .map(\.name)
+            .filter { !defaultNameKeys.contains(normalizedKey($0)) }
+    }
+
+    private var allCategoryNames: [String] {
+        GroceryCategory.allCases.map(\.title) + customCategoryNames
+    }
+
+    private var existingCategoryKeys: Set<String> {
+        Set(allCategoryNames.map(normalizedKey))
+    }
+
+    private var usedColorNamesByHex: [String: [String]] {
+        var result: [String: [String]] = [:]
+        for categoryName in customCategoryNames {
+            guard let category = vaultService.getCategory(named: categoryName) else { continue }
+            let hex = normalizedHex(category.colorHex)
+            guard !hex.isEmpty else { continue }
+            result[hex, default: []].append(category.name)
+        }
+        return result
+    }
+
+    private var usedEmojiNamesByEmoji: [String: [String]] {
+        var result: [String: [String]] = [:]
+        for categoryName in customCategoryNames {
+            let emoji = vaultService.displayEmoji(forCategoryName: categoryName)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !emoji.isEmpty else { continue }
+            result[emoji, default: []].append(categoryName)
+        }
+        return result
+    }
+
+    private var usedEmojiSet: Set<String> {
+        Set(usedEmojiNamesByEmoji.keys)
+    }
+
+    private func saveCategoryFromQuickCreateSheet() {
+        createCategoryViewModel.createCategoryError = nil
+
+        let trimmedName = createCategoryViewModel.newCategoryName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty else { return }
+
+        let key = normalizedKey(trimmedName)
+        if existingCategoryKeys.contains(key) {
+            createCategoryViewModel.createCategoryError = "That category already exists."
+            HapticManager.shared.playMedium()
+            return
+        }
+
+        let emoji = createCategoryViewModel.newCategoryEmoji.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedEmoji = emoji.isEmpty ? nil : String(emoji.prefix(1))
+
+        guard let createdCategory = vaultService.createCustomCategory(
+            named: trimmedName,
+            emoji: normalizedEmoji,
+            colorHex: createCategoryViewModel.selectedColorHex
+        ) else {
+            createCategoryViewModel.createCategoryError = "Couldn’t create that category."
+            HapticManager.shared.playMedium()
+            return
+        }
+
+        let createdKey = normalizedKey(createdCategory.name)
+        var visibleNames = decodedVisibleCategoryNames
+        visibleNames.removeAll { normalizedKey($0) == createdKey }
+        visibleNames.insert(createdCategory.name, at: 0)
+        visibleCategoryNamesData = (try? JSONEncoder().encode(normalizedVisibleNames(from: visibleNames))) ?? Data()
+
+        selectedCategoryName = createdCategory.name
+        HapticManager.shared.playSuccess()
+        showCreateCategorySheet = false
+    }
+
+    private func resetCreateCategoryForm() {
+        createCategoryViewModel.newCategoryName = ""
+        createCategoryViewModel.newCategoryEmoji = ""
+        createCategoryViewModel.selectedEmoji = nil
+        createCategoryViewModel.selectedColorHex = nil
+        createCategoryViewModel.createCategoryError = nil
+    }
+
+    private func normalizedKey(_ value: String) -> String {
+        value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+
+    private func normalizedHex(_ hex: String?) -> String {
+        guard let hex else { return "" }
+        return hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted).uppercased()
+    }
+
+    private func normalizedVisibleNames(from names: [String]) -> [String] {
+        let defaultCategoryNames = GroceryCategory.allCases.map(\.title)
+        let customCategoryNames = (vaultService.vault?.categories ?? [])
+            .sorted { $0.sortOrder < $1.sortOrder }
+            .map(\.name)
+        let allCategoryNames = defaultCategoryNames + customCategoryNames
+
+        var canonicalByKey: [String: String] = [:]
+        for name in allCategoryNames {
+            let key = name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            if !key.isEmpty, canonicalByKey[key] == nil {
+                canonicalByKey[key] = name
+            }
+        }
+
+        var seen = Set<String>()
+        var result: [String] = []
+        for name in names {
+            let key = name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            guard let canonical = canonicalByKey[key], !seen.contains(key) else { continue }
+            seen.insert(key)
+            result.append(canonical)
+        }
+        return result
     }
 }
 

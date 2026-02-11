@@ -160,6 +160,7 @@ protocol VaultShoppingManaging {
     func addVaultItemToCart(item: Item, cart: Cart, quantity: Double, selectedStore: String?)
     func addVaultItemToCartDuringShopping(item: Item, store: String, price: Double, unit: String, cart: Cart, quantity: Double)
     func addShoppingItemToCart(name: String, store: String, price: Double, unit: String, cart: Cart, quantity: Double, category: GroceryCategory?)
+    func addShoppingItemToCart(name: String, store: String, price: Double, unit: String, cart: Cart, quantity: Double, categoryName: String?)
     func removeItemFromCart(cart: Cart, itemId: String)
     func updateCartItemActualData(cart: Cart, itemId: String, actualPrice: Double?, actualQuantity: Double?, actualUnit: String?, actualStore: String?)
     func changeCartItemStore(cart: Cart, itemId: String, newStore: String)

@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		4C5FE1352F3C6F03006400BE /* RevenueCat in Frameworks */ = {isa = PBXBuildFile; productRef = 4C5FE1342F3C6F03006400BE /* RevenueCat */; };
+		4C5FE1372F3C6F03006400BE /* RevenueCatUI in Frameworks */ = {isa = PBXBuildFile; productRef = 4C5FE1362F3C6F03006400BE /* RevenueCatUI */; };
 		4C69B5B52F2613130078BEBF /* Glur in Frameworks */ = {isa = PBXBuildFile; productRef = 4C69B5B42F2613130078BEBF /* Glur */; };
 		4C76BFED2ED6B13400F98D86 /* SwiftUIIntrospect in Frameworks */ = {isa = PBXBuildFile; productRef = 4C76BFEC2ED6B13400F98D86 /* SwiftUIIntrospect */; };
 		4CA669322EB55D3F00769F3F /* Lottie in Frameworks */ = {isa = PBXBuildFile; productRef = 4CA669312EB55D3F00769F3F /* Lottie */; };
@@ -49,8 +51,10 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4C5FE1352F3C6F03006400BE /* RevenueCat in Frameworks */,
 				4CA669322EB55D3F00769F3F /* Lottie in Frameworks */,
 				4C76BFED2ED6B13400F98D86 /* SwiftUIIntrospect in Frameworks */,
+				4C5FE1372F3C6F03006400BE /* RevenueCatUI in Frameworks */,
 				4C69B5B52F2613130078BEBF /* Glur in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -97,6 +101,8 @@
 				4CA669312EB55D3F00769F3F /* Lottie */,
 				4C76BFEC2ED6B13400F98D86 /* SwiftUIIntrospect */,
 				4C69B5B42F2613130078BEBF /* Glur */,
+				4C5FE1342F3C6F03006400BE /* RevenueCat */,
+				4C5FE1362F3C6F03006400BE /* RevenueCatUI */,
 			);
 			productName = Grock;
 			productReference = 4C07F7B82E88245000B46866 /* Grock.app */;
@@ -130,6 +136,7 @@
 				4CA669302EB55D3F00769F3F /* XCRemoteSwiftPackageReference "lottie-ios" */,
 				4C76BFEB2ED6B13400F98D86 /* XCRemoteSwiftPackageReference "swiftui-introspect" */,
 				4C69B5B32F2613130078BEBF /* XCRemoteSwiftPackageReference "Glur" */,
+				4C5FE1332F3C6F03006400BE /* XCRemoteSwiftPackageReference "purchases-ios-spm" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 4C07F7B92E88245000B46866 /* Products */;
@@ -292,7 +299,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 23C886DGJJ;
+				DEVELOPMENT_TEAM = BCUFVJJD88;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Grock/Info.plist;
@@ -371,6 +378,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		4C5FE1332F3C6F03006400BE /* XCRemoteSwiftPackageReference "purchases-ios-spm" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/RevenueCat/purchases-ios-spm.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 5.58.0;
+			};
+		};
 		4C69B5B32F2613130078BEBF /* XCRemoteSwiftPackageReference "Glur" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/joogps/Glur";
@@ -398,6 +413,16 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		4C5FE1342F3C6F03006400BE /* RevenueCat */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 4C5FE1332F3C6F03006400BE /* XCRemoteSwiftPackageReference "purchases-ios-spm" */;
+			productName = RevenueCat;
+		};
+		4C5FE1362F3C6F03006400BE /* RevenueCatUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 4C5FE1332F3C6F03006400BE /* XCRemoteSwiftPackageReference "purchases-ios-spm" */;
+			productName = RevenueCatUI;
+		};
 		4C69B5B42F2613130078BEBF /* Glur */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 4C69B5B32F2613130078BEBF /* XCRemoteSwiftPackageReference "Glur" */;

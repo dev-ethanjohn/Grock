@@ -353,6 +353,11 @@ private struct CompletedItemRow: View {
                                       let cat = GroceryCategory(rawValue: raw) {
                                 Text(cat.emoji)
                                     .font(.caption)
+                            } else if cartItem.isShoppingOnlyItem,
+                                      let categoryName = cartItem.shoppingOnlyCategory?.trimmingCharacters(in: .whitespacesAndNewlines),
+                                      !categoryName.isEmpty {
+                                Text(vaultService.displayEmoji(forCategoryName: categoryName))
+                                    .font(.caption)
                             }
                         }
                     }

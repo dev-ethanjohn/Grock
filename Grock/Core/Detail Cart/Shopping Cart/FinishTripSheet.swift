@@ -127,6 +127,19 @@ struct FinishTripSheet: View {
            let groceryCategory = GroceryCategory(rawValue: raw) {
             return groceryCategory.pastelColor.darker(by: 0.4).saturated(by: 0.4)
         }
+        if cartItem.isShoppingOnlyItem,
+           let categoryName = cartItem.shoppingOnlyCategory?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !categoryName.isEmpty {
+            if let groceryCategory = GroceryCategory.allCases.first(where: { $0.title == categoryName }) {
+                return groceryCategory.pastelColor.darker(by: 0.4).saturated(by: 0.4)
+            }
+            if let category = vaultService.getCategory(named: categoryName),
+               let hex = category.colorHex,
+               !hex.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                return Color(hex: hex).darker(by: 0.4).saturated(by: 0.4)
+            }
+            return categoryName.generatedPastelColor.darker(by: 0.4).saturated(by: 0.4)
+        }
         if let item = vaultService.findItemById(cartItem.itemId),
            let category = vaultService.getCategory(for: item.id) {
             if let groceryCategory = GroceryCategory.allCases.first(where: { $0.title == category.name }) {
@@ -251,6 +264,11 @@ struct FinishTripSheet: View {
             if cartItem.isShoppingOnlyItem, let raw = cartItem.shoppingOnlyCategory, let cat = GroceryCategory(rawValue: raw) {
                 emoji = cat.emoji
                 title = cat.title
+            } else if cartItem.isShoppingOnlyItem,
+                      let categoryName = cartItem.shoppingOnlyCategory?.trimmingCharacters(in: .whitespacesAndNewlines),
+                      !categoryName.isEmpty {
+                title = categoryName
+                emoji = vaultService.displayEmoji(forCategoryName: categoryName)
             } else if let vaultItem = item, let category = vaultService.getCategory(for: vaultItem.id) {
                 title = category.name
                 emoji = vaultService.displayEmoji(forCategoryName: category.name)
@@ -282,17 +300,21 @@ struct FinishTripSheet: View {
             let price = cartItem.shoppingOnlyPrice ?? 0
             let unit = (cartItem.shoppingOnlyUnit ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             
-            let category: GroceryCategory
-            if let raw = cartItem.shoppingOnlyCategory,
-               let parsed = GroceryCategory(rawValue: raw) {
-                category = parsed
-            } else {
-                category = .pantry
-            }
+            let targetCategoryName: String = {
+                if let raw = cartItem.shoppingOnlyCategory,
+                   let parsed = GroceryCategory(rawValue: raw) {
+                    return parsed.title
+                }
+                if let categoryName = cartItem.shoppingOnlyCategory?.trimmingCharacters(in: .whitespacesAndNewlines),
+                   !categoryName.isEmpty {
+                    return categoryName
+                }
+                return GroceryCategory.pantry.title
+            }()
             
             _ = vaultService.addItem(
                 name: name,
-                to: category,
+                toCategoryName: targetCategoryName,
                 store: store,
                 price: price,
                 unit: unit.isEmpty ? "ea" : unit

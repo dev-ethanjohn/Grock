@@ -1072,10 +1072,30 @@ struct CategoriesManagerSheet: View {
         let emoji = viewModel.newCategoryEmoji.trimmingCharacters(in: .whitespacesAndNewlines)
         let normalizedEmoji = emoji.isEmpty ? nil : String(emoji.prefix(1))
 
-        guard vaultService.createCustomCategory(named: trimmed, emoji: normalizedEmoji, colorHex: viewModel.selectedColorHex) != nil else {
+        guard let createdCategory = vaultService.createCustomCategory(
+            named: trimmed,
+            emoji: normalizedEmoji,
+            colorHex: viewModel.selectedColorHex
+        ) else {
             viewModel.createCategoryError = "Couldn’t create that category."
             HapticManager.shared.playMedium()
             return
+        }
+
+        let createdName = createdCategory.name
+        let createdKey = normalizedKey(createdName)
+        var updatedVisibleNames = visibleCategoryNames
+        updatedVisibleNames.removeAll { normalizedKey($0) == createdKey }
+        updatedVisibleNames.insert(createdName, at: 0)
+        visibleCategoryNames = normalizedVisibleNames(from: updatedVisibleNames)
+        selectedCategoryName = createdName
+
+        if viewModel.activeTab != .shown {
+            viewModel.navigationDirection = .left
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                viewModel.activeTab = .shown
+                viewModel.progress = 0
+            }
         }
 
         HapticManager.shared.playSuccess()
@@ -1208,8 +1228,10 @@ struct CategoriesManagerSheet: View {
     }
 
     private func normalizedVisibleNames(from names: [String]) -> [String] {
+        // Use live category names (not cached) so create/rename flows keep the newest
+        // category at the intended position immediately.
         let canonicalByKey = Dictionary(
-            uniqueKeysWithValues: allCategoryNames.map { (normalizedKey($0), $0) }
+            uniqueKeysWithValues: computeAllCategoryNames().map { (normalizedKey($0), $0) }
         )
         var seen = Set<String>()
         var result: [String] = []

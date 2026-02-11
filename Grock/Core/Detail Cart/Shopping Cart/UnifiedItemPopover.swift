@@ -67,6 +67,11 @@ struct UnifiedItemPopover: View {
            let groceryCategory = GroceryCategory(rawValue: rawValue) {
             return (groceryCategory.emoji, groceryCategory.title)
         }
+        if cartItem.isShoppingOnlyItem,
+           let categoryName = cartItem.shoppingOnlyCategory?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !categoryName.isEmpty {
+            return (vaultService.displayEmoji(forCategoryName: categoryName), categoryName)
+        }
         
         let categoryName =
         cartItem.vaultItemCategorySnapshot ??

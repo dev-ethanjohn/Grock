@@ -389,8 +389,12 @@ class CartItem {
         price: Double,
         unit: String,
         quantity: Double = 1,
-        category: GroceryCategory? = nil
+        category: GroceryCategory? = nil,
+        categoryName: String? = nil
     ) -> CartItem {
+        let normalizedCategoryName = categoryName?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let shoppingCategoryIdentifier = category?.rawValue ?? (normalizedCategoryName?.isEmpty == false ? normalizedCategoryName : nil)
+
         return CartItem(
             itemId: UUID().uuidString,
             quantity: quantity,
@@ -406,7 +410,7 @@ class CartItem {
             shoppingOnlyStore: store,
             shoppingOnlyPrice: price,
             shoppingOnlyUnit: unit,
-            shoppingOnlyCategory: category?.rawValue,
+            shoppingOnlyCategory: shoppingCategoryIdentifier,
             originalPlanningQuantity: nil,
             addedDuringShopping: true
         )

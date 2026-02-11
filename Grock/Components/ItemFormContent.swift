@@ -3,12 +3,14 @@ import SwiftUI
 struct ItemFormContent: View {
     @Bindable var formViewModel: ItemFormViewModel
     var itemNameFieldIsFocused: FocusState<Bool>.Binding
+    var categoryPickerSource: CategoryPickerSource = .myBar
     var showCategoryTooltip: Bool = false
     var duplicateError: String? = nil
     var isCheckingDuplicate: Bool = false
     var onStoreChange: (() -> Void)? = nil
     var isCategoryEditable: Bool = true
     
+    @Environment(VaultService.self) private var vaultService
     @State private var showUnitPicker = false
     
     // Shake states for each field
@@ -32,7 +34,10 @@ struct ItemFormContent: View {
                 }
                 
                 ItemNameInput(
-                    selectedCategoryEmoji: formViewModel.selectedCategoryEmoji,
+                    selectedCategoryEmoji: selectedCategoryEmoji,
+                    selectedCategoryColor: selectedCategoryColor,
+                    selectedCategoryPlaceholder: selectedCategoryPlaceholder,
+                    categoryPickerSource: categoryPickerSource,
                     showTooltip: showCategoryTooltip,
                     showItemNameError: (formViewModel.attemptedSubmission && formViewModel.firstMissingField == "Item Name") || duplicateError != nil,
                     showCategoryError: formViewModel.attemptedSubmission && formViewModel.firstMissingField == "Category",
@@ -41,7 +46,7 @@ struct ItemFormContent: View {
                     duplicateError: duplicateError,
                     itemNameFieldIsFocused: itemNameFieldIsFocused,
                     itemName: $formViewModel.itemName,
-                    selectedCategory: $formViewModel.selectedCategory,
+                    selectedCategoryName: $formViewModel.selectedCategoryName,
                     isCategoryEditable: isCategoryEditable
                 )
                 .offset(x: itemNameShakeOffset)
@@ -236,6 +241,43 @@ struct ItemFormContent: View {
         default:
             break
         }
+    }
+
+    private var selectedCategoryEmoji: String {
+        guard let name = formViewModel.selectedCategoryName,
+              !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        else {
+            return ""
+        }
+        return vaultService.displayEmoji(forCategoryName: name)
+    }
+
+    private var selectedCategoryColor: Color? {
+        guard let name = formViewModel.selectedCategoryName,
+              !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        else {
+            return nil
+        }
+
+        if let groceryCategory = GroceryCategory.allCases.first(where: { $0.title == name }) {
+            return groceryCategory.pastelColor
+        }
+
+        if let customCategory = vaultService.getCategory(named: name),
+           let hex = customCategory.colorHex,
+           !hex.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return Color(hex: hex)
+        }
+
+        return name.generatedPastelColor
+    }
+
+    private var selectedCategoryPlaceholder: String {
+        guard let name = formViewModel.selectedCategoryName else { return "e.g. Item name" }
+        if let groceryCategory = GroceryCategory.allCases.first(where: { $0.title == name }) {
+            return groceryCategory.placeholder
+        }
+        return "e.g. Item name"
     }
     
     private func validationError(_ message: String) -> some View {

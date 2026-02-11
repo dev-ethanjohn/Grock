@@ -218,7 +218,7 @@ class OnboardingViewModel {
     
     // Data Methods
     func saveInitialData(vaultService: VaultService) -> Bool {
-        guard let category = GroceryCategory.allCases.first(where: { $0.title == formViewModel.selectedCategory?.title }),
+        guard let categoryName = formViewModel.selectedCategoryName,
               let price = Double(formViewModel.itemPrice) else {
             print("❌ Failed to save item - invalid data")
             return false
@@ -226,7 +226,7 @@ class OnboardingViewModel {
         
         let createdItem = vaultService.addItem(
             name: formViewModel.itemName,
-            to: category,
+            toCategoryName: categoryName,
             store: formViewModel.storeName,
             price: price,
             unit: formViewModel.unit
@@ -245,7 +245,7 @@ class OnboardingViewModel {
     func saveOnboardingItemData() {
         UserDefaults.standard.set([
             "itemName": formViewModel.itemName,
-            "categoryName": formViewModel.selectedCategory?.title ?? "",
+            "categoryName": formViewModel.selectedCategoryName ?? "",
             "portion": formViewModel.portion ?? 1.0
         ] as [String: Any], forKey: "onboardingItemData")
         

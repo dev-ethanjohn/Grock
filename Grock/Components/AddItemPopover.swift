@@ -4,7 +4,7 @@ struct AddItemPopover: View {
     @Binding var isPresented: Bool
     @Binding var createCartButtonVisible: Bool
     
-    var onSave: ((String, GroceryCategory, String, String, Double) -> Void)?
+    var onSave: ((String, String, String, String, Double) -> Void)?
     var onDismiss: (() -> Void)?
     
     @Environment(VaultService.self) private var vaultService
@@ -85,7 +85,7 @@ struct AddItemPopover: View {
                 ) {
                     KeyboardManager.dismissWithAnimation()
                     if formViewModel.attemptSubmission(),
-                       let category = formViewModel.selectedCategory,
+                       let categoryName = formViewModel.selectedCategoryName,
                        let priceValue = Double(formViewModel.itemPrice) {
                         
                         // Final duplicate check before saving
@@ -100,11 +100,11 @@ struct AddItemPopover: View {
                         // ENSURE THE STORE exists in vault stores before saving
                         vaultService.ensureStoreExists(formViewModel.storeName)
                         
-                        onSave?(formViewModel.itemName, category, formViewModel.storeName, formViewModel.unit, priceValue)
+                        onSave?(formViewModel.itemName, categoryName, formViewModel.storeName, formViewModel.unit, priceValue)
                         NotificationCenter.default.post(
                             name: NSNotification.Name("ItemCategoryChanged"),
                             object: nil,
-                            userInfo: ["newCategory": category]
+                            userInfo: ["newCategoryName": categoryName]
                         )
                         dismissPopover()
                     }

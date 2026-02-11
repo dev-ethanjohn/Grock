@@ -12,7 +12,7 @@ struct AddNewItemToCartSheet: View {
     @State private var formViewModel = ItemFormViewModel(requiresPortion: true, requiresStore: true)
     @FocusState private var itemNameFieldIsFocused: Bool
     
-    @State private var selectedCategory: GroceryCategory?
+    @State private var selectedCategoryName: String?
     @State private var showAddItemPopoverInVault = false
     
     // Keyboard state for done button
@@ -49,7 +49,7 @@ struct AddNewItemToCartSheet: View {
                     // Page 2: Browse Vault
                     BrowseVaultView(
                         cart: cart,
-                        selectedCategory: $selectedCategory,
+                        selectedCategoryName: $selectedCategoryName,
                         focusSearchToken: vaultSearchFocusToken,
                         onItemSelected: { item in
                             handleVaultItemSelection(item)
@@ -114,7 +114,7 @@ struct AddNewItemToCartSheet: View {
                 AddItemPopover(
                     isPresented: $showAddItemPopoverInVault,
                     createCartButtonVisible: .constant(false),
-                    onSave: { itemName, category, store, unit, price in
+                    onSave: { itemName, categoryName, store, unit, price in
                         if cart.isShopping {
                             vaultService.addShoppingItemToCart(
                                 name: itemName,
@@ -123,7 +123,7 @@ struct AddNewItemToCartSheet: View {
                                 unit: unit,
                                 cart: cart,
                                 quantity: 1,
-                                category: category
+                                categoryName: categoryName
                             )
                             hasUnsavedChanges = true
                             onItemAdded?()
@@ -131,7 +131,7 @@ struct AddNewItemToCartSheet: View {
                         } else {
                             let success = addNewItemToVaultAndCart(
                                 name: itemName,
-                                category: category,
+                                categoryName: categoryName,
                                 store: store,
                                 unit: unit,
                                 price: price
@@ -183,7 +183,7 @@ struct AddNewItemToCartSheet: View {
     
     private func handleAddToCart() {
         guard formViewModel.attemptSubmission(),
-              let category = formViewModel.selectedCategory,
+              let categoryName = formViewModel.selectedCategoryName,
               let priceValue = Double(formViewModel.itemPrice) else {
             return
         }
@@ -198,7 +198,7 @@ struct AddNewItemToCartSheet: View {
                 unit: formViewModel.unit,
                 cart: cart,
                 quantity: formViewModel.portion ?? 1.0,
-                category: category
+                categoryName: categoryName
             )
             print("🛍️ Added shopping-only item: \(formViewModel.itemName)")
             
@@ -214,7 +214,7 @@ struct AddNewItemToCartSheet: View {
             // Planning mode: Add to vault and cart
             let success = addNewItemToVaultAndCart(
                 name: formViewModel.itemName,
-                category: category,
+                categoryName: categoryName,
                 store: formViewModel.storeName,
                 unit: formViewModel.unit,
                 price: priceValue
@@ -335,10 +335,10 @@ struct AddNewItemToCartSheet: View {
          )
      }
     
-    private func addNewItemToVaultAndCart(name: String, category: GroceryCategory, store: String, unit: String, price: Double) -> Bool {
+    private func addNewItemToVaultAndCart(name: String, categoryName: String, store: String, unit: String, price: Double) -> Bool {
         let newItem = vaultService.addItem(
             name: name,
-            to: category,
+            toCategoryName: categoryName,
             store: store,
             price: price,
             unit: unit

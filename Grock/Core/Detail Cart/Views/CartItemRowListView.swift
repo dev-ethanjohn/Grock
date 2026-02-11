@@ -787,6 +787,11 @@ private struct ItemPriceRow: View {
            let cat = GroceryCategory(rawValue: raw) {
             return cat.emoji
         }
+        if cartItem.isShoppingOnlyItem,
+           let categoryName = cartItem.shoppingOnlyCategory?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !categoryName.isEmpty {
+            return vaultService.displayEmoji(forCategoryName: categoryName)
+        }
         if let vaultItem = item,
            let category = vaultService.getCategory(for: vaultItem.id) {
             return vaultService.displayEmoji(forCategoryName: category.name)

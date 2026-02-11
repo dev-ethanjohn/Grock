@@ -268,10 +268,9 @@ struct EditItemSheet: View {
             formViewModel.portion = cartItem.quantity
             
             // Category from vault
-            if let categoryName = vaultService.getCategory(for: item.id)?.name,
-               let groceryCategory = GroceryCategory.allCases.first(where: { $0.title == categoryName }) {
-                formViewModel.selectedCategory = groceryCategory
-                print("   Category: \(groceryCategory.title)")
+            if let categoryName = vaultService.getCategory(for: item.id)?.name {
+                formViewModel.selectedCategoryName = categoryName
+                print("   Category: \(categoryName)")
             }
             
             // REMOVED: modeDescription assignment
@@ -388,7 +387,7 @@ struct EditItemSheet: View {
         oldCategoryName: String?
     ) -> Bool {
         print("📝 Updating Vault and cart")
-        guard let selectedCategory = formViewModel.selectedCategory else {
+        guard let selectedCategoryName = formViewModel.selectedCategoryName else {
             duplicateError = "Category is required"
             return false
         }
@@ -400,7 +399,7 @@ struct EditItemSheet: View {
         let success = vaultService.updateItem(
             item: item,
             newName: trimmedItemName,
-            newCategory: selectedCategory,
+            newCategoryName: selectedCategoryName,
             newStore: trimmedStoreName,
             newPrice: priceValue,
             newUnit: formViewModel.unit
@@ -453,7 +452,7 @@ struct EditItemSheet: View {
         oldCategoryName: String?
     ) -> Bool {
         print("🏦 Vault editing - updating Vault")
-        guard let selectedCategory = formViewModel.selectedCategory else {
+        guard let selectedCategoryName = formViewModel.selectedCategoryName else {
             duplicateError = "Category is required"
             return false
         }
@@ -461,7 +460,7 @@ struct EditItemSheet: View {
         return vaultService.updateItem(
             item: item,
             newName: formViewModel.itemName.trimmingCharacters(in: .whitespacesAndNewlines),
-            newCategory: selectedCategory,
+            newCategoryName: selectedCategoryName,
             newStore: formViewModel.storeName.trimmingCharacters(in: .whitespacesAndNewlines),
             newPrice: priceValue,
             newUnit: formViewModel.unit
@@ -525,13 +524,13 @@ struct EditItemSheet: View {
             dismiss()
             
             // Notify category change if needed
-            if let selectedCategory = formViewModel.selectedCategory,
-               oldCategoryName != selectedCategory.title {
+            if let selectedCategoryName = formViewModel.selectedCategoryName,
+               oldCategoryName != selectedCategoryName {
                 NotificationCenter.default.post(
                     name: NSNotification.Name("ItemCategoryChanged"),
                     object: nil,
                     userInfo: [
-                        "newCategory": selectedCategory,
+                        "newCategoryName": selectedCategoryName,
                         "itemId": item.id
                     ]
                 )

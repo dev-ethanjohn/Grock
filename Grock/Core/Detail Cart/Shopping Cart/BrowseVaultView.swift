@@ -7,7 +7,7 @@ extension Notification.Name {
 
 struct BrowseVaultView: View {
     let cart: Cart
-    @Binding var selectedCategory: GroceryCategory?
+    @Binding var selectedCategoryName: String?
     let focusSearchToken: Int
     let onItemSelected: (Item) -> Void
     let onBack: () -> Void

@@ -2,6 +2,9 @@ import SwiftUI
 
 struct ItemNameInput: View {
     let selectedCategoryEmoji: String
+    let selectedCategoryColor: Color?
+    let selectedCategoryPlaceholder: String
+    var categoryPickerSource: CategoryPickerSource = .myBar
     let showTooltip: Bool
     let showItemNameError: Bool
     let showCategoryError: Bool
@@ -12,7 +15,7 @@ struct ItemNameInput: View {
     var itemNameFieldIsFocused: FocusState<Bool>.Binding
     
     @Binding var itemName: String
-    @Binding var selectedCategory: GroceryCategory?
+    @Binding var selectedCategoryName: String?
     
     @State private var fillAnimation: CGFloat = 0.0
     @State private var fieldScale: CGFloat = 1.0
@@ -29,7 +32,7 @@ struct ItemNameInput: View {
         VStack(alignment: .leading, spacing: 4) {
             ZStack(alignment: .trailing) {
                 
-                if showCategoryError && selectedCategory == nil {
+                if showCategoryError && selectedCategoryName == nil {
                     CategoryErrorPopover()
                         .offset(x: 0, y: -36)
                         .transition(.asymmetric(
@@ -42,7 +45,7 @@ struct ItemNameInput: View {
                         ))
                         .zIndex(1)
                 }
-                else if showTooltip && selectedCategory == nil && !showCategoryError {
+                else if showTooltip && selectedCategoryName == nil && !showCategoryError {
                     CategoryTooltipPopover()
                         .offset(x: 0, y: -36)
                         .transition(.asymmetric(
@@ -72,7 +75,7 @@ struct ItemNameInput: View {
                 }
                 
                 HStack {
-                    TextField(selectedCategory?.placeholder ?? "e.g. Item name", text: $itemName)
+                    TextField(selectedCategoryPlaceholder, text: $itemName)
                         .normalizedText($itemName)
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.never)
@@ -93,9 +96,10 @@ struct ItemNameInput: View {
                         )
                         .overlay(
                             CategoryCircularButton(
-                                selectedCategory: $selectedCategory,
+                                selectedCategoryName: $selectedCategoryName,
                                 selectedCategoryEmoji: selectedCategoryEmoji,
-                                hasError: showCategoryError && selectedCategory == nil,
+                                hasError: showCategoryError && selectedCategoryName == nil,
+                                categoryPickerSource: categoryPickerSource,
                                 isEditable: isCategoryEditable,
                                 onTap: {
                                     if !isCategoryEditable {
@@ -118,11 +122,11 @@ struct ItemNameInput: View {
                 }
             }
             
-            if let category = selectedCategory {
+            if let categoryName = selectedCategoryName {
                 HStack(spacing: 4) {
-                    Text(category.title)
+                    Text(categoryName)
                         .lexend(.caption2)
-                        .foregroundColor(category.pastelColor.darker(by: 0.3))
+                        .foregroundColor((selectedCategoryColor ?? Color.gray).darker(by: 0.3))
                     
                     if !isCategoryEditable {
                         Image(systemName: "lock.fill")
@@ -136,22 +140,22 @@ struct ItemNameInput: View {
                 }
                 .padding(.horizontal, 16)
                 .transition(.scale.combined(with: .opacity))
-                .id(category.id)
+                .id(categoryName)
             }
         }
-        .animation(.spring(response: 0.4, dampingFraction: 0.6), value: selectedCategory)
+        .animation(.spring(response: 0.4, dampingFraction: 0.6), value: selectedCategoryName)
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isCheckingDuplicate)
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: duplicateError)
-        .onChange(of: selectedCategory) { oldValue, newValue in
+        .onChange(of: selectedCategoryName) { oldValue, newValue in
             handleCategoryChange(oldValue: oldValue, newValue: newValue)
         }
         .onChange(of: showCategoryError) { oldValue, newValue in
-            if newValue && selectedCategory == nil {
+            if newValue && selectedCategoryName == nil {
                 triggerShakeAnimation()
             }
         }
         .onChange(of: invalidAttemptCount) { oldValue, newValue in
-            if newValue > oldValue && showCategoryError && selectedCategory == nil {
+            if newValue > oldValue && showCategoryError && selectedCategoryName == nil {
                 triggerShakeAnimation()
             }
         }
@@ -172,13 +176,14 @@ struct ItemNameInput: View {
         Group {
             if shouldShowErrorStyling {
                 Color(hex: "#FF2C2C").opacity(0.05)
-            } else if selectedCategory == nil {
+            } else if selectedCategoryName == nil {
                 Color(.systemGray6).brightness(0.03)
             } else {
+                let baseColor = selectedCategoryColor ?? Color.gray
                 RadialGradient(
                     colors: [
-                        selectedCategory!.pastelColor.opacity(isCategoryEditable ? 0.4 : 0.2),
-                        selectedCategory!.pastelColor.opacity(isCategoryEditable ? 0.35 : 0.15)
+                        baseColor.opacity(isCategoryEditable ? 0.4 : 0.2),
+                        baseColor.opacity(isCategoryEditable ? 0.35 : 0.15)
                     ],
                     center: .center,
                     startRadius: 0,
@@ -190,7 +195,7 @@ struct ItemNameInput: View {
         .opacity(isCategoryEditable ? 1.0 : 0.8)
     }
     
-    private func handleCategoryChange(oldValue: GroceryCategory?, newValue: GroceryCategory?) {
+    private func handleCategoryChange(oldValue: String?, newValue: String?) {
         if newValue != nil {
             if oldValue == nil {
                 withAnimation(.spring(duration: 0.5)) {

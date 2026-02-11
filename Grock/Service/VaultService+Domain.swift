@@ -340,6 +340,43 @@ extension VaultService {
         return newItem
     }
 
+    /// Creates a new vault `Item` in a category by name (supports custom categories).
+    func addItem(
+        name: String,
+        toCategoryName categoryName: String,
+        store: String,
+        price: Double,
+        unit: String
+    ) -> Item? {
+        guard let vault = vault else { return nil }
+
+        let validation = validateItemName(name, store: store)
+        guard validation.isValid else {
+            print("❌ Cannot add item: \(validation.errorMessage ?? "Unknown error")")
+            return nil
+        }
+
+        let trimmedCategory = categoryName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let targetCategory: Category
+        if let existingCategory = getCategory(named: trimmedCategory) {
+            targetCategory = existingCategory
+        } else {
+            targetCategory = Category(name: trimmedCategory)
+            modelContext.insert(targetCategory)
+            vault.categories.append(targetCategory)
+        }
+
+        let pricePerUnit = PricePerUnit(priceValue: price, unit: unit)
+        let priceOption = PriceOption(store: store, pricePerUnit: pricePerUnit)
+        let newItem = Item(name: name.trimmingCharacters(in: .whitespacesAndNewlines))
+        newItem.priceOptions = [priceOption]
+
+        modelContext.insert(newItem)
+        targetCategory.items.append(newItem)
+        saveContext()
+        return newItem
+    }
+
     /// Updates an item’s name/category and replaces the first price option with the new store/price/unit.
     ///
     /// Implications:
@@ -376,6 +413,54 @@ extension VaultService {
 
         let currentCategory = vault.categories.first { $0.items.contains(where: { $0.id == item.id }) }
         let targetCategory = getCategory(newCategory) ?? Category(name: newCategory.title)
+
+        if currentCategory?.name != targetCategory.name {
+            currentCategory?.items.removeAll { $0.id == item.id }
+
+            if !vault.categories.contains(where: { $0.name == targetCategory.name }) {
+                vault.categories.append(targetCategory)
+            }
+            targetCategory.items.append(item)
+        }
+
+        saveContext()
+        updateActiveCartsContainingItem(itemId: item.id)
+        return true
+    }
+
+    /// Updates an item’s name/category using a category name (supports custom categories).
+    func updateItem(
+        item: Item,
+        newName: String,
+        newCategoryName: String,
+        newStore: String,
+        newPrice: Double,
+        newUnit: String
+    ) -> Bool {
+        guard let vault = vault else { return false }
+
+        let validation = validateItemName(newName, store: newStore, excluding: item.id)
+        guard validation.isValid else {
+            print("❌ Cannot update item: \(validation.errorMessage ?? "Unknown error")")
+            return false
+        }
+
+        item.name = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if let existingPriceOption = item.priceOptions.first {
+            existingPriceOption.store = newStore
+            existingPriceOption.pricePerUnit = PricePerUnit(priceValue: newPrice, unit: newUnit)
+        } else {
+            let newPriceOption = PriceOption(
+                store: newStore,
+                pricePerUnit: PricePerUnit(priceValue: newPrice, unit: newUnit)
+            )
+            item.priceOptions = [newPriceOption]
+        }
+
+        let currentCategory = vault.categories.first { $0.items.contains(where: { $0.id == item.id }) }
+        let trimmedCategory = newCategoryName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let targetCategory = getCategory(named: trimmedCategory) ?? Category(name: trimmedCategory)
 
         if currentCategory?.name != targetCategory.name {
             currentCategory?.items.removeAll { $0.id == item.id }
