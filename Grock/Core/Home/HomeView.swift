@@ -45,7 +45,6 @@ struct HomeView: View {
     @State private var cartToRename: Cart? = nil
     @State private var cartToDelete: Cart? = nil
     @State private var showingDeleteAlert = false
-    @State private var showProWelcomeSheet = false
     
     // Backup & Restore
     @State private var showingRestoreAlert = false
@@ -56,7 +55,6 @@ struct HomeView: View {
     
     // Name entry sheet state
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding: Bool = false
-    @AppStorage("hasSeenProWelcome") private var hasSeenProWelcome: Bool = false
     
     init(viewModel: HomeViewModel) {
         self._viewModel = State(initialValue: viewModel)
@@ -121,9 +119,6 @@ struct HomeView: View {
                         .environment(cartViewModel)
                 }
             }
-            .sheet(isPresented: $showProWelcomeSheet) {
-                ProWelcomeSheet(isPresented: $showProWelcomeSheet)
-            }
             .customPopover(isPresented: $showCreateCartPopover) {
                 CreateCartPopover(
                     onConfirm: { title, budget in
@@ -178,9 +173,12 @@ struct HomeView: View {
             }
             .onChange(of: viewModel.showVault) { oldValue, newValue in
                 if !newValue {
-                    viewModel.transferPendingCart()
+                    // For vault cart creation, onCreateCartFromVault handles transfer timing
+                    // after data refresh. Avoid triggering an early transfer here.
+                    if viewModel.pendingSelectedCart != nil && viewModel.pendingCartToShow == nil {
+                        viewModel.transferPendingCart()
+                    }
                     scheduleVaultButtonAnimation()
-                    checkForProWelcome()
                 } else {
                     cancelVaultButtonAnimation()
                 }
@@ -206,7 +204,6 @@ struct HomeView: View {
                                 viewModel.completePendingCartDisplay()
                             }
                             scheduleVaultButtonAnimation()
-                            checkForProWelcome()
                         }
                 } else {
                     Color.clear
@@ -214,15 +211,9 @@ struct HomeView: View {
             }
             .onAppear {
                 scheduleVaultButtonAnimation()
-                checkForProWelcome()
             }
             .onChange(of: hasCompletedOnboarding) { _, _ in
                 scheduleVaultButtonAnimation()
-            }
-            .onChange(of: hasSeenProWelcome) { _, newValue in
-                if newValue {
-                    scheduleVaultButtonAnimation()
-                }
             }
         }
     }
@@ -743,27 +734,6 @@ struct HomeView: View {
         }
     }
     
-    // MARK: - Pro Welcome Logic
-    private func checkForProWelcome() {
-        // Conditions:
-        // 1. Not seen yet
-        guard !UserDefaults.standard.hasSeenProWelcome else { return }
-        
-        // 2. Has completed onboarding
-        guard hasCompletedOnboarding else { return }
-        
-        // 3. Has entered name (Vault celebration finished)
-        // Use SwiftData as source of truth for name
-        guard let name = vaultService.currentUser?.name, 
-              !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-        
-        // 4. We are on HomeView (Vault dismissed, Cart Detail dismissed)
-        if !viewModel.showVault && viewModel.selectedCart == nil && viewModel.pendingSelectedCart == nil {
-            print("🎁 Showing Pro Welcome Sheet")
-            showProWelcomeSheet = true
-        }
-    }
-
     // MARK: - Vault Button Animation Logic
     private func scheduleVaultButtonAnimation() {
         print("DEBUG: Checking vault animation conditions")
@@ -772,17 +742,14 @@ struct HomeView: View {
         print("DEBUG: selectedCart: \(String(describing: viewModel.selectedCart))")
         print("DEBUG: hasCompletedOnboarding: \(hasCompletedOnboarding)")
         print("DEBUG: currentUserName: \(vaultService.currentUser?.name ?? "nil")")
-        print("DEBUG: hasSeenProWelcome: \(hasSeenProWelcome)")
 
         // Only schedule if we haven't shown it, vault is closed, and no cart is selected
         // AND user has completed onboarding and entered their name
-        // AND user has seen the Pro Welcome sheet
         guard !hasShownVaultAnimation,
               !viewModel.showVault,
               viewModel.selectedCart == nil,
               hasCompletedOnboarding,
-              let name = vaultService.currentUser?.name, !name.isEmpty,
-              hasSeenProWelcome else {
+              let name = vaultService.currentUser?.name, !name.isEmpty else {
             print("DEBUG: Conditions not met for vault animation")
             return 
         }

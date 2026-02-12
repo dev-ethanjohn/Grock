@@ -61,8 +61,8 @@ class CartViewModel {
         }
     }
     
-    func createCartWithActiveItems(name: String, budget: Double) -> Cart? {
-        print("🛒 CartViewModel: Creating cart with \(activeCartItems.count) active items")
+    func createCartWithActiveItems(name: String, budget: Double, notifyChanges: Bool = true) -> Cart? {
+        print("🛒 CartViewModel: Creating cart with \(activeCartItems.count) active items (notifyChanges: \(notifyChanges))")
         
         let newCart = vaultService.createCartWithActiveItems(
             name: name,
@@ -73,21 +73,27 @@ class CartViewModel {
         print("🛒 CartViewModel: Cart created by VaultService - ID: \(newCart.id), Name: \(newCart.name)")
         print("🛒 CartViewModel: Cart items count: \(newCart.cartItems.count)")
 
-        loadCarts()
-        
-        if let foundCart = carts.first(where: { $0.id == newCart.id }) {
-            print("✅ CartViewModel: Cart found in carts list - setting as current")
-            self.currentCart = foundCart
+        if notifyChanges {
+            loadCarts()
+            
+            if let foundCart = carts.first(where: { $0.id == newCart.id }) {
+                print("✅ CartViewModel: Cart found in carts list - setting as current")
+                self.currentCart = foundCart
+            } else {
+                print("⚠️ CartViewModel: Cart not found in carts list, using newly created one")
+                self.currentCart = newCart
+                self.carts.append(newCart)
+            }
+            
+            self.activeCartItems.removeAll()
+            
+            print("✅ CartViewModel: Cart creation complete - returning cart")
+            return currentCart
         } else {
-            print("⚠️ CartViewModel: Cart not found in carts list, using newly created one")
-            self.currentCart = newCart
-            self.carts.append(newCart)
+            // Return the raw cart without updating view model state
+            // This prevents UI glitches during dismissal transitions
+            return newCart
         }
-        
-        self.activeCartItems.removeAll()
-        
-        print("✅ CartViewModel: Cart creation complete - returning cart")
-        return currentCart
     }
     
     func completeCart(_ cart: Cart) {

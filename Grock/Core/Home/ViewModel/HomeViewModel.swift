@@ -162,36 +162,52 @@ final class HomeViewModel {
         print("   Created cart: \(createdCart.name), ID: \(createdCart.id)")
         print("   Cart items: \(createdCart.cartItems.count)")
         
-        // Refresh to include the new cart
-        cartViewModel.loadCarts()
+        // 1. Set pending cart IMMEDIATELY
+        self.pendingSelectedCart = createdCart
         
-        print("🔄 HomeViewModel: After loadCarts - available carts: \(cartViewModel.carts.count)")
+        // Hide every newly created cart row until its detail screen is dismissed.
+        self.hiddenCartIds.insert(createdCart.id)
+        self.pendingCartToShow = createdCart
         
-        // Store the pending cart immediately
-        if let exactCart = cartViewModel.carts.first(where: { $0.id == createdCart.id }) {
-            print("🎯 HomeViewModel: Found exact cart in list - Setting as pending")
-            self.pendingSelectedCart = exactCart
-        } else {
-            print("⚠️ HomeViewModel: Cart not found in list, queuing created cart")
-            self.pendingSelectedCart = createdCart
-        }
-        
+        // 2. Dismiss Vault FIRST
         showVault = false
         
-        print("✅ HomeViewModel: Vault closed, cart is pending and detail screen will open")
+        // 3. Delay data updates to protect the animation
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
+            guard let self = self else { return }
+            
+            print("🔄 HomeViewModel: Refreshing data after Vault dismissal")
+            
+            // Now safe to update data
+            self.cartViewModel.loadCarts()
+            self.cartViewModel.clearActiveItems()
+            
+            // 4. Row stays hidden while transitioning into detail.
+            // It will be revealed from HomeView after detail dismissal.
+            if let exactCart = self.cartViewModel.carts.first(where: { $0.id == createdCart.id }) {
+                self.pendingSelectedCart = exactCart
+            } else {
+                self.pendingSelectedCart = createdCart
+            }
+            
+            print("🔄 HomeViewModel: After loadCarts - available carts: \(self.cartViewModel.carts.count)")
+            
+            // 5. Trigger Navigation
+            // This sets selectedCart = createdCart, which triggers .navigationDestination in HomeView
+            self.transferPendingCart(immediate: true)
+            
+            print("✅ HomeViewModel: Delayed setup complete")
+        }
     }
     
-    func transferPendingCart() {
+    func transferPendingCart(immediate: Bool = false) {
         if let pending = pendingSelectedCart {
-            print("✅ Transferring pending to selectedCart: \(pending.name)")
-            
-            // 🎯 Also hide this cart when transferring from pending
-            hiddenCartIds.insert(pending.id)
-            pendingCartToShow = pending
+            print("✅ Transferring pending to selectedCart: \(pending.name) (immediate: \(immediate))")
             
             // Delay selection to allow Vault sheet to dismiss completely
             // This prevents "abrupt" transitions and navigation conflicts
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            let delay = immediate ? 0.05 : 0.5
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
                 withAnimation {
                     self?.selectedCart = pending
                     self?.pendingSelectedCart = nil
@@ -239,7 +255,6 @@ final class HomeViewModel {
         UserDefaults.standard.userName = nil
         UserDefaults.standard.hasPromptedForNameAfterOnboarding = false
         UserDefaults.standard.hasPromptedForNameAfterVaultCelebration = false
-        UserDefaults.standard.hasSeenProWelcome = false
         
         // Reset vault animation flag
         UserDefaults.standard.set(false, forKey: "hasShownVaultAnimation")
@@ -258,7 +273,6 @@ final class HomeViewModel {
         print("   - userName: cleared")
         print("   - hasPromptedForNameAfterOnboarding: false")
         print("   - hasPromptedForNameAfterVaultCelebration: false")
-        print("   - hasSeenProWelcome: false")
     }
     
     // MARK: - UI Helpers

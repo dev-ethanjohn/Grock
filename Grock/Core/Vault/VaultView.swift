@@ -1119,11 +1119,16 @@ extension View {
                 pendingCartConfirmation.wrappedValue = nil
 
                 print("🛒 Creating cart...")
-                if let newCart = cartViewModel.createCartWithActiveItems(name: pending.title, budget: pending.budget) {
-                    print("✅ Cart created: \(newCart.name)")
-                    onCreateCart?(newCart)
-                } else {
-                    print("❌ Failed to create cart")
+                
+                // Add delay to ensure popover dismissal animation completes
+                // and prevents premature VaultView state reset/dismissal
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                    if let newCart = cartViewModel.createCartWithActiveItems(name: pending.title, budget: pending.budget, notifyChanges: false) {
+                        print("✅ Cart created: \(newCart.name)")
+                        onCreateCart?(newCart)
+                    } else {
+                        print("❌ Failed to create cart")
+                    }
                 }
             }) {
                 CartConfirmationPopover(

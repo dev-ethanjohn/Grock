@@ -60,9 +60,6 @@ struct ActiveCarts: View {
                                     .navigationTransition(.zoom(sourceID: cart.id, in: cartNamespace))
                                     .onDisappear {
                                         viewModel.loadCarts()
-                                        if viewModel.pendingCartToShow != nil {
-                                            viewModel.completePendingCartDisplay()
-                                        }
                                     }
                             } label: {
                                 HomeCartRowView(
