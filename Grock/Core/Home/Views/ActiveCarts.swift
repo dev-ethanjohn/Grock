@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import Lottie
 
 struct ActiveCarts: View {
     @Environment(VaultService.self) private var vaultService
@@ -139,25 +140,54 @@ struct ActiveCarts: View {
     }
     
     private var emptyStateView: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 16) {
             Spacer()
             
-            Image(systemName: "cart")
-                .lexendFont(60)
-                .foregroundColor(.gray.opacity(0.6))
+            LottieView(animation: .named("Empty"))
+                .playing(.fromProgress(0, toProgress: 1, loopMode: .loop))
+                .allowsHitTesting(false)
+                .frame(width: 180, height: 180)
             
-            Text("No carts yet!")
-                .lexend(.title2)
-                .foregroundColor(.gray)
-            
-            Text("Create your first cart to start shopping")
-                .lexend(.body)
-                .foregroundColor(.gray.opacity(0.8))
+            Text("Let's plan your shopping!")
+                .fuzzyBubblesFont(24, weight: .bold)
+                .foregroundColor(.black.opacity(0.8))
                 .multilineTextAlignment(.center)
+            
+            emptyStateDescriptionText
+                .multilineTextAlignment(.center)
+                .lineSpacing(2)
+                .padding(.horizontal, 28)
             
             Spacer()
         }
         .padding(.vertical, 40)
+    }
+    
+    private var emptyStateDescriptionText: Text {
+        let bodyColor = Color.gray.opacity(0.9)
+        let accentColor = Color.black.opacity(0.6)
+        
+        let start = Text("Tap \"")
+            .lexend(.subheadline, weight: .light)
+            .foregroundColor(bodyColor)
+        
+        let createCart = Text("Create Cart")
+            .lexend(.subheadline, weight: .medium)
+            .foregroundColor(accentColor)
+        
+        let middle = Text("\" to start fresh, or open the ")
+            .lexend(.subheadline, weight: .light)
+            .foregroundColor(bodyColor)
+        
+        let vault = Text("Vault")
+            .lexend(.subheadline, weight: .medium)
+            .foregroundColor(accentColor)
+        
+        let end = Text(" to build a cart from saved items.")
+            .lexend(.subheadline, weight: .light)
+            .foregroundColor(bodyColor)
+        
+        return start + createCart + middle + vault + end
     }
 }
 
