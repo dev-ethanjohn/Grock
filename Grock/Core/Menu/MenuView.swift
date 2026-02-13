@@ -1,4 +1,5 @@
 import SwiftUI
+import UserJot
 
 struct MenuView: View {
     @Environment(VaultService.self) private var vaultService
@@ -215,7 +216,7 @@ struct MenuView: View {
     private var stickyHeader: some View {
         VStack(spacing: 0) {
             HStack(alignment: .bottom) {
-                HStack {
+                HStack(spacing: 4) {
                     Image("grock_logo")
                         .resizable()
                         .scaledToFill()
@@ -289,7 +290,7 @@ struct MenuView: View {
                 .padding(.top, 4)
                 .padding(.bottom, 8)
             
-            Button(action: {}) {
+            Button(action: handleFeedbackTapped) {
                 feedbackRow(title: "Give Feedback", icon: "💬")
             }
             .buttonStyle(.plain)
@@ -504,6 +505,10 @@ struct MenuView: View {
                 showMailUnavailableAlert = true
             }
         }
+    }
+    
+    private func handleFeedbackTapped() {
+        UserJot.showFeedback()
     }
 }
 

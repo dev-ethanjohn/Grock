@@ -2,6 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>USERJOT_PROJECT_ID</key>
+	<string>cmljqz2ug06j50hn6yp7jgdzw</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>FuzzyBubbles-Regular.ttf</string>

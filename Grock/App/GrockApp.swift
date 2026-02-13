@@ -82,6 +82,7 @@
 
 import SwiftUI
 import SwiftData
+import UserJot
 
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
@@ -128,6 +129,7 @@ struct ContentView: View {
 @main
 struct GrockApp: App {
     let container: ModelContainer
+    private static let userJotProjectIdKey = "USERJOT_PROJECT_ID"
     
 //    init() {
 //        do {
@@ -177,6 +179,7 @@ struct GrockApp: App {
             
             container = try ModelContainer(for: schema, configurations: config)
             print("✅ Loaded persistent database (data preserved)")
+            configureUserJot()
         } catch {
             fatalError("Could not create ModelContainer: \(error)")
         }
@@ -188,6 +191,22 @@ struct GrockApp: App {
             ContentViewWrapper()
         }
         .modelContainer(container)
+    }
+    
+    private func configureUserJot() {
+        guard let rawProjectId = Bundle.main.object(forInfoDictionaryKey: Self.userJotProjectIdKey) as? String else {
+            print("⚠️ USERJOT_PROJECT_ID is missing in Info.plist")
+            return
+        }
+        
+        let projectId = rawProjectId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !projectId.isEmpty, projectId != "YOUR_PROJECT_ID" else {
+            print("⚠️ USERJOT_PROJECT_ID is not configured. Set it in Info.plist.")
+            return
+        }
+        
+        UserJot.setup(projectId: projectId)
+        print("✅ UserJot setup complete")
     }
 }
 
