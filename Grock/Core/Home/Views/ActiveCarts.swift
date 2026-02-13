@@ -21,6 +21,7 @@ struct ActiveCarts: View {
     let onDeleteCart: (Cart) -> Void
     let onRenameCart: (Cart) -> Void
     let cartNamespace: Namespace.ID
+    let bottomBlurOffsetY: CGFloat
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -136,7 +137,7 @@ struct ActiveCarts: View {
             .scrollTargetLayout()
         }
         .scrollIndicators(.hidden)
-        .blurScroll()
+        .blurScroll(bottomOffsetY: bottomBlurOffsetY)
     }
     
     private var emptyStateView: some View {

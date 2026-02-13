@@ -65,7 +65,7 @@ struct HomeView: View {
     var body: some View {
         NavigationStack(path: $cartPath) {
             ZStack(alignment: .top) {
-                Color(hex: "#e0e0e0").ignoresSafeArea()
+                Color(hex: "#ffffff").ignoresSafeArea()
                 
                 MenuView()
                     .opacity(viewModel.showMenu ? 1 : 0)
@@ -287,7 +287,8 @@ struct HomeView: View {
                 onRenameCart: { cart in
                     cartToRename = cart
                 },
-                cartNamespace: cartNamespace
+                cartNamespace: cartNamespace,
+                bottomBlurOffsetY: viewModel.showMenu ? safeAreaBottomPadding : 0
             )
             .environment(cartStateManager)
             ZStack(alignment: .topLeading) {

@@ -47,11 +47,16 @@ struct TrashView: View {
     var body: some View {
         List {
             if deletedItems.isEmpty && deletedCarts.isEmpty {
-                ContentUnavailableView(
-                    "Trash is empty",
-                    systemImage: "trash",
-                    description: Text("Deleted items will appear here.")
-                )
+                ContentUnavailableView {
+                    Label {
+                        Text("Trash is empty")
+                            .fuzzyBubblesFont(28, weight: .bold)
+                    } icon: {
+                        Image(systemName: "trash")
+                    }
+                } description: {
+                    Text("Deleted items will appear here.")
+                }
             } else {
                 if !deletedCarts.isEmpty {
                     Section("Trips") {

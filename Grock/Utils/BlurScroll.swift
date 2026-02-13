@@ -8,6 +8,7 @@ struct BlurScrollOffsetPreferenceKey: PreferenceKey {
 struct BlurScroll: ViewModifier {
     let blur: CGFloat
     let bottomBlurScale: CGFloat
+    let bottomBlurOffsetY: CGFloat
     let coordinateSpaceName = "scroll"
     
     // NOTE: Removed preferenceKey tracking to prevent stuttering
@@ -38,6 +39,7 @@ struct BlurScroll: ViewModifier {
                         )
                     )
                     .frame(height: proxy.size.height * 0.15 * bottomBlurScale)
+                    .offset(y: bottomBlurOffsetY)
                     .allowsHitTesting(false) // Let touches pass through to scroll
             }
         }
@@ -46,7 +48,17 @@ struct BlurScroll: ViewModifier {
 }
 
 extension View {
-    func blurScroll(blur: CGFloat = 8, scale: CGFloat = 1.0) -> some View {
-        modifier(BlurScroll(blur: blur, bottomBlurScale: scale))
+    func blurScroll(
+        blur: CGFloat = 8,
+        scale: CGFloat = 1.0,
+        bottomOffsetY: CGFloat = 0
+    ) -> some View {
+        modifier(
+            BlurScroll(
+                blur: blur,
+                bottomBlurScale: scale,
+                bottomBlurOffsetY: bottomOffsetY
+            )
+        )
     }
 }
