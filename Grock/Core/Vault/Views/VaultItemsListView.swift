@@ -48,6 +48,8 @@ struct VaultItemsListView: View {
         }
         .listStyle(PlainListStyle())
         .listSectionSpacing(16)
+        .listSectionSeparator(.hidden, edges: .all)
+        .listRowSeparatorTint(.clear)
         .safeAreaInset(edge: .bottom) {
             if !availableStores.isEmpty {
                 Color.clear.frame(height: 20)
@@ -118,13 +120,6 @@ struct StoreSection: View {
                             Label("Remove from Vault", systemImage: "trash")
                         }
                     }
-                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                        Button(role: .destructive) {
-                            onDeleteItem?(tuple.item)
-                        } label: {
-                            Label("Remove", systemImage: "trash")
-                        }
-                    }
                     
                     if tuple.id != itemsWithStableIdentifiers.last?.id {
                         DashedLine()
@@ -135,8 +130,18 @@ struct StoreSection: View {
                             .padding(.leading, 14)
                     }
                 }
+                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                    Button {
+                        onDeleteItem?(tuple.item)
+                    } label: {
+                        Label("Remove", systemImage: "trash")
+                    }
+                    .tint(.red)
+                }
                 .listRowInsets(EdgeInsets())
-                .listRowSeparator(.hidden)
+                .listRowSeparator(.hidden, edges: .all)
+                .listRowSeparatorTint(.clear, edges: .all)
+                .listRowBackground(Color.clear)
                 .transition(.asymmetric(
                     insertion: .move(edge: .top)
                         .combined(with: .opacity)
@@ -147,5 +152,6 @@ struct StoreSection: View {
                 .animation(.spring(response: 0.4, dampingFraction: 0.75), value: itemsWithStableIdentifiers.map { $0.id })
             }
         }
+        .listSectionSeparator(.hidden, edges: .all)
     }
 }

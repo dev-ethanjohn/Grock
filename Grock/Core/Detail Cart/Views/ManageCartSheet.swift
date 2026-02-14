@@ -1095,6 +1095,8 @@ struct ManageCartItemsListView: View {
         }
         .listStyle(PlainListStyle())
         .listSectionSpacing(16)
+        .listSectionSeparator(.hidden, edges: .all)
+        .listRowSeparatorTint(.clear)
         .onAppear {
             previousStores = availableStores
         }
@@ -1184,8 +1186,18 @@ struct ManageCartStoreSection: View {
                             .padding(.leading, 14)
                     }
                 }
+                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                    Button {
+                        onDeleteVaultItem(tuple.item)
+                    } label: {
+                        Label("Vault", systemImage: "trash.slash")
+                    }
+                    .tint(.red)
+                }
                 .listRowInsets(EdgeInsets())
-                .listRowSeparator(.hidden)
+                .listRowSeparator(.hidden, edges: .all)
+                .listRowSeparatorTint(.clear, edges: .all)
+                .listRowBackground(Color.clear)
                 .transition(.asymmetric(
                     insertion: .move(edge: .top)
                         .combined(with: .opacity)
@@ -1196,6 +1208,7 @@ struct ManageCartStoreSection: View {
                 .animation(.spring(response: 0.4, dampingFraction: 0.75), value: itemsWithStableIdentifiers.map { $0.id })
             }
         }
+        .listSectionSeparator(.hidden, edges: .all)
     }
 }
 
@@ -1313,14 +1326,6 @@ struct ManageCartItemRow: View {
             } label: {
                 Label("Edit", systemImage: "pencil")
             }
-        }
-        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-            Button(role: .destructive) {
-                onDeleteVaultItem(item)
-            } label: {
-                Label("Vault", systemImage: "trash.slash")
-            }
-            .tint(.red)
         }
         .onChange(of: currentQuantity) { _, newValue in
             if !isFocused {
