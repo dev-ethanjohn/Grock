@@ -41,6 +41,8 @@ struct HomeView: View {
     
     @State private var cartRefreshTrigger = UUID()
     
+    @State private var isEditingName = false
+    
     // ADD THESE STATE VARIABLES for rename cart
     @State private var cartToRename: Cart? = nil
     @State private var cartToDelete: Cart? = nil
@@ -67,7 +69,7 @@ struct HomeView: View {
             ZStack(alignment: .top) {
                 Color(hex: "#ffffff").ignoresSafeArea()
                 
-                MenuView()
+                MenuView(isEditingName: $isEditingName)
                     .opacity(viewModel.showMenu ? 1 : 0)
                     .offset(x: viewModel.showMenu ? 0 : -300)
                     .rotation3DEffect(
@@ -83,7 +85,7 @@ struct HomeView: View {
                 
                 // Rename cart popover overlay (using if conditional)
                 if let cartToRename = cartToRename {
-                    RenameCartNamePopover(
+                    RenamePopover(
                         isPresented: Binding(
                             get: { self.cartToRename != nil },
                             set: { if !$0 { self.cartToRename = nil } }
@@ -100,6 +102,20 @@ struct HomeView: View {
                     )
                     .environment(vaultService)
                     .zIndex(1000) // Ensure it's on top
+                }
+                
+                if isEditingName {
+                    RenamePopover(
+                        isPresented: $isEditingName,
+                        title: "Rename Your Name",
+                        currentName: vaultService.currentUser?.name ?? "",
+                        onSave: { newName in
+                            vaultService.updateUserName(newName)
+                        },
+                        onDismiss: nil
+                    )
+                    .environment(vaultService)
+                    .zIndex(1001)
                 }
             }
             .clipShape(RoundedRectangle(cornerRadius: 24))

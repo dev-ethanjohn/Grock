@@ -79,6 +79,7 @@ struct CartDetailScreen: View {
             popoverOverlays
         }
         .environment(stateManager)
+        .environment(\.cartStateManager, stateManager)
         .environment(alertManager)
         .modifier(CartDetailAllModifiers(
             cart: cart,
@@ -193,7 +194,7 @@ struct CartDetailScreen: View {
             
             // Edit cart name popover
             if stateManager.showingEditCartName {
-                RenameCartNamePopover(
+                RenamePopover(
                     isPresented: Binding(
                         get: { stateManager.showingEditCartName },
                         set: { stateManager.showingEditCartName = $0 }
@@ -225,6 +226,35 @@ struct CartDetailScreen: View {
                 )
                 .transition(.scale)
                 .zIndex(1001)
+            }
+            
+            // Trip completion celebration (must stay above all other popovers/sheets in this ZStack)
+            if stateManager.showTripCompletionCelebration {
+                TripCompletionCelebrationOverlay(
+                    isPresented: Binding(
+                        get: { stateManager.showTripCompletionCelebration },
+                        set: { stateManager.showTripCompletionCelebration = $0 }
+                    ),
+                    message: stateManager.tripCompletionMessage,
+                    autoDismissAfter: 2.0,
+                    onDismiss: {
+                        stateManager.showingShoppingPopover = false
+                        stateManager.showingFulfillPopover = false
+                        stateManager.showingEditCartName = false
+                        stateManager.showingEditBudget = false
+                        stateManager.showingCartSheet = false
+                        stateManager.showingFilterSheet = false
+                        stateManager.showingCompletedSheet = false
+                        
+                        NotificationCenter.default.post(
+                            name: NSNotification.Name("ShowInsightsAfterTrip"),
+                            object: nil,
+                            userInfo: ["cartId": cart.id]
+                        )
+                    }
+                )
+                .transition(.opacity.combined(with: .scale))
+                .zIndex(2002)
             }
         }
     }
@@ -989,28 +1019,6 @@ struct CartDetailContent: View {
                 .zIndex(1001)
             }
             
-            if stateManager.showTripCompletionCelebration {
-                TripCompletionCelebrationOverlay(
-                    isPresented: Binding(
-                        get: { stateManager.showTripCompletionCelebration },
-                        set: { stateManager.showTripCompletionCelebration = $0 }
-                    ),
-                    message: stateManager.tripCompletionMessage,
-                    autoDismissAfter: 3.0,
-                    onDismiss: {
-                        dismiss()
-                        DispatchQueue.main.async {
-                            NotificationCenter.default.post(
-                                name: NSNotification.Name("ShowInsightsAfterTrip"),
-                                object: nil,
-                                userInfo: ["cartId": cart.id]
-                            )
-                        }
-                    }
-                )
-                .transition(.opacity.combined(with: .scale))
-                .zIndex(1002)
-            }
         }
         .ignoresSafeArea(.keyboard)
         .onChange(of: cart.budget) { oldValue, newValue in
@@ -1038,6 +1046,7 @@ struct CartDetailContent: View {
     // MARK: - Event Handlers
     private func handleCartStatusChange(oldValue: CartStatus, newValue: CartStatus) {
         if oldValue != .completed && newValue == .completed {
+            // Dismiss finish sheet immediately so the celebration overlay can play.
             showingCompleteAlert = false
             stateManager.tripCompletionMessage = makeTripCompletionMessage()
             stateManager.showTripCompletionCelebration = true

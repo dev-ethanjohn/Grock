@@ -15,6 +15,7 @@ struct BrowseVaultView: View {
     @Binding var hasUnsavedChanges: Bool
     
     @Environment(VaultService.self) private var vaultService
+    @Environment(\.cartStateManager) private var stateManager
     @State private var searchText = ""
     
     @State private var debouncedSearchText = ""
@@ -68,6 +69,7 @@ struct BrowseVaultView: View {
                     itemsByStore: cachedStoreGroups,
                     availableStores: availableStores,
                     showEndIndicator: showEndIndicator,
+                    hasBackgroundImage: stateManager.hasBackgroundImage,
                     cart: cart,
                     onItemSelected: { item in
                         onItemSelected(item)
@@ -325,6 +327,7 @@ private struct StoreItemsListView: View {
     let itemsByStore: [BrowseVaultView.StoreGroup]
     let availableStores: [String]
     let showEndIndicator: Bool
+    let hasBackgroundImage: Bool
     let cart: Cart
     let onItemSelected: (Item) -> Void
     let onQuantityChange: (() -> Void)?  // This is already here
@@ -336,6 +339,7 @@ private struct StoreItemsListView: View {
                     BrowseVaultStoreSection(
                         storeName: store,
                         items: storeGroup.items,
+                        hasBackgroundImage: hasBackgroundImage,
                         cart: cart,
                         onItemSelected: onItemSelected,
                         onQuantityChange: onQuantityChange,  // PASS IT HERE

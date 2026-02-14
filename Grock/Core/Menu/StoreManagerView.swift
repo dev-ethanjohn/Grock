@@ -3,58 +3,70 @@ import SwiftData
 
 struct StoreManagerView: View {
     @Environment(VaultService.self) private var vaultService
-    @Environment(\.dismiss) private var dismiss
     
     @State private var stores: [String] = []
     @State private var showingAddStore = false
     @State private var newStoreName = ""
     
     @State private var storeToRename: String?
-    @State private var renameText = ""
-    @State private var showingRenameAlert = false
     
     var body: some View {
-        List {
-            if stores.isEmpty {
-                ContentUnavailableView("No Stores", systemImage: "storefront", description: Text("Add a store to get started."))
-            } else {
-                ForEach(stores, id: \.self) { store in
-                    HStack {
-                        Image(systemName: "storefront")
-                            .foregroundColor(.gray)
-                        Text(store)
-                            .lexend(.body)
-                        Spacer()
-                    }
-                    .contentShape(Rectangle())
-                    .contextMenu {
-                        Button {
-                            prepareRename(store)
-                        } label: {
-                            Label("Rename", systemImage: "pencil")
+        ZStack {
+            List {
+                if stores.isEmpty {
+                    ContentUnavailableView("No Stores", systemImage: "storefront", description: Text("Add a store to get started."))
+                } else {
+                    ForEach(stores, id: \.self) { store in
+                        HStack {
+                            HStack(spacing: 4) {
+                                Text(store)
+                                    .lexend(.body)
+                                Text("✏️")
+                                    .font(.footnote)
+                            }
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                prepareRename(store)
+                            }
+                            
+                            Spacer()
+                            
+                            Button(role: .destructive) {
+                                deleteStore(store)
+                            } label: {
+                                Text("🗑️")
+                                    .font(.footnote)
+                            }
+                            .buttonStyle(.plain)
+                            .padding(.leading, 8)
                         }
-                        
-                        Button(role: .destructive) {
-                            deleteStore(store)
-                        } label: {
-                            Label("Delete", systemImage: "trash")
-                        }
-                    }
-                    .swipeActions(edge: .trailing) {
-                        Button(role: .destructive) {
-                            deleteStore(store)
-                        } label: {
-                            Label("Delete", systemImage: "trash")
-                        }
-                        
-                        Button {
-                            prepareRename(store)
-                        } label: {
-                            Label("Rename", systemImage: "pencil")
-                        }
-                        .tint(.orange)
+                        .contentShape(Rectangle())
                     }
                 }
+            }
+            
+            if let storeToRename {
+                RenamePopover(
+                    isPresented: Binding(
+                        get: { self.storeToRename != nil },
+                        set: { if !$0 { self.storeToRename = nil } }
+                    ),
+                    title: "Rename Store Name",
+                    placeholder: "Enter store name...",
+                    saveButtonTitle: "Update Store",
+                    useLexendInputFont: true,
+                    currentName: storeToRename,
+                    onSave: { newName in
+                        vaultService.renameStore(oldName: storeToRename, newName: newName)
+                        loadStores()
+                        self.storeToRename = nil
+                    },
+                    onDismiss: {
+                        self.storeToRename = nil
+                    }
+                )
+                .environment(vaultService)
+                .zIndex(2000)
             }
         }
         .navigationTitle("Manage Stores")
@@ -75,18 +87,6 @@ struct StoreManagerView: View {
                 showingAddStore = false
             }
         }
-        .alert("Rename Store", isPresented: $showingRenameAlert) {
-            TextField("Store Name", text: $renameText)
-            Button("Cancel", role: .cancel) { }
-            Button("Save") {
-                if let oldName = storeToRename {
-                    vaultService.renameStore(oldName: oldName, newName: renameText)
-                    loadStores()
-                }
-            }
-        } message: {
-            Text("Enter a new name for this store.")
-        }
         .onAppear {
             loadStores()
         }
@@ -94,8 +94,6 @@ struct StoreManagerView: View {
     
     private func prepareRename(_ store: String) {
         storeToRename = store
-        renameText = store
-        showingRenameAlert = true
     }
     
     private func loadStores() {

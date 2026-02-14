@@ -13,7 +13,7 @@ struct FinishSheetHeaderView: View {
                 .fuzzyBubblesFont(18, weight: .bold)
                 .foregroundColor(Color(hex: "231F30"))
                 .multilineTextAlignment(.center)
-                .padding(.horizontal, 44)
+                .padding(.horizontal, 40)
                 .padding(.top, 24)
                 .padding(.bottom, 12)
             
@@ -23,7 +23,6 @@ struct FinishSheetHeaderView: View {
                 fulfilledTotal: totalSpent
             )
             .padding(.top, 12)
-            .padding(.horizontal, 20)
             .padding(.bottom, 8)
         }
         .padding(.top, 20)
@@ -562,7 +561,7 @@ private struct HalfCircleTickRing: View, Animatable {
 #Preview("FinishSheetHeaderView") {
     let previewCart = Cart(name: "Preview Trip", budget: 200)
     return FinishSheetHeaderView(
-        headerSummaryText: "You set a $200 plan, and this trip stayed comfortably within it.",
+        headerSummaryText: "You have $120 left. You're at 40% of your $200 budget.",
         cart: previewCart,
         cartBudget: 200,
         cartTotal: 140,

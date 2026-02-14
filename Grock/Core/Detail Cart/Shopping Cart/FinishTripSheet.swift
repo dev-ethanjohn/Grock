@@ -111,15 +111,54 @@ struct FinishTripSheet: View {
     }
     
     private var headerSummaryText: String {
-        let symbol = CurrencyManager.shared.selectedCurrency.symbol
-        if cartBudget <= 0 {
-            return "Set a plan to make sense of this trip later."
+        guard cartBudget > 0 else {
+            return "No budget set yet. Add one to see how much is left or over."
         }
+        
+        let budgetText = cartBudget.formattedCurrency
+        let usagePercent = budgetUsagePercent
+        
+        if budgetDifference < -0.01 {
+            let leftAmount = abs(budgetDifference).formattedCurrency
+            let follow: String
+            let lead: String
+            
+            if usagePercent <= 25 {
+                lead = "You still have \(leftAmount) left."
+                follow = "Wow! You're at \(usagePercent)% of your \(budgetText) budget."
+            } else if usagePercent <= 60 {
+                lead = "You still have \(leftAmount) left."
+                follow = "Nice! You're at \(usagePercent)% of your \(budgetText) budget."
+            } else if usagePercent <= 85 {
+                lead = "You have \(leftAmount) left."
+                follow = "You're at \(usagePercent)% of your \(budgetText) budget."
+            } else {
+                lead = "You're close - \(leftAmount) left."
+                follow = "That puts you at \(usagePercent)% of your \(budgetText) budget."
+            }
+            
+            return "\(lead) \(follow)"
+        }
+        
         if budgetDifference > 0.01 {
-            return "You set a \(symbol)\(String(format: "%.0f", cartBudget)) plan, and this trip went a bit over."
-        } else {
-            return "You set a \(symbol)\(String(format: "%.0f", cartBudget)) plan, and this trip stayed comfortably within it."
+            let overAmount = abs(budgetDifference).formattedCurrency
+            let lead = usagePercent <= 115
+                ? "You're \(overAmount) over budget."
+                : "You've exceeded your budget by \(overAmount)."
+            let follow = usagePercent <= 130
+                ? "You're at \(usagePercent)% of your \(budgetText) budget."
+                : "Trip spend reached \(usagePercent)% of your \(budgetText) budget."
+            
+            return "\(lead) \(follow)"
         }
+        
+        return "You're right on budget. You're at 100% of your \(budgetText) budget."
+    }
+    
+    private var budgetUsagePercent: Int {
+        guard cartBudget > 0 else { return 0 }
+        let rawPercent = (totalSpent / cartBudget) * 100
+        return max(0, Int(rawPercent.rounded()))
     }
     
     private func categoryColor(for cartItem: CartItem) -> Color {
@@ -400,6 +439,7 @@ struct FinishTripSheet: View {
                     
                     CompletionActionsView(
                         onFinish: {
+                            dismiss()
                             mergeSelectedNewItemsToVault()
                             vaultService.completeShopping(cart: cart)
                         },

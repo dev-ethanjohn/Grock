@@ -15,7 +15,7 @@ struct TripCompletionCelebrationOverlay: View {
     var body: some View {
         ZStack {
             Color.black
-                .opacity(0.4 * overlayOpacity)
+                .opacity(0.52 * overlayOpacity)
                 .ignoresSafeArea()
 
             LottieView(animation: .named("Celebration"))

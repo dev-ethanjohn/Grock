@@ -1050,6 +1050,7 @@ struct ManageCartItemsListView: View {
     let onDeleteVaultItem: (Item) -> Void
     
     @Environment(VaultService.self) private var vaultService
+    @Environment(\.cartStateManager) private var stateManager
     @State private var focusedItemId: String?
     @State private var previousStores: [String] = []
     
@@ -1072,6 +1073,7 @@ struct ManageCartItemsListView: View {
                     items: itemsForStore(store),
                     categoryName: categoryName,
                     categoryColor: categoryColor,
+                    hasBackgroundImage: stateManager.hasBackgroundImage,
                     localActiveItems: $localActiveItems,
                     onDeleteVaultItem: { item in
                         itemToDelete = item
@@ -1126,6 +1128,7 @@ struct ManageCartStoreSection: View {
     let items: [Item]
     let categoryName: String
     let categoryColor: Color
+    let hasBackgroundImage: Bool
     @Binding var localActiveItems: [String: Double]
     let onDeleteVaultItem: (Item) -> Void
     
@@ -1133,16 +1136,30 @@ struct ManageCartStoreSection: View {
         items.map { ($0.id, $0) }
     }
     
+    private var headerForegroundColor: Color {
+        hasBackgroundImage ? .black : .white
+    }
+    
+    private var headerBackgroundColor: Color {
+        hasBackgroundImage ? .white : categoryColor.saturated(by: 0.3).darker(by: 0.5)
+    }
+    
     var body: some View {
         Section(
             header: HStack {
-                Text(storeName)
-                    .fuzzyBubblesFont(11, weight: .bold)
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(categoryColor.saturated(by: 0.3).darker(by: 0.5))
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                HStack(spacing: 2) {
+                    Image(systemName: "storefront")
+                        .lexendFont(10)
+                        .foregroundStyle(headerForegroundColor)
+                    
+                    Text(storeName)
+                        .fuzzyBubblesFont(11, weight: .bold)
+                        .foregroundStyle(headerForegroundColor)
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .background(headerBackgroundColor)
+                .clipShape(RoundedRectangle(cornerRadius: 6))
                 Spacer()
             }
             .padding(.leading)

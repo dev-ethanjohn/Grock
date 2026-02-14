@@ -1,13 +1,15 @@
 import SwiftUI
 import UserJot
+import WebKit
+import Darwin
 
 struct MenuView: View {
     @Environment(VaultService.self) private var vaultService
     @State private var currencyManager = CurrencyManager.shared
     @Environment(\.openURL) private var openURL
     
-    @State private var isEditingName = false
-    @State private var editingName = ""
+    @Binding var isEditingName: Bool
+    @State private var showingFeedbackSheet = false
     @State private var showMailUnavailableAlert = false
     private let stickyHeaderHeight: CGFloat = 156
     private let listHorizontalPadding: CGFloat = 12
@@ -87,6 +89,10 @@ struct MenuView: View {
     private let shareAppURL = URL(string: "https://grock.app")!
     private let shareAppMessage = "Check out Grock for tracking trips, items, and grocery budgets."
     
+    init(isEditingName: Binding<Bool> = .constant(false)) {
+        self._isEditingName = isEditingName
+    }
+    
     var body: some View {
         NavigationStack {
             ZStack(alignment: .topLeading) {
@@ -142,7 +148,7 @@ struct MenuView: View {
                             StoreManagerView()
                         } label: {
                             HStack(spacing: 8) {
-                                menuEmoji("🏬")
+                                menuEmoji("🏪")
                                 
                                 Text("Manage Stores")
                                     .lexendFont(16)
@@ -195,21 +201,15 @@ struct MenuView: View {
             .frame(width: 300, alignment: .leading)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .alert("Change Name", isPresented: $isEditingName) {
-            TextField("Name", text: $editingName)
-            Button("Cancel", role: .cancel) { }
-            Button("Save") {
-                if !editingName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    vaultService.updateUserName(editingName)
-                }
-            }
-        } message: {
-            Text("Enter your new username")
-        }
         .alert("Mail App Unavailable", isPresented: $showMailUnavailableAlert) {
             Button("OK", role: .cancel) { }
         } message: {
             Text("Please set up the Mail app to contact support.")
+        }
+        .sheet(isPresented: $showingFeedbackSheet) {
+            MenuUserJotFeedbackScreen()
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
         }
     }
     
@@ -239,8 +239,6 @@ struct MenuView: View {
                     .bold()
                 
                 Button {
-                    let name = vaultService.currentUser?.name ?? ""
-                    editingName = name
                     isEditingName = true
                 } label: {
                     Text("✏️")
@@ -482,7 +480,23 @@ struct MenuView: View {
         
         Name: \(userName)
         
-        I need help with:
+        What happened?
+        
+        
+        What did you expect?
+        
+        
+        Steps to reproduce:
+        1.
+        2.
+        3.
+        
+        Additional notes:
+        
+        
+        ---
+        Support Diagnostics (please keep)
+        \(supportDiagnosticsSummary())
         
         
         """
@@ -508,10 +522,182 @@ struct MenuView: View {
     }
     
     private func handleFeedbackTapped() {
-        UserJot.showFeedback()
+        showingFeedbackSheet = true
+    }
+    
+    private func supportDiagnosticsSummary() -> String {
+        let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown"
+        let buildNumber = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "Unknown"
+        
+        let deviceType = UIDevice.current.userInterfaceIdiom == .pad ? "iPad" : "iPhone"
+        let modelIdentifier = UIDevice.current.modelIdentifier
+        let osVersion = UIDevice.current.systemVersion
+        
+        let localeIdentifier = Locale.current.identifier
+        let timeZone = TimeZone.current
+        let timeZoneSummary: String
+        if let abbreviation = timeZone.abbreviation() {
+            timeZoneSummary = "\(timeZone.identifier) (\(abbreviation))"
+        } else {
+            timeZoneSummary = timeZone.identifier
+        }
+        
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        let timestamp = formatter.string(from: Date())
+        
+        return """
+        - App: Grock \(appVersion) (\(buildNumber))
+        - Device: \(deviceType) (\(modelIdentifier))
+        - OS: iOS \(osVersion)
+        - Locale: \(localeIdentifier)
+        - Time Zone: \(timeZoneSummary)
+        - Timestamp (UTC): \(timestamp)
+        """
+    }
+}
+
+private struct MenuUserJotFeedbackScreen: View {
+    @State private var feedbackURL: URL?
+    @State private var isLoading = true
+    @State private var pollingTask: Task<Void, Never>?
+    
+    var body: some View {
+        ZStack {
+            Color.white
+                .ignoresSafeArea()
+            
+            if let feedbackURL {
+                MenuUserJotWebView(url: feedbackURL, isLoading: $isLoading)
+                    .ignoresSafeArea()
+            }
+            
+            if feedbackURL == nil || isLoading {
+                Color.white.opacity(0.96)
+                    .ignoresSafeArea()
+                
+                ProgressView()
+                    .progressViewStyle(.circular)
+                    .tint(.black)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+            }
+        }
+        .onAppear {
+            resolveFeedbackURL()
+        }
+        .onDisappear {
+            pollingTask?.cancel()
+        }
+        .ignoresSafeArea()
+    }
+    
+    private func resolveFeedbackURL() {
+        if feedbackURL != nil {
+            return
+        }
+        
+        pollingTask?.cancel()
+        
+        if let url = UserJot.feedbackURL() {
+            feedbackURL = url
+            return
+        }
+        
+        pollingTask = Task {
+            while !Task.isCancelled {
+                if Task.isCancelled { return }
+                try? await Task.sleep(nanoseconds: 150_000_000)
+                
+                if let url = UserJot.feedbackURL() {
+                    await MainActor.run {
+                        feedbackURL = url
+                    }
+                    return
+                }
+            }
+        }
+    }
+}
+
+private struct MenuUserJotWebView: UIViewRepresentable {
+    let url: URL
+    @Binding var isLoading: Bool
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(isLoading: $isLoading)
+    }
+    
+    func makeUIView(context: Context) -> WKWebView {
+        let configuration = WKWebViewConfiguration()
+        configuration.allowsInlineMediaPlayback = true
+        
+        let webView = WKWebView(frame: .zero, configuration: configuration)
+        webView.navigationDelegate = context.coordinator
+        webView.scrollView.contentInsetAdjustmentBehavior = .never
+        
+        let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+        let deviceInfo = UIDevice.current.userInterfaceIdiom == .pad ? "iPad" : "iPhone"
+        let osVersion = UIDevice.current.systemVersion
+        webView.customUserAgent = "UserJotSDK/1.0 (\(deviceInfo); iOS \(osVersion); AppVersion/\(appVersion))"
+        
+        webView.isOpaque = false
+        webView.backgroundColor = .white
+        webView.scrollView.backgroundColor = .white
+        
+        return webView
+    }
+    
+    func updateUIView(_ uiView: WKWebView, context: Context) {
+        guard context.coordinator.loadedURL != url else { return }
+        
+        context.coordinator.loadedURL = url
+        uiView.load(URLRequest(url: url))
+    }
+    
+    final class Coordinator: NSObject, WKNavigationDelegate {
+        @Binding var isLoading: Bool
+        var loadedURL: URL?
+        
+        init(isLoading: Binding<Bool>) {
+            self._isLoading = isLoading
+        }
+        
+        func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+            setLoading(true)
+        }
+        
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            setLoading(false)
+        }
+        
+        func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+            setLoading(false)
+        }
+        
+        func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+            setLoading(false)
+        }
+        
+        private func setLoading(_ value: Bool) {
+            DispatchQueue.main.async {
+                self.isLoading = value
+            }
+        }
     }
 }
 
 #Preview {
     MenuView()
+}
+
+private extension UIDevice {
+    var modelIdentifier: String {
+        var systemInfo = utsname()
+        uname(&systemInfo)
+        return withUnsafePointer(to: &systemInfo.machine) { machinePtr in
+            machinePtr.withMemoryRebound(to: CChar.self, capacity: 1) { cStringPtr in
+                String(cString: cStringPtr)
+            }
+        }
+    }
 }

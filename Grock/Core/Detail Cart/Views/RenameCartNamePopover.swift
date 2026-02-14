@@ -1,8 +1,12 @@
 import SwiftUI
 import Lottie
 
-struct RenameCartNamePopover: View {
+struct RenamePopover: View {
     @Binding var isPresented: Bool
+    let title: String
+    let placeholder: String
+    let saveButtonTitle: String
+    let useLexendInputFont: Bool
     let currentName: String
     let onSave: (String) -> Void
     let onDismiss: (() -> Void)?
@@ -19,7 +23,25 @@ struct RenameCartNamePopover: View {
     @State private var isInvalidName = false
     @State private var errorMessage: String = ""
     
-    @Environment(VaultService.self) private var vaultService
+    init(
+        isPresented: Binding<Bool>,
+        title: String = "Rename Cart Name",
+        placeholder: String = "Enter new name...",
+        saveButtonTitle: String = "Update Name",
+        useLexendInputFont: Bool = false,
+        currentName: String,
+        onSave: @escaping (String) -> Void,
+        onDismiss: (() -> Void)?
+    ) {
+        self._isPresented = isPresented
+        self.title = title
+        self.placeholder = placeholder
+        self.saveButtonTitle = saveButtonTitle
+        self.useLexendInputFont = useLexendInputFont
+        self.currentName = currentName
+        self.onSave = onSave
+        self.onDismiss = onDismiss
+    }
     
     var body: some View {
         ZStack {
@@ -30,7 +52,7 @@ struct RenameCartNamePopover: View {
             VStack(spacing: 0) {
                 // Header
                 HStack(alignment: .center) {
-                    Text("Rename Cart Name")
+                    Text(title)
                         .fuzzyBubblesFont(16, weight: .bold)
                     
                     Image("edit")
@@ -48,15 +70,15 @@ struct RenameCartNamePopover: View {
                     ZStack(alignment: .leading) {
                         // Placeholder showing when field is empty
                         if cartName.isEmpty {
-                            Text("Enter new name...")
-                                .fuzzyBubblesFont(20, weight: .bold)
+                            Text(placeholder)
+                                .renameInputFont(useLexend: useLexendInputFont)
                                 .foregroundColor(Color(hex: "999"))
                         }
                         
                         TextField("", text: $cartName, onCommit: {
                             if isValidName { saveName() }
                         })
-                        .fuzzyBubblesFont(20, weight: .bold)
+                        .renameInputFont(useLexend: useLexendInputFont)
                         .foregroundColor(.black)
                         .autocorrectionDisabled(true)
                         .textInputAutocapitalization(.never)
@@ -137,7 +159,7 @@ struct RenameCartNamePopover: View {
                 // Action buttons
                 VStack(spacing: 6) {
                     FormCompletionButton(
-                        title: "Update Name",
+                        title: saveButtonTitle,
                         isEnabled: isValidName && !isInvalidName,
                         cornerRadius: 100,
                         verticalPadding: 12,
@@ -174,7 +196,7 @@ struct RenameCartNamePopover: View {
             .background(Color.white)
             .cornerRadius(24)
             .scaleEffect(contentScale)
-            .offset(y: keyboardVisible ? -UIScreen.main.bounds.height * 0.12 : 0)
+            .offset(y: keyboardVisible ? -min(UIScreen.main.bounds.height * 0.03, 24) : 0)
             .shadow(color: Color.black.opacity(0.15), radius: 20, x: 0, y: 10)
             .animation(.spring(response: 0.2, dampingFraction: 0.7, blendDuration: 0.1), value: isValidName)
             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: keyboardVisible)
@@ -279,7 +301,20 @@ struct RenameCartNamePopover: View {
     }
 }
 
+typealias RenameCartNamePopover = RenamePopover
+
 // Helper extension to find and select text in TextField
+private extension View {
+    @ViewBuilder
+    func renameInputFont(useLexend: Bool) -> some View {
+        if useLexend {
+            self.lexendFont(20)
+        } else {
+            self.fuzzyBubblesFont(20, weight: .bold)
+        }
+    }
+}
+
 extension UIView {
     func findTextField() -> UITextField? {
         if let textField = self as? UITextField {

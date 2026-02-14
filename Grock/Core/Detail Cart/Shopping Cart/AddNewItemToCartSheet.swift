@@ -547,6 +547,7 @@ struct AddNewItemView: View {
 struct BrowseVaultStoreSection: View {
     let storeName: String
     let items: [StoreItem]
+    let hasBackgroundImage: Bool
     let cart: Cart
     let onItemSelected: (Item) -> Void
     let onQuantityChange: (() -> Void)?  // Add this
@@ -555,25 +556,31 @@ struct BrowseVaultStoreSection: View {
     private var itemsWithStableIdentifiers: [(id: String, storeItem: StoreItem)] {
           items.map { ($0.id, $0) }
       }
+    
+    private var headerForegroundColor: Color {
+        hasBackgroundImage ? .black : .white
+    }
+    
+    private var headerBackgroundColor: Color {
+        hasBackgroundImage ? .white : .black
+    }
       
     
     var body: some View {
         Section(
             header: HStack {
                 HStack(spacing: 2) {
-                    Image("store")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 10, height: 10)
-                        .foregroundColor(.white)
+                    Image(systemName: "storefront")
+                        .lexendFont(10)
+                        .foregroundStyle(headerForegroundColor)
                     
                     Text(storeName)
                         .fuzzyBubblesFont(11, weight: .bold)
+                        .foregroundStyle(headerForegroundColor)
                 }
-                .foregroundColor(.white)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
-                .background(Color.black)
+                .background(headerBackgroundColor)
                 .cornerRadius(6)
                 Spacer()
             }

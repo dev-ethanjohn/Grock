@@ -314,7 +314,7 @@ private struct StoreSectionHeader: View {
                 HStack(spacing: 2) {
                     Image(systemName: "storefront")
                         .lexendFont(10)
-                        .foregroundColor(stateManager.hasBackgroundImage ? .black : .white)
+                        .foregroundStyle(stateManager.hasBackgroundImage ? .black : .white)
                     
                     Text(displayStoreName)
                         .lexendFont(11, weight: .bold)

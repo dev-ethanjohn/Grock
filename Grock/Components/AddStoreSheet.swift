@@ -17,7 +17,6 @@ struct AddStoreSheet: View {
             VStack(spacing: 20) {
                 TextField("Enter store name", text: $storeName)
                     .lexend(.subheadline)
-                    .bold()
                     .normalizedText($storeName)
                     .autocorrectionDisabled()
                     .textInputAutocapitalization(.never)

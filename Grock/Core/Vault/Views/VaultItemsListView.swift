@@ -66,11 +66,20 @@ struct StoreSection: View {
     let storeName: String
     let items: [Item]
     let category: GroceryCategory?
+    var hasBackgroundImage: Bool = false
     var onDeleteItem: ((Item) -> Void)?
     let isLastStore: Bool
     
     private var itemsWithStableIdentifiers: [(id: String, item: Item)] {
         items.map { ($0.id, $0) }
+    }
+    
+    private var headerForegroundColor: Color {
+        hasBackgroundImage ? .black : .white
+    }
+    
+    private var headerBackgroundColor: Color {
+        hasBackgroundImage ? .white : (category?.pastelColor.saturated(by: 0.3).darker(by: 0.5) ?? Color.primary)
     }
     
     var body: some View {
@@ -79,15 +88,15 @@ struct StoreSection: View {
             HStack(spacing: 2) {
                 Image(systemName: "storefront")
                     .lexendFont(10)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(headerForegroundColor)
                 
                 Text(storeName)
                     .lexendFont(11, weight: .bold)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(headerForegroundColor)
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
-            .background(category?.pastelColor.saturated(by: 0.3).darker(by: 0.5) ?? Color.primary)
+            .background(headerBackgroundColor)
             .clipShape(RoundedRectangle(cornerRadius: 6))
             
             Spacer()
