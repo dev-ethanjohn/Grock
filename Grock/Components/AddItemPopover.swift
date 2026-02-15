@@ -6,6 +6,7 @@ struct AddItemPopover: View {
     
     var onSave: ((String, String, String, String, Double) -> Void)?
     var onDismiss: (() -> Void)?
+    var preferredCategoryName: String? = nil
     
     @Environment(VaultService.self) private var vaultService
     
@@ -127,6 +128,7 @@ struct AddItemPopover: View {
             .frame(maxHeight: .infinity, alignment: keyboardVisible ? .top : .center)
         }
         .onAppear {
+            applyPreferredCategoryContext()
             itemNameFieldIsFocused = true
             withAnimation(.easeOut(duration: 0.2)) {
                 overlayOpacity = 1
@@ -205,5 +207,30 @@ struct AddItemPopover: View {
         KeyboardManager.dismissWithAnimation()
         isPresented = false
         onDismiss?()
+    }
+
+    private func applyPreferredCategoryContext() {
+        guard let preferred = resolvedPreferredCategoryName else { return }
+        formViewModel.selectedCategoryName = preferred
+    }
+
+    private var resolvedPreferredCategoryName: String? {
+        guard let raw = preferredCategoryName?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !raw.isEmpty else { return nil }
+
+        if let groceryCategory = GroceryCategory.allCases.first(where: {
+            $0.title.caseInsensitiveCompare(raw) == .orderedSame
+        }) {
+            return groceryCategory.title
+        }
+
+        if let customCategory = vaultService.vault?.categories.first(where: {
+            $0.name.trimmingCharacters(in: .whitespacesAndNewlines)
+                .caseInsensitiveCompare(raw) == .orderedSame
+        }) {
+            return customCategory.name
+        }
+
+        return raw
     }
 }

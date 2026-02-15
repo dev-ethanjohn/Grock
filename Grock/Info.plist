@@ -9,6 +9,8 @@
 		<string>Lexend-VariableFont_wght.ttf</string>
 		<string>ShantellSans-Bold.ttf</string>
 	</array>
+	<key>REVENUECAT_API_KEY</key>
+	<string>test_xweOqIKUKoKfGiXNiaHyZxujWJj</string>
 	<key>USERJOT_PROJECT_ID</key>
 	<string>cmljqz2ug06j50hn6yp7jgdzw</string>
 </dict>

@@ -447,12 +447,11 @@ struct VaultView: View {
                             price: price,
                             unit: unit
                         )
-                    },
-                    onDismiss: {
+                    }, onDismiss: {
                         withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
                             createCartButtonVisible = true
                         }
-                    }
+                    }, preferredCategoryName: selectedCategoryName
                 )
                 .transition(.opacity)
                 .zIndex(1)

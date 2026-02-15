@@ -353,18 +353,21 @@ struct HomeView: View {
             .padding(.bottom, 32)
             .animation(.spring(response: 0.4, dampingFraction: 0.65), value: isVaultButtonExpanded)
 
-            Text("Your Trip")
-                .lexendFont(13)
-                .foregroundStyle(.black)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 4)
-                .background(
-                    Capsule()
-                        .fill(.white)
-                        .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
-                )
-                .frame(maxWidth: .infinity, alignment: .center)
-                .padding(.bottom)
+            if viewModel.hasCarts {
+                Text("Your Trip")
+                    .lexendFont(13)
+                    .foregroundStyle(.black)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 4)
+                    .background(
+                        Capsule()
+                            .fill(.white)
+                            .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
+                    )
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.bottom)
+                    .transition(.opacity.combined(with: .scale(scale: 0.95)))
+            }
         }
         .frame(maxWidth: .infinity)
         .background(headerBackground)
@@ -430,11 +433,24 @@ struct HomeView: View {
                     }
                     
                     Button {
-                        subscriptionManager.togglePro()
+                        Task {
+                            await subscriptionManager.refreshCustomerInfo()
+                        }
                     } label: {
                         Label(
-                            subscriptionManager.isPro ? "Switch to Free (Dev)" : "Switch to Pro (Dev)",
-                            systemImage: subscriptionManager.isPro ? "lock.open" : "lock"
+                            "Refresh Subscription",
+                            systemImage: "arrow.clockwise"
+                        )
+                    }
+                    
+                    Button {
+                        Task {
+                            _ = await subscriptionManager.restorePurchases()
+                        }
+                    } label: {
+                        Label(
+                            "Restore Purchases",
+                            systemImage: "arrow.uturn.backward.circle"
                         )
                     }
                 }

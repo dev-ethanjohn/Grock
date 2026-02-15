@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import Charts
+import RevenueCatUI
 
 struct InsightsView: View {
     @Environment(VaultService.self) private var vaultService
@@ -9,6 +10,9 @@ struct InsightsView: View {
     
     @State private var viewModel = InsightsViewModel()
     @State private var subscriptionManager = SubscriptionManager.shared
+    @State private var showPaywall = false
+    @State private var showSubscriptionAlert = false
+    @State private var subscriptionAlertMessage = ""
     
     var body: some View {
         NavigationStack {
@@ -35,7 +39,7 @@ struct InsightsView: View {
                             subtitle: "Based on budgeted trips",
                             lockText: "See how your spending compares to what you planned.",
                             isPro: subscriptionManager.isPro,
-                            onUnlock: { print("Show RevenueCat Paywall") }
+                            onUnlock: { showPaywall = true }
                         ) {
                             BudgetInsightsSection(viewModel: viewModel)
                         }
@@ -49,7 +53,7 @@ struct InsightsView: View {
                             subtitle: "With vs without a budget",
                             lockText: "Understand how planning changes your shopping.",
                             isPro: subscriptionManager.isPro,
-                            onUnlock: { print("Show RevenueCat Paywall") }
+                            onUnlock: { showPaywall = true }
                         ) {
                             BehaviorComparisonSection(viewModel: viewModel)
                         }
@@ -63,7 +67,7 @@ struct InsightsView: View {
                             subtitle: "Frequently bought items",
                             lockText: "Build long-term price memory across trips.",
                             isPro: subscriptionManager.isPro,
-                            onUnlock: { print("Show RevenueCat Paywall") }
+                            onUnlock: { showPaywall = true }
                         ) {
                             ItemMemorySection(viewModel: viewModel, vaultService: vaultService)
                         }
@@ -87,6 +91,45 @@ struct InsightsView: View {
             }
             .onChange(of: cartViewModel.carts) { _, newCarts in
                 viewModel.update(carts: newCarts)
+            }
+            .task {
+                await subscriptionManager.refreshAll()
+            }
+            .sheet(isPresented: $showPaywall) {
+                PaywallView(displayCloseButton: true)
+                    .onPurchaseCompleted { customerInfo in
+                        let isUnlocked = customerInfo.entitlements
+                            .activeInCurrentEnvironment[SubscriptionManager.grockProEntitlementID] != nil
+                        if isUnlocked {
+                            showPaywall = false
+                        }
+                    }
+                    .onRestoreCompleted { customerInfo in
+                        let isUnlocked = customerInfo.entitlements
+                            .activeInCurrentEnvironment[SubscriptionManager.grockProEntitlementID] != nil
+                        if isUnlocked {
+                            showPaywall = false
+                        } else {
+                            subscriptionAlertMessage = "No active Grock Pro entitlement was found to restore."
+                            showSubscriptionAlert = true
+                        }
+                    }
+                    .onPurchaseFailure { error in
+                        subscriptionAlertMessage = "Purchase failed: \(error.localizedDescription)"
+                        showSubscriptionAlert = true
+                    }
+                    .onRestoreFailure { error in
+                        subscriptionAlertMessage = "Restore failed: \(error.localizedDescription)"
+                        showSubscriptionAlert = true
+                    }
+                    .onPurchaseCancelled {
+                        showPaywall = false
+                    }
+            }
+            .alert("Subscription", isPresented: $showSubscriptionAlert) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text(subscriptionAlertMessage)
             }
         }
     }

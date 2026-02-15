@@ -317,10 +317,9 @@ struct ManageCartSheet: View {
                             let selectionKey = ActiveItemSelectionKey.make(itemId: newItem.id, store: store)
                             localActiveItems[selectionKey] = 1
                         }
-                    },
-                    onDismiss: {
+                    }, onDismiss: {
                         duplicateError = nil
-                    }
+                    }, preferredCategoryName: selectedCategoryName
                 )
                 .offset(y: UIScreen.main.bounds.height * -0.04)
                 .transition(.opacity)

@@ -2,6 +2,7 @@ import SwiftUI
 import UserJot
 import WebKit
 import Darwin
+import RevenueCatUI
 
 struct MenuView: View {
     @Environment(VaultService.self) private var vaultService
@@ -11,6 +12,11 @@ struct MenuView: View {
     @Binding var isEditingName: Bool
     @State private var showingFeedbackSheet = false
     @State private var showMailUnavailableAlert = false
+    @State private var subscriptionManager = SubscriptionManager.shared
+    @State private var showingPaywall = false
+    @State private var showingCustomerCenter = false
+    @State private var showSubscriptionAlert = false
+    @State private var subscriptionAlertMessage = ""
     private let stickyHeaderHeight: CGFloat = 156
     private let listHorizontalPadding: CGFloat = 12
     private let rowHorizontalPadding: CGFloat = 6
@@ -183,6 +189,9 @@ struct MenuView: View {
                             .padding(.horizontal, rowHorizontalPadding)
                             .padding(.vertical, 2)
                         }
+
+                        subscriptionSection
+                            .padding(.top, sectionGapAfterPrimaryRows)
                         
                         feedbackSupportSection
                             .padding(.top, sectionGapAfterPrimaryRows)
@@ -201,16 +210,64 @@ struct MenuView: View {
             .frame(width: 300, alignment: .leading)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .task {
+            await subscriptionManager.refreshAll()
+        }
         .alert("Mail App Unavailable", isPresented: $showMailUnavailableAlert) {
             Button("OK", role: .cancel) { }
         } message: {
             Text("Please set up the Mail app to contact support.")
+        }
+        .alert("Subscription", isPresented: $showSubscriptionAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(subscriptionAlertMessage)
         }
         .sheet(isPresented: $showingFeedbackSheet) {
             MenuUserJotFeedbackScreen()
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
         }
+        .sheet(isPresented: $showingPaywall) {
+            PaywallView(displayCloseButton: true)
+                .onPurchaseCompleted { customerInfo in
+                    let unlocked = customerInfo.entitlements
+                        .activeInCurrentEnvironment[SubscriptionManager.grockProEntitlementID] != nil
+                    if unlocked {
+                        showingPaywall = false
+                    }
+                }
+                .onRestoreCompleted { customerInfo in
+                    let unlocked = customerInfo.entitlements
+                        .activeInCurrentEnvironment[SubscriptionManager.grockProEntitlementID] != nil
+                    if unlocked {
+                        showingPaywall = false
+                    } else {
+                        subscriptionAlertMessage = "No active Grock Pro entitlement was found to restore."
+                        showSubscriptionAlert = true
+                    }
+                }
+                .onPurchaseFailure { error in
+                    subscriptionAlertMessage = "Purchase failed: \(error.localizedDescription)"
+                    showSubscriptionAlert = true
+                }
+                .onRestoreFailure { error in
+                    subscriptionAlertMessage = "Restore failed: \(error.localizedDescription)"
+                    showSubscriptionAlert = true
+                }
+        }
+        .presentCustomerCenter(
+            isPresented: $showingCustomerCenter,
+            restoreCompleted: { _ in
+                Task {
+                    await subscriptionManager.refreshCustomerInfo()
+                }
+            },
+            restoreFailed: { error in
+                subscriptionAlertMessage = "Restore failed: \(error.localizedDescription)"
+                showSubscriptionAlert = true
+            }
+        )
     }
     
     private var stickyHeader: some View {
@@ -275,6 +332,54 @@ struct MenuView: View {
                         endPoint: .bottom
                     )
                 )
+        }
+    }
+
+    private var subscriptionSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            DashedLine()
+                .stroke(style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
+                .frame(height: 1)
+                .foregroundColor(Color(hex: "ddd"))
+                .padding(.horizontal, rowHorizontalPadding)
+                .padding(.top, 4)
+                .padding(.bottom, 8)
+
+            Button {
+                showingPaywall = true
+            } label: {
+                feedbackRow(
+                    title: subscriptionManager.isPro ? "Manage Grock Pro" : "Unlock Grock Pro",
+                    icon: "👑",
+                    isHighlighted: !subscriptionManager.isPro
+                )
+            }
+            .buttonStyle(.plain)
+
+            Button(action: handleRestorePurchasesTapped) {
+                feedbackRow(title: "Restore Purchases", icon: "↩️")
+            }
+            .buttonStyle(.plain)
+
+            Button {
+                showingCustomerCenter = true
+            } label: {
+                feedbackRow(title: "Customer Center", icon: "🧾")
+            }
+            .buttonStyle(.plain)
+
+            if subscriptionManager.isLoadingCustomerInfo || subscriptionManager.isLoadingOfferings {
+                ProgressView()
+                    .tint(.black)
+                    .padding(.horizontal, rowHorizontalPadding)
+                    .padding(.top, 4)
+            } else {
+                Text(subscriptionManager.isPro ? "Grock Pro is active" : "Currently on Free plan")
+                    .lexend(.caption2, weight: .regular)
+                    .foregroundColor(.gray)
+                    .padding(.horizontal, rowHorizontalPadding + 32)
+                    .padding(.top, 2)
+            }
         }
     }
     
@@ -470,6 +575,22 @@ struct MenuView: View {
         let isSelectedRegion = (currencyRegionByCode[currencyManager.selectedCurrency.code] ?? "Other") == region
         let dot = isSelectedRegion ? "●" : "○"
         return "\(region)   \(dot)"
+    }
+
+    private func handleRestorePurchasesTapped() {
+        Task {
+            let result = await subscriptionManager.restorePurchases()
+            switch result {
+            case .success:
+                subscriptionAlertMessage = "Restore completed."
+            case .cancelled:
+                subscriptionAlertMessage = "Restore cancelled."
+            case .failure(let message):
+                subscriptionAlertMessage = message
+            }
+
+            showSubscriptionAlert = true
+        }
     }
     
     private func contactSupportTapped() {

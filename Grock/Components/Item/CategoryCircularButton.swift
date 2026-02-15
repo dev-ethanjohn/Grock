@@ -28,7 +28,7 @@ struct CategoryCircularButton: View {
                 // Editable category button (Menu)
                 Menu {
                     Section {
-                        Text(categoryPickerSource == .defaultsOnly ? "Grocery Categories" : "Your Categories")
+                        Text(categoryPickerSource == .defaultsOnly ? "Grocery Categories" : "Categories")
                             .font(.headline)
                             .foregroundColor(.primary)
                     }

@@ -83,6 +83,7 @@
 import SwiftUI
 import SwiftData
 import UserJot
+import RevenueCat
 
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
@@ -130,6 +131,8 @@ struct ContentView: View {
 struct GrockApp: App {
     let container: ModelContainer
     private static let userJotProjectIdKey = "USERJOT_PROJECT_ID"
+    private static let revenueCatApiKeyKey = "REVENUECAT_API_KEY"
+    private static let fallbackRevenueCatApiKey = "test_xweOqIKUKoKfGiXNiaHyZxujWJj"
     
 //    init() {
 //        do {
@@ -179,7 +182,11 @@ struct GrockApp: App {
             
             container = try ModelContainer(for: schema, configurations: config)
             print("✅ Loaded persistent database (data preserved)")
+            configureRevenueCat()
             configureUserJot()
+            Task { @MainActor in
+                SubscriptionManager.shared.start()
+            }
         } catch {
             fatalError("Could not create ModelContainer: \(error)")
         }
@@ -207,6 +214,32 @@ struct GrockApp: App {
         
         UserJot.setup(projectId: projectId)
         print("✅ UserJot setup complete")
+    }
+
+    private func configureRevenueCat() {
+        let infoPlistApiKey = (Bundle.main.object(forInfoDictionaryKey: Self.revenueCatApiKeyKey) as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        let apiKey: String
+        if let infoPlistApiKey, !infoPlistApiKey.isEmpty, infoPlistApiKey != "YOUR_REVENUECAT_API_KEY" {
+            apiKey = infoPlistApiKey
+        } else {
+            apiKey = Self.fallbackRevenueCatApiKey
+        }
+
+        #if DEBUG
+        Purchases.logLevel = .debug
+        #else
+        Purchases.logLevel = .warn
+        #endif
+
+        if Purchases.isConfigured {
+            print("ℹ️ RevenueCat already configured")
+            return
+        }
+
+        Purchases.configure(withAPIKey: apiKey)
+        print("✅ RevenueCat setup complete")
     }
 }
 
