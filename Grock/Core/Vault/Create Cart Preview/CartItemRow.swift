@@ -4,6 +4,14 @@ struct CartItemRow: View {
     let item: Item
     let quantity: Double
     let isLastItem: Bool
+    let selectedStore: String?
+
+    init(item: Item, quantity: Double, isLastItem: Bool, selectedStore: String? = nil) {
+        self.item = item
+        self.quantity = quantity
+        self.isLastItem = isLastItem
+        self.selectedStore = selectedStore
+    }
     
     private var displayQuantity: String {
         if quantity == Double(Int(quantity)) {
@@ -14,15 +22,14 @@ struct CartItemRow: View {
     }
     
     private var displayUnit: String {
-        // Extract unit from the first price option if available
-        if let firstPrice = item.priceOptions.first {
-            return firstPrice.pricePerUnit.unit
+        if let selectedPriceOption {
+            return selectedPriceOption.pricePerUnit.unit
         }
         return ""
     }
     
     private var itemPrice: Double {
-        item.priceOptions.first?.pricePerUnit.priceValue ?? 0.0
+        selectedPriceOption?.pricePerUnit.priceValue ?? 0.0
     }
     
     private var itemTotal: Double {
@@ -41,6 +48,14 @@ struct CartItemRow: View {
             // Two decimal places
             return String(format: "%@%.2f", symbol, itemTotal)
         }
+    }
+
+    private var selectedPriceOption: PriceOption? {
+        if let selectedStore {
+            return item.priceOptions.first(where: { $0.store.caseInsensitiveCompare(selectedStore) == .orderedSame })
+                ?? item.priceOptions.first
+        }
+        return item.priceOptions.first
     }
     
     var body: some View {
@@ -110,5 +125,3 @@ struct CartItemRow: View {
     }
 
 }
-
-

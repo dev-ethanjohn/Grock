@@ -238,6 +238,7 @@ struct CartDetailScreen: View {
                     message: stateManager.tripCompletionMessage,
                     autoDismissAfter: 2.0,
                     onDismiss: {
+                        stateManager.isTripFinishingFromSheet = false
                         stateManager.showingShoppingPopover = false
                         stateManager.showingFulfillPopover = false
                         stateManager.showingEditCartName = false
@@ -324,6 +325,7 @@ struct CartDetailScreen: View {
         stateManager.selectedCartItemForPopover = nil
         stateManager.showTripCompletionCelebration = false
         stateManager.tripCompletionMessage = ""
+        stateManager.isTripFinishingFromSheet = false
         
         stateManager.localBudget = cart.budget
         stateManager.animatedBudget = cart.budget
@@ -605,7 +607,27 @@ struct CartDetailAllModifiers: ViewModifier {
             .finishTripSheet(
                 cart: cart,
                 showing: $showingCompleteAlert,
-                vaultService: vaultService
+                vaultService: vaultService,
+                cartStateManager: stateManager,
+                onTripCompletionSequenceFinished: {
+                    stateManager.showingShoppingPopover = false
+                    stateManager.showingFulfillPopover = false
+                    stateManager.showingEditCartName = false
+                    stateManager.showingEditBudget = false
+                    stateManager.showingCartSheet = false
+                    stateManager.showingFilterSheet = false
+                    stateManager.showingCompletedSheet = false
+                    stateManager.showTripCompletionCelebration = false
+                    stateManager.isTripFinishingFromSheet = false
+                    showingCompleteAlert = false
+
+                    dismiss()
+                    NotificationCenter.default.post(
+                        name: NSNotification.Name("ShowInsightsAfterTrip"),
+                        object: nil,
+                        userInfo: ["cartId": cart.id]
+                    )
+                }
             )
             
             // Lifecycle
@@ -1046,7 +1068,16 @@ struct CartDetailContent: View {
     // MARK: - Event Handlers
     private func handleCartStatusChange(oldValue: CartStatus, newValue: CartStatus) {
         if oldValue != .completed && newValue == .completed {
-            // Dismiss finish sheet immediately so the celebration overlay can play.
+            // If FinishTripSheet is currently presented, let the sheet control
+            // the celebration + dismissal sequence.
+            if showingCompleteAlert {
+                return
+            }
+
+            if stateManager.isTripFinishingFromSheet {
+                return
+            }
+
             showingCompleteAlert = false
             stateManager.tripCompletionMessage = makeTripCompletionMessage()
             stateManager.showTripCompletionCelebration = true
@@ -1373,11 +1404,17 @@ extension View {
     func finishTripSheet(
         cart: Cart,
         showing: Binding<Bool>,
-        vaultService: VaultService
+        vaultService: VaultService,
+        cartStateManager: CartStateManager,
+        onTripCompletionSequenceFinished: (() -> Void)? = nil
     ) -> some View {
         self.sheet(isPresented: showing) {
-            FinishTripSheet(cart: cart)
+            FinishTripSheet(
+                cart: cart,
+                onTripCompletionSequenceFinished: onTripCompletionSequenceFinished
+            )
                 .environment(vaultService)
+                .environment(\.cartStateManager, cartStateManager)
         }
     }
 }

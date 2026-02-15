@@ -185,17 +185,21 @@ struct CartConfirmationPopover: View {
         case title, budget
     }
     
-    private var activeItemsWithDetails: [(item: Item, quantity: Double)] {
-        activeCartItems.compactMap { itemId, quantity in
-            guard let item = findItemById(itemId) else { return nil }
-            return (item, quantity)
+    private var activeItemsWithDetails: [(key: String, item: Item, quantity: Double, store: String?)] {
+        activeCartItems.compactMap { key, quantity in
+            let parsed = ActiveItemSelectionKey.parse(key)
+            guard let item = findItemById(parsed.itemId) else { return nil }
+            return (key, item, quantity, parsed.store)
         }
     }
     
     private var totalCartValue: Double {
         activeItemsWithDetails.reduce(0) { total, itemData in
-            let (item, quantity) = itemData
-            let price = item.priceOptions.first?.pricePerUnit.priceValue ?? 0.0
+            let price = itemData.item.priceOptions.first(where: {
+                guard let store = itemData.store else { return false }
+                return $0.store.caseInsensitiveCompare(store) == .orderedSame
+            })?.pricePerUnit.priceValue ?? itemData.item.priceOptions.first?.pricePerUnit.priceValue ?? 0.0
+            let quantity = itemData.quantity
             return total + (price * quantity)
         }
     }
@@ -298,9 +302,15 @@ struct CartConfirmationPopover: View {
             if activeItemsWithDetails.count <= 5 {
                 // Just use VStack for small number of items
                 VStack(spacing: 0) {
-                    ForEach(Array(activeItemsWithDetails.enumerated()), id: \.element.item.id) { index, data in
-                        let (item, quantity) = data
-                        CartItemRow(item: item, quantity: quantity, isLastItem: index == activeItemsWithDetails.count - 1)
+                    ForEach(Array(activeItemsWithDetails.enumerated()), id: \.element.key) { index, data in
+                        let item = data.item
+                        let quantity = data.quantity
+                        CartItemRow(
+                            item: item,
+                            quantity: quantity,
+                            isLastItem: index == activeItemsWithDetails.count - 1,
+                            selectedStore: data.store
+                        )
                     }
                 }
                 .padding(.horizontal, 20)
@@ -308,9 +318,15 @@ struct CartConfirmationPopover: View {
                 // Use Custom ScrollView with moving indicator
                 VerticalScrollViewWithCustomIndicator(maxHeight: 200) {
                     LazyVStack(spacing: 0) {
-                        ForEach(Array(activeItemsWithDetails.enumerated()), id: \.element.item.id) { index, data in
-                            let (item, quantity) = data
-                            CartItemRow(item: item, quantity: quantity, isLastItem: index == activeItemsWithDetails.count - 1)
+                        ForEach(Array(activeItemsWithDetails.enumerated()), id: \.element.key) { index, data in
+                            let item = data.item
+                            let quantity = data.quantity
+                            CartItemRow(
+                                item: item,
+                                quantity: quantity,
+                                isLastItem: index == activeItemsWithDetails.count - 1,
+                                selectedStore: data.store
+                            )
                         }
                     }
                     .padding(.leading, 20)

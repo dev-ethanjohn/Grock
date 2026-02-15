@@ -73,7 +73,7 @@ struct StoreSection: View {
     let isLastStore: Bool
     
     private var itemsWithStableIdentifiers: [(id: String, item: Item)] {
-        items.map { ($0.id, $0) }
+        items.map { (ActiveItemSelectionKey.make(itemId: $0.id, store: storeName), $0) }
     }
     
     private var headerForegroundColor: Color {
@@ -111,6 +111,7 @@ struct StoreSection: View {
                 VStack(spacing: 0) {
                     VaultItemRow(
                         item: tuple.item,
+                        storeName: storeName,
                         categoryColor: categoryColor
                     )
                     .contextMenu {

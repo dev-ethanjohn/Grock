@@ -16,13 +16,24 @@ extension VaultService {
         return newCart
     }
 
-    /// Creates a cart and pre-populates it using `activeItems` (itemId -> quantity).
+    /// Creates a cart and pre-populates it using `activeItems`.
+    ///
+    /// Key format supports:
+    /// - `itemId` (legacy)
+    /// - `itemId||storeName` (store-specific selection)
     func createCartWithActiveItems(name: String, budget: Double, activeItems: [String: Double]) -> Cart {
         let newCart = createCart(name: name, budget: budget)
 
-        for (itemId, quantity) in activeItems {
+        for (selectionKey, quantity) in activeItems {
+            let parsed = ActiveItemSelectionKey.parse(selectionKey)
+            let itemId = parsed.itemId
             if let item = findItemById(itemId) {
-                addVaultItemToCart(item: item, cart: newCart, quantity: quantity)
+                addVaultItemToCart(
+                    item: item,
+                    cart: newCart,
+                    quantity: quantity,
+                    selectedStore: parsed.store
+                )
             }
         }
 

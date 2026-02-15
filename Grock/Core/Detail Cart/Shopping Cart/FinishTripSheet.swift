@@ -10,10 +10,13 @@ struct HeaderHeightPreferenceKey: PreferenceKey {
 
 struct FinishTripSheet: View {
     @Bindable var cart: Cart  // CHANGED: Make cart mutable
+    var onTripCompletionSequenceFinished: (() -> Void)? = nil
     @Environment(VaultService.self) private var vaultService
+    @Environment(\.cartStateManager) private var stateManager
     @Environment(\.dismiss) private var dismiss
     @State private var showingEditBudget = false
     @State private var newItemToggles: [String: Bool] = [:]
+    @State private var showTripCompletionOverlay = false
     
     // Computed properties
     private var cartInsights: CartInsights {
@@ -360,6 +363,63 @@ struct FinishTripSheet: View {
             )
         }
     }
+
+    private func finishTrip() {
+        guard !showTripCompletionOverlay else { return }
+
+        stateManager.isTripFinishingFromSheet = true
+        mergeSelectedNewItemsToVault()
+        vaultService.completeShopping(cart: cart)
+
+        stateManager.tripCompletionMessage = makeTripCompletionMessage()
+        withAnimation(.easeOut(duration: 0.2)) {
+            showTripCompletionOverlay = true
+        }
+    }
+
+    private func finalizeAfterCelebration() {
+        stateManager.isTripFinishingFromSheet = false
+        if let onTripCompletionSequenceFinished {
+            onTripCompletionSequenceFinished()
+        } else {
+            dismiss()
+        }
+    }
+
+    private func makeTripCompletionMessage() -> String {
+        let spent = totalSpent
+        let budget = cartBudget
+        let epsilon = 0.01
+        let spentText = formatCurrencyNoDecimals(spent)
+
+        guard budget > 0 else {
+            return "Trip complete! \(spentText) spent."
+        }
+
+        let delta = spent - budget
+        let diffText = formatCurrencyNoDecimals(abs(delta))
+
+        if delta < -epsilon {
+            return "Great job! \(spentText) spent, \(diffText) under budget."
+        }
+        if delta > epsilon {
+            return "Trip complete! \(spentText) spent, \(diffText) over budget."
+        }
+        return "Perfect match! \(spentText) spent, right on budget."
+    }
+
+    private func formatCurrencyNoDecimals(_ amount: Double) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.locale = Locale.current
+        formatter.currencyCode = CurrencyManager.shared.selectedCurrency.code
+        formatter.currencySymbol = CurrencyManager.shared.selectedCurrency.symbol
+        formatter.minimumFractionDigits = 0
+        formatter.maximumFractionDigits = 0
+
+        return formatter.string(from: NSNumber(value: amount))
+            ?? "\(CurrencyManager.shared.selectedCurrency.symbol)\(String(format: "%.0f", amount))"
+    }
     
     var body: some View {
         ZStack {
@@ -439,9 +499,7 @@ struct FinishTripSheet: View {
                     
                     CompletionActionsView(
                         onFinish: {
-                            dismiss()
-                            mergeSelectedNewItemsToVault()
-                            vaultService.completeShopping(cart: cart)
+                            finishTrip()
                         },
                         onContinue: {
                             dismiss()
@@ -480,6 +538,16 @@ struct FinishTripSheet: View {
                     onDismiss: nil
                 )
                 .zIndex(1)
+            }
+
+            if showTripCompletionOverlay {
+                TripCompletionCelebrationOverlay(
+                    isPresented: $showTripCompletionOverlay,
+                    message: stateManager.tripCompletionMessage,
+                    autoDismissAfter: 2.0,
+                    onDismiss: finalizeAfterCelebration
+                )
+                .zIndex(2000)
             }
         }
         .presentationDetents([.large])

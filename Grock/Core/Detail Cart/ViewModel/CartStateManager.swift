@@ -46,6 +46,7 @@ final class CartStateManager {
     var showCelebration = false
     var showTripCompletionCelebration = false
     var tripCompletionMessage: String = ""
+    var isTripFinishingFromSheet = false
     var manageCartButtonVisible = false
     var buttonScale: CGFloat = 1.0
     var shouldBounceAfterCelebration = false

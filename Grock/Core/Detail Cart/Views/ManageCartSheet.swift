@@ -314,7 +314,8 @@ struct ManageCartSheet: View {
                             price: price,
                             unit: unit
                         ) {
-                            localActiveItems[newItem.id] = 1
+                            let selectionKey = ActiveItemSelectionKey.make(itemId: newItem.id, store: store)
+                            localActiveItems[selectionKey] = 1
                         }
                     },
                     onDismiss: {
@@ -591,7 +592,11 @@ struct ManageCartSheet: View {
         
         // Add items from the existing cart to localActiveItems
         for cartItem in cart.cartItems {
-            localActiveItems[cartItem.itemId] = cartItem.quantity
+            let selectionKey = ActiveItemSelectionKey.make(
+                itemId: cartItem.itemId,
+                store: cartItem.plannedStore
+            )
+            localActiveItems[selectionKey] = cartItem.quantity
             if let item = vaultService.findItemById(cartItem.itemId) {
                 print("   - Pre-selected: \(item.name) × \(cartItem.quantity)")
             }
@@ -602,8 +607,19 @@ struct ManageCartSheet: View {
     
     private func updateCartWithSelectedItems() {
         print("🔄 Updating cart with selected items")
-        
-        let selectedItemIds = Set(localActiveItems.keys)
+
+        let selectedEntries: [(itemId: String, store: String?, quantity: Double)] = localActiveItems
+            .compactMap { key, quantity in
+                guard quantity > 0 else { return nil }
+                let parsed = ActiveItemSelectionKey.parse(key)
+                return (parsed.itemId, parsed.store, quantity)
+            }
+
+        var selectedByItemId: [String: (itemId: String, store: String?, quantity: Double)] = [:]
+        for entry in selectedEntries {
+            selectedByItemId[entry.itemId] = entry
+        }
+        let selectedItemIds = Set(selectedByItemId.keys)
         let currentCartItemIds = Set(cart.cartItems.map { $0.itemId })
         var changedQuantities: [(itemId: String, newQuantity: Double)] = []
         
@@ -618,7 +634,9 @@ struct ManageCartSheet: View {
         }
         
         // Add/Update selected items
-        for (itemId, quantity) in localActiveItems {
+        for (itemId, selection) in selectedByItemId {
+            let quantity = selection.quantity
+            let selectedStore = selection.store
             if let item = vaultService.findItemById(itemId) {
                 if currentCartItemIds.contains(itemId) {
                     // Update existing item quantity
@@ -626,6 +644,13 @@ struct ManageCartSheet: View {
                         if quantity > 0 {
                             print("   🔄 Updating: \(item.name) from \(existingCartItem.quantity) to \(quantity)")
                             existingCartItem.quantity = quantity
+                            if let selectedStore, !selectedStore.isEmpty {
+                                existingCartItem.plannedStore = selectedStore
+                                if let option = item.priceOptions.first(where: { $0.store.caseInsensitiveCompare(selectedStore) == .orderedSame }) {
+                                    existingCartItem.plannedPrice = option.pricePerUnit.priceValue
+                                    existingCartItem.plannedUnit = option.pricePerUnit.unit
+                                }
+                            }
                             changedQuantities.append((itemId: itemId, newQuantity: quantity))
                         } else {
                             // Remove item if quantity is 0
@@ -638,8 +663,12 @@ struct ManageCartSheet: View {
                     // Add new item only if quantity > 0
                     if quantity > 0 {
                         print("   ➕ Adding: \(item.name) × \(quantity)")
-                        // CHANGED: Use addVaultItemToCart instead of addItemToCart
-                        vaultService.addVaultItemToCart(item: item, cart: cart, quantity: quantity)
+                        vaultService.addVaultItemToCart(
+                            item: item,
+                            cart: cart,
+                            quantity: quantity,
+                            selectedStore: selectedStore
+                        )
                         changedQuantities.append((itemId: itemId, newQuantity: quantity))
                     }
                 }
@@ -766,7 +795,9 @@ struct ManageCartSheet: View {
         guard let foundCategory = vaultCategory(named: name, in: vaultService.vault) else { return 0 }
         
         let activeItemsCount = foundCategory.items.reduce(0) { count, item in
-            let isActive = (localActiveItems[item.id] ?? 0) > 0
+            let isActive = localActiveItems.contains { key, quantity in
+                ActiveItemSelectionKey.itemId(from: key) == item.id && quantity > 0
+            }
             return count + (isActive ? 1 : 0)
         }
         
@@ -987,7 +1018,12 @@ struct CategoryItemsListView: View {
                     localActiveItems: $localActiveItems,
                     onDeleteVaultItem: { item in
                         let itemId = item.id
-                        localActiveItems.removeValue(forKey: itemId)
+                        let keysToRemove = localActiveItems.keys.filter { key in
+                            ActiveItemSelectionKey.itemId(from: key) == itemId
+                        }
+                        for key in keysToRemove {
+                            localActiveItems.removeValue(forKey: key)
+                        }
                         vaultService.deleteItem(itemId: itemId)
                     }
                 )
@@ -1145,7 +1181,7 @@ struct ManageCartStoreSection: View {
     let onDeleteVaultItem: (Item) -> Void
     
     private var itemsWithStableIdentifiers: [(id: String, item: Item)] {
-        items.map { ($0.id, $0) }
+        items.map { (ActiveItemSelectionKey.make(itemId: $0.id, store: storeName), $0) }
     }
     
     private var headerForegroundColor: Color {
@@ -1181,6 +1217,7 @@ struct ManageCartStoreSection: View {
                 VStack(spacing: 0) {
                     ManageCartItemRow(
                         item: tuple.item,
+                        storeName: storeName,
                         categoryName: categoryName,
                         categoryColor: categoryColor,
                         localActiveItems: $localActiveItems,
@@ -1225,6 +1262,7 @@ struct ManageCartStoreSection: View {
 // MARK: - Item Row for Manage Cart (clean version without custom swipe)
 struct ManageCartItemRow: View {
     let item: Item
+    let storeName: String
     let categoryName: String
     let categoryColor: Color
     @Binding var localActiveItems: [String: Double]
@@ -1239,13 +1277,22 @@ struct ManageCartItemRow: View {
     @State private var isNewlyAdded = true
     @State private var appearScale: CGFloat = 0.8
     @State private var appearOpacity: Double = 0
+
+    private var selectionKey: String {
+        ActiveItemSelectionKey.make(itemId: item.id, store: storeName)
+    }
     
     private var currentQuantity: Double {
-        localActiveItems[item.id] ?? 0
+        localActiveItems[selectionKey] ?? 0
     }
     
     private var isActive: Bool {
         currentQuantity > 0
+    }
+
+    private var selectedPriceOption: PriceOption? {
+        item.priceOptions.first(where: { $0.store.caseInsensitiveCompare(storeName) == .orderedSame })
+        ?? item.priceOptions.first
     }
     
     var body: some View {
@@ -1266,7 +1313,7 @@ struct ManageCartItemRow: View {
                     .foregroundColor(isActive ? .black : Color(hex: "999"))
                     .lexendFont(17)
                 
-                if let priceOption = item.priceOptions.first {
+                if let priceOption = selectedPriceOption {
                     HStack(spacing: 0) {
                         Text("\(CurrencyManager.shared.selectedCurrency.symbol)\(priceOption.pricePerUnit.priceValue.formattedPricePerUnitValue)")
                             .contentTransition(.numericText())
@@ -1320,7 +1367,7 @@ struct ManageCartItemRow: View {
         }
         .contextMenu {
             Button(role: .destructive) {
-                localActiveItems.removeValue(forKey: item.id)
+                removeSelectionsForItem()
             } label: {
                 Label("Remove from Cart", systemImage: "trash")
             }
@@ -1426,7 +1473,7 @@ struct ManageCartItemRow: View {
                 handlePlus()
             } else {
                 withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-                    localActiveItems[item.id] = 1
+                    setSelectionQuantity(1)
                 }
             }
         }) {
@@ -1452,7 +1499,7 @@ struct ManageCartItemRow: View {
         }
         
         let clamped = min(newValue, 100)
-        localActiveItems[item.id] = clamped
+        setSelectionQuantity(clamped)
         textValue = formatValue(clamped)
     }
     
@@ -1465,7 +1512,7 @@ struct ManageCartItemRow: View {
         }
         
         let clamped = max(newValue, 0)
-        localActiveItems[item.id] = clamped
+        setSelectionQuantity(clamped)
         textValue = formatValue(clamped)
     }
     
@@ -1476,7 +1523,7 @@ struct ManageCartItemRow: View {
         if let number = formatter.number(from: textValue) {
             let doubleValue = number.doubleValue
             let clamped = min(max(doubleValue, 0), 100)
-            localActiveItems[item.id] = clamped
+            setSelectionQuantity(clamped)
             
             if doubleValue != clamped {
                 textValue = formatValue(clamped)
@@ -1487,6 +1534,30 @@ struct ManageCartItemRow: View {
             textValue = formatValue(currentQuantity)
         }
         isFocused = false
+    }
+
+    private func removeSelectionsForItem() {
+        let keysToRemove = localActiveItems.keys.filter { key in
+            ActiveItemSelectionKey.itemId(from: key) == item.id
+        }
+        for key in keysToRemove {
+            localActiveItems.removeValue(forKey: key)
+        }
+    }
+
+    private func setSelectionQuantity(_ quantity: Double) {
+        let keysToClear = localActiveItems.keys.filter { key in
+            ActiveItemSelectionKey.itemId(from: key) == item.id && key != selectionKey
+        }
+        for key in keysToClear {
+            localActiveItems.removeValue(forKey: key)
+        }
+
+        if quantity > 0 {
+            localActiveItems[selectionKey] = quantity
+        } else {
+            localActiveItems.removeValue(forKey: selectionKey)
+        }
     }
     
     private func formatValue(_ val: Double) -> String {

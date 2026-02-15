@@ -58,6 +58,7 @@ class KeyboardManager {
 
 struct VaultItemRow: View {
     let item: Item
+    let storeName: String
     let categoryColor: Color
     @Environment(CartViewModel.self) private var cartViewModel
     @Environment(VaultService.self) private var vaultService
@@ -70,11 +71,20 @@ struct VaultItemRow: View {
     @State private var slideInOffset: CGFloat = 20
 
     private var currentQuantity: Double {
-        cartViewModel.activeCartItems[item.id] ?? 0
+        cartViewModel.activeCartItems[selectionKey] ?? 0
     }
 
     private var isActive: Bool {
         currentQuantity > 0
+    }
+
+    private var selectionKey: String {
+        ActiveItemSelectionKey.make(itemId: item.id, store: storeName)
+    }
+
+    private var selectedPriceOption: PriceOption? {
+        item.priceOptions.first(where: { $0.store.caseInsensitiveCompare(storeName) == .orderedSame })
+        ?? item.priceOptions.first
     }
 
     @State private var textValue: String = ""
@@ -164,7 +174,7 @@ struct VaultItemRow: View {
         }
 
         let clamped = min(newValue, 100)
-        cartViewModel.updateActiveItem(itemId: item.id, quantity: clamped)
+        updateSelectionQuantity(clamped)
         textValue = formatValue(clamped)
         
         let generator = UIImpactFeedbackGenerator(style: .light)
@@ -180,7 +190,7 @@ struct VaultItemRow: View {
         }
 
         let clamped = max(newValue, 0)
-        cartViewModel.updateActiveItem(itemId: item.id, quantity: clamped)
+        updateSelectionQuantity(clamped)
         textValue = formatValue(clamped)
         
         let generator = UIImpactFeedbackGenerator(style: .light)
@@ -194,7 +204,7 @@ struct VaultItemRow: View {
         if let number = formatter.number(from: textValue) {
             let doubleValue = number.doubleValue
             let clamped = min(max(doubleValue, 0), 100)
-            cartViewModel.updateActiveItem(itemId: item.id, quantity: clamped)
+            updateSelectionQuantity(clamped)
 
             if doubleValue != clamped {
                 textValue = formatValue(clamped)
@@ -241,7 +251,7 @@ struct VaultItemRow: View {
                 .foregroundColor(isActive ? .black : Color(hex: "999"))
                 .lexendFont(17)
 
-            if let priceOption = item.priceOptions.first {
+            if let priceOption = selectedPriceOption {
                 HStack(spacing: 0) {
                     Text("\(CurrencyManager.shared.selectedCurrency.symbol)\(priceOption.pricePerUnit.priceValue.formattedPricePerUnitValue)")
                         .contentTransition(.numericText())
@@ -332,7 +342,7 @@ struct VaultItemRow: View {
                 handlePlus()
             } else {
                 withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-                    cartViewModel.updateActiveItem(itemId: item.id, quantity: 1)
+                    updateSelectionQuantity(1)
                 }
             }
         }) {
@@ -347,6 +357,16 @@ struct VaultItemRow: View {
         .contentShape(Circle())
         .buttonStyle(.plain)
         .disabled(isFocused)
+    }
+
+    private func updateSelectionQuantity(_ quantity: Double) {
+        let keysToClear = cartViewModel.activeCartItems.keys.filter { key in
+            ActiveItemSelectionKey.itemId(from: key) == item.id && key != selectionKey
+        }
+        for key in keysToClear {
+            cartViewModel.updateActiveItem(itemId: key, quantity: 0)
+        }
+        cartViewModel.updateActiveItem(itemId: selectionKey, quantity: quantity)
     }
 }
 

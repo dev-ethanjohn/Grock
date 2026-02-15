@@ -941,7 +941,11 @@ struct VaultView: View {
         cartViewModel.activeCartItems.removeAll()
         
         for cartItem in existingCart.cartItems {
-            cartViewModel.activeCartItems[cartItem.itemId] = cartItem.quantity
+            let selectionKey = ActiveItemSelectionKey.make(
+                itemId: cartItem.itemId,
+                store: cartItem.plannedStore
+            )
+            cartViewModel.activeCartItems[selectionKey] = cartItem.quantity
             if let item = vaultService.findItemById(cartItem.itemId) {
                 print("   - Activated: \(item.name) × \(cartItem.quantity)")
             }
@@ -968,7 +972,9 @@ struct VaultView: View {
         guard let foundCategory = vault.categories.first(where: { $0.name == categoryName }) else { return 0 }
         
         let activeItemsCount = foundCategory.items.reduce(0) { count, item in
-            let isActive = (cartViewModel.activeCartItems[item.id] ?? 0) > 0
+            let isActive = cartViewModel.activeCartItems.contains { key, quantity in
+                ActiveItemSelectionKey.itemId(from: key) == item.id && quantity > 0
+            }
             return count + (isActive ? 1 : 0)
         }
         
@@ -996,7 +1002,12 @@ struct VaultView: View {
         
         print("🗑️ Deleting item: '\(item.name)'")
         
-        cartViewModel.activeCartItems.removeValue(forKey: item.id)
+        let keysToRemove = cartViewModel.activeCartItems.keys.filter { key in
+            ActiveItemSelectionKey.itemId(from: key) == item.id
+        }
+        for key in keysToRemove {
+            cartViewModel.activeCartItems.removeValue(forKey: key)
+        }
         
         withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
             vaultService.deleteItem(item)
