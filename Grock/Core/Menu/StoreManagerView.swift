@@ -2,12 +2,12 @@ import SwiftUI
 import SwiftData
 
 struct StoreManagerView: View {
+    
     @Environment(VaultService.self) private var vaultService
     
     @State private var stores: [String] = []
     @State private var showingAddStore = false
     @State private var newStoreName = ""
-    
     @State private var storeToRename: String?
     
     var body: some View {

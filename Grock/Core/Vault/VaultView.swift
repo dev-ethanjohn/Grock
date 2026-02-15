@@ -774,6 +774,20 @@ struct VaultView: View {
         private var groceryCategory: GroceryCategory? {
             GroceryCategory.allCases.first(where: { $0.title == categoryName })
         }
+
+        private var categoryColor: Color {
+            if let customCategory = vaultService.getCategory(named: categoryName),
+               let hex = customCategory.colorHex?.trimmingCharacters(in: .whitespacesAndNewlines),
+               !hex.isEmpty {
+                return Color(hex: hex)
+            }
+
+            if let groceryCategory {
+                return groceryCategory.pastelColor
+            }
+
+            return categoryName.generatedPastelColor
+        }
         
         private var categoryItems: [Item] {
             guard let foundCategory = vaultService.getCategory(named: categoryName) else { return [] }
@@ -805,7 +819,7 @@ struct VaultView: View {
                         items: categoryItems,
                         availableStores: availableStores,
                         selectedStore: .constant(nil),
-                        category: groceryCategory,
+                        categoryColor: categoryColor,
                         onDeleteItem: onDeleteItem
                     )
                 }

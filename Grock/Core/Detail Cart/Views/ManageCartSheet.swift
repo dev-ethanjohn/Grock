@@ -936,7 +936,17 @@ struct CategoryItemsListView: View {
     }
     
     private var categoryColor: Color {
-        groceryCategory?.pastelColor ?? categoryName.generatedPastelColor
+        if let customCategory = vaultService.getCategory(named: categoryName),
+           let hex = customCategory.colorHex?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !hex.isEmpty {
+            return Color(hex: hex)
+        }
+
+        if let groceryCategory {
+            return groceryCategory.pastelColor
+        }
+
+        return categoryName.generatedPastelColor
     }
     
     private var categoryEmoji: String {
@@ -1155,7 +1165,7 @@ struct ManageCartStoreSection: View {
                         .foregroundStyle(headerForegroundColor)
                     
                     Text(storeName)
-                        .fuzzyBubblesFont(11, weight: .bold)
+                        .lexendFont(11, weight: .bold)
                         .foregroundStyle(headerForegroundColor)
                 }
                 .padding(.horizontal, 8)

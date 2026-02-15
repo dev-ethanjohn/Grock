@@ -4,7 +4,7 @@ struct VaultItemsListView: View {
     let items: [Item]
     let availableStores: [String]
     @Binding var selectedStore: String?
-    let category: GroceryCategory?
+    let categoryColor: Color
     var onDeleteItem: ((Item) -> Void)?
     
     private var showEndIndicator: Bool {
@@ -18,7 +18,7 @@ struct VaultItemsListView: View {
                 StoreSection(
                     storeName: store,
                     items: storeItems,
-                    category: category,
+                    categoryColor: categoryColor,
                     onDeleteItem: onDeleteItem,
                     isLastStore: store == availableStores.last
                 )
@@ -67,7 +67,7 @@ struct VaultItemsListView: View {
 struct StoreSection: View {
     let storeName: String
     let items: [Item]
-    let category: GroceryCategory?
+    let categoryColor: Color
     var hasBackgroundImage: Bool = false
     var onDeleteItem: ((Item) -> Void)?
     let isLastStore: Bool
@@ -81,7 +81,7 @@ struct StoreSection: View {
     }
     
     private var headerBackgroundColor: Color {
-        hasBackgroundImage ? .white : (category?.pastelColor.saturated(by: 0.3).darker(by: 0.5) ?? Color.primary)
+        hasBackgroundImage ? .white : categoryColor.saturated(by: 0.3).darker(by: 0.5)
     }
     
     var body: some View {
@@ -111,7 +111,7 @@ struct StoreSection: View {
                 VStack(spacing: 0) {
                     VaultItemRow(
                         item: tuple.item,
-                        category: category
+                        categoryColor: categoryColor
                     )
                     .contextMenu {
                         Button(role: .destructive) {

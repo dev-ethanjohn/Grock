@@ -58,7 +58,7 @@ class KeyboardManager {
 
 struct VaultItemRow: View {
     let item: Item
-    let category: GroceryCategory?
+    let categoryColor: Color
     @Environment(CartViewModel.self) private var cartViewModel
     @Environment(VaultService.self) private var vaultService
     
@@ -225,7 +225,7 @@ struct VaultItemRow: View {
     private var itemIndicator: some View {
         VStack {
             Circle()
-                .fill(isActive ? (category?.pastelColor.saturated(by: 0.3).darker(by: 0.5) ?? Color.primary) : .clear)
+                .fill(isActive ? categoryColor.saturated(by: 0.3).darker(by: 0.5) : .clear)
                 .frame(width: 9, height: 9)
                 .scaleEffect(isActive ? 1 : 0)
                 .animation(.spring(response: 0.3, dampingFraction: 0.5), value: isActive)

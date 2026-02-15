@@ -104,11 +104,17 @@ struct TrashView: View {
                     Section(group.categoryName) {
                         ForEach(group.items, id: \.id) { item in
                             HStack(spacing: 12) {
-                                Image(systemName: "trash")
-                                    .foregroundColor(.gray)
                                 Text(item.name)
                                     .lexend(.body)
                                 Spacer()
+                                Button {
+                                    confirmRestore(item)
+                                } label: {
+                                    Text("🔄")
+                                        .font(.body)
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel("Restore item")
                             }
                             .contentShape(Rectangle())
                             .contextMenu {
