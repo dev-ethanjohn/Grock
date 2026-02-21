@@ -38,7 +38,9 @@ extension VaultService {
                 self.currentUser = newUser
             }
 
-            reconcilePlanEntitlementState(isPro: UserDefaults.standard.isPro)
+            let isPro = UserDefaults.standard.isPro
+            reconcilePlanEntitlementState(isPro: isPro)
+            reconcileCartBackgroundEntitlementState(isPro: isPro)
         } catch {
             self.error = error
             print("❌ Failed to load user and vault: \(error)")

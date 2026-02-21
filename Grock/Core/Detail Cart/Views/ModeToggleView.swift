@@ -6,8 +6,6 @@ struct ColorOption: Identifiable, Equatable {
     let hex: String
     let name: String
     
-    static let defaultColor =  ColorOption(hex: "FFFFFF", name: "White")
-    
     static let options: [ColorOption] = [
         // Warm tones
         ColorOption(hex: "F5E9D9", name: "Warm Beige"),
@@ -31,6 +29,10 @@ struct ColorOption: Identifiable, Equatable {
         ColorOption(hex: "F0F0F0", name: "Cloud Gray"),
         ColorOption(hex: "FFFFFF", name: "White"),
     ]
+
+    static var defaultColor: ColorOption {
+        options.first ?? ColorOption(hex: "FFFFFF", name: "White")
+    }
     
     var color: Color {
         Color(hex: hex)
@@ -215,6 +217,8 @@ struct ColorPickerButton: View {
     let cart: Cart
     
     @State private var hasBackgroundImage: Bool = false
+    @State private var subscriptionManager = SubscriptionManager.shared
+    @State private var showPaywall = false
     
     var body: some View {
         Button(action: { showingColorPicker.toggle() }) {
@@ -275,11 +279,26 @@ struct ColorPickerButton: View {
             ColorPickerPopup(
                 selectedColor: $selectedColor,
                 isPresented: $showingColorPicker,
-                cart: cart
+                cart: cart,
+                isPro: subscriptionManager.isPro,
+                onLockedImageTap: {
+                    showingColorPicker = false
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+                        showPaywall = true
+                    }
+                }
             )
             .presentationCompactAdaptation(.popover)
             .presentationCornerRadius(16)
             .presentationBackground(.white)
+        }
+        .task {
+            await subscriptionManager.refreshCustomerInfo()
+        }
+        .fullScreenCover(isPresented: $showPaywall) {
+            GrockPaywallView {
+                showPaywall = false
+            }
         }
     }
     
@@ -293,6 +312,8 @@ struct ColorPickerPopup: View {
     @Binding var isPresented: Bool
     @Environment(\.dismiss) private var dismiss
     let cart: Cart
+    let isPro: Bool
+    let onLockedImageTap: () -> Void
     
     @State private var selectedImage: UIImage? = nil
     @State private var photosPickerItem: PhotosPickerItem? = nil
@@ -305,12 +326,16 @@ struct ColorPickerPopup: View {
     
     var body: some View {
         HStack(spacing: 4) {
-            ImagePickerCircle(
-                selectedImage: $selectedImage,
-                photosPickerItem: $photosPickerItem,
-                isLoadingImage: $isLoadingImage,
-                cart: cart
-            )
+            if isPro {
+                ImagePickerCircle(
+                    selectedImage: $selectedImage,
+                    photosPickerItem: $photosPickerItem,
+                    isLoadingImage: $isLoadingImage,
+                    cart: cart
+                )
+            } else {
+                LockedImagePickerCircle(action: onLockedImageTap)
+            }
             
             //
             Text("|")
@@ -334,6 +359,45 @@ struct ColorPickerPopup: View {
                 selectedImage = image
             }
         }
+    }
+}
+
+struct LockedImagePickerCircle: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            ZStack {
+                Circle()
+                    .fill(Color.gray.opacity(0.1))
+                    .frame(width: 40, height: 40)
+                    .overlay(
+                        Circle()
+                            .stroke(Color.black.opacity(0.2), lineWidth: 1)
+                    )
+
+                Image(systemName: "photo")
+                    .lexendFont(16)
+                    .foregroundColor(.black.opacity(0.45))
+
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        ZStack {
+                            Circle()
+                                .fill(Color.white)
+                                .frame(width: 22, height: 22)
+                            Text("💎")
+                                .font(.system(size: 11))
+                        }
+                        .offset(x: 2, y: 2)
+                    }
+                }
+            }
+        }
+        .buttonStyle(PlainButtonStyle())
+        .frame(width: 40, height: 40)
     }
 }
 
@@ -388,6 +452,10 @@ struct ImagePickerCircle: View {
         .frame(width: 40, height: 40)
         .onChange(of: photosPickerItem) { oldItem, newItem in
             guard let newItem = newItem else { return }
+            guard UserDefaults.standard.isPro else {
+                photosPickerItem = nil
+                return
+            }
             
             Task {
                 isLoadingImage = true
@@ -561,8 +629,20 @@ class CartBackgroundImageManager: @unchecked Sendable {
             print("❌ Failed to save image: \(error)")
         }
     }
+
+    /// Checks if a cart has a stored background image on disk, regardless of entitlement.
+    func hasStoredBackgroundImage(forCartId cartId: String) -> Bool {
+        if UserDefaults.standard.bool(forKey: "hasBackgroundImage_\(cartId)") {
+            return true
+        }
+
+        let filename = getDocumentsDirectory().appendingPathComponent("cart_background_\(cartId).jpg")
+        return fileManager.fileExists(atPath: filename.path)
+    }
     
     func loadImage(forCartId cartId: String) -> UIImage? {
+        guard UserDefaults.standard.isPro else { return nil }
+
         // Try cache first
         if let cached = ImageCacheManager.shared.getImage(forCartId: cartId) {
             return cached
@@ -583,6 +663,8 @@ class CartBackgroundImageManager: @unchecked Sendable {
     }
     
     func hasBackgroundImage(forCartId cartId: String) -> Bool {
+        guard UserDefaults.standard.isPro else { return false }
+
         if UserDefaults.standard.bool(forKey: "hasBackgroundImage_\(cartId)") {
             return true
         }

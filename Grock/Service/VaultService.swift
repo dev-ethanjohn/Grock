@@ -81,6 +81,7 @@ class VaultService {
     @objc private func handleSubscriptionStatusChanged(_ notification: Notification) {
         let isPro = (notification.userInfo?["isPro"] as? Bool) ?? UserDefaults.standard.isPro
         reconcilePlanEntitlementState(isPro: isPro)
+        reconcileCartBackgroundEntitlementState(isPro: isPro)
     }
     
     /// Clears internal caches used for faster lookups.

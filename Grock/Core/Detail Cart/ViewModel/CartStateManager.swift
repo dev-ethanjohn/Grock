@@ -22,6 +22,7 @@ final class CartStateManager {
     var showingColorPicker = false
     var hasBackgroundImage: Bool = false
     var backgroundImage: UIImage? = nil
+    var backgroundImageCartId: String? = nil
     
     // Mode-specific state
     var showFinishTripButton = false

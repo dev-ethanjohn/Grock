@@ -12,6 +12,7 @@ extension VaultService {
     func createCart(name: String, budget: Double) -> Cart {
         let newCart = Cart(name: name, budget: budget, status: .planning)
         vault?.carts.append(newCart)
+        UserDefaults.standard.set(ColorOption.defaultColor.hex, forKey: "cartBackgroundColor_\(newCart.id)")
         saveContext()
         return newCart
     }
@@ -41,6 +42,72 @@ extension VaultService {
         saveContext()
 
         return newCart
+    }
+
+    /// Enforces plan-based background limitations for carts.
+    ///
+    /// Free plan behavior:
+    /// - Custom background images are hidden (but preserved on disk).
+    /// - Background color is reset to the app's default cart color.
+    /// - UI update notifications are emitted per cart.
+    ///
+    /// Pro behavior:
+    /// - Preserved custom background images are re-enabled and refreshed in UI.
+    func reconcileCartBackgroundEntitlementState(isPro: Bool) {
+        guard let vault else { return }
+
+        let defaultColorHex = ColorOption.defaultColor.hex
+
+        for cart in vault.carts {
+            let cartId = cart.id
+            let colorKey = "cartBackgroundColor_\(cartId)"
+            let currentHex = UserDefaults.standard.string(forKey: colorKey)
+            let hasStoredImage = CartBackgroundImageManager.shared.hasStoredBackgroundImage(forCartId: cartId)
+            var shouldNotifyColorChange = false
+
+            if isPro {
+                // Refresh preserved Pro image backgrounds after re-subscribe.
+                if hasStoredImage {
+                    NotificationCenter.default.post(
+                        name: Notification.Name("CartBackgroundImageChanged"),
+                        object: nil,
+                        userInfo: ["cartId": cartId]
+                    )
+                    shouldNotifyColorChange = true
+                }
+            } else {
+                // Free mode: hide image backgrounds without deleting them.
+                UserDefaults.standard.removeObject(forKey: "hasBackgroundImage_\(cartId)")
+
+                if currentHex != defaultColorHex {
+                    UserDefaults.standard.set(defaultColorHex, forKey: colorKey)
+                    shouldNotifyColorChange = true
+                }
+
+                if hasStoredImage {
+                    NotificationCenter.default.post(
+                        name: Notification.Name("CartBackgroundImageChanged"),
+                        object: nil,
+                        userInfo: ["cartId": cartId]
+                    )
+                    shouldNotifyColorChange = true
+                }
+            }
+
+            if shouldNotifyColorChange {
+                let resolvedHex = UserDefaults.standard.string(forKey: colorKey) ?? defaultColorHex
+                NotificationCenter.default.post(
+                    name: Notification.Name("CartColorChanged"),
+                    object: nil,
+                    userInfo: ["cartId": cartId, "colorHex": resolvedHex]
+                )
+            }
+        }
+
+        if !isPro {
+            // Ensure stale in-memory images don't linger while entitlement is inactive.
+            ImageCacheManager.shared.clearCache()
+        }
     }
 
     func deleteCart(_ cart: Cart) {

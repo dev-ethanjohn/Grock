@@ -337,6 +337,10 @@ private struct ItemsListContent: View {
     @Environment(VaultService.self) private var vaultService
     @Environment(CartStateManager.self) private var stateManager
     //    @Namespace private var summaryNamespace
+
+    private var hasCurrentCartBackgroundImage: Bool {
+        stateManager.hasBackgroundImage && stateManager.backgroundImageCartId == cart.id
+    }
     
     // Helper methods
     private func getDisplayItems(for store: String) -> [(cartItem: CartItem, item: Item?)] {
@@ -396,7 +400,7 @@ private struct ItemsListContent: View {
                         identity: ReverseCharacterRevealModifier(progress: 1)
                     )
                 ))
-                .offset(y: stateManager.hasBackgroundImage ? 0 : 4)
+                .offset(y: hasCurrentCartBackgroundImage ? 0 : 4)
             }
         }
         .animation(.spring(response: 0.45, dampingFraction: 0.75), value: cart.isShopping)
@@ -416,6 +420,22 @@ private struct StoreItemsList: View {
     let geometry: GeometryProxy
     
     @Environment(CartStateManager.self) private var stateManager
+
+    private var hasCurrentCartBackgroundImage: Bool {
+        stateManager.hasBackgroundImage && stateManager.backgroundImageCartId == cart.id
+    }
+
+    private var currentBackgroundImage: UIImage? {
+        stateManager.backgroundImageCartId == cart.id ? stateManager.backgroundImage : nil
+    }
+
+    private var currentEffectiveBackgroundColor: Color {
+        hasCurrentCartBackgroundImage ? .clear : stateManager.backgroundColor
+    }
+
+    private var currentEffectiveRowBackgroundColor: Color {
+        hasCurrentCartBackgroundImage ? .clear : stateManager.rowBackgroundColor
+    }
     
     var body: some View {
         cardContent
@@ -428,9 +448,9 @@ private struct StoreItemsList: View {
             // Card Background
             ZStack {
                 let background = ListBackgroundView(
-                    hasBackgroundImage: stateManager.hasBackgroundImage,
-                    backgroundImage: stateManager.backgroundImage,
-                    backgroundColor: stateManager.effectiveBackgroundColor,
+                    hasBackgroundImage: hasCurrentCartBackgroundImage,
+                    backgroundImage: currentBackgroundImage,
+                    backgroundColor: currentEffectiveBackgroundColor,
                     geometry: geometry,
                     height: min(calculatedHeight, maxAllowedHeight) // ✅ Pass explicit height
                 )
@@ -441,7 +461,7 @@ private struct StoreItemsList: View {
             }
             .frame(height: min(calculatedHeight, maxAllowedHeight))
             .clipShape(RoundedRectangle(cornerRadius: 16))
-            .applyBorderAndCorners(hasBackgroundImage: stateManager.hasBackgroundImage, isShopping: cart.isShopping)
+            .applyBorderAndCorners(hasBackgroundImage: hasCurrentCartBackgroundImage, isShopping: cart.isShopping)
             
             .overlay(
                 // Glare Effect
@@ -459,7 +479,7 @@ private struct StoreItemsList: View {
                 .frame(height: min(calculatedHeight, maxAllowedHeight))
                 .applyListStyling()
                 .scrollContentBackground(.hidden)
-                .background(stateManager.effectiveRowBackgroundColor)
+                .background(currentEffectiveRowBackgroundColor)
                 .clipShape(RoundedRectangle(cornerRadius: 16)) // ✅ Clip content to prevent overflow
                 .mask(RoundedRectangle(cornerRadius: 16)) // Double ensure clipping for list content
         }
@@ -489,7 +509,7 @@ private struct StoreItemsList: View {
                     )
                     .listRowInsets(EdgeInsets())
                     .listRowSeparator(.hidden)
-                    .listRowBackground(stateManager.effectiveRowBackgroundColor)
+                    .listRowBackground(currentEffectiveRowBackgroundColor)
                 }
             }
         }

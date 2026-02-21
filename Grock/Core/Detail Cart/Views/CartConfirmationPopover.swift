@@ -227,7 +227,7 @@ struct CartConfirmationPopover: View {
             }
             .frame(width: UIScreen.main.bounds.width * 0.92)
             .presentationBackground(.clear)
-            .background(Color(hex: "F7F2ED"))
+            .background(ColorOption.defaultColor.color)
             .clipShape(RoundedRectangle(cornerRadius: 24))
             .shadow(color: .black.opacity(0.2), radius: 20, x: 0, y: 10)
             

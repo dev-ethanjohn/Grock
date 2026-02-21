@@ -329,29 +329,20 @@ struct CartDetailScreen: View {
         
         stateManager.localBudget = cart.budget
         stateManager.animatedBudget = cart.budget
-        
+
+        // Reset cart-specific visual state immediately to avoid flashing a previous cart's background.
+        stateManager.backgroundImageCartId = cart.id
+        stateManager.backgroundImage = nil
+        stateManager.hasBackgroundImage = false
+
+        // Always reset to default first, then apply persisted color if available.
+        stateManager.selectedColor = .defaultColor
         if let savedHex = UserDefaults.standard.string(forKey: "cartBackgroundColor_\(cart.id)"),
            let savedColor = ColorOption.options.first(where: { $0.hex == savedHex }) {
             stateManager.selectedColor = savedColor
         }
-        
-        stateManager.hasBackgroundImage = CartBackgroundImageManager.shared.hasBackgroundImage(forCartId: cart.id)
-        if stateManager.hasBackgroundImage {
-            let cartId = cart.id
-            if let cached = ImageCacheManager.shared.getImage(forCartId: cartId) {
-                stateManager.backgroundImage = cached
-            } else {
-                Task.detached(priority: .userInitiated) {
-                    let image = CartBackgroundImageManager.shared.loadImage(forCartId: cartId)
-                    await MainActor.run {
-                        stateManager.backgroundImage = image
-                        if let image {
-                            ImageCacheManager.shared.saveImage(image, forCartId: cartId)
-                        }
-                    }
-                }
-            }
-        }
+
+        loadBackgroundImage()
         
         if cart.isShopping && hasItems {
             stateManager.showFinishTripButton = true
@@ -368,6 +359,39 @@ struct CartDetailScreen: View {
             object: nil,
             userInfo: ["cartId": cart.id]
         )
+    }
+
+    private func loadBackgroundImage() {
+        let cartId = cart.id
+        stateManager.backgroundImageCartId = cartId
+        stateManager.backgroundImage = nil
+
+        let hasImage = CartBackgroundImageManager.shared.hasBackgroundImage(forCartId: cartId)
+        stateManager.hasBackgroundImage = hasImage
+
+        if !(stateManager.selectedColor.hex == "FFFFFF" || hasImage) {
+            stateManager.backgroundImage = nil
+            stateManager.hasBackgroundImage = false
+            return
+        }
+
+        if let cached = ImageCacheManager.shared.getImage(forCartId: cartId) {
+            stateManager.backgroundImage = cached
+            stateManager.hasBackgroundImage = true
+            return
+        }
+
+        Task.detached(priority: .userInitiated) { [cartId] in
+            let image = CartBackgroundImageManager.shared.loadImage(forCartId: cartId)?.resized(to: 1800)
+            await MainActor.run {
+                guard stateManager.backgroundImageCartId == cartId else { return }
+                stateManager.backgroundImage = image
+                stateManager.hasBackgroundImage = image != nil
+                if let image {
+                    ImageCacheManager.shared.saveImage(image, forCartId: cartId)
+                }
+            }
+        }
     }
     
     private func saveStateOnDismiss() {
@@ -1063,6 +1087,16 @@ struct CartDetailContent: View {
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("CartBackgroundImageChanged"))) { notification in
             handleBackgroundImageChange(notification)
         }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("CartColorChanged"))) { notification in
+            guard let cartId = notification.userInfo?["cartId"] as? String, cartId == cart.id else { return }
+            let fallback = ColorOption.defaultColor
+            if let colorHex = notification.userInfo?["colorHex"] as? String,
+               let matched = ColorOption.options.first(where: { $0.hex == colorHex }) {
+                stateManager.selectedColor = matched
+            } else {
+                stateManager.selectedColor = fallback
+            }
+        }
     }
     
     // MARK: - Event Handlers
@@ -1219,6 +1253,9 @@ struct CartDetailContent: View {
     
     private func loadBackgroundImage() {
         let cartId = cart.id
+        stateManager.backgroundImageCartId = cartId
+        stateManager.backgroundImage = nil
+
         let hasImage = CartBackgroundImageManager.shared.hasBackgroundImage(forCartId: cartId)
         stateManager.hasBackgroundImage = hasImage
         
@@ -1237,6 +1274,7 @@ struct CartDetailContent: View {
         Task.detached(priority: .userInitiated) { [cartId] in
             let image = CartBackgroundImageManager.shared.loadImage(forCartId: cartId)?.resized(to: 1800)
             await MainActor.run {
+                guard stateManager.backgroundImageCartId == cartId else { return }
                 stateManager.backgroundImage = image
                 stateManager.hasBackgroundImage = image != nil
                 if let image {
