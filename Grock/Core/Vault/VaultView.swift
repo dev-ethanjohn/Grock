@@ -357,6 +357,7 @@ struct VaultView: View {
                 cartViewModel: cartViewModel,
                 vaultService: vaultService,
                 onCreateCart: onCreateCart,
+                onActiveCartLimitReached: presentProPaywallForActiveCartLimit,
                 onCelebrationDismiss: handleCelebrationDismiss
             )
     }
@@ -518,6 +519,7 @@ struct VaultView: View {
             onNavigatePrevious: navigateToPreviousCategory,
             onNavigateNext: navigateToNextCategory,
             onAddItemsToCart: onAddItemsToCart,
+            onActiveCartLimitReached: presentProPaywallForActiveCartLimit,
             dismissKeyboard: dismissKeyboard
         )
         .onChange(of: hasActiveItems) { oldValue, newValue in
@@ -952,6 +954,12 @@ struct VaultView: View {
         HapticManager.shared.playMedium()
         showPaywall = true
     }
+
+    private func presentProPaywallForActiveCartLimit() {
+        dismissKeyboard()
+        HapticManager.shared.playMedium()
+        showPaywall = true
+    }
     
     // MARK: - Data Methods
 
@@ -1170,6 +1178,7 @@ extension View {
         cartViewModel: CartViewModel,
         vaultService: VaultService,
         onCreateCart: ((Cart) -> Void)?,
+        onActiveCartLimitReached: @escaping () -> Void,
         onCelebrationDismiss: @escaping () -> Void
     ) -> some View {
         self
@@ -1214,6 +1223,9 @@ extension View {
                         onCreateCart?(newCart)
                     } else {
                         print("❌ Failed to create cart")
+                        if cartViewModel.isActiveCartLimitReached() {
+                            onActiveCartLimitReached()
+                        }
                     }
                 }
             }) {

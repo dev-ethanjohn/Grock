@@ -20,6 +20,7 @@ struct VaultBottomContent: View {
     let onNavigatePrevious: () -> Void
     let onNavigateNext: () -> Void
     let onAddItemsToCart: (([String: Double]) -> Void)?
+    let onActiveCartLimitReached: () -> Void
     let dismissKeyboard: () -> Void
     
     var body: some View {
@@ -118,6 +119,10 @@ struct VaultBottomContent: View {
                 onAddItemsToCart?(cartViewModel.activeCartItems)
                 dismiss()
             } else {
+                guard !cartViewModel.isActiveCartLimitReached() else {
+                    onActiveCartLimitReached()
+                    return
+                }
                 withAnimation {
                     showCartConfirmation = true
                 }

@@ -54,6 +54,7 @@ struct HomeView: View {
     @Environment(\.modelContext) private var modelContext
     
     @State private var subscriptionManager = SubscriptionManager.shared
+    @State private var showPaywall = false
     
     // Name entry sheet state
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding: Bool = false
@@ -141,6 +142,11 @@ struct HomeView: View {
                         let success = viewModel.handleCreateCartConfirmation(title: title, budget: budget)
                         if success {
                             showCreateCartPopover = false
+                        } else if cartViewModel.isActiveCartLimitReached() {
+                            showCreateCartPopover = false
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+                                showPaywall = true
+                            }
                         }
                     },
                     onCancel: {
@@ -149,6 +155,11 @@ struct HomeView: View {
                     },
                     isPresented: $showCreateCartPopover,
                 )
+            }
+            .fullScreenCover(isPresented: $showPaywall) {
+                GrockPaywallView {
+                    showPaywall = false
+                }
             }
             // Add delete alert
             .alert("Delete Cart", isPresented: $showingDeleteAlert) {
@@ -531,6 +542,10 @@ struct HomeView: View {
     
     private var createCartButton: some View {
         Button(action: {
+            guard !cartViewModel.isActiveCartLimitReached() else {
+                showPaywall = true
+                return
+            }
             showCreateCartPopover = true
         }) {
             Text("Create Cart")
