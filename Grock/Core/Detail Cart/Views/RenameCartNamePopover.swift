@@ -18,7 +18,7 @@ struct RenamePopover: View {
     
     @State private var overlayOpacity: Double = 0
     @State private var contentScale: CGFloat = 0.9
-    @State private var keyboardVisible: Bool = false
+    @State private var keyboardHeight: CGFloat = 0
     
     @State private var isInvalidName = false
     @State private var errorMessage: String = ""
@@ -72,7 +72,7 @@ struct RenamePopover: View {
                         if cartName.isEmpty {
                             Text(placeholder)
                                 .renameInputFont(useLexend: useLexendInputFont)
-                                .foregroundColor(Color(hex: "999"))
+                                .foregroundColor(Color.Grock.textMuted)
                         }
                         
                         TextField("", text: $cartName, onCommit: {
@@ -97,7 +97,7 @@ struct RenamePopover: View {
                         }) {
                             Image(systemName: "xmark.circle.fill")
                                 .lexendFont(20)
-                                .foregroundColor(Color(hex: "999"))
+                                .foregroundColor(Color.Grock.textMuted)
                                 .frame(width: 24, height: 24)
                         }
                         .padding(.leading, 8)
@@ -119,7 +119,7 @@ struct RenamePopover: View {
                 if isInvalidName {
                     Text(errorMessage)
                         .lexendFont(11, weight: .medium)
-                        .foregroundColor(Color(hex: "FA003F"))
+                        .foregroundColor(Color.Grock.accentDanger)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.top, 8)
                         .transition(
@@ -196,12 +196,12 @@ struct RenamePopover: View {
             .background(Color.white)
             .cornerRadius(24)
             .scaleEffect(contentScale)
-            .offset(y: keyboardVisible ? -min(UIScreen.main.bounds.height * 0.03, 24) : 0)
+            .offset(y: -popoverKeyboardShift)
             .shadow(color: Color.black.opacity(0.15), radius: 20, x: 0, y: 10)
             .animation(.spring(response: 0.2, dampingFraction: 0.7, blendDuration: 0.1), value: isValidName)
-            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: keyboardVisible)
+            .animation(.spring(response: 0.35, dampingFraction: 0.8), value: keyboardHeight)
             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isInvalidName)
-            .frame(maxHeight: .infinity, alignment: keyboardVisible ? .center : .center)
+            .frame(maxHeight: .infinity, alignment: .center)
             .padding(.horizontal, UIScreen.main.bounds.width * 0.038)
         }
         .onAppear {
@@ -233,15 +233,17 @@ struct RenamePopover: View {
         }
         .onDisappear {
             nameFieldIsFocused = false
+            keyboardHeight = 0
         }
-        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
-            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                keyboardVisible = true
-            }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { notification in
+            updateKeyboardHeight(from: notification)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { notification in
+            updateKeyboardHeight(from: notification)
         }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
             withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                keyboardVisible = false
+                keyboardHeight = 0
             }
         }
     }
@@ -279,6 +281,7 @@ struct RenamePopover: View {
     
     private func dismissPopover() {
         nameFieldIsFocused = false
+        keyboardHeight = 0
         withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
             overlayOpacity = 0
             contentScale = 0.9
@@ -298,6 +301,29 @@ struct RenamePopover: View {
         }
         
         return windowScene.windows.first
+    }
+    
+    private var adjustedKeyboardHeight: CGFloat {
+        let safeAreaBottom = getKeyWindow()?.safeAreaInsets.bottom ?? 0
+        return max(0, keyboardHeight - safeAreaBottom)
+    }
+    
+    private var popoverKeyboardShift: CGFloat {
+        guard adjustedKeyboardHeight > 0 else { return 0 }
+        return min((adjustedKeyboardHeight * 0.4) + 8, UIScreen.main.bounds.height * 0.2)
+    }
+    
+    private func updateKeyboardHeight(from notification: Notification) {
+        guard let keyboardFrame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect else {
+            return
+        }
+        
+        let windowHeight = getKeyWindow()?.bounds.height ?? UIScreen.main.bounds.height
+        let newHeight = max(0, windowHeight - keyboardFrame.minY)
+        
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+            keyboardHeight = newHeight
+        }
     }
 }
 

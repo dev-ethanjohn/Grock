@@ -7,6 +7,7 @@ struct VaultCategoryNameIcon: View {
     let itemCount: Int
     let hasItems: Bool
     let iconText: String?
+    let isLocked: Bool
     let action: () -> Void
     
     @State private var opacityBounce: Double = 1.0
@@ -14,6 +15,24 @@ struct VaultCategoryNameIcon: View {
     @State private var iconScale: Double = 1.0
     
     @Environment(VaultService.self) private var vaultService
+
+    init(
+        name: String,
+        isSelected: Bool,
+        itemCount: Int,
+        hasItems: Bool,
+        iconText: String?,
+        isLocked: Bool = false,
+        action: @escaping () -> Void
+    ) {
+        self.name = name
+        self.isSelected = isSelected
+        self.itemCount = itemCount
+        self.hasItems = hasItems
+        self.iconText = iconText
+        self.isLocked = isLocked
+        self.action = action
+    }
 
     private var groceryCategory: GroceryCategory? {
         GroceryCategory.allCases.first(where: { $0.title == name })
@@ -49,35 +68,63 @@ struct VaultCategoryNameIcon: View {
     private var isAlphabeticIcon: Bool {
         resolvedIconText.unicodeScalars.allSatisfy { CharacterSet.letters.contains($0) }
     }
+
+    private var iconOpacity: Double {
+        return hasItems ? opacityBounce : 0.3
+    }
     
     var body: some View {
         Button(action: action) {
             ZStack(alignment: .topTrailing) {
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(
-                        RadialGradient(
-                            colors: [
-                                baseColor.darker(by: 0.07).saturated(by: 0.03),
-                                baseColor.darker(by: 0.15).saturated(by: 0.05),
-                            ],
-                            center: .center,
-                            startRadius: 0,
-                            endRadius: fillAnimation * 30
+                ZStack {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(
+                            RadialGradient(
+                                colors: [
+                                    baseColor.darker(by: 0.07).saturated(by: 0.03),
+                                    baseColor.darker(by: 0.15).saturated(by: 0.05),
+                                ],
+                                center: .center,
+                                startRadius: 0,
+                                endRadius: fillAnimation * 30
+                            )
                         )
-                    )
-                    .shadow(
-                        color: .black.opacity(hasItems ? 0.10 : 0.0),
-                        radius: 2,
-                        x: 0,
-                        y: 1
-                    )
-                    .frame(width: 42, height: 42)
-                    .scaleEffect(iconScale)
-                
-                Text(resolvedIconText)
-                    .font(.system(size: iconFontSize, weight: isAlphabeticIcon ? .bold : .regular))
-                    .frame(width: 42, height: 42)
-                    .scaleEffect(iconScale)
+                        .overlay {
+                            if !isLocked {
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(Color.black.opacity(0.6), lineWidth: 0.5)
+                            }
+                        }
+
+                        .frame(width: 42, height: 42)
+                        .scaleEffect(iconScale)
+                    
+                    Text(resolvedIconText)
+                        .font(.system(size: iconFontSize, weight: isAlphabeticIcon ? .bold : .regular))
+                        .frame(width: 42, height: 42)
+                        .scaleEffect(iconScale)
+                }
+                .grayscale(isLocked ? 1 : 0)
+                .opacity(iconOpacity)
+                .overlay {
+                    if isLocked {
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color.white.opacity(0.7))
+                    }
+                }
+                .overlay(alignment: .bottomTrailing) {
+                    if isLocked {
+                        ZStack {
+                            Circle()
+                                .fill(Color.white)
+                                .frame(width: 20, height: 20)
+                            Text("💎")
+                                .font(.system(size: 10))
+                        }
+                        .offset(x: 3, y: 3)
+                        .allowsHitTesting(false)
+                    }
+                }
                 
                 if itemCount > 0 {
                     Text("\(itemCount)")
@@ -89,15 +136,17 @@ struct VaultCategoryNameIcon: View {
                         .offset(x: 2, y: -2)
                         .background(.white)
                         .clipShape(Capsule())
-                        .scaleEffect(itemCount > 0 ? 1 : 0)
+                        .transition(.scale(scale: 0.2, anchor: .topTrailing))
                         .contentTransition(.numericText())
                         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: itemCount)
                 }
+
             }
             .padding(2)
+            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: itemCount > 0)
         }
-        .opacity(hasItems ? opacityBounce : 0.3)
         .onChange(of: hasItems) { _, newValue in
+            guard !isLocked else { return }
             if newValue {
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
                     opacityBounce = 0.9

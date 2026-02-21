@@ -60,6 +60,8 @@ struct VaultItemRow: View {
     let item: Item
     let storeName: String
     let categoryColor: Color
+    let isEditingLocked: Bool
+    let onLockedEditAttempt: (() -> Void)?
     @Environment(CartViewModel.self) private var cartViewModel
     @Environment(VaultService.self) private var vaultService
     
@@ -109,6 +111,10 @@ struct VaultItemRow: View {
                 // If text field is focused, tapping elsewhere should dismiss keyboard
                 isFocused = false
             } else {
+                guard !isEditingLocked else {
+                    onLockedEditAttempt?()
+                    return
+                }
                 editItem = item
             }
         }
@@ -127,10 +133,22 @@ struct VaultItemRow: View {
             .presentationBackground(.white)
         }
         .contextMenu {
-            Button {
-                editItem = item
-            } label: {
-                Label("Edit", systemImage: "pencil")
+            if isEditingLocked {
+                Button {
+                    onLockedEditAttempt?()
+                } label: {
+                    Label {
+                        Text("Unlock Pro to Edit")
+                    } icon: {
+                        Text("💎")
+                    }
+                }
+            } else {
+                Button {
+                    editItem = item
+                } label: {
+                    Label("Edit", systemImage: "pencil")
+                }
             }
         }
         .onChange(of: currentQuantity) { _, newValue in
@@ -166,6 +184,11 @@ struct VaultItemRow: View {
     }
 
     private func handlePlus() {
+        guard !isEditingLocked else {
+            onLockedEditAttempt?()
+            return
+        }
+
         let newValue: Double
         if currentQuantity.truncatingRemainder(dividingBy: 1) != 0 {
             newValue = ceil(currentQuantity)
@@ -182,6 +205,11 @@ struct VaultItemRow: View {
     }
 
     private func handleMinus() {
+        guard !isEditingLocked else {
+            onLockedEditAttempt?()
+            return
+        }
+
         let newValue: Double
         if currentQuantity.truncatingRemainder(dividingBy: 1) != 0 {
             newValue = floor(currentQuantity)
@@ -198,6 +226,13 @@ struct VaultItemRow: View {
     }
 
     private func commitTextField() {
+        guard !isEditingLocked else {
+            onLockedEditAttempt?()
+            isFocused = false
+            textValue = formatValue(currentQuantity)
+            return
+        }
+
         let formatter = NumberFormatter()
         formatter.numberStyle = .decimal
 
@@ -248,7 +283,7 @@ struct VaultItemRow: View {
     private var itemDetails: some View {
         VStack(alignment: .leading, spacing: 1) {
             Text(item.name)
-                .foregroundColor(isActive ? .black : Color(hex: "999"))
+                .foregroundColor(isActive ? .black : Color.Grock.textMuted)
                 .lexendFont(17)
 
             if let priceOption = selectedPriceOption {
@@ -260,7 +295,7 @@ struct VaultItemRow: View {
                     Spacer()
                 }
                 .lexendFont(12)
-                .foregroundColor(isActive ? .black : Color(hex: "999"))
+                .foregroundColor(isActive ? .black : Color.Grock.textMuted)
             }
         }
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isActive)
@@ -286,7 +321,7 @@ struct VaultItemRow: View {
         } label: {
             Image(systemName: "minus")
                 .lexend(.footnote).bold()
-                .foregroundColor(Color(hex: "1E2A36"))
+                .foregroundColor(Color.Grock.textDeep)
                 .frame(width: 24, height: 24)
                 .background(.white)
                 .clipShape(Circle())
@@ -301,7 +336,7 @@ struct VaultItemRow: View {
         ZStack {
             Text(textValue)
                 .lexendFont(15, weight: .bold)
-                .foregroundColor(Color(hex: "2C3E50"))
+                .foregroundColor(Color.Grock.textDeepAlt)
                 .multilineTextAlignment(.center)
                 .contentTransition(.numericText())
                 .animation(.spring(response: 0.3, dampingFraction: 0.7), value: textValue)
@@ -314,6 +349,7 @@ struct VaultItemRow: View {
                 .multilineTextAlignment(.center)
                 .autocorrectionDisabled()
                 .focused($isFocused)
+                .disabled(isEditingLocked)
                 .numbersOnly($textValue, includeDecimal: true)
                 .onChange(of: isFocused) { _, focused in
                     if !focused {
@@ -329,7 +365,7 @@ struct VaultItemRow: View {
         .padding(.horizontal, 6)
         .background(
             RoundedRectangle(cornerRadius: 6)
-                .stroke(Color(hex: "F2F2F2").darker(by: 0.1), lineWidth: 1)
+                .stroke(Color.Grock.borderSubtle.darker(by: 0.1), lineWidth: 1)
         )
         .frame(minWidth: 40)
         .frame(maxWidth: 80)
@@ -338,6 +374,10 @@ struct VaultItemRow: View {
     
     private var plusButton: some View {
         Button(action: {
+            guard !isEditingLocked else {
+                onLockedEditAttempt?()
+                return
+            }
             if isActive {
                 handlePlus()
             } else {
@@ -349,17 +389,22 @@ struct VaultItemRow: View {
             Image(systemName: "plus")
                 .lexend(.footnote)
                 .bold()
-                .foregroundColor(isActive ? Color(hex: "1E2A36") : Color(hex: "888888"))
+                .foregroundColor(isActive ? Color.Grock.textDeep : Color.Grock.neutral500)
         }
         .frame(width: 24, height: 24)
         .background(.white)
         .clipShape(Circle())
         .contentShape(Circle())
         .buttonStyle(.plain)
-        .disabled(isFocused)
+        .disabled(isFocused || isEditingLocked)
     }
 
     private func updateSelectionQuantity(_ quantity: Double) {
+        guard !isEditingLocked else {
+            onLockedEditAttempt?()
+            return
+        }
+
         let keysToClear = cartViewModel.activeCartItems.keys.filter { key in
             ActiveItemSelectionKey.itemId(from: key) == item.id && key != selectionKey
         }

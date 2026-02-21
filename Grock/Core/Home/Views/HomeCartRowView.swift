@@ -45,11 +45,11 @@ struct HomeCartRowView: View {
     private var budgetProgressColor: Color {
         let progress = currentProgress
         if progress < 0.7 {
-            return Color(hex: "98F476")
+            return Color.Grock.budgetSafe
         } else if progress < 0.9 {
             return Color(hex: "FFB166")
         } else {
-            return Color(hex: "F47676")
+            return Color.Grock.budgetOver
         }
         
     }
@@ -428,7 +428,7 @@ struct HomeCartRowView: View {
 //            }
             
             if cart.isShopping {
-                let summaryColor = hasBackgroundImage ? Color.white.opacity(0.82) : Color(hex: "717171")
+                let summaryColor = hasBackgroundImage ? Color.white.opacity(0.82) : Color.Grock.textSubtle
                 CharacterRevealView(
                     text: "Spent so far: \(fulfilledItemsTotal)",
                     delay: 0.15,

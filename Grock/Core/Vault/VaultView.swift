@@ -98,12 +98,16 @@ struct VaultView: View {
 
     @State private var searchText: String = ""
     @State private var isSearching: Bool = false
+    @State private var subscriptionManager = SubscriptionManager.shared
+    @State private var showPaywall = false
     @Namespace private var searchNamespace
     @Namespace private var categoryManagerNamespace
     
     private var totalVaultItemsCount: Int {
         guard let vault = vaultService.vault else { return 0 }
-        return vault.categories.reduce(0) { $0 + $1.items.count }
+        return vault.categories.reduce(0) { count, category in
+            count + visibleItemCount(in: category)
+        }
     }
     
     private var hasActiveItems: Bool {
@@ -159,6 +163,10 @@ struct VaultView: View {
 
         return result.isEmpty ? defaultCategoryNames : result
     }
+
+    private func visibleItemCount(in category: Category) -> Int {
+        category.items.filter { !$0.isDeleted && !$0.isPlanSuppressed }.count
+    }
     
     private var visibleCategoriesBinding: Binding<[String]> {
         Binding(
@@ -170,6 +178,14 @@ struct VaultView: View {
                 visibleCategoryNamesData = (try? JSONEncoder().encode(normalized)) ?? Data()
             }
         )
+    }
+
+    private var firstSelectableVisibleCategory: String? {
+        visibleCategories.first
+    }
+
+    private func isLockedCustomCategory(named categoryName: String) -> Bool {
+        vaultService.isCategoryLockedByPlan(named: categoryName)
     }
     
     private func dismissKeyboard() {
@@ -234,7 +250,8 @@ struct VaultView: View {
                 visibleCategoryNames: visibleCategories,
                 selectedCategoryName: $selectedCategoryName,
                 showAddItemPopover: $showAddItemPopover,
-                updateChevronVisibility: updateChevronVisibility
+                updateChevronVisibility: updateChevronVisibility,
+                isCategorySelectable: { _ in true }
             )
             .applyTooltipModifiers(
                 showFirstItemTooltip: $showFirstItemTooltip,
@@ -265,13 +282,21 @@ struct VaultView: View {
             .onChange(of: visibleCategoryNamesData) { _, _ in
                 if let selectedCategoryName,
                    !visibleCategories.contains(selectedCategoryName) {
-                    self.selectedCategoryName = visibleCategories.first
+                    self.selectedCategoryName = firstSelectableVisibleCategory
                 }
                 updateChevronVisibility()
             }
             .onChange(of: userName) { _, _ in
                 if hasEnteredName {
                     isCelebrationSequenceActive = false
+                }
+            }
+            .task {
+                await subscriptionManager.refreshCustomerInfo()
+            }
+            .fullScreenCover(isPresented: $showPaywall) {
+                GrockPaywallView {
+                    showPaywall = false
                 }
             }
     }
@@ -572,7 +597,7 @@ struct VaultView: View {
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
             if selectedCategoryName == nil {
-                selectedCategoryName = firstVisibleCategoryWithItems ?? visibleCategories.first
+                selectedCategoryName = firstVisibleCategoryWithItems ?? firstSelectableVisibleCategory
             }
             updateChevronVisibility()
         }
@@ -585,9 +610,12 @@ struct VaultView: View {
         print("🎉 hasPromptedForNameAfterVaultCelebration: \(UserDefaults.standard.hasPromptedForNameAfterVaultCelebration)")
         
         if let vault = vaultService.vault {
-            let totalItems = vault.categories.reduce(0) { $0 + $1.items.count }
+            let totalItems = vault.categories.reduce(0) { count, category in
+                count + visibleItemCount(in: category)
+            }
+            let categoriesWithVisibleItems = vault.categories.filter { visibleItemCount(in: $0) > 0 }.count
             print("🎉 Total items in vault: \(totalItems)")
-            print("🎉 Categories with items: \(vault.categories.filter { !$0.items.isEmpty }.count)")
+            print("🎉 Categories with items: \(categoriesWithVisibleItems)")
         }
         
         if shouldTriggerCelebration {
@@ -620,15 +648,11 @@ struct VaultView: View {
             queue: .main
         ) { notification in
             if let newCategoryName = notification.userInfo?["newCategoryName"] as? String {
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                    selectedCategoryName = newCategoryName
-                }
+                selectCategory(named: newCategoryName)
                 print("🔄 Auto-switched to category: \(newCategoryName)")
                 updateChevronVisibility()
             } else if let newCategory = notification.userInfo?["newCategory"] as? GroceryCategory {
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                    selectedCategoryName = newCategory.title
-                }
+                selectCategory(named: newCategory.title)
                 print("🔄 Auto-switched to category: \(newCategory.title)")
                 updateChevronVisibility()
             }
@@ -654,71 +678,11 @@ struct VaultView: View {
     // MARK: - Category Views
     
     private var categoryScrollView: some View {
-        ScrollViewReader { proxy in
-            let iconSize: CGFloat = 50
-            let iconSpacing: CGFloat = 0
-            HStack(spacing: 8) {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    ZStack(alignment: .leading) {
-                        if let selectedCategoryName,
-                           let selectedIndex = visibleCategories.firstIndex(of: selectedCategoryName) {
-                            RoundedRectangle(cornerRadius: 12)
-                                .strokeBorder(Color.black, lineWidth: 2)
-                                .frame(width: iconSize, height: iconSize)
-                                .offset(x: CGFloat(selectedIndex) * (iconSize + iconSpacing))
-                                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: selectedCategoryName)
-                        }
-                        
-                        HStack(spacing: iconSpacing) {
-                            ForEach(visibleCategories, id: \.self) { categoryName in
-                                VaultCategoryNameIcon(
-                                    name: categoryName,
-                                    isSelected: selectedCategoryName == categoryName,
-                                    itemCount: getActiveItemCount(forCategoryNamed: categoryName),
-                                    hasItems: hasItems(inCategoryNamed: categoryName),
-                                    iconText: vaultService.displayEmoji(forCategoryName: categoryName),
-                                    action: {
-                                        dismissKeyboard()
-                                        
-                                        if let current = selectedCategoryName,
-                                           let currentIndex = visibleCategories.firstIndex(of: current),
-                                           let newIndex = visibleCategories.firstIndex(of: categoryName) {
-                                            navigationDirection = newIndex > currentIndex ? .right : .left
-                                        }
-                                        selectCategory(named: categoryName)
-                                    }
-                                )
-                                .frame(width: iconSize, height: iconSize)
-                                .id(categoryName)
-                            }
+        ScrollViewReader(content: categoryScrollContent)
+    }
 
-                            Image(systemName: "plus.square.dashed")
-                                .font(.system(size: 46, weight: .light))
-                                .foregroundStyle(Color(.systemGray3))
-                                .offset(x: -2)
-                                .onTapGesture {
-                                    categoryManagerStartOnHidden = true
-                                    openCategoryManager()
-                                }
-                        }
-                        .padding(.trailing, 80)
-                    }
-                    .padding(.vertical, 1)
-                    .padding(.leading)
-                    .padding(.trailing, 4)
-                }
-                .overlay(alignment: .trailing) {
-                    GroceryCategoryScrollRightOverlay(
-                        backgroundColor: .white,
-                        namespace: categoryManagerNamespace,
-                        isExpanded: showCategoryPickerSheet
-                    ) {
-                        dismissKeyboard()
-                        categoryManagerStartOnHidden = false
-                        openCategoryManager()
-                    }
-                }
-            }
+    private func categoryScrollContent(proxy: ScrollViewProxy) -> some View {
+        categoryScrollContainer
             .onChange(of: selectedCategoryName) { _, newValue in
                 if let newName = newValue {
                     withAnimation(.spring(response: 0.4, dampingFraction: 0.95)) {
@@ -727,7 +691,7 @@ struct VaultView: View {
                 }
             }
             .onAppear {
-                if let initialCategory = selectedCategoryName ?? firstVisibleCategoryWithItems ?? visibleCategories.first {
+                if let initialCategory = selectedCategoryName ?? firstVisibleCategoryWithItems ?? firstSelectableVisibleCategory {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
                             proxy.scrollTo(initialCategory, anchor: .center)
@@ -735,7 +699,94 @@ struct VaultView: View {
                     }
                 }
             }
+    }
+
+    private var categoryScrollContainer: some View {
+        let iconSize: CGFloat = 50
+        let iconSpacing: CGFloat = 0
+
+        return HStack(spacing: 8) {
+            categoryHorizontalList(iconSize: iconSize, iconSpacing: iconSpacing)
         }
+    }
+
+    private func categoryHorizontalList(iconSize: CGFloat, iconSpacing: CGFloat) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            ZStack(alignment: .leading) {
+                categoryIconsRow(iconSize: iconSize, iconSpacing: iconSpacing)
+                    .zIndex(0)
+                categorySelectionOutline(iconSize: iconSize, iconSpacing: iconSpacing)
+                    .zIndex(10)
+            }
+            .padding(.vertical, 1)
+            .padding(.leading)
+            .padding(.trailing, 4)
+        }
+        .overlay(alignment: .trailing) {
+            GroceryCategoryScrollRightOverlay(
+                backgroundColor: .white,
+                namespace: categoryManagerNamespace,
+                isExpanded: showCategoryPickerSheet
+            ) {
+                dismissKeyboard()
+                categoryManagerStartOnHidden = false
+                openCategoryManager()
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func categorySelectionOutline(iconSize: CGFloat, iconSpacing: CGFloat) -> some View {
+        if let selectedCategoryName,
+           let selectedIndex = visibleCategories.firstIndex(of: selectedCategoryName) {
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(Color.black, lineWidth: 2)
+                .frame(width: iconSize, height: iconSize)
+                .offset(x: CGFloat(selectedIndex) * (iconSize + iconSpacing))
+                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: selectedCategoryName)
+                .allowsHitTesting(false)
+        }
+    }
+
+    private func categoryIconsRow(iconSize: CGFloat, iconSpacing: CGFloat) -> some View {
+        HStack(spacing: iconSpacing) {
+            ForEach(Array(visibleCategories), id: \.self) { categoryName in
+                categoryIconCell(categoryName: categoryName, iconSize: iconSize)
+            }
+
+            Image(systemName: "plus.square.dashed")
+                .font(.system(size: 46, weight: .light))
+                .foregroundStyle(Color(.systemGray3))
+                .offset(x: -2)
+                .onTapGesture {
+                    categoryManagerStartOnHidden = true
+                    openCategoryManager()
+                }
+        }
+        .padding(.trailing, 80)
+    }
+
+    private func categoryIconCell(categoryName: String, iconSize: CGFloat) -> some View {
+        VaultCategoryNameIcon(
+            name: categoryName,
+            isSelected: selectedCategoryName == categoryName,
+            itemCount: getActiveItemCount(forCategoryNamed: categoryName),
+            hasItems: hasItems(inCategoryNamed: categoryName),
+            iconText: vaultService.displayEmoji(forCategoryName: categoryName),
+            isLocked: isLockedCustomCategory(named: categoryName),
+            action: {
+                dismissKeyboard()
+
+                if let current = selectedCategoryName,
+                   let currentIndex = visibleCategories.firstIndex(of: current),
+                   let newIndex = visibleCategories.firstIndex(of: categoryName) {
+                    navigationDirection = newIndex > currentIndex ? .right : .left
+                }
+                selectCategory(named: categoryName)
+            }
+        )
+        .frame(width: iconSize, height: iconSize)
+        .id(categoryName)
     }
     
     private var categoryContentScrollView: some View {
@@ -744,7 +795,9 @@ struct VaultView: View {
                 CategoryItemsView(
                     categoryName: selectedCategoryName,
                     searchText: searchText,
-                    onDeleteItem: deleteItem
+                    onDeleteItem: deleteItem,
+                    isEditingLocked: isLockedCustomCategory(named: selectedCategoryName),
+                    onLockedEditAttempt: presentProPaywallForLockedCategory
                 )
                 .frame(width: geometry.size.width, height: geometry.size.height)
                 .id(selectedCategoryName)
@@ -766,6 +819,8 @@ struct VaultView: View {
         let categoryName: String
         let searchText: String
         let onDeleteItem: (Item) -> Void
+        let isEditingLocked: Bool
+        let onLockedEditAttempt: () -> Void
         
         @Environment(VaultService.self) private var vaultService
         @Environment(CartViewModel.self) private var cartViewModel
@@ -817,9 +872,12 @@ struct VaultView: View {
                     VaultItemsListView(
                         items: categoryItems,
                         availableStores: availableStores,
+                        categoryName: categoryName,
                         selectedStore: .constant(nil),
                         categoryColor: categoryColor,
-                        onDeleteItem: onDeleteItem
+                        onDeleteItem: onDeleteItem,
+                        isEditingLocked: isEditingLocked,
+                        onLockedEditAttempt: onLockedEditAttempt
                     )
                 }
             }
@@ -868,9 +926,7 @@ struct VaultView: View {
         
         let previousCategory = visibleCategories[currentIndex - 1]
         navigationDirection = .left
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-            selectedCategoryName = previousCategory
-        }
+        selectCategory(named: previousCategory)
     }
     
     private func navigateToNextCategory() {
@@ -882,15 +938,19 @@ struct VaultView: View {
         
         let nextCategory = visibleCategories[currentIndex + 1]
         navigationDirection = .right
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-            selectedCategoryName = nextCategory
-        }
+        selectCategory(named: nextCategory)
     }
     
     private func selectCategory(named categoryName: String) {
         withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
             selectedCategoryName = categoryName
         }
+    }
+
+    private func presentProPaywallForLockedCategory() {
+        dismissKeyboard()
+        HapticManager.shared.playMedium()
+        showPaywall = true
     }
     
     // MARK: - Data Methods
@@ -919,7 +979,9 @@ struct VaultView: View {
             return
         }
         
-        let totalItems = vault.categories.reduce(0) { $0 + $1.items.count }
+        let totalItems = vault.categories.reduce(0) { count, category in
+            count + visibleItemCount(in: category)
+        }
         print("🎉 Total items in vault: \(totalItems)")
         
         guard totalItems > 0 else {
@@ -1185,7 +1247,8 @@ extension View {
         visibleCategoryNames: [String],
         selectedCategoryName: Binding<String?>,
         showAddItemPopover: Binding<Bool>,
-        updateChevronVisibility: @escaping () -> Void
+        updateChevronVisibility: @escaping () -> Void,
+        isCategorySelectable: @escaping (String) -> Bool
     ) -> some View {
         self
             .onAppear(perform: onAppear)
@@ -1194,6 +1257,7 @@ extension View {
                 if selectedCategoryName.wrappedValue == nil {
                     if let vault = newValue {
                         for categoryName in visibleCategoryNames {
+                            guard isCategorySelectable(categoryName) else { continue }
                             if let vaultCategory = vault.categories.first(where: { $0.name == categoryName }),
                                !vaultCategory.items.isEmpty {
                                 selectedCategoryName.wrappedValue = categoryName
@@ -1203,7 +1267,7 @@ extension View {
                     }
                     
                     if selectedCategoryName.wrappedValue == nil {
-                        selectedCategoryName.wrappedValue = visibleCategoryNames.first
+                        selectedCategoryName.wrappedValue = visibleCategoryNames.first(where: isCategorySelectable)
                     }
                 }
                 updateChevronVisibility()

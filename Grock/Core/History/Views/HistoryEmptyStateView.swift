@@ -25,5 +25,5 @@ struct HistoryEmptyStateView: View {
 #Preview("HistoryEmptyStateView") {
     HistoryEmptyStateView()
         .padding()
-        .background(Color(hex: "#F9F9F9"))
+        .background(Color.Grock.surfaceSoft)
 }

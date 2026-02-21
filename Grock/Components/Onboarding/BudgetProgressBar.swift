@@ -32,11 +32,11 @@ struct FluidBudgetPillView: View {
     private var budgetProgressColor: Color {
         let progress = self.progress
         if progress < 0.7 {
-            return Color(hex: "98F476")
+            return Color.Grock.budgetSafe
         } else if progress < 0.9 {
-            return Color(hex: "F4B576")
+            return Color.Grock.budgetWarning
         } else {
-            return Color(hex: "F47676")
+            return Color.Grock.budgetOver
         }
     }
     
@@ -96,7 +96,7 @@ struct FluidBudgetPillView: View {
                         let clampedCenterX = min(max(indicatorWidth, 70), geometry.size.width - 70)
                         Text("you spent \(customIndicatorSpent.formattedCurrency)")
                             .lexendFont(12)
-                            .foregroundColor(Color(hex: "666"))
+                            .foregroundColor(Color.Grock.textSecondary)
                             .fixedSize()
                             .position(x: clampedCenterX, y: 6)
                     }

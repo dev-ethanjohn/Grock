@@ -210,7 +210,7 @@ struct BrowseVaultItemRow: View {
     private var priceColor: Color {
         switch itemType {
         case .vaultOnly:
-            return currentQuantity > 0 ? .gray : Color(hex: "666").opacity(0.7)
+            return currentQuantity > 0 ? .gray : Color.Grock.textSecondary.opacity(0.7)
         case .plannedCart, .shoppingOnly:
             return currentQuantity > 0 ? .gray : Color(hex: "888").opacity(0.7)
         }
@@ -744,15 +744,15 @@ private struct QuantityControlsView: View {
                         onCommit: onTextCommit
                     )
                     ControlPlusButton(
-                        color: Color(hex: "1E2A36"),
+                        color: Color.Grock.textDeep,
                         strokeColor: .clear,
                         isFocused: isFocused,
                         action: onPlus
                     )
                 } else {
                     ControlPlusButton(
-                        color: Color(hex: "888888").opacity(0.7),
-                        strokeColor: Color(hex: "F2F2F2").darker(by: 0.1),
+                        color: Color.Grock.neutral500.opacity(0.7),
+                        strokeColor: Color.Grock.borderSubtle.darker(by: 0.1),
                         isFocused: isFocused,
                         action: onPlus
                     )
@@ -767,7 +767,7 @@ private struct QuantityControlsView: View {
                         onCommit: onTextCommit
                     )
                     ControlPlusButton(
-                        color: Color(hex: "1E2A36"),
+                        color: Color.Grock.textDeep,
                         strokeColor: .clear,
                         isFocused: isFocused,
                         action: onPlus
@@ -790,7 +790,7 @@ private struct QuantityControlsView: View {
                         onCommit: onTextCommit
                     )
                     ControlPlusButton(
-                        color: Color(hex: "1E2A36"),
+                        color: Color.Grock.textDeep,
                         strokeColor: .clear,
                         isFocused: isFocused,
                         action: onPlus
@@ -814,7 +814,7 @@ private struct ControlMinusButton: View {
         Button(action: action) {
             Image(systemName: "minus")
                 .font(.footnote).bold()
-                .foregroundColor(Color(hex: "1E2A36"))
+                .foregroundColor(Color.Grock.textDeep)
                 .frame(width: 24, height: 24)
                 .background(.white)
                 .clipShape(Circle())
@@ -885,7 +885,7 @@ private struct QuantityTextField: View {
         ZStack {
             Text(textValue)
                 .font(.system(size: 15, weight: .bold))
-                .foregroundColor(Color(hex: "2C3E50"))
+                .foregroundColor(Color.Grock.textDeepAlt)
                 .multilineTextAlignment(.center)
                 .contentTransition(.numericText())
                 .animation(.spring(response: 0.3, dampingFraction: 0.7), value: textValue)
@@ -908,7 +908,7 @@ private struct QuantityTextField: View {
         .padding(.horizontal, 6)
         .background(
             RoundedRectangle(cornerRadius: 6)
-                .stroke(Color(hex: "F2F2F2").darker(by: 0.1), lineWidth: 1)
+                .stroke(Color.Grock.borderSubtle.darker(by: 0.1), lineWidth: 1)
         )
         .frame(minWidth: 40)
         .frame(maxWidth: 80)

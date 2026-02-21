@@ -30,7 +30,7 @@ struct HistoryContentView: View {
         }
         .padding(.top, 8)
         .blurScroll(scale: 1.8)
-        .background(Color(hex: "#F9F9F9"))
+        .background(Color.Grock.surfaceSoft)
     }
 }
 

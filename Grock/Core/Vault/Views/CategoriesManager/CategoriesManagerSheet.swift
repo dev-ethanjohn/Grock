@@ -17,11 +17,10 @@ struct CategoriesManagerSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var viewModel: CategoriesManagerViewModel
     @State private var editingCategoryName: String? = nil
-    @State private var closeButtonScale: CGFloat = 0.0
-    @State private var closeButtonPressed = false
-    @State private var closeButtonDidAppear = false
     @State private var showCompactAddButton = false
     @State private var addButtonDidAppear = false
+    @State private var subscriptionManager = SubscriptionManager.shared
+    @State private var showPaywall = false
     @Namespace private var addButtonNamespace
 
     init(
@@ -409,6 +408,14 @@ struct CategoriesManagerSheet: View {
         .onChange(of: vaultService.vault?.categories) { _, _ in
             updateCachedCategories()
         }
+        .task {
+            await subscriptionManager.refreshCustomerInfo()
+        }
+        .fullScreenCover(isPresented: $showPaywall) {
+            GrockPaywallView {
+                showPaywall = false
+            }
+        }
     }
     
     private var header: some View {
@@ -418,7 +425,7 @@ struct CategoriesManagerSheet: View {
                     .fuzzyBubblesFont(24, weight: .bold)
                     .foregroundStyle(.black)
                 Spacer()
-                closeButton
+                saveButton
             }
             .frame(height: 44)
             .padding(.top, 22)
@@ -625,6 +632,10 @@ struct CategoriesManagerSheet: View {
 
     private var floatingCreateButton: some View {
         Button(action: {
+            guard subscriptionManager.isPro else {
+                presentProPaywallForCategoryCreation()
+                return
+            }
             viewModel.createCategoryError = nil
             viewModel.newCategoryName = ""
             viewModel.newCategoryEmoji = ""
@@ -651,7 +662,7 @@ struct CategoriesManagerSheet: View {
         ZStack {
             if isCompact {
                 Image(systemName: "plus")
-                    .lexendFont(18, weight: .bold)
+                    .lexendFont(22, weight: .bold)
                     .foregroundStyle(.white)
                     .matchedGeometryEffect(id: "addButtonContent", in: addButtonNamespace)
             } else {
@@ -661,8 +672,8 @@ struct CategoriesManagerSheet: View {
                     .matchedGeometryEffect(id: "addButtonContent", in: addButtonNamespace)
             }
         }
-        .padding(.horizontal, isCompact ? 0 : 20)
-        .frame(width: isCompact ? 44 : nil, height: 44)
+        .padding(.horizontal, isCompact ? 0 : 24)
+        .frame(width: isCompact ? 56 : nil, height: isCompact ? 56 : 52)
         .background(
             ZStack {
                 Capsule()
@@ -695,27 +706,19 @@ struct CategoriesManagerSheet: View {
         )
     }
 
-    private var closeButton: some View {
-        Button(action: {
-            handleCloseButtonTap()
-        }) {
-            Image(systemName: "xmark")
-                .font(.system(size: 14, weight: .bold))
-                .foregroundColor(.black)
-                .frame(width: 28, height: 28)
-                .background(
-                    Circle()
-                        .fill(.white)
-                )
-        }
-        .buttonStyle(.plain)
-        .scaleEffect(closeButtonScale * (closeButtonPressed ? 0.9 : 1.0))
-        .animation(.spring(response: 0.35, dampingFraction: 0.55), value: closeButtonScale)
-        .animation(.spring(response: 0.25, dampingFraction: 0.6), value: closeButtonPressed)
-        .accessibilityLabel("Close")
-        .onAppear {
-            animateCloseButtonIn()
-        }
+    private var saveButton: some View {
+        FormCompletionButton(
+            title: "Save",
+            isEnabled: true,
+            cornerRadius: 100,
+            verticalPadding: 4,
+            maxRadius: 1000,
+            bounceScale: (0.98, 1.05, 1.0),
+            bounceTiming: (0.1, 0.3, 0.3),
+            appearanceScale: 0.9,
+            action: handleSaveButtonTap
+        )
+        .accessibilityLabel("Save categories")
     }
 
     private func tabButtons() -> some View {
@@ -839,14 +842,16 @@ struct CategoriesManagerSheet: View {
                 ForEach(names, id: \.self) { (name: String) in
                     let iconText = vaultService.displayEmoji(forCategoryName: name)
                     let isSystemCategory = defaultCategoryNames.contains { normalizedKey($0) == normalizedKey(name) }
+                    let isPlanLocked = vaultService.isCategoryLockedByPlan(named: name)
+                    let rowActionSymbol = isShownColumn ? "xmark" : "plus"
+                    let rowActionEnabled = isShownColumn ? shownNames.count > 1 : true
                     let row = CategoryManagerRow(
                         name: name,
                         iconText: iconText,
                         isSelected: selectedCategoryName == name,
-                        activeCount: activeItemCount(name),
                         hasItems: hasItems(name),
-                        actionSymbol: isShownColumn ? "xmark" : "plus",
-                        actionEnabled: isShownColumn ? shownNames.count > 1 : true,
+                        actionSymbol: rowActionSymbol,
+                        actionEnabled: rowActionEnabled,
                         action: {
                             if isShownColumn {
                                 withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
@@ -858,8 +863,13 @@ struct CategoriesManagerSheet: View {
                                 }
                             }
                         },
+                        isFeatureLocked: isPlanLocked,
                         onEdit: isSystemCategory ? nil : {
-                            beginEditingCategory(named: name)
+                            if isPlanLocked {
+                                presentProPaywallForCategoryCreation()
+                            } else {
+                                beginEditingCategory(named: name)
+                            }
                         },
                         onTap: {
                             if isShownColumn {
@@ -1005,6 +1015,11 @@ struct CategoriesManagerSheet: View {
     }
 
     private func beginEditingCategory(named name: String) {
+        guard subscriptionManager.isPro else {
+            presentProPaywallForCategoryCreation()
+            return
+        }
+
         guard let category = vaultService.getCategory(named: name) else { return }
         let isSystemCategory = GroceryCategory.allCases.contains { normalizedKey($0.title) == normalizedKey(category.name) }
         guard !isSystemCategory else { return }
@@ -1037,6 +1052,11 @@ struct CategoriesManagerSheet: View {
     }
     
     private func createCategory() {
+        guard subscriptionManager.isPro else {
+            presentProPaywallForCategoryCreation()
+            return
+        }
+
         viewModel.createCategoryError = nil
         
         let trimmed = viewModel.newCategoryName.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -1060,6 +1080,11 @@ struct CategoriesManagerSheet: View {
     }
 
     private func createCategoryFromPopover() {
+        guard subscriptionManager.isPro else {
+            presentProPaywallForCategoryCreation()
+            return
+        }
+
         let trimmed = viewModel.newCategoryName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
 
@@ -1107,6 +1132,11 @@ struct CategoriesManagerSheet: View {
     }
 
     private func updateCategoryFromPopover(originalName: String) {
+        guard subscriptionManager.isPro else {
+            presentProPaywallForCategoryCreation()
+            return
+        }
+
         let trimmed = viewModel.newCategoryName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
 
@@ -1148,6 +1178,11 @@ struct CategoriesManagerSheet: View {
     }
 
     private func deleteCategoryFromPopover() {
+        guard subscriptionManager.isPro else {
+            presentProPaywallForCategoryCreation()
+            return
+        }
+
         guard let name = editingCategoryName else { return }
         let key = normalizedKey(name)
 
@@ -1217,6 +1252,14 @@ struct CategoriesManagerSheet: View {
         }
     }
 
+    private func presentProPaywallForCategoryCreation() {
+        HapticManager.shared.playMedium()
+        if viewModel.showCategoryPopover {
+            dismissCategoryPopover()
+        }
+        showPaywall = true
+    }
+
     private func normalizeEmojiInput(_ value: String) -> String {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let first = trimmed.first else { return "" }
@@ -1248,36 +1291,11 @@ struct CategoriesManagerSheet: View {
         names
     }
 
-    private func animateCloseButtonIn() {
-        guard !closeButtonDidAppear else { return }
-        closeButtonDidAppear = true
-        closeButtonScale = 0.0
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            withAnimation(.spring(response: 0.35, dampingFraction: 0.55)) {
-                closeButtonScale = 1.0
-            }
-        }
-    }
-
-    private func handleCloseButtonTap() {
-        withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
-            closeButtonPressed = true
-        }
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.06) {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                closeButtonPressed = false
-                closeButtonScale = 0.7
-            }
-        }
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
-            if let onClose {
-                onClose()
-            } else {
-                dismiss()
-            }
+    private func handleSaveButtonTap() {
+        if let onClose {
+            onClose()
+        } else {
+            dismiss()
         }
     }
 

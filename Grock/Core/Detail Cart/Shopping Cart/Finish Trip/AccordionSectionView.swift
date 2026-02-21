@@ -138,7 +138,7 @@ private struct AccordionPreviewWrapper: View {
             accentDeep: Color(hex: "3A3A3A"),
             isExpanded: $expanded,
             hasContent: true,
-            background: Color(hex: "F9F9F9")
+            background: Color.Grock.surfaceSoft
         ) {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Item 1")

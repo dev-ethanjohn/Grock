@@ -58,6 +58,29 @@ class VaultService {
     init(modelContext: ModelContext) {
         self.modelContext = modelContext
         loadUserAndVault()
+        observeSubscriptionStatusChanges()
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(
+            self,
+            name: .subscriptionStatusChanged,
+            object: nil
+        )
+    }
+
+    private func observeSubscriptionStatusChanges() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleSubscriptionStatusChanged(_:)),
+            name: .subscriptionStatusChanged,
+            object: nil
+        )
+    }
+
+    @objc private func handleSubscriptionStatusChanged(_ notification: Notification) {
+        let isPro = (notification.userInfo?["isPro"] as? Bool) ?? UserDefaults.standard.isPro
+        reconcilePlanEntitlementState(isPro: isPro)
     }
     
     /// Clears internal caches used for faster lookups.

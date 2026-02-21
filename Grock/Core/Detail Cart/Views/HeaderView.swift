@@ -1,6 +1,7 @@
 import SwiftUI
 import Lottie
 import SwiftData
+import UIKit
 
 struct HeaderView: View {
     let cart: Cart
@@ -53,39 +54,33 @@ struct HeaderView: View {
                 
                 Spacer()
                 
-                Menu {
-                    // Edit Cart Name button
-                    Button("Edit Cart Name", systemImage: "pencil") {
+                HeaderOptionsMenuButtonUIKit(
+                    showCategoryIcons: stateManager.showCategoryIcons,
+                    showItemPriceRow: stateManager.showItemPriceRow,
+                    isPlanning: cart.isPlanning,
+                    isCompleted: cart.isCompleted,
+                    onEditCartName: {
                         stateManager.showingEditCartName = true
-                    }
-                    
-                    Button(stateManager.showCategoryIcons ? "Hide Category Icons" : "Show Category Icons", systemImage: stateManager.showCategoryIcons ? "eye.slash" : "eye") {
+                    },
+                    onToggleCategoryIcons: {
                         withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
                             stateManager.showCategoryIcons.toggle()
                         }
-                    }
-                    
-                    if cart.isPlanning {
-                        Button("Start Shopping", systemImage: "cart") {
-                            stateManager.showingStartShoppingAlert = true
-                        }
-                    } else if cart.isCompleted {
-                        Button("Reactivate Cart", systemImage: "arrow.clockwise") {
-                            vaultService.reopenCart(cart: cart)
-                        }
-                    }
-                    Divider()
-                    
-                    Button("Delete Cart", systemImage: "trash", role: .destructive) {
+                    },
+                    onToggleItemPriceRow: {
+                        stateManager.setItemPriceRowVisibility(!stateManager.showItemPriceRow, animated: true)
+                    },
+                    onStartShopping: {
+                        stateManager.showingStartShoppingAlert = true
+                    },
+                    onReactivateCart: {
+                        vaultService.reopenCart(cart: cart)
+                    },
+                    onDeleteCart: {
                         onDeleteCart?()
                     }
-                } label: {
-                    Image(systemName: "ellipsis")
-                                         .lexendFont(20, weight: .medium) // Slightly larger
-                                         .foregroundColor(.black)
-                                         .frame(width: 28, height: 28) // 👈 Minimum 44x44 tap target
-                                         .contentShape(Rectangle())
-                }
+                )
+                .frame(width: 28, height: 28)
             }
             .padding(.top, 8)
             
@@ -157,6 +152,88 @@ struct HeaderView: View {
                           }
                   }
               )
+    }
+    
+    private struct HeaderOptionsMenuButtonUIKit: UIViewRepresentable {
+        let showCategoryIcons: Bool
+        let showItemPriceRow: Bool
+        let isPlanning: Bool
+        let isCompleted: Bool
+        let onEditCartName: () -> Void
+        let onToggleCategoryIcons: () -> Void
+        let onToggleItemPriceRow: () -> Void
+        let onStartShopping: () -> Void
+        let onReactivateCart: () -> Void
+        let onDeleteCart: () -> Void
+        
+        func makeUIView(context: Context) -> UIButton {
+            let button = UIButton(type: .system)
+            let config = UIImage.SymbolConfiguration(pointSize: 20, weight: .medium)
+            button.setPreferredSymbolConfiguration(config, forImageIn: .normal)
+            button.setImage(UIImage(systemName: "ellipsis"), for: .normal)
+            button.tintColor = .black
+            button.showsMenuAsPrimaryAction = true
+            button.changesSelectionAsPrimaryAction = false
+            button.accessibilityLabel = "Cart options"
+            return button
+        }
+        
+        func updateUIView(_ uiView: UIButton, context: Context) {
+            uiView.menu = buildMenu()
+        }
+        
+        private func buildMenu() -> UIMenu {
+            var children: [UIMenuElement] = []
+            
+            children.append(
+                UIAction(title: "Edit Cart Name", image: UIImage(systemName: "pencil")) { _ in
+                    onEditCartName()
+                }
+            )
+            
+            children.append(
+                UIAction(
+                    title: showCategoryIcons ? "Hide Category Icons" : "Show Category Icons",
+                    image: UIImage(systemName: showCategoryIcons ? "eye.slash" : "eye")
+                ) { _ in
+                    onToggleCategoryIcons()
+                }
+            )
+            
+            children.append(
+                UIAction(
+                    title: showItemPriceRow ? "Simplify List" : "Show Item Price/Unit",
+                    image: UIImage(systemName: showItemPriceRow ? "text.line.first.and.arrowtriangle.forward" : "text.justify")
+                ) { _ in
+                    onToggleItemPriceRow()
+                }
+            )
+            
+            if isPlanning {
+                children.append(
+                    UIAction(title: "Start Shopping", image: UIImage(systemName: "cart")) { _ in
+                        onStartShopping()
+                    }
+                )
+            } else if isCompleted {
+                children.append(
+                    UIAction(title: "Reactivate Cart", image: UIImage(systemName: "arrow.clockwise")) { _ in
+                        onReactivateCart()
+                    }
+                )
+            }
+            
+            let deleteAction = UIAction(
+                title: "Delete Cart",
+                image: UIImage(systemName: "trash"),
+                attributes: .destructive
+            ) { _ in
+                onDeleteCart()
+            }
+            children.append(UIMenu(options: .displayInline, children: [deleteAction]))
+            
+            return UIMenu(children: children)
+        }
     }
     
     private func fulfilledSpentTotal() -> Double? {

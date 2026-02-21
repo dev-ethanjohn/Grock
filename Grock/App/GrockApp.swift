@@ -132,7 +132,7 @@ struct GrockApp: App {
     let container: ModelContainer
     private static let userJotProjectIdKey = "USERJOT_PROJECT_ID"
     private static let revenueCatApiKeyKey = "REVENUECAT_API_KEY"
-    private static let fallbackRevenueCatApiKey = "test_xweOqIKUKoKfGiXNiaHyZxujWJj"
+    private static let fallbackRevenueCatApiKey = "test_uifCKvbwWxUoARrWWcwzcpSlIud"
     
 //    init() {
 //        do {

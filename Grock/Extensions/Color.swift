@@ -28,6 +28,44 @@ extension Color {
 }
 
 extension Color {
+    enum Grock {
+        private static func token(_ assetName: String, fallbackHex: String) -> Color {
+            if let uiColor = UIColor(named: assetName) {
+                return Color(uiColor)
+            }
+            return Color(hex: fallbackHex)
+        }
+
+        // Brand & status
+        static let accentDanger = token("AccentDanger", fallbackHex: "FA003F")
+        static let accentBlue = token("AccentBlue", fallbackHex: "278DD9")
+        static let subscriptionAccent = token("SubscriptionAccent", fallbackHex: "6EBC59")
+        static let success = token("Success", fallbackHex: "4CAF50")
+        static let budgetSafe = token("BudgetSafe", fallbackHex: "98F476")
+        static let budgetWarning = token("BudgetWarning", fallbackHex: "F4B576")
+        static let budgetOver = token("BudgetOver", fallbackHex: "F47676")
+
+        // Text colors
+        static let textPrimary = token("TextPrimary", fallbackHex: "231F30")
+        static let textSecondary = token("TextSecondary", fallbackHex: "666")
+        static let textMuted = token("TextMuted", fallbackHex: "999")
+        static let textMutedAlt = token("TextMutedAlt", fallbackHex: "999999")
+        static let textSubtle = token("TextSubtle", fallbackHex: "717171")
+        static let textDeep = token("TextDeep", fallbackHex: "1E2A36")
+        static let textDeepAlt = token("TextDeepAlt", fallbackHex: "2C3E50")
+
+        // Neutrals
+        static let neutral500 = token("Neutral500", fallbackHex: "888888")
+        static let neutral300 = token("Neutral300", fallbackHex: "DDD")
+        static let borderSubtle = token("BorderSubtle", fallbackHex: "F2F2F2")
+
+        // Surfaces
+        static let surfaceMuted = token("SurfaceMuted", fallbackHex: "F7F7F7")
+        static let surfaceSoft = token("SurfaceSoft", fallbackHex: "F9F9F9")
+        static let surfaceLight = token("SurfaceLight", fallbackHex: "F5F5F5")
+        static let surfaceElevated = token("SurfaceElevated", fallbackHex: "EEEEEE")
+    }
+
     static let cartChangedDeep = Color(hex: "4F00B5")
     static let cartChangedBackground = Color(hex: "F8EBFF")
     static let cartAddedDeep = Color(hex: "3A3A3A")
@@ -36,7 +74,7 @@ extension Color {
     static let cartSkippedBackground = Color(hex: "FFE7D8")
     static let cartNewDeep = Color(hex: "FFB300")
     static let cartNewBackground = Color(hex: "FFF9E6")
-    static let cartVaultDeep = Color(hex: "888888")
+    static let cartVaultDeep = Color.Grock.neutral500
     
     func saturated(by percentage: Double) -> Color {
         UIColor(self).saturated(by: percentage).map(Color.init) ?? self

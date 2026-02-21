@@ -66,7 +66,7 @@ struct ItemFormContent: View {
                 DashedLine()
                     .stroke(style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
                     .frame(height: 1)
-                    .foregroundColor(Color(hex: "ddd"))
+                    .foregroundColor(Color.Grock.neutral300)
                     .padding(.vertical, 2)
                     .padding(.horizontal)
                 
@@ -283,7 +283,7 @@ struct ItemFormContent: View {
     private func validationError(_ message: String) -> some View {
         Text(message)
             .font(.caption)
-            .foregroundColor(Color(hex: "#FA003F"))
+            .foregroundColor(Color.Grock.accentDanger)
             .padding(.horizontal, 4)
             .padding(.bottom, 4)
             .transition(.asymmetric(

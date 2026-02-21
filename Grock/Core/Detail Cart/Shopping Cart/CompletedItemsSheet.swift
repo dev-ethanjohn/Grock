@@ -113,7 +113,7 @@ private struct CompletedHeader: View {
                     }
                     .padding(.vertical, 12)
                     .frame(maxWidth: .infinity)
-                    .background(Color(hex: "F5F5F5"))
+                    .background(Color.Grock.surfaceLight)
                     .cornerRadius(12)
                 } else if skippedCount > 0 {
                     Text("\(skippedCount) skipped item\(skippedCount == 1 ? "" : "s")")
@@ -126,10 +126,10 @@ private struct CompletedHeader: View {
                 } else {
                     Text("No fulfilled items yet")
                         .fuzzyBubblesFont(16, weight: .bold)
-                        .foregroundStyle(Color(hex: "999999"))
+                        .foregroundStyle(Color.Grock.textMutedAlt)
                         .padding(.vertical, 12)
                         .frame(maxWidth: .infinity)
-                        .background(Color(hex: "F5F5F5"))
+                        .background(Color.Grock.surfaceLight)
                         .cornerRadius(12)
                 }
             }
@@ -196,7 +196,7 @@ private struct CompletedItemsList: View {
                                 .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
-                            .background(Color(hex: "F9F9F9"))
+                            .background(Color.Grock.surfaceSoft)
                             .id("skipped-header-\(cart.id)")
                             .zIndex(1)
                             
@@ -217,7 +217,7 @@ private struct CompletedItemsList: View {
                                 .transition(.opacity.combined(with: .move(edge: .top)))
                             }
                         }
-                        .background(Color(hex: "F9F9F9"))
+                        .background(Color.Grock.surfaceSoft)
                         .cornerRadius(12)
                         .overlay(
                             RoundedRectangle(cornerRadius: 12)
@@ -297,13 +297,13 @@ private struct CompletedItemRow: View {
                     .padding(.bottom, 4)
                     .padding(.horizontal)
                     .padding(.vertical)
-                    .background(Color(hex: "F9F9F9"))
+                    .background(Color.Grock.surfaceSoft)
                 
                 if showDivider {
                     DashedLine()
                         .stroke(style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
                         .frame(height: 0.5)
-                        .foregroundColor(Color(hex: "999").opacity(0.5))
+                        .foregroundColor(Color.Grock.textMuted.opacity(0.5))
                         .padding(.horizontal, 12)
                 }
             }
@@ -374,7 +374,7 @@ private struct CompletedItemRow: View {
                         
                         Text(totalPrice.formattedCurrency)
                             .lexendFont(13, weight: .semibold)
-                            .foregroundColor(Color(hex: "231F30"))
+                            .foregroundColor(Color.Grock.textPrimary)
                             .contentTransition(.numericText())
                     }
                     .lexendFont(12)
@@ -383,7 +383,7 @@ private struct CompletedItemRow: View {
                         DashedLine()
                             .stroke(style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
                             .frame(height: 0.5)
-                            .foregroundColor(Color(hex: "999").opacity(0.5))
+                            .foregroundColor(Color.Grock.textMuted.opacity(0.5))
                             .padding(.top, 12)
                     }
                 }

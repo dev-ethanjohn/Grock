@@ -4,36 +4,34 @@ struct CategoryManagerRow: View {
     let name: String
     let iconText: String
     let isSelected: Bool
-    let activeCount: Int
     let hasItems: Bool
     let actionSymbol: String
     let actionEnabled: Bool
     let action: () -> Void
+    let isFeatureLocked: Bool
     let onEdit: (() -> Void)?
     let onTap: () -> Void
-
-    @Environment(VaultService.self) private var vaultService
 
     init(
         name: String,
         iconText: String,
         isSelected: Bool,
-        activeCount: Int,
         hasItems: Bool,
         actionSymbol: String,
         actionEnabled: Bool,
         action: @escaping () -> Void,
+        isFeatureLocked: Bool = false,
         onEdit: (() -> Void)? = nil,
         onTap: @escaping () -> Void
     ) {
         self.name = name
         self.iconText = iconText
         self.isSelected = isSelected
-        self.activeCount = activeCount
         self.hasItems = hasItems
         self.actionSymbol = actionSymbol
         self.actionEnabled = actionEnabled
         self.action = action
+        self.isFeatureLocked = isFeatureLocked
         self.onEdit = onEdit
         self.onTap = onTap
     }
@@ -42,72 +40,50 @@ struct CategoryManagerRow: View {
         GroceryCategory.allCases.first(where: { $0.title == name })
     }
 
-    private var displayIcon: String { iconText }
-
-    private var iconFontSize: CGFloat {
-        if groceryCategory != nil { return 24 }
-        return isAlphabeticIcon ? 18 : 24
-    }
-
-    private var isAlphabeticIcon: Bool {
-        iconText.unicodeScalars.allSatisfy { CharacterSet.letters.contains($0) }
-    }
-
-    private var iconBackground: Color {
-        if let customCategory = vaultService.getCategory(named: name),
-           let hex = customCategory.colorHex {
-            return Color(hex: hex)
-        }
-
-        if let groceryCategory {
-            return groceryCategory.pastelColor
-        }
-
-        return name.generatedPastelColor
-    }
-
     private var isSystemCategory: Bool {
         groceryCategory != nil
     }
 
     private var systemBadge: some View {
-        Image(systemName: "lock.fill")
-            .font(.system(size: 11, weight: .semibold))
-            .foregroundStyle(Color.black.opacity(0.35))
+        Text("Default")
+            .lexendFont(8, weight: .bold)
+            .foregroundStyle(Color.black.opacity(0.52))
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(
+                Capsule()
+                    .fill(Color.black.opacity(0.05))
+            )
+            .overlay(
+                Capsule()
+                    .stroke(Color.black.opacity(0.08), lineWidth: 1)
+            )
+            .fixedSize()
+            .accessibilityLabel("Default category")
     }
 
     var body: some View {
         HStack(spacing: 10) {
-            ZStack(alignment: .topTrailing) {
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(
-                        RadialGradient(
-                            colors: [
-                                iconBackground.darker(by: 0.07).saturated(by: 0.03),
-                                iconBackground.darker(by: 0.15).saturated(by: 0.05),
-                            ],
-                            center: .center,
-                            startRadius: 0,
-                            endRadius: 30
-                        )
-                    )
-                    .frame(width: 42, height: 42)
+            VaultCategoryNameIcon(
+                name: name,
+                isSelected: isSelected,
+                itemCount: 0,
+                hasItems: hasItems,
+                iconText: iconText,
+                isLocked: isFeatureLocked,
+                action: {}
+            )
+            .frame(width: 46, height: 46)
+            .allowsHitTesting(false)
 
-                Text(displayIcon)
-                    .font(.system(size: iconFontSize, weight: isAlphabeticIcon ? .bold : .regular))
-                    .foregroundStyle(.black)
-                    .frame(width: 42, height: 42)
-
-            }
-
-            HStack(spacing: 6) {
+            VStack(alignment: .leading, spacing: 3) {
+                if isSystemCategory {
+                    systemBadge
+                }
                 Text(name)
                     .lexendFont(14, weight: .medium)
                     .foregroundStyle(.black)
                     .lineLimit(2)
-                if isSystemCategory {
-                    systemBadge
-                }
             }
 
             Spacer()
@@ -119,20 +95,22 @@ struct CategoryManagerRow: View {
                     }) {
                         Text("Edit")
                             .lexendFont(12, weight: .semibold)
-                            .foregroundStyle(Color.black.opacity(0.7))
+                            .foregroundStyle(.black)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 4)
                             .background(
                                 Capsule()
-                                    .fill(Color.black.opacity(0.06))
+                                    .fill(Color(hex: "FFC94A"))
                             )
                             .overlay(
                                 Capsule()
-                                    .stroke(Color.black.opacity(0.12), lineWidth: 1)
+                                    .stroke(.black, lineWidth: 1)
                             )
                             .fixedSize()
                     }
                     .buttonStyle(.plain)
+                    .saturation(isFeatureLocked ? 0 : 1)
+                    .opacity(isFeatureLocked ? 0.5 : 1)
                 }
 
                 Button(action: {

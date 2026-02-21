@@ -25,7 +25,7 @@ struct ChangedItemRowView: View {
             
             if (priceChanged || qtyChanged) && impactAbs > 0.0001 {
                 Text("\(isIncrease ? "+" : "-")\(impactAbs.formattedCurrency)")
-                    .foregroundColor(isIncrease ? Color(hex: "FA003F") : Color(hex: "4CAF50"))
+                    .foregroundColor(isIncrease ? Color.Grock.accentDanger : Color.Grock.success)
                     .lexendFont(13, weight: .semibold)
             }
         }

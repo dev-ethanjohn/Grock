@@ -163,9 +163,9 @@ private struct MainContentView: View {
         isLastInSection: Bool,
         containerWidth: CGFloat
     ) -> CGFloat {
+        let priceRowProgress = min(max(stateManager.showItemPriceRowProgress, 0), 1)
         let itemFont = UIFont(name: "Lexend-Regular", size: 16) ?? .systemFont(ofSize: 16)
-        let priceFont = UIFont(name: "Lexend-Medium", size: 12) ?? .systemFont(ofSize: 12, weight: .medium)
-        let unitFont = UIFont(name: "Lexend-Regular", size: 11) ?? .systemFont(ofSize: 11)
+        let priceRowHeight: CGFloat = 16 * priceRowProgress
         
         let trailingColumnWidth: CGFloat = 70
         let hStackSpacing: CGFloat = 20
@@ -178,8 +178,7 @@ private struct MainContentView: View {
             maxLines: 3
         )
         
-        let priceRowHeight = max(priceFont.lineHeight, unitFont.lineHeight)
-        let itemRowSpacing: CGFloat = 2
+        let itemRowSpacing: CGFloat = 2 * priceRowProgress
         let topPadding: CGFloat = 12
         let bottomPadding: CGFloat = isLastInSection ? 12 : 0
         
@@ -400,7 +399,6 @@ private struct ItemsListContent: View {
                 .offset(y: stateManager.hasBackgroundImage ? 0 : 4)
             }
         }
-        .animation(.spring(response: 0.45, dampingFraction: 0.85), value: calculatedHeight)
         .animation(.spring(response: 0.45, dampingFraction: 0.75), value: cart.isShopping)
     }
 }
@@ -421,6 +419,7 @@ private struct StoreItemsList: View {
     
     var body: some View {
         cardContent
+            .animation(.spring(response: 0.4, dampingFraction: 0.7, blendDuration: 0.1), value: stateManager.showItemPriceRowProgress)
             .applyAnimations(calculatedHeight: calculatedHeight, isShopping: cart.isShopping)
     }
     
@@ -544,10 +543,8 @@ private extension View {
         //            )
     }
     
-    func applyAnimations(calculatedHeight: CGFloat, isShopping: Bool) -> some View {
+    func applyAnimations(calculatedHeight _: CGFloat, isShopping: Bool) -> some View {
         self
-        // Smoother spring for height changes - higher damping prevents bouncy/rocky feel
-        .animation(.spring(response: 0.5, dampingFraction: 0.88), value: calculatedHeight)
         .animation(.spring(response: 0.45, dampingFraction: 0.75), value: isShopping)
     }
 }
@@ -559,34 +556,121 @@ private struct ListBackgroundView: View {
     let geometry: GeometryProxy
     var height: CGFloat? = nil
     
+    @State private var displayedHasBackgroundImage: Bool
+    @State private var displayedImage: UIImage?
+    @State private var previousHasBackgroundImage: Bool = false
+    @State private var previousImage: UIImage?
+    @State private var transitionProgress: CGFloat = 1
+    @State private var isTransitioning = false
+    @State private var transitionID = UUID()
+    
+    init(
+        hasBackgroundImage: Bool,
+        backgroundImage: UIImage?,
+        backgroundColor: Color,
+        geometry: GeometryProxy,
+        height: CGFloat? = nil
+    ) {
+        self.hasBackgroundImage = hasBackgroundImage
+        self.backgroundImage = backgroundImage
+        self.backgroundColor = backgroundColor
+        self.geometry = geometry
+        self.height = height
+        self._displayedHasBackgroundImage = State(initialValue: hasBackgroundImage)
+        self._displayedImage = State(initialValue: backgroundImage)
+    }
+    
+    private var transitionKey: String {
+        let imageIdentity = backgroundImage.map { String(ObjectIdentifier($0).hashValue) } ?? "nil"
+        return "\(hasBackgroundImage)-\(imageIdentity)"
+    }
+    
+    private var hasAnyImageLayer: Bool {
+        displayedHasBackgroundImage || previousHasBackgroundImage
+    }
+    
     var body: some View {
         ZStack {
-            if hasBackgroundImage, let backgroundImage = backgroundImage {
-                ZStack {
-                    Image(uiImage: backgroundImage)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: geometry.size.width, height: height ?? geometry.size.height)
-                        .clipped()
-                        .overlay(Color.black.opacity(0.55))
-                        .overlay(Color.gray.opacity(0.05))
-                        .blur(radius: 2)
-                    
-                    VisibleNoiseView(
-                        grainSize: 0.0001,
-                        density: 0.7,
-                        opacity: 0.15
-                    )
-                }
-            } else if hasBackgroundImage {
-                LinearGradient(
-                    colors: [Color.gray.opacity(0.1), Color.gray.opacity(0.2)],
-                    startPoint: .top,
-                    endPoint: .bottom
+            renderedBackgroundLayer(
+                hasImage: displayedHasBackgroundImage,
+                image: displayedImage
+            )
+            .opacity(isTransitioning ? Double(transitionProgress) : 1)
+            .scaleEffect(isTransitioning ? (0.985 + (0.015 * transitionProgress)) : 1)
+            .blur(radius: isTransitioning ? (1.3 * (1 - transitionProgress)) : 0)
+            
+            if isTransitioning {
+                renderedBackgroundLayer(
+                    hasImage: previousHasBackgroundImage,
+                    image: previousImage
                 )
-            } else {
-                backgroundColor
+                .opacity(Double(1 - transitionProgress))
+                .scaleEffect(1 + (0.02 * transitionProgress))
+                .blur(radius: 1.1 * transitionProgress)
+                .allowsHitTesting(false)
             }
+            
+            if hasAnyImageLayer {
+                VisibleNoiseView(
+                    grainSize: 0.0001,
+                    density: 0.7,
+                    opacity: 0.15
+                )
+            }
+        }
+        .onChange(of: transitionKey) { _, _ in
+            startBackgroundTransitionIfNeeded()
+        }
+    }
+    
+    @ViewBuilder
+    private func renderedBackgroundLayer(hasImage: Bool, image: UIImage?) -> some View {
+        if hasImage, let image {
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFill()
+                .frame(width: geometry.size.width, height: height ?? geometry.size.height)
+                .clipped()
+                .overlay(Color.black.opacity(0.55))
+                .overlay(Color.gray.opacity(0.05))
+                .blur(radius: 2)
+        } else if hasImage {
+            LinearGradient(
+                colors: [Color.gray.opacity(0.1), Color.gray.opacity(0.2)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        } else {
+            backgroundColor
+        }
+    }
+    
+    private func startBackgroundTransitionIfNeeded() {
+        let sameImageObject = (displayedImage === backgroundImage) || (displayedImage == nil && backgroundImage == nil)
+        let sameState = displayedHasBackgroundImage == hasBackgroundImage && sameImageObject
+        
+        guard !sameState else { return }
+        
+        previousHasBackgroundImage = displayedHasBackgroundImage
+        previousImage = displayedImage
+        displayedHasBackgroundImage = hasBackgroundImage
+        displayedImage = backgroundImage
+        
+        transitionProgress = 0
+        isTransitioning = true
+        
+        let id = UUID()
+        transitionID = id
+        
+        withAnimation(.easeInOut(duration: 0.5)) {
+            transitionProgress = 1
+        }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.52) {
+            guard transitionID == id else { return }
+            isTransitioning = false
+            previousHasBackgroundImage = false
+            previousImage = nil
         }
     }
 }

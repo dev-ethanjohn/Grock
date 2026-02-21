@@ -12,20 +12,20 @@ struct ChangePillView: View {
             HStack(spacing: 2) {
                 Text(currentText)
                     .lexendFont(13)
-                    .foregroundColor(Color(hex: "231F30"))
+                    .foregroundColor(Color.Grock.textPrimary)
                 
                 if let impactText = impactText {
                     Text(impactText)
                         .lexendFont(10)
                         .baselineOffset(6)
-                        .foregroundColor(isIncrease ? Color(hex: "FA003F") : Color(hex: "4CAF50"))
+                        .foregroundColor(isIncrease ? Color.Grock.accentDanger : Color.Grock.success)
                 }
             }
                         
             if let unitSuffix = unitSuffix {
                 Text(slashUnit ? " / \(unitSuffix)" : " \(unitSuffix)")
                     .lexendFont(13)
-                    .foregroundColor(Color(hex: "231F30"))
+                    .foregroundColor(Color.Grock.textPrimary)
             }
         }
         .fixedSize(horizontal: true, vertical: true)

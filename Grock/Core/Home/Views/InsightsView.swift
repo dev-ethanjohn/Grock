@@ -1,7 +1,6 @@
 import SwiftUI
 import SwiftData
 import Charts
-import RevenueCatUI
 
 struct InsightsView: View {
     @Environment(VaultService.self) private var vaultService
@@ -11,8 +10,6 @@ struct InsightsView: View {
     @State private var viewModel = InsightsViewModel()
     @State private var subscriptionManager = SubscriptionManager.shared
     @State private var showPaywall = false
-    @State private var showSubscriptionAlert = false
-    @State private var subscriptionAlertMessage = ""
     
     var body: some View {
         NavigationStack {
@@ -75,7 +72,7 @@ struct InsightsView: View {
                 }
                 .padding(.vertical, 24)
             }
-            .background(Color(hex: "#F9F9F9"))
+            .background(Color.Grock.surfaceSoft)
             .navigationTitle("Insights")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
@@ -95,41 +92,10 @@ struct InsightsView: View {
             .task {
                 await subscriptionManager.refreshAll()
             }
-            .sheet(isPresented: $showPaywall) {
-                PaywallView(displayCloseButton: true)
-                    .onPurchaseCompleted { customerInfo in
-                        let isUnlocked = customerInfo.entitlements
-                            .activeInCurrentEnvironment[SubscriptionManager.grockProEntitlementID] != nil
-                        if isUnlocked {
-                            showPaywall = false
-                        }
-                    }
-                    .onRestoreCompleted { customerInfo in
-                        let isUnlocked = customerInfo.entitlements
-                            .activeInCurrentEnvironment[SubscriptionManager.grockProEntitlementID] != nil
-                        if isUnlocked {
-                            showPaywall = false
-                        } else {
-                            subscriptionAlertMessage = "No active Grock Pro entitlement was found to restore."
-                            showSubscriptionAlert = true
-                        }
-                    }
-                    .onPurchaseFailure { error in
-                        subscriptionAlertMessage = "Purchase failed: \(error.localizedDescription)"
-                        showSubscriptionAlert = true
-                    }
-                    .onRestoreFailure { error in
-                        subscriptionAlertMessage = "Restore failed: \(error.localizedDescription)"
-                        showSubscriptionAlert = true
-                    }
-                    .onPurchaseCancelled {
-                        showPaywall = false
-                    }
-            }
-            .alert("Subscription", isPresented: $showSubscriptionAlert) {
-                Button("OK", role: .cancel) { }
-            } message: {
-                Text(subscriptionAlertMessage)
+            .fullScreenCover(isPresented: $showPaywall) {
+                GrockPaywallView {
+                    showPaywall = false
+                }
             }
         }
     }

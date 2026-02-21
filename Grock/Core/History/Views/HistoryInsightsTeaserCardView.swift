@@ -31,5 +31,5 @@ struct HistoryInsightsTeaserCardView: View {
             .padding(.bottom, 12)
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .background(Color(hex: "#F9F9F9"))
+    .background(Color.Grock.surfaceSoft)
 }

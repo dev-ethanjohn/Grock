@@ -112,7 +112,7 @@ struct ShoppingProgressSummary: View {
                     delay: 0.15
                 )
                 .fuzzyBubblesFont(13, weight: .bold)
-                .foregroundColor(Color(hex: "717171"))
+                .foregroundColor(Color.Grock.textSubtle)
                 
                 // Show skipped items (only vault items)
                 if skippedItems > 0 {
@@ -121,7 +121,7 @@ struct ShoppingProgressSummary: View {
                         delay: 0.25
                     )
                     .fuzzyBubblesFont(13, weight: .bold)
-                    .foregroundColor(Color(hex: "717171"))
+                    .foregroundColor(Color.Grock.textSubtle)
                 }
             }
             .padding(.top, 10)
@@ -182,7 +182,7 @@ struct CharacterRevealView: View {
     var animateOnChange: Bool = false
     var animateOnAppear: Bool = true
     var showsUnderline: Bool = true
-    var underlineColor: Color = Color(hex: "717171")
+    var underlineColor: Color = Color.Grock.textSubtle
     @State private var revealedCharacters: Int = 0
     @State private var isAnimating = false
     @State private var underlineWidth: CGFloat = 0

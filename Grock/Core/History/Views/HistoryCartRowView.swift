@@ -108,7 +108,7 @@ struct HistoryCartRowView: View {
             }
 
             VStack(alignment: .leading, spacing: 4) {
-                let summaryColor = hasBackgroundImage ? Color.white.opacity(0.82) : Color(hex: "717171")
+                let summaryColor = hasBackgroundImage ? Color.white.opacity(0.82) : Color.Grock.textSubtle
                 CharacterRevealView(
                     text: completedSummaryText,
                     delay: 0.15,
@@ -200,5 +200,5 @@ struct HistoryCartRowView: View {
             .environment(preview.cartViewModel)
     }
     .padding()
-    .background(Color(hex: "#F9F9F9"))
+    .background(Color.Grock.surfaceSoft)
 }

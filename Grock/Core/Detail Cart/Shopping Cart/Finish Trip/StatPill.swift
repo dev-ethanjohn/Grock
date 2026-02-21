@@ -17,7 +17,7 @@ struct StatPill: View {
             
             Text(label)
                 .lexendFont(12)
-                .foregroundColor(Color(hex: "666"))
+                .foregroundColor(Color.Grock.textSecondary)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 12)

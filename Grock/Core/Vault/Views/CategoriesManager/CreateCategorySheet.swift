@@ -43,7 +43,7 @@ struct CreateCategorySheet: View {
                                 .frame(width: 34, height: 34)
                                 .background(
                                     Circle()
-                                        .fill(Color(hex: "#FA003F"))
+                                        .fill(Color.Grock.accentDanger)
                                 )
                         }
                         .buttonStyle(.plain)
@@ -217,7 +217,7 @@ struct CreateCategorySheet: View {
     private func validationError(_ message: String) -> some View {
         Text(message)
             .font(.caption)
-            .foregroundColor(Color(hex: "#FA003F"))
+            .foregroundColor(Color.Grock.accentDanger)
             .padding(.bottom, 4)
             .transition(.asymmetric(
                 insertion: .scale(scale: 0.9, anchor: .center)

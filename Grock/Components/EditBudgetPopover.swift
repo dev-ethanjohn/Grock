@@ -48,14 +48,14 @@ struct EditBudgetPopover: View {
                     HStack(spacing: 2) {
                         Text(CurrencyManager.shared.selectedCurrency.symbol)
                             .lexendFont(26, weight: .semibold)
-                            .foregroundColor(budgetString.isEmpty ? Color(hex: "999").opacity(0.5) : .black)
+                            .foregroundColor(budgetString.isEmpty ? Color.Grock.textMuted.opacity(0.5) : .black)
                             .contentTransition(.numericText())
                             .animation(.snappy, value: CurrencyManager.shared.selectedCurrency.symbol)
                         
                         // Use overlay approach like PricePerUnitField
                         Text(budgetString.isEmpty ? "0" : budgetString)
                             .lexendFont(26, weight: .semibold)
-                            .foregroundColor(budgetString.isEmpty ? Color(hex: "999").opacity(0.5) : .black)
+                            .foregroundColor(budgetString.isEmpty ? Color.Grock.textMuted.opacity(0.5) : .black)
                             .overlay(
                                 TextField("", text: $budgetString, onCommit: {
                                     if isValidBudget { saveBudget() }
@@ -90,7 +90,7 @@ struct EditBudgetPopover: View {
                 if isInvalidAmount {
                     Text(errorMessage)
                         .lexendFont(11, weight: .medium)
-                        .foregroundColor(Color(hex: "FA003F"))
+                        .foregroundColor(Color.Grock.accentDanger)
                         .frame(maxWidth: .infinity, alignment: .center)
                         .padding(.top, 8)
                         .transition(

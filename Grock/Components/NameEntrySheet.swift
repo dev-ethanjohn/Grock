@@ -151,7 +151,7 @@ struct NameEntrySheet: View {
     private func validationErrorView(_ message: String) -> some View {
         Text(message)
             .font(.caption)
-            .foregroundColor(Color(hex: "#FA003F"))
+            .foregroundColor(Color.Grock.accentDanger)
             .transition(.asymmetric(
                 insertion: .scale(scale: 0.9, anchor: .center).combined(with: .opacity).animation(.spring(response: 0.3, dampingFraction: 0.55)),
                 removal: .scale(scale: 0.9, anchor: .center).combined(with: .opacity).animation(.spring(response: 0.3, dampingFraction: 0.75))

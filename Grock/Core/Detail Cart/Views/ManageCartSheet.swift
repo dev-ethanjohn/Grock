@@ -13,6 +13,8 @@ struct ManageCartSheet: View {
     @State private var createCartButtonVisible = true
     @State private var searchText: String = ""
     @State private var isSearching: Bool = false
+    @State private var subscriptionManager = SubscriptionManager.shared
+    @State private var showPaywall = false
     @Namespace private var searchNamespace
     @Namespace private var categoryManagerNamespace
     
@@ -120,6 +122,14 @@ struct ManageCartSheet: View {
         )
     }
 
+    private var firstSelectableVisibleCategory: String? {
+        visibleCategories.first
+    }
+
+    private func isLockedCustomCategory(named categoryName: String) -> Bool {
+        vaultService.isCategoryLockedByPlan(named: categoryName)
+    }
+
     private func openCategoryManager() {
         showCategoryPickerSheet = true
     }
@@ -151,7 +161,7 @@ struct ManageCartSheet: View {
             .onAppear {
                 initializeActiveItemsFromCart()
                 if selectedCategoryName == nil {
-                    selectedCategoryName = firstVisibleCategoryWithItems ?? visibleCategories.first
+                    selectedCategoryName = firstVisibleCategoryWithItems ?? firstSelectableVisibleCategory
                 }
                 updateChevronVisibility()
             }
@@ -162,7 +172,7 @@ struct ManageCartSheet: View {
                 // Update selected category if the current one no longer has items
                 if let currentCategoryName = selectedCategoryName,
                    !hasItems(inCategoryNamed: currentCategoryName) {
-                    selectedCategoryName = firstVisibleCategoryWithItems ?? visibleCategories.first
+                    selectedCategoryName = firstVisibleCategoryWithItems ?? firstSelectableVisibleCategory
                 }
             }
             .onChange(of: vaultUpdateTrigger) { oldValue, newValue in
@@ -172,14 +182,10 @@ struct ManageCartSheet: View {
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ItemCategoryChanged"))) { notification in
                 if let newCategoryName = notification.userInfo?["newCategoryName"] as? String {
                     print("🔄 ManageCartSheet: Received category change notification - switching to \(newCategoryName)")
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                        selectedCategoryName = newCategoryName
-                    }
+                    selectCategory(named: newCategoryName)
                 } else if let newCategory = notification.userInfo?["newCategory"] as? GroceryCategory {
                     print("🔄 ManageCartSheet: Received category change notification - switching to \(newCategory.title)")
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                        selectedCategoryName = newCategory.title
-                    }
+                    selectCategory(named: newCategory.title)
                 }
             }
             .onChange(of: selectedCategoryName) { oldValue, newValue in
@@ -202,9 +208,12 @@ struct ManageCartSheet: View {
             .onChange(of: visibleCategoryNamesData) { _, _ in
                 if let selectedCategoryName,
                    !visibleCategories.contains(selectedCategoryName) {
-                    self.selectedCategoryName = visibleCategories.first
+                    self.selectedCategoryName = firstSelectableVisibleCategory
                 }
                 updateChevronVisibility()
+            }
+            .task {
+                await subscriptionManager.refreshCustomerInfo()
             }
             .onChange(of: hasActiveItems) { oldValue, newValue in
                 if newValue {
@@ -232,6 +241,11 @@ struct ManageCartSheet: View {
             .fullScreenCover(isPresented: $showCategoryPickerSheet) {
                 NavigationStack {
                     categoriesManagerDestination
+                }
+            }
+            .fullScreenCover(isPresented: $showPaywall) {
+                GrockPaywallView {
+                    showPaywall = false
                 }
             }
             .presentationDragIndicator(.visible)
@@ -349,23 +363,15 @@ struct ManageCartSheet: View {
             HStack(spacing: 8) {
                 ScrollView(.horizontal, showsIndicators: false) {
                     ZStack(alignment: .leading) {
-                        if let selectedCategoryName,
-                           let selectedIndex = visibleCategories.firstIndex(of: selectedCategoryName) {
-                            RoundedRectangle(cornerRadius: 12)
-                                .strokeBorder(Color.black, lineWidth: 2)
-                                .frame(width: iconSize, height: iconSize)
-                                .offset(x: CGFloat(selectedIndex) * (iconSize + iconSpacing))
-                                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: selectedCategoryName)
-                        }
-                        
                         HStack(spacing: iconSpacing) {
-                            ForEach(visibleCategories, id: \.self) { categoryName in
+                            ForEach(Array(visibleCategories), id: \.self) { (categoryName: String) in
                                 VaultCategoryNameIcon(
                                     name: categoryName,
                                     isSelected: selectedCategoryName == categoryName,
                                     itemCount: getActiveItemCount(forCategoryNamed: categoryName),
                                     hasItems: hasItems(inCategoryNamed: categoryName),
                                     iconText: vaultService.displayEmoji(forCategoryName: categoryName),
+                                    isLocked: isLockedCustomCategory(named: categoryName),
                                     action: {
                                         // Dismiss keyboard immediately when tapping category
                                         UIApplication.shared.endEditing()
@@ -393,6 +399,18 @@ struct ManageCartSheet: View {
                                 }
                         }
                         .padding(.trailing, 80)
+                        .zIndex(0)
+
+                        if let selectedCategoryName,
+                           let selectedIndex = visibleCategories.firstIndex(of: selectedCategoryName) {
+                            RoundedRectangle(cornerRadius: 12)
+                                .strokeBorder(Color.black, lineWidth: 2)
+                                .frame(width: iconSize, height: iconSize)
+                                .offset(x: CGFloat(selectedIndex) * (iconSize + iconSpacing))
+                                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: selectedCategoryName)
+                                .allowsHitTesting(false)
+                                .zIndex(10)
+                        }
                     }
                     .padding(.vertical, 1)
                     .padding(.leading)
@@ -418,7 +436,7 @@ struct ManageCartSheet: View {
                 }
             }
             .onAppear {
-                if let initialCategory = selectedCategoryName ?? firstVisibleCategoryWithItems ?? visibleCategories.first {
+                if let initialCategory = selectedCategoryName ?? firstVisibleCategoryWithItems ?? firstSelectableVisibleCategory {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
                             proxy.scrollTo(initialCategory, anchor: .center)
@@ -436,7 +454,9 @@ struct ManageCartSheet: View {
                     categoryName: selectedCategoryName,
                     localActiveItems: $localActiveItems,
                     searchText: searchText,
-                    navigationDirection: navigationDirection
+                    navigationDirection: navigationDirection,
+                    isEditingLocked: isLockedCustomCategory(named: selectedCategoryName),
+                    onLockedEditAttempt: presentProPaywallForLockedCategory
                 )
             }
         }
@@ -717,6 +737,12 @@ struct ManageCartSheet: View {
             selectedCategoryName = categoryName
         }
     }
+
+    private func presentProPaywallForLockedCategory() {
+        UIApplication.shared.endEditing()
+        HapticManager.shared.playMedium()
+        showPaywall = true
+    }
     
     private func updateChevronVisibility() {
         guard let currentCategory = selectedCategoryName,
@@ -740,9 +766,7 @@ struct ManageCartSheet: View {
         
         let previousCategory = visibleCategories[currentIndex - 1]
         navigationDirection = .left
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-            selectedCategoryName = previousCategory
-        }
+        selectCategory(named: previousCategory)
     }
     
     private func navigateToNextCategory() {
@@ -755,9 +779,7 @@ struct ManageCartSheet: View {
         
         let nextCategory = visibleCategories[currentIndex + 1]
         navigationDirection = .right
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-            selectedCategoryName = nextCategory
-        }
+        selectCategory(named: nextCategory)
     }
     
     private func matchCategoryForSearch(_ text: String, vault: Vault) -> String? {
@@ -955,11 +977,10 @@ struct CategoryItemsListView: View {
     @Binding var localActiveItems: [String: Double]
     let searchText: String
     let navigationDirection: ManageCartSheet.NavigationDirection
+    let isEditingLocked: Bool
+    let onLockedEditAttempt: () -> Void
     
     @Environment(VaultService.self) private var vaultService
-    
-    // Store availableStores as @State
-    @State private var currentStores: [String] = []
     
     private var groceryCategory: GroceryCategory? {
         GroceryCategory.allCases.first(where: { $0.title == categoryName })
@@ -1003,6 +1024,13 @@ struct CategoryItemsListView: View {
             return items.filter { $0.name.localizedCaseInsensitiveContains(trimmed) }
         }
     }
+
+    private var availableStores: [String] {
+        let allStores = categoryItems.flatMap { item in
+            item.priceOptions.map { $0.store }
+        }
+        return Array(Set(allStores)).sorted()
+    }
     
     var body: some View {
         Group {
@@ -1011,10 +1039,12 @@ struct CategoryItemsListView: View {
             } else {
                 ManageCartItemsListView(
                     items: categoryItems,
-                    availableStores: currentStores,
+                    availableStores: availableStores,
                     categoryName: categoryName,
                     categoryColor: categoryColor,
                     localActiveItems: $localActiveItems,
+                    isEditingLocked: isEditingLocked,
+                    onLockedEditAttempt: onLockedEditAttempt,
                     onDeleteVaultItem: { item in
                         let itemId = item.id
                         let keysToRemove = localActiveItems.keys.filter { key in
@@ -1037,31 +1067,6 @@ struct CategoryItemsListView: View {
                         .move(edge: .trailing)
                 ))
             }
-        }
-        .onAppear {
-            updateStores()
-        }
-        .onChange(of: vaultService.vault) { oldValue, newValue in
-            updateStores()
-        }
-        // Also watch for when items count changes
-        .onChange(of: categoryItems.count) { oldCount, newCount in
-            updateStores()
-        }
-        .onChange(of: searchText) { _, _ in
-            updateStores()
-        }
-    }
-    
-    private func updateStores() {
-        let allStores = categoryItems.flatMap { item in
-            item.priceOptions.map { $0.store }
-        }
-        let newStores = Array(Set(allStores)).sorted()
-        
-        if newStores != currentStores {
-            print("🔄 Stores updated: \(newStores)")
-            currentStores = newStores
         }
     }
     
@@ -1092,6 +1097,8 @@ struct ManageCartItemsListView: View {
     let categoryName: String
     let categoryColor: Color
     @Binding var localActiveItems: [String: Double]
+    let isEditingLocked: Bool
+    let onLockedEditAttempt: () -> Void
     let onDeleteVaultItem: (Item) -> Void
     
     @Environment(VaultService.self) private var vaultService
@@ -1102,6 +1109,10 @@ struct ManageCartItemsListView: View {
     // Alert state
     @State private var itemToDelete: Item?
     @State private var showDeleteConfirmation = false
+
+    private var lockedRowsOpacity: Double {
+        isEditingLocked ? 0.82 : 1
+    }
     
     var body: some View {
         List {
@@ -1120,6 +1131,8 @@ struct ManageCartItemsListView: View {
                     categoryColor: categoryColor,
                     hasBackgroundImage: stateManager.hasBackgroundImage,
                     localActiveItems: $localActiveItems,
+                    isEditingLocked: isEditingLocked,
+                    onLockedEditAttempt: onLockedEditAttempt,
                     onDeleteVaultItem: { item in
                         itemToDelete = item
                         showDeleteConfirmation = true
@@ -1129,6 +1142,55 @@ struct ManageCartItemsListView: View {
                     previousStores.contains(store) ? nil : .spring(response: 0.3, dampingFraction: 0.7),
                     value: store
                 )
+            }
+
+            if isEditingLocked {
+                VStack(spacing: 0) {
+                    HStack(alignment: .center, spacing: 0) {
+                        Text("Bring back “\(categoryName)” \(vaultService.displayEmoji(forCategoryName: categoryName)) for complete planning, shopping, and budget tracking.")
+                            .fuzzyBubblesFont(14, weight: .bold)
+                            .foregroundStyle(Color.black.opacity(0.9))
+                            .lineLimit(3)
+                            .multilineTextAlignment(.leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 14)
+
+                    DashedLine()
+                        .stroke(style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
+                        .foregroundColor(Color.black.opacity(0.2))
+                        .frame(height: 1)
+                        .padding(.horizontal, 16)
+
+                    Button(action: onLockedEditAttempt) {
+                        Text("Unlock with Pro")
+                            .fuzzyBubblesFont(20, weight: .bold)
+                            .foregroundColor(.black.opacity(0.9))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 11)
+                    }
+                    .buttonStyle(.plain)
+                    .background(
+                        categoryColor
+                    )
+                }
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(categoryColor.opacity(0.32))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(Color.gray.opacity(0.7), lineWidth: 0.5)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .padding(.horizontal, 16)
+                .padding(.top, 4)
+                .padding(.bottom, 12)
+                .listRowInsets(EdgeInsets())
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
             }
             
             // Add bottom padding
@@ -1177,6 +1239,8 @@ struct ManageCartStoreSection: View {
     let categoryColor: Color
     let hasBackgroundImage: Bool
     @Binding var localActiveItems: [String: Double]
+    let isEditingLocked: Bool
+    let onLockedEditAttempt: () -> Void
     let onDeleteVaultItem: (Item) -> Void
     
     private var itemsWithStableIdentifiers: [(id: String, item: Item)] {
@@ -1189,6 +1253,10 @@ struct ManageCartStoreSection: View {
     
     private var headerBackgroundColor: Color {
         hasBackgroundImage ? .white : categoryColor.saturated(by: 0.3).darker(by: 0.5)
+    }
+
+    private var lockedRowsOpacity: Double {
+        isEditingLocked ? 0.82 : 1
     }
     
     var body: some View {
@@ -1211,6 +1279,8 @@ struct ManageCartStoreSection: View {
             }
             .padding(.leading)
             .listRowInsets(EdgeInsets())
+            .saturation(isEditingLocked ? 0 : 1)
+            .opacity(lockedRowsOpacity)
         ) {
             ForEach(itemsWithStableIdentifiers, id: \.id) { tuple in
                 VStack(spacing: 0) {
@@ -1220,6 +1290,8 @@ struct ManageCartStoreSection: View {
                         categoryName: categoryName,
                         categoryColor: categoryColor,
                         localActiveItems: $localActiveItems,
+                        isEditingLocked: isEditingLocked,
+                        onLockedEditAttempt: onLockedEditAttempt,
                         onDeleteVaultItem: onDeleteVaultItem
                     )
                     
@@ -1227,18 +1299,31 @@ struct ManageCartStoreSection: View {
                         DashedLine()
                             .stroke(style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
                             .frame(height: 1)
-                            .foregroundColor(Color(hex: "ddd"))
+                            .foregroundColor(Color.Grock.neutral300)
                             .padding(.horizontal, 16)
                             .padding(.leading, 14)
                     }
                 }
                 .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                    Button {
-                        onDeleteVaultItem(tuple.item)
-                    } label: {
-                        Label("Vault", systemImage: "trash.slash")
+                    if isEditingLocked {
+                        Button {
+                            onLockedEditAttempt()
+                        } label: {
+                            Label {
+                                Text("Pro")
+                            } icon: {
+                                Text("💎")
+                            }
+                        }
+                        .tint(.orange)
+                    } else {
+                        Button {
+                            onDeleteVaultItem(tuple.item)
+                        } label: {
+                            Label("Vault", systemImage: "trash.slash")
+                        }
+                        .tint(.red)
                     }
-                    .tint(.red)
                 }
                 .listRowInsets(EdgeInsets())
                 .listRowSeparator(.hidden, edges: .all)
@@ -1252,6 +1337,8 @@ struct ManageCartStoreSection: View {
                         .combined(with: .opacity)
                 ))
                 .animation(.spring(response: 0.4, dampingFraction: 0.75), value: itemsWithStableIdentifiers.map { $0.id })
+                .saturation(isEditingLocked ? 0 : 1)
+                .opacity(lockedRowsOpacity)
             }
         }
         .listSectionSeparator(.hidden, edges: .all)
@@ -1265,6 +1352,8 @@ struct ManageCartItemRow: View {
     let categoryName: String
     let categoryColor: Color
     @Binding var localActiveItems: [String: Double]
+    let isEditingLocked: Bool
+    let onLockedEditAttempt: () -> Void
     let onDeleteVaultItem: (Item) -> Void
     
     @Environment(VaultService.self) private var vaultService
@@ -1309,7 +1398,7 @@ struct ManageCartItemRow: View {
             
             VStack(alignment: .leading, spacing: 0) {
                 Text(item.name)
-                    .foregroundColor(isActive ? .black : Color(hex: "999"))
+                    .foregroundColor(isActive ? .black : Color.Grock.textMuted)
                     .lexendFont(17)
                 
                 if let priceOption = selectedPriceOption {
@@ -1321,7 +1410,7 @@ struct ManageCartItemRow: View {
                         Spacer()
                     }
                     .lexendFont(12)
-                    .foregroundColor(isActive ? .black : Color(hex: "999"))
+                    .foregroundColor(isActive ? .black : Color.Grock.textMuted)
                 }
             }
             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isActive)
@@ -1348,6 +1437,10 @@ struct ManageCartItemRow: View {
         .opacity(appearOpacity)
         .animation(.spring(response: 0.4, dampingFraction: 0.7), value: isActive)
         .onTapGesture {
+            guard !isEditingLocked else {
+                onLockedEditAttempt()
+                return
+            }
             if !isFocused {
                 showEditSheet = true
             }
@@ -1365,22 +1458,34 @@ struct ManageCartItemRow: View {
             .presentationBackground(.white)
         }
         .contextMenu {
-            Button(role: .destructive) {
-                removeSelectionsForItem()
-            } label: {
-                Label("Remove from Cart", systemImage: "trash")
-            }
-            
-            Button(role: .destructive) {
-                onDeleteVaultItem(item)
-            } label: {
-                Label("Remove from Vault", systemImage: "trash.slash")
-            }
-            
-            Button {
-                showEditSheet = true
-            } label: {
-                Label("Edit", systemImage: "pencil")
+            if isEditingLocked {
+                Button {
+                    onLockedEditAttempt()
+                } label: {
+                    Label {
+                        Text("Unlock Pro to Edit")
+                    } icon: {
+                        Text("💎")
+                    }
+                }
+            } else {
+                Button(role: .destructive) {
+                    removeSelectionsForItem()
+                } label: {
+                    Label("Remove from Cart", systemImage: "trash")
+                }
+                
+                Button(role: .destructive) {
+                    onDeleteVaultItem(item)
+                } label: {
+                    Label("Remove from Vault", systemImage: "trash.slash")
+                }
+                
+                Button {
+                    showEditSheet = true
+                } label: {
+                    Label("Edit", systemImage: "pencil")
+                }
             }
         }
         .onChange(of: currentQuantity) { _, newValue in
@@ -1412,18 +1517,22 @@ struct ManageCartItemRow: View {
     
     private var minusButton: some View {
         Button {
+            guard !isEditingLocked else {
+                onLockedEditAttempt()
+                return
+            }
             handleMinus()
         } label: {
             Image(systemName: "minus")
                 .lexend(.footnote).bold()
-                .foregroundColor(Color(hex: "1E2A36"))
+                .foregroundColor(Color.Grock.textDeep)
                 .frame(width: 24, height: 24)
                 .background(.white)
                 .clipShape(Circle())
         }
         .buttonStyle(.plain)
         .contentShape(Rectangle())
-        .disabled(currentQuantity <= 0)
+        .disabled(currentQuantity <= 0 || isEditingLocked)
         .opacity(currentQuantity <= 0 ? 0.5 : 1)
     }
     
@@ -1431,7 +1540,7 @@ struct ManageCartItemRow: View {
         ZStack {
             Text(textValue)
                 .lexendFont(15, weight: .bold)
-                .foregroundColor(Color(hex: "2C3E50"))
+                .foregroundColor(Color.Grock.textDeepAlt)
                 .multilineTextAlignment(.center)
                 .contentTransition(.numericText())
                 .animation(.spring(response: 0.3, dampingFraction: 0.7), value: textValue)
@@ -1444,6 +1553,7 @@ struct ManageCartItemRow: View {
                 .multilineTextAlignment(.center)
                 .autocorrectionDisabled()
                 .focused($isFocused)
+                .disabled(isEditingLocked)
                 .numbersOnly($textValue, includeDecimal: true)
                 .onChange(of: isFocused) { oldValue, focused in
                     if !focused {
@@ -1459,7 +1569,7 @@ struct ManageCartItemRow: View {
         .padding(.horizontal, 6)
         .background(
             RoundedRectangle(cornerRadius: 6)
-                .stroke(Color(hex: "F2F2F2").darker(by: 0.1), lineWidth: 1)
+                .stroke(Color.Grock.borderSubtle.darker(by: 0.1), lineWidth: 1)
         )
         .frame(minWidth: 40)
         .frame(maxWidth: 80)
@@ -1468,6 +1578,10 @@ struct ManageCartItemRow: View {
     
     private var plusButton: some View {
         Button(action: {
+            guard !isEditingLocked else {
+                onLockedEditAttempt()
+                return
+            }
             if isActive {
                 handlePlus()
             } else {
@@ -1479,17 +1593,22 @@ struct ManageCartItemRow: View {
             Image(systemName: "plus")
                 .lexend(.footnote)
                 .bold()
-                .foregroundColor(isActive ? Color(hex: "1E2A36") : Color(hex: "888888"))
+                .foregroundColor(isActive ? Color.Grock.textDeep : Color.Grock.neutral500)
         }
         .frame(width: 24, height: 24)
         .background(.white)
         .clipShape(Circle())
         .contentShape(Circle())
         .buttonStyle(.plain)
-        .disabled(isFocused)
+        .disabled(isFocused || isEditingLocked)
     }
     
     private func handlePlus() {
+        guard !isEditingLocked else {
+            onLockedEditAttempt()
+            return
+        }
+
         let newValue: Double
         if currentQuantity.truncatingRemainder(dividingBy: 1) != 0 {
             newValue = ceil(currentQuantity)
@@ -1503,6 +1622,11 @@ struct ManageCartItemRow: View {
     }
     
     private func handleMinus() {
+        guard !isEditingLocked else {
+            onLockedEditAttempt()
+            return
+        }
+
         let newValue: Double
         if currentQuantity.truncatingRemainder(dividingBy: 1) != 0 {
             newValue = floor(currentQuantity)
@@ -1516,6 +1640,13 @@ struct ManageCartItemRow: View {
     }
     
     private func commitTextField() {
+        guard !isEditingLocked else {
+            onLockedEditAttempt()
+            isFocused = false
+            textValue = formatValue(currentQuantity)
+            return
+        }
+
         let formatter = NumberFormatter()
         formatter.numberStyle = .decimal
         
@@ -1545,6 +1676,11 @@ struct ManageCartItemRow: View {
     }
 
     private func setSelectionQuantity(_ quantity: Double) {
+        guard !isEditingLocked else {
+            onLockedEditAttempt()
+            return
+        }
+
         let keysToClear = localActiveItems.keys.filter { key in
             ActiveItemSelectionKey.itemId(from: key) == item.id && key != selectionKey
         }

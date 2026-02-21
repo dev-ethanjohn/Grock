@@ -110,7 +110,7 @@ struct UnifiedItemPopover: View {
     }
     
     private var totalCostDeltaColor: Color {
-        totalCostDelta > 0 ? Color(hex: "FA003F") : Color(hex: "4CAF50")
+        totalCostDelta > 0 ? Color.Grock.accentDanger : Color.Grock.success
     }
     
     private var totalCostDeltaText: String {
@@ -249,7 +249,7 @@ struct UnifiedItemPopover: View {
             DashedLine()
                 .stroke(style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
                 .frame(height: 0.5)
-                .foregroundColor(Color(hex: "999").opacity(0.5))
+                .foregroundColor(Color.Grock.textMuted.opacity(0.5))
             
             HStack(alignment: .top) {
                 Text("Total Cost:")
@@ -527,7 +527,7 @@ private struct ItemDescriptionText: View {
     
     private var livePriceDeltaColor: Color {
         if livePriceDelta > 0 {
-            return Color(hex: "FA003F")
+            return Color.Grock.accentDanger
         } else if livePriceDelta < 0 {
             return .green
         } else {

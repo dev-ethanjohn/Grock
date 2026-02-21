@@ -17,6 +17,7 @@ struct MenuView: View {
     @State private var showingCustomerCenter = false
     @State private var showSubscriptionAlert = false
     @State private var subscriptionAlertMessage = ""
+    private let selectedAccent = Color.Grock.budgetSafe
     private let stickyHeaderHeight: CGFloat = 156
     private let listHorizontalPadding: CGFloat = 12
     private let rowHorizontalPadding: CGFloat = 6
@@ -112,7 +113,7 @@ struct MenuView: View {
                             DashedLine()
                                 .stroke(style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
                                 .frame(height: 1)
-                                .foregroundColor(Color(hex: "ddd"))
+                                .foregroundColor(Color.Grock.neutral300)
                             
                             ForEach(groupedMenuCurrencies) { group in
                                 Menu {
@@ -228,33 +229,10 @@ struct MenuView: View {
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
         }
-        .sheet(isPresented: $showingPaywall) {
-            PaywallView(displayCloseButton: true)
-                .onPurchaseCompleted { customerInfo in
-                    let unlocked = customerInfo.entitlements
-                        .activeInCurrentEnvironment[SubscriptionManager.grockProEntitlementID] != nil
-                    if unlocked {
-                        showingPaywall = false
-                    }
-                }
-                .onRestoreCompleted { customerInfo in
-                    let unlocked = customerInfo.entitlements
-                        .activeInCurrentEnvironment[SubscriptionManager.grockProEntitlementID] != nil
-                    if unlocked {
-                        showingPaywall = false
-                    } else {
-                        subscriptionAlertMessage = "No active Grock Pro entitlement was found to restore."
-                        showSubscriptionAlert = true
-                    }
-                }
-                .onPurchaseFailure { error in
-                    subscriptionAlertMessage = "Purchase failed: \(error.localizedDescription)"
-                    showSubscriptionAlert = true
-                }
-                .onRestoreFailure { error in
-                    subscriptionAlertMessage = "Restore failed: \(error.localizedDescription)"
-                    showSubscriptionAlert = true
-                }
+        .fullScreenCover(isPresented: $showingPaywall) {
+            GrockPaywallView {
+                showingPaywall = false
+            }
         }
         .presentCustomerCenter(
             isPresented: $showingCustomerCenter,
@@ -340,17 +318,21 @@ struct MenuView: View {
             DashedLine()
                 .stroke(style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
                 .frame(height: 1)
-                .foregroundColor(Color(hex: "ddd"))
+                .foregroundColor(Color.Grock.neutral300)
                 .padding(.horizontal, rowHorizontalPadding)
                 .padding(.top, 4)
                 .padding(.bottom, 8)
 
             Button {
-                showingPaywall = true
+                if subscriptionManager.isPro {
+                    showingCustomerCenter = true
+                } else {
+                    showingPaywall = true
+                }
             } label: {
                 feedbackRow(
                     title: subscriptionManager.isPro ? "Manage Grock Pro" : "Unlock Grock Pro",
-                    icon: "👑",
+                    icon: "✨",
                     isHighlighted: !subscriptionManager.isPro
                 )
             }
@@ -388,7 +370,7 @@ struct MenuView: View {
             DashedLine()
                 .stroke(style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
                 .frame(height: 1)
-                .foregroundColor(Color(hex: "ddd"))
+                .foregroundColor(Color.Grock.neutral300)
                 .padding(.horizontal, rowHorizontalPadding)
                 .padding(.top, 4)
                 .padding(.bottom, 8)
@@ -410,7 +392,7 @@ struct MenuView: View {
             DashedLine()
                 .stroke(style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
                 .frame(height: 1)
-                .foregroundColor(Color(hex: "ddd"))
+                .foregroundColor(Color.Grock.neutral300)
                 .padding(.horizontal, rowHorizontalPadding)
                 .padding(.top, 4)
                 .padding(.bottom, 8)
@@ -489,14 +471,14 @@ struct MenuView: View {
                 Capsule()
                     .fill(
                         LinearGradient(
-                            colors: [Color(hex: "FFE08A"), Color(hex: "FFC94A")],
+                            colors: [selectedAccent, selectedAccent.darker(by: 0.12)],
                             startPoint: .leading,
                             endPoint: .trailing
                         )
                     )
                     .overlay(
                         Capsule()
-                            .stroke(Color(hex: "E3AD2B"), lineWidth: 1)
+                            .stroke(selectedAccent.darker(by: 0.32), lineWidth: 1)
                     )
             }
         }

@@ -2,6 +2,10 @@ import Foundation
 import Observation
 import RevenueCat
 
+extension Notification.Name {
+    static let subscriptionStatusChanged = Notification.Name("SubscriptionStatusChanged")
+}
+
 enum SubscriptionActionResult {
     case success
     case cancelled
@@ -25,6 +29,8 @@ final class SubscriptionManager {
     private(set) var lastErrorMessage: String?
 
     private var customerInfoStreamTask: Task<Void, Never>?
+    private let purchaseLock = NSLock()
+    private var isPurchaseInProgress = false
 
     private init() {
         self.isPro = UserDefaults.standard.isPro
@@ -82,7 +88,9 @@ final class SubscriptionManager {
 
         do {
             let info = try await Purchases.shared.customerInfo()
-            apply(customerInfo: info)
+            await MainActor.run {
+                apply(customerInfo: info)
+            }
             clearError()
         } catch {
             setError("Could not refresh subscription status: \(error.localizedDescription)")
@@ -96,9 +104,16 @@ final class SubscriptionManager {
             return .failure(message)
         }
 
+        guard beginPurchase() else {
+            return .failure("Purchase already in progress. Please wait.")
+        }
+        defer { endPurchase() }
+
         do {
             let result = try await Purchases.shared.purchase(package: package)
-            apply(customerInfo: result.customerInfo)
+            await MainActor.run {
+                apply(customerInfo: result.customerInfo)
+            }
 
             if result.userCancelled {
                 return .cancelled
@@ -144,7 +159,9 @@ final class SubscriptionManager {
 
         do {
             let info = try await Purchases.shared.restorePurchases()
-            apply(customerInfo: info)
+            await MainActor.run {
+                apply(customerInfo: info)
+            }
             clearError()
             return .success
         } catch {
@@ -163,7 +180,9 @@ final class SubscriptionManager {
 
         do {
             let info = try await Purchases.shared.syncPurchases()
-            apply(customerInfo: info)
+            await MainActor.run {
+                apply(customerInfo: info)
+            }
             clearError()
             return .success
         } catch {
@@ -191,14 +210,28 @@ final class SubscriptionManager {
             ?? offering.annual
     }
 
+    @MainActor
     private func apply(customerInfo: CustomerInfo) {
         self.customerInfo = customerInfo
 
+        let previousIsPro = self.isPro
         let proIsActive = customerInfo.entitlements
             .activeInCurrentEnvironment[SubscriptionManager.grockProEntitlementID] != nil
 
         self.isPro = proIsActive
         UserDefaults.standard.isPro = proIsActive
+
+        if previousIsPro != proIsActive {
+            NotificationCenter.default.post(
+                name: .subscriptionStatusChanged,
+                object: nil,
+                userInfo: [
+                    "isPro": proIsActive,
+                    "previousIsPro": previousIsPro,
+                    "changedAt": Date()
+                ]
+            )
+        }
     }
 
     private func setError(_ message: String) {
@@ -208,5 +241,19 @@ final class SubscriptionManager {
 
     private func clearError() {
         lastErrorMessage = nil
+    }
+
+    private func beginPurchase() -> Bool {
+        purchaseLock.lock()
+        defer { purchaseLock.unlock() }
+        guard !isPurchaseInProgress else { return false }
+        isPurchaseInProgress = true
+        return true
+    }
+
+    private func endPurchase() {
+        purchaseLock.lock()
+        isPurchaseInProgress = false
+        purchaseLock.unlock()
     }
 }

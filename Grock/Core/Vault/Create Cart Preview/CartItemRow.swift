@@ -79,7 +79,7 @@ struct CartItemRow: View {
                 DashedLine()
                     .stroke(style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
                     .frame(height: 1)
-                    .foregroundColor(Color(hex: "ddd"))
+                    .foregroundColor(Color.Grock.neutral300)
             }
         }
     }

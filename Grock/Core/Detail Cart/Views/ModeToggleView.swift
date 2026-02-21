@@ -63,7 +63,7 @@ struct ModeToggleView: View {
             )
         }
         .padding(.top, stateManager.headerHeight)
-//        .background(Color(hex: "#f7f7f7"))
+//        .background(Color.Grock.surfaceMuted)
         .zIndex(100)
         .allowsHitTesting(true)
         .onChange(of: cart.status) { oldValue, newValue in
@@ -105,7 +105,7 @@ struct ToggleSwitchView: View {
     
     var body: some View {
         ZStack {
-            Color(hex: "EEEEEE")
+            Color.Grock.surfaceElevated
                 .frame(width: 176, height: 26)
                 .cornerRadius(16)
             
@@ -159,7 +159,7 @@ struct PlanningButton: View {
         Button(action: handlePlanningTap) {
             Text("Planning")
                 .lexendFont(13, weight: .medium)
-                .foregroundColor(cart.isPlanning ? .black : Color(hex: "999999"))
+                .foregroundColor(cart.isPlanning ? .black : Color.Grock.textMutedAlt)
                 .frame(width: 88, height: 26)
                 .offset(x: cart.isPlanning ? stateManager.anticipationOffset : 0)
                 .animation(.spring(response: 0.3, dampingFraction: 0.7), value: stateManager.anticipationOffset)
@@ -188,7 +188,7 @@ struct ShoppingButton: View {
         Button(action: handleShoppingTap) {
             Text("Shopping")
                 .lexendFont(13, weight: .medium)
-                .foregroundColor(cart.isShopping ? .black : Color(hex: "999999"))
+                .foregroundColor(cart.isShopping ? .black : Color.Grock.textMutedAlt)
                 .frame(width: 88, height: 26)
                 .offset(x: cart.isShopping ? stateManager.anticipationOffset : 0)
                 .animation(.spring(response: 0.3, dampingFraction: 0.7), value: stateManager.anticipationOffset)

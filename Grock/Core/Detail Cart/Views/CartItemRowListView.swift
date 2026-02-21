@@ -537,10 +537,25 @@ private struct ItemDetailsSection: View {
         cart.isShopping && (cartItem.isFulfilled || cartItem.isSkippedDuringShopping)
     }
     
+    private var priceRowProgress: CGFloat {
+        min(max(stateManager.showItemPriceRowProgress, 0), 1)
+    }
+    
+    private var priceRowTransition: AnyTransition {
+        .asymmetric(
+            insertion: .scale(scale: 0.8, anchor: .center)
+                .combined(with: .opacity)
+                .animation(.spring(response: 0.4, dampingFraction: 0.6, blendDuration: 0.2)),
+            removal: .scale(scale: 0.8, anchor: .center)
+                .combined(with: .opacity)
+                .animation(.spring(response: 0.3, dampingFraction: 0.7, blendDuration: 0.1))
+        )
+    }
+    
     var body: some View {
         VStack(spacing: 0) {
             HStack(alignment: .bottom, spacing: 20) {
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 2 * priceRowProgress) {
                     ItemNameRow(
                         cartItem: cartItem,
                         item: item,
@@ -550,14 +565,20 @@ private struct ItemDetailsSection: View {
                         isFirstItem: isFirstItem,
                         displayUnit: displayUnit
                     )
-                    
-                    ItemPriceRow(
-                        cartItem: cartItem,
-                        item: item,
-                        currentPrice: currentPrice,
-                        displayUnit: displayUnit,
-                        isItemFulfilled: isItemFulfilled
-                    )
+
+                    ZStack(alignment: .topLeading) {
+                        if stateManager.showItemPriceRow {
+                            ItemPriceRow(
+                                currentPrice: currentPrice,
+                                displayUnit: displayUnit,
+                                isItemFulfilled: isItemFulfilled
+                            )
+                            .transition(priceRowTransition)
+                        }
+                    }
+                    .frame(maxHeight: 16 * priceRowProgress, alignment: .topLeading)
+                    .clipped()
+                    .allowsHitTesting(priceRowProgress > 0.99)
                 }
                 
                 VStack(alignment: .trailing, spacing: 2) {
@@ -584,7 +605,7 @@ private struct ItemDetailsSection: View {
                 DashedLine()
                     .stroke(style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
                     .frame(height: 0.5)
-                    .foregroundColor(stateManager.hasBackgroundImage ? .white.opacity(0.5) : Color(hex: "999").opacity(0.5))
+                    .foregroundColor(stateManager.hasBackgroundImage ? .white.opacity(0.5) : Color.Grock.textMuted.opacity(0.5))
                     .padding(.top, 12)
             }
         }
@@ -601,8 +622,49 @@ private struct ItemNameRow: View {
     let displayUnit: String
     
     @Environment(CartStateManager.self) private var stateManager
+    @Environment(VaultService.self) private var vaultService
     @State private var animatedStrikethroughWidth: CGFloat = 0
     @State private var animatedStrikethroughOpacity: Double = 0
+    
+    private var categoryEmoji: String {
+        if cartItem.isShoppingOnlyItem,
+           let raw = cartItem.shoppingOnlyCategory,
+           let cat = GroceryCategory(rawValue: raw) {
+            return cat.emoji
+        }
+        if cartItem.isShoppingOnlyItem,
+           let categoryName = cartItem.shoppingOnlyCategory?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !categoryName.isEmpty {
+            return vaultService.displayEmoji(forCategoryName: categoryName)
+        }
+        if let vaultItem = item,
+           let category = vaultService.getCategory(for: vaultItem.id) {
+            return vaultService.displayEmoji(forCategoryName: category.name)
+        }
+        return ""
+    }
+    
+    private var baseItemLabel: String {
+        "\(currentQuantity.formattedQuantity)\(displayUnit) \(item?.name ?? cartItem.shoppingOnlyName ?? cartItem.vaultItemNameSnapshot ?? "Unknown Item")"
+    }
+    
+    private var itemLabelAnimationKey: String {
+        if stateManager.showCategoryIcons && !categoryEmoji.isEmpty {
+            return "\(baseItemLabel) \(categoryEmoji)"
+        }
+        return baseItemLabel
+    }
+    
+    private var itemLabelWithCategoryText: Text {
+        let textWeight: Font.Weight = stateManager.hasBackgroundImage ? .semibold : .regular
+        let baseText = Text(baseItemLabel).lexendFont(16, weight: textWeight)
+        
+        if stateManager.showCategoryIcons && !categoryEmoji.isEmpty {
+            return baseText + Text(" ") + Text(categoryEmoji).lexendFont(13, weight: textWeight)
+        }
+        
+        return baseText
+    }
     
     private var textColor: Color {
         if isItemFulfilled {
@@ -631,13 +693,12 @@ private struct ItemNameRow: View {
         HStack(spacing: 4) {
             ZStack(alignment: .leading) {
                 // Item name text
-                Text("\(currentQuantity.formattedQuantity)\(displayUnit) \(item?.name ?? cartItem.shoppingOnlyName ?? cartItem.vaultItemNameSnapshot ?? "Unknown Item") ")
-                    .lexendFont(16, weight: stateManager.hasBackgroundImage ? .semibold : .regular)
+                itemLabelWithCategoryText
                     .lineLimit(3)
                     .fixedSize(horizontal: false, vertical: true)
                     .strikethrough(isItemFulfilled && !cartItem.shouldStrikethrough, color: staticStrikethroughColor)
                     .foregroundColor(textColor)
-                    .id(item?.name ?? cartItem.shoppingOnlyName ?? cartItem.vaultItemNameSnapshot ?? "Unknown")
+                    .id(itemLabelAnimationKey)
                     .contentTransition(.numericText())
                     .animation(nil, value: currentQuantity)
                     .opacity(cartItem.animationState == .removalAnimating ? 0.25 : 1.0)
@@ -691,10 +752,10 @@ private struct ItemNameRow: View {
                     .frame(height: 1)
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
             
             Spacer()
         }
+        .animation(.spring(response: 0.35, dampingFraction: 0.78), value: stateManager.showCategoryIcons)
         .onChange(of: cartItem.shouldStrikethrough) { oldValue, newValue in
             handleStrikethroughAnimationChange(oldValue: oldValue, newValue: newValue)
         }
@@ -772,40 +833,19 @@ private struct ItemNameRow: View {
 
 // MARK: - Item Price Row (Updated)
 private struct ItemPriceRow: View {
-    let cartItem: CartItem
-    let item: Item?
     let currentPrice: Double
     let displayUnit: String
     let isItemFulfilled: Bool
     
     @Environment(CartStateManager.self) private var stateManager
-    @Environment(VaultService.self) private var vaultService
-    
-    private var categoryEmoji: String {
-        if cartItem.isShoppingOnlyItem,
-           let raw = cartItem.shoppingOnlyCategory,
-           let cat = GroceryCategory(rawValue: raw) {
-            return cat.emoji
-        }
-        if cartItem.isShoppingOnlyItem,
-           let categoryName = cartItem.shoppingOnlyCategory?.trimmingCharacters(in: .whitespacesAndNewlines),
-           !categoryName.isEmpty {
-            return vaultService.displayEmoji(forCategoryName: categoryName)
-        }
-        if let vaultItem = item,
-           let category = vaultService.getCategory(for: vaultItem.id) {
-            return vaultService.displayEmoji(forCategoryName: category.name)
-        }
-        return ""
-    }
     
     private var textColor: Color {
         if isItemFulfilled {
             // Gray text for fulfilled items
-            return stateManager.hasBackgroundImage ? .white.opacity(0.4) : Color(hex: "888888")
+            return stateManager.hasBackgroundImage ? .white.opacity(0.4) : Color.Grock.neutral500
         } else {
             // Normal text color
-            return stateManager.hasBackgroundImage ? .white.opacity(0.7) : Color(hex: "231F30")
+            return stateManager.hasBackgroundImage ? .white.opacity(0.7) : Color.Grock.textPrimary
         }
     }
     
@@ -814,20 +854,14 @@ private struct ItemPriceRow: View {
         HStack(spacing: 0) {
             Text("\(currentPrice.formattedCurrency)")
                 .lexendFont(12, weight: .medium)
-                .foregroundColor(stateManager.hasBackgroundImage ? .white.opacity(0.8) : Color(hex: "231F30"))
-            Text("/\(displayUnit) ")
+                .foregroundColor(stateManager.hasBackgroundImage ? .white.opacity(0.8) : Color.Grock.textPrimary)
+            Text(" /\(displayUnit) ")
                 .lexendFont(11)
                 .lineLimit(1)
                 .contentTransition(.numericText())
                 .animation(nil, value: currentPrice)
                 .foregroundColor(textColor)
                 .opacity(isItemFulfilled ? 0.5 : 1.0)
-            if !categoryEmoji.isEmpty && stateManager.showCategoryIcons {
-                Text(categoryEmoji)
-                    .lexendFont(10)
-                    .foregroundColor(stateManager.hasBackgroundImage ? .white.opacity(0.8) : Color(hex: "666"))
-                    .transition(.scale.combined(with: .opacity))
-            }
         }
 
     }
@@ -877,7 +911,7 @@ private struct RowBackgroundView: View {
             // Instant change - no animation
             return stateManager.hasBackgroundImage ?
                 Color.white.opacity(0.05) :
-                Color(hex: "F5F5F5")
+                Color.Grock.surfaceLight
         } else {
             return stateManager.effectiveRowBackgroundColor
         }
@@ -920,7 +954,7 @@ private struct FulfillmentButtonContent: View {
     
     private var checkmarkColor: Color {
          // ALWAYS use green for checkmarks
-        return Color(hex: "98F476")
+        return Color.Grock.budgetSafe
      }
     
     var body: some View {
@@ -974,7 +1008,7 @@ private struct FulfillmentButtonContent: View {
                 // Empty circle for unfulfilled
                 Circle()
                     .strokeBorder(
-                        stateManager.hasBackgroundImage ? Color.white.opacity(0.7) : Color(hex: "666"),
+                        stateManager.hasBackgroundImage ? Color.white.opacity(0.7) : Color.Grock.textSecondary,
                         lineWidth: 1.5
                     )
                     .frame(width: 18, height: 18)

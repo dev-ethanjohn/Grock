@@ -37,6 +37,8 @@ extension VaultService {
                 try modelContext.save()
                 self.currentUser = newUser
             }
+
+            reconcilePlanEntitlementState(isPro: UserDefaults.standard.isPro)
         } catch {
             self.error = error
             print("❌ Failed to load user and vault: \(error)")
@@ -53,6 +55,143 @@ extension VaultService {
 
 extension VaultService {
     static let removedEmojiSentinel = "__removed__"
+    private static let planSuppressionReasonCustomCategory = "custom_category_requires_pro"
+
+    func isCategoryLockedByPlan(named categoryName: String) -> Bool {
+        if let category = getCategory(named: categoryName) {
+            return category.isPlanSuppressed
+        }
+        return shouldSuppressCategory(named: categoryName, isPro: UserDefaults.standard.isPro)
+    }
+
+    /// Reconciles persisted entitlement-lock state without mutating user-delete flags.
+    func reconcilePlanEntitlementState(isPro: Bool) {
+        guard let vault = vault else { return }
+
+        var didChange = false
+
+        for category in vault.categories {
+            let shouldSuppressCategory = shouldSuppressCategory(named: category.name, isPro: isPro)
+            let reason = shouldSuppressCategory ? Self.planSuppressionReasonCustomCategory : nil
+
+            if applyPlanSuppression(
+                to: category,
+                isSuppressed: shouldSuppressCategory,
+                reason: reason
+            ) {
+                didChange = true
+            }
+
+            for item in category.items {
+                if applyPlanSuppression(
+                    to: item,
+                    isSuppressed: shouldSuppressCategory,
+                    reason: reason
+                ) {
+                    didChange = true
+                }
+            }
+        }
+
+        for item in vault.deletedItems {
+            let categoryName = item.deletedFromCategoryName ?? item.category?.name ?? ""
+            let shouldSuppressItem = shouldSuppressCategory(named: categoryName, isPro: isPro)
+            let reason = shouldSuppressItem ? Self.planSuppressionReasonCustomCategory : nil
+            if applyPlanSuppression(
+                to: item,
+                isSuppressed: shouldSuppressItem,
+                reason: reason
+            ) {
+                didChange = true
+            }
+        }
+
+        guard didChange else { return }
+
+        itemCache.removeAll()
+        invalidateCategoryCache()
+        saveContext()
+
+        NotificationCenter.default.post(
+            name: NSNotification.Name("DataUpdated"),
+            object: nil
+        )
+    }
+
+    private func shouldSuppressCategory(named categoryName: String, isPro: Bool) -> Bool {
+        guard !isPro else { return false }
+        return !isSystemCategory(named: categoryName)
+    }
+
+    private func isSystemCategory(named categoryName: String) -> Bool {
+        GroceryCategory.allCases.contains {
+            normalizedCategoryName($0.title) == normalizedCategoryName(categoryName)
+        }
+    }
+
+    @discardableResult
+    private func applyPlanSuppression(to category: Category, isSuppressed: Bool, reason: String?) -> Bool {
+        var changed = false
+
+        if category.isPlanSuppressed != isSuppressed {
+            category.isPlanSuppressed = isSuppressed
+            changed = true
+        }
+
+        if isSuppressed {
+            if category.planSuppressedAt == nil {
+                category.planSuppressedAt = Date()
+                changed = true
+            }
+            if category.planSuppressedReason != reason {
+                category.planSuppressedReason = reason
+                changed = true
+            }
+        } else {
+            if category.planSuppressedAt != nil {
+                category.planSuppressedAt = nil
+                changed = true
+            }
+            if category.planSuppressedReason != nil {
+                category.planSuppressedReason = nil
+                changed = true
+            }
+        }
+
+        return changed
+    }
+
+    @discardableResult
+    private func applyPlanSuppression(to item: Item, isSuppressed: Bool, reason: String?) -> Bool {
+        var changed = false
+
+        if item.isPlanSuppressed != isSuppressed {
+            item.isPlanSuppressed = isSuppressed
+            changed = true
+        }
+
+        if isSuppressed {
+            if item.planSuppressedAt == nil {
+                item.planSuppressedAt = Date()
+                changed = true
+            }
+            if item.planSuppressedReason != reason {
+                item.planSuppressedReason = reason
+                changed = true
+            }
+        } else {
+            if item.planSuppressedAt != nil {
+                item.planSuppressedAt = nil
+                changed = true
+            }
+            if item.planSuppressedReason != nil {
+                item.planSuppressedReason = nil
+                changed = true
+            }
+        }
+
+        return changed
+    }
 
     /// Ensures the default grocery categories exist (without deleting user-created categories).
     ///
@@ -137,6 +276,7 @@ extension VaultService {
     }
     
     func createCustomCategory(named name: String, emoji: String? = nil, colorHex: String? = nil) -> Category? {
+        guard UserDefaults.standard.isPro else { return nil }
         guard let vault = vault else { return nil }
         
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -169,6 +309,7 @@ extension VaultService {
     }
 
     func updateCustomCategory(originalName: String, newName: String, emoji: String? = nil, colorHex: String? = nil) -> Category? {
+        guard UserDefaults.standard.isPro else { return nil }
         guard let vault = vault else { return nil }
 
         let normalizedOriginal = normalizedCategoryName(originalName)
@@ -214,6 +355,7 @@ extension VaultService {
     }
 
     func deleteCustomCategory(named name: String) -> Bool {
+        guard UserDefaults.standard.isPro else { return false }
         guard let vault = vault else { return false }
         let normalized = normalizedCategoryName(name)
         guard let category = vault.categories.first(where: { normalizedCategoryName($0.name) == normalized }) else {
@@ -329,6 +471,10 @@ extension VaultService {
             vault.categories.append(targetCategory)
         }
 
+        guard UserDefaults.standard.isPro || !targetCategory.isPlanSuppressed else {
+            return nil
+        }
+
         let pricePerUnit = PricePerUnit(priceValue: price, unit: unit)
         let priceOption = PriceOption(store: store, pricePerUnit: pricePerUnit)
         let newItem = Item(name: name.trimmingCharacters(in: .whitespacesAndNewlines))
@@ -359,8 +505,14 @@ extension VaultService {
         let trimmedCategory = categoryName.trimmingCharacters(in: .whitespacesAndNewlines)
         let targetCategory: Category
         if let existingCategory = getCategory(named: trimmedCategory) {
+            guard UserDefaults.standard.isPro || !existingCategory.isPlanSuppressed else {
+                return nil
+            }
             targetCategory = existingCategory
         } else {
+            guard UserDefaults.standard.isPro || isSystemCategory(named: trimmedCategory) else {
+                return nil
+            }
             targetCategory = Category(name: trimmedCategory)
             modelContext.insert(targetCategory)
             vault.categories.append(targetCategory)
@@ -398,6 +550,10 @@ extension VaultService {
             return false
         }
 
+        guard UserDefaults.standard.isPro || !item.isPlanSuppressed else {
+            return false
+        }
+
         item.name = newName.trimmingCharacters(in: .whitespacesAndNewlines)
 
         if let existingPriceOption = item.priceOptions.first {
@@ -413,6 +569,10 @@ extension VaultService {
 
         let currentCategory = vault.categories.first { $0.items.contains(where: { $0.id == item.id }) }
         let targetCategory = getCategory(newCategory) ?? Category(name: newCategory.title)
+
+        guard UserDefaults.standard.isPro || !targetCategory.isPlanSuppressed else {
+            return false
+        }
 
         if currentCategory?.name != targetCategory.name {
             currentCategory?.items.removeAll { $0.id == item.id }
@@ -445,6 +605,10 @@ extension VaultService {
             return false
         }
 
+        guard UserDefaults.standard.isPro || !item.isPlanSuppressed else {
+            return false
+        }
+
         item.name = newName.trimmingCharacters(in: .whitespacesAndNewlines)
 
         if let existingPriceOption = item.priceOptions.first {
@@ -460,7 +624,15 @@ extension VaultService {
 
         let currentCategory = vault.categories.first { $0.items.contains(where: { $0.id == item.id }) }
         let trimmedCategory = newCategoryName.trimmingCharacters(in: .whitespacesAndNewlines)
-        let targetCategory = getCategory(named: trimmedCategory) ?? Category(name: trimmedCategory)
+        let existingTargetCategory = getCategory(named: trimmedCategory)
+        guard UserDefaults.standard.isPro || existingTargetCategory != nil || isSystemCategory(named: trimmedCategory) else {
+            return false
+        }
+        let targetCategory = existingTargetCategory ?? Category(name: trimmedCategory)
+
+        guard UserDefaults.standard.isPro || !targetCategory.isPlanSuppressed else {
+            return false
+        }
 
         if currentCategory?.name != targetCategory.name {
             currentCategory?.items.removeAll { $0.id == item.id }
@@ -562,6 +734,10 @@ extension VaultService {
     func deleteItem(itemId: String) {
         guard let vault = vault else { return }
         guard let item = findVaultItemById(itemId) else { return }
+
+        guard UserDefaults.standard.isPro || !item.isPlanSuppressed else {
+            return
+        }
         
         if item.isDeleted {
             return
@@ -629,6 +805,10 @@ extension VaultService {
         guard let item = vault.deletedItems.first(where: { $0.id == itemId }) else { return }
         
         let categoryName = item.deletedFromCategoryName
+
+        if let categoryName, UserDefaults.standard.isPro == false, shouldSuppressCategory(named: categoryName, isPro: false) {
+            return
+        }
         
         let targetCategory: Category = {
             if let categoryName, let existing = vault.categories.first(where: { $0.name == categoryName }) {
@@ -659,6 +839,11 @@ extension VaultService {
         item.isDeleted = false
         item.deletedAt = nil
         item.deletedFromCategoryName = nil
+        applyPlanSuppression(
+            to: item,
+            isSuppressed: targetCategory.isPlanSuppressed,
+            reason: targetCategory.isPlanSuppressed ? Self.planSuppressionReasonCustomCategory : nil
+        )
         
         if let index = vault.deletedItems.firstIndex(where: { $0.id == itemId }) {
             vault.deletedItems.remove(at: index)

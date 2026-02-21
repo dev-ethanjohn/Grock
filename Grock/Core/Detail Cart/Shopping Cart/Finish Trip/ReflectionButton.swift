@@ -18,7 +18,7 @@ struct ReflectionButton: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
-            .background(isSelected ? Color.black : Color(hex: "F5F5F5"))
+            .background(isSelected ? Color.black : Color.Grock.surfaceLight)
             .foregroundColor(isSelected ? .white : .black)
             .cornerRadius(20)
         }

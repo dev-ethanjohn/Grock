@@ -64,16 +64,29 @@ class Category {
     var emoji: String?
     var sortOrder: Int
     var colorHex: String?
+    var isPlanSuppressed: Bool = false
+    var planSuppressedAt: Date?
+    var planSuppressedReason: String?
     
     @Relationship(deleteRule: .cascade, inverse: \Item.category)
     var items: [Item] = []
     
-    init(name: String, emoji: String? = nil, colorHex: String? = nil) {
+    init(
+        name: String,
+        emoji: String? = nil,
+        colorHex: String? = nil,
+        isPlanSuppressed: Bool = false,
+        planSuppressedAt: Date? = nil,
+        planSuppressedReason: String? = nil
+    ) {
         self.uid = UUID().uuidString
         self.name = name
         self.emoji = emoji
         self.sortOrder = 0
         self.colorHex = colorHex
+        self.isPlanSuppressed = isPlanSuppressed
+        self.planSuppressedAt = planSuppressedAt
+        self.planSuppressedReason = planSuppressedReason
     }
 }
 
@@ -104,6 +117,11 @@ class Item: Identifiable {
     var isDeleted: Bool = false
     var deletedAt: Date?
     var deletedFromCategoryName: String?
+
+    // MARK: - Plan Suppression (entitlement lock state)
+    var isPlanSuppressed: Bool = false
+    var planSuppressedAt: Date?
+    var planSuppressedReason: String?
     
     @Relationship(deleteRule: .cascade, inverse: \DeletedCartItemSnapshot.item)
     var deletedCartItemSnapshots: [DeletedCartItemSnapshot] = []
@@ -118,7 +136,10 @@ class Item: Identifiable {
         shoppingUnit: String? = nil,
         isDeleted: Bool = false,
         deletedAt: Date? = nil,
-        deletedFromCategoryName: String? = nil
+        deletedFromCategoryName: String? = nil,
+        isPlanSuppressed: Bool = false,
+        planSuppressedAt: Date? = nil,
+        planSuppressedReason: String? = nil
     ) {
         self.id = id
         self.name = name
@@ -130,6 +151,9 @@ class Item: Identifiable {
         self.isDeleted = isDeleted
         self.deletedAt = deletedAt
         self.deletedFromCategoryName = deletedFromCategoryName
+        self.isPlanSuppressed = isPlanSuppressed
+        self.planSuppressedAt = planSuppressedAt
+        self.planSuppressedReason = planSuppressedReason
     }
 }
 

@@ -21,17 +21,17 @@
 //            VStack(alignment: .leading, spacing: 4) {
 //                Text(title)
 //                    .lexendFont(14, weight: .semibold)
-//                    .foregroundColor(Color(hex: "231F30"))
+//                    .foregroundColor(Color.Grock.textPrimary)
 //                Text(subtitle)
 //                    .lexendFont(12)
-//                    .foregroundColor(Color(hex: "666"))
+//                    .foregroundColor(Color.Grock.textSecondary)
 //            }
 //            
 //            Spacer()
 //            
 //            Image(systemName: "chevron.up")
 //                .font(.system(size: 14, weight: .semibold))
-//                .foregroundColor(Color(hex: "231F30"))
+//                .foregroundColor(Color.Grock.textPrimary)
 //        }
 //        .padding(.horizontal, 16)
 //        .padding(.vertical, 14)

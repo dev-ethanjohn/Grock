@@ -90,7 +90,7 @@ struct ItemNameInput: View {
                         .overlay(
                             RoundedRectangle(cornerRadius: 40)
                                 .stroke(
-                                    Color(hex: "#FA003F"),
+                                    Color.Grock.accentDanger,
                                     lineWidth: shouldShowErrorStyling ? 2.0 : 0
                                 )
                         )
@@ -129,8 +129,8 @@ struct ItemNameInput: View {
                         .foregroundColor((selectedCategoryColor ?? Color.gray).darker(by: 0.3))
                     
                     if !isCategoryEditable {
-                        Image(systemName: "lock.fill")
-                            .lexendFont(8)
+                        Text("💎")
+                            .font(.system(size: 8))
                             .foregroundColor(.gray)
                         
                         Text("From Vault")
@@ -247,8 +247,8 @@ struct CategoryLockedTooltip: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 8) {
-                Image(systemName: "lock.fill")
-                    .lexend(.caption)
+                Text("💎")
+                    .font(.system(size: 12))
                     .foregroundColor(.gray)
                 
                 Text("Category locked in shopping mode")

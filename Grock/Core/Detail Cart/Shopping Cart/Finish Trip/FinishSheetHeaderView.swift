@@ -11,7 +11,7 @@ struct FinishSheetHeaderView: View {
         VStack(spacing: 10) {
             Text(headerSummaryText)
                 .fuzzyBubblesFont(18, weight: .bold)
-                .foregroundColor(Color(hex: "231F30"))
+                .foregroundColor(Color.Grock.textPrimary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 40)
                 .padding(.top, 24)
@@ -123,23 +123,23 @@ private struct BudgetCartFulfillmentGauge: View {
     private var cartProgressColor: Color {
         let progress = max(0, min(cartRatio, 1))
         if progress < 0.7 {
-            return Color(hex: "98F476")
+            return Color.Grock.budgetSafe
         } else if progress < 0.9 {
-            return Color(hex: "F4B576")
+            return Color.Grock.budgetWarning
         } else {
-            return Color(hex: "F47676")
+            return Color.Grock.budgetOver
         }
     }
 
     private var spentProgressColor: Color {
-        guard hasBudget else { return Color(hex: "231F30") }
+        guard hasBudget else { return Color.Grock.textPrimary }
         let ratio = fulfilledRatio
         if ratio < 0.7 {
-            return Color(hex: "98F476")
+            return Color.Grock.budgetSafe
         } else if ratio < 0.9 {
-            return Color(hex: "F4B576")
+            return Color.Grock.budgetWarning
         } else {
-            return Color(hex: "F47676")
+            return Color.Grock.budgetOver
         }
     }
     
@@ -203,7 +203,7 @@ private struct BudgetCartFulfillmentGauge: View {
                 VStack(spacing: 4) {
                     Text(primaryLabelText)
                         .lexendFont(16, weight: .medium)
-                        .foregroundStyle(Color(hex: "666"))
+                        .foregroundStyle(Color.Grock.textSecondary)
                         .contentTransition(.opacity)
                         .frame(width: spentValueFrame)
                         .offset(y: gaugeSize * 0.02)
@@ -265,11 +265,11 @@ private struct BudgetCartFulfillmentGauge: View {
                             angleStep: labelAngleStep,
                             baseFontSize: labelFontSize,
                             baseWeight: .medium,
-                            baseColor: Color(hex: "231F30").opacity(0.65),
+                            baseColor: Color.Grock.textPrimary.opacity(0.65),
                             highlightRange: highlightRange,
                             highlightFontSize: valueFontSize,
                             highlightWeight: .semibold,
-                            highlightColor: Color(hex: "231F30").opacity(0.85),
+                            highlightColor: Color.Grock.textPrimary.opacity(0.85),
                             revealTrigger: showCartValueLabel,
                             revealDelay: 0
                         )

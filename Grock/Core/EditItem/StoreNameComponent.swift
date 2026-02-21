@@ -100,7 +100,7 @@ struct StoreNameComponent: View {
         .overlay(
             RoundedRectangle(cornerRadius: 12)
                 .stroke(
-                    Color(hex: "#FA003F"),
+                    Color.Grock.accentDanger,
                     lineWidth: hasError ? 2.0 : 0
                 )
         )

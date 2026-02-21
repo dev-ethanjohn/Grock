@@ -87,15 +87,15 @@ struct FinishTripSheet: View {
     
     private var differenceColor: Color {
         if cartBudget <= 0 {
-            return Color(hex: "666") // Gray for no budget
+            return Color.Grock.textSecondary // Gray for no budget
         }
         
         if budgetDifference > 0.01 {
-            return Color(hex: "FA003F") // Red for over budget
+            return Color.Grock.accentDanger // Red for over budget
         } else if budgetDifference < -0.01 {
-            return Color(hex: "4CAF50") // Green for under budget
+            return Color.Grock.success // Green for under budget
         } else {
-            return Color(hex: "666") // Gray for on budget
+            return Color.Grock.textSecondary // Gray for on budget
         }
     }
     

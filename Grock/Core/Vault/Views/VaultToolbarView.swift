@@ -47,7 +47,7 @@ struct VaultToolbarView: View {
                             .frame(height: 24)
                             .background(
                                 RoundedRectangle(cornerRadius: 14)
-                                    .fill(Color(hex: "FA003F"))
+                                    .fill(Color.Grock.accentDanger)
                             )
                     }
                     .transition(

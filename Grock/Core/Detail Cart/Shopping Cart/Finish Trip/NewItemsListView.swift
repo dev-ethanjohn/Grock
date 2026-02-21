@@ -32,7 +32,7 @@ struct NewItemsListView: View {
             DashedLine()
                 .stroke(style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
                 .frame(height: 0.5)
-                .foregroundColor(Color(hex: "999").opacity(0.5))
+                .foregroundColor(Color.Grock.textMuted.opacity(0.5))
                 .padding(.horizontal, 24)
             
             ForEach(items) { item in

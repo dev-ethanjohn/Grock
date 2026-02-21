@@ -375,7 +375,7 @@ private struct ModePicker: View {
             modeButton(title: "Vault", page: .browseVault)
         }
         .padding(2)
-        .background(Color(hex: "EEEEEE"))
+        .background(Color.Grock.surfaceElevated)
         .clipShape(Capsule())
         .frame(width: 200, height: 32)
     }
@@ -602,7 +602,7 @@ struct BrowseVaultStoreSection: View {
                         DashedLine()
                             .stroke(style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
                             .frame(height: 1)
-                            .foregroundColor(Color(hex: "ddd"))
+                            .foregroundColor(Color.Grock.neutral300)
                             .padding(.horizontal, 16)
                             .padding(.leading, 14)
                     }

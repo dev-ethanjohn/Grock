@@ -58,8 +58,40 @@ final class CartStateManager {
         }
     }
     
+    var showItemPriceRow: Bool {
+        didSet {
+            UserDefaults.standard.set(showItemPriceRow, forKey: "showItemPriceRow")
+        }
+    }
+    
+    // Drives smooth simplify/show transitions across row content and list height.
+    var showItemPriceRowProgress: CGFloat
+    
     init() {
-        self.showCategoryIcons = UserDefaults.standard.object(forKey: "showCategoryIcons") as? Bool ?? false
+        let storedShowCategoryIcons = UserDefaults.standard.object(forKey: "showCategoryIcons") as? Bool ?? false
+        let storedShowItemPriceRow = UserDefaults.standard.object(forKey: "showItemPriceRow") as? Bool ?? true
+        
+        self.showCategoryIcons = storedShowCategoryIcons
+        self.showItemPriceRow = storedShowItemPriceRow
+        self.showItemPriceRowProgress = storedShowItemPriceRow ? 1 : 0
+    }
+    
+    func setItemPriceRowVisibility(_ isVisible: Bool, animated: Bool = true) {
+        let target: CGFloat = isVisible ? 1 : 0
+        
+        if animated {
+            let transitionAnimation: Animation = isVisible
+                ? .spring(response: 0.4, dampingFraction: 0.6, blendDuration: 0.2)
+                : .spring(response: 0.3, dampingFraction: 0.7, blendDuration: 0.1)
+            
+            withAnimation(transitionAnimation) {
+                showItemPriceRow = isVisible
+                showItemPriceRowProgress = target
+            }
+        } else {
+            showItemPriceRow = isVisible
+            showItemPriceRowProgress = target
+        }
     }
     
     // Computed properties

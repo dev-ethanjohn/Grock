@@ -19,6 +19,8 @@ struct CategoryCircularButton: View {
     @State private var showLockTooltip = false
     @State private var showCreateCategorySheet = false
     @State private var createCategoryViewModel = CategoriesManagerViewModel(startOnHiddenTab: true)
+    @State private var subscriptionManager = SubscriptionManager.shared
+    @State private var showPaywall = false
     
     var body: some View {
         HStack {
@@ -32,14 +34,30 @@ struct CategoryCircularButton: View {
                             .font(.headline)
                             .foregroundColor(.primary)
                     }
-                    
-                    Picker("Category", selection: $selectedCategoryName) {
-                        ForEach(availableCategoryNames, id: \.self) { categoryName in
-                            Text("\(categoryName) \(emojiForCategoryName(categoryName))")
-                                .tag(categoryName as String?)
+
+                    ForEach(availableCategoryNames, id: \.self) { categoryName in
+                        let isLocked = isLockedCustomCategoryName(categoryName)
+                        Button {
+                            if isLocked {
+                                presentProPaywallForCategoryCreation()
+                                return
+                            }
+                            selectedCategoryName = categoryName
+                        } label: {
+                            HStack(spacing: 8) {
+                                Text("\(categoryName) \(emojiForCategoryName(categoryName))")
+                                    .foregroundStyle(isLocked ? Color.secondary : Color.primary)
+                                    .saturation(isLocked ? 0 : 1)
+
+                                if isLocked {
+                                    Text("💎")
+                                } else if selectedCategoryName == categoryName {
+                                    Image(systemName: "checkmark")
+                                        .foregroundStyle(Color.primary)
+                                }
+                            }
                         }
                     }
-                    .pickerStyle(.inline)
 
                     if categoryPickerSource == .myBar {
                         Divider()
@@ -74,9 +92,8 @@ struct CategoryCircularButton: View {
                                     .fill(Color.black.opacity(0.3))
                                     .frame(width: 34, height: 34)
                                 
-                                // Lock icon
-                                Image(systemName: "lock.fill")
-                                    .font(.system(size: 12, weight: .semibold))
+                                Text("💎")
+                                    .font(.system(size: 13))
                                     .foregroundColor(.white)
                             }
 
@@ -111,6 +128,20 @@ struct CategoryCircularButton: View {
             .presentationDragIndicator(.visible)
             .ignoresSafeArea(.keyboard)
         }
+        .task {
+            await subscriptionManager.refreshCustomerInfo()
+        }
+        .fullScreenCover(isPresented: $showPaywall) {
+            GrockPaywallView {
+                showPaywall = false
+            }
+        }
+        .onChange(of: selectedCategoryName) { oldValue, newValue in
+            guard let newValue else { return }
+            guard isLockedCustomCategoryName(newValue) else { return }
+            selectedCategoryName = oldValue
+            presentProPaywallForCategoryCreation()
+        }
     }
     
     private var categoryButtonContent: some View {
@@ -137,7 +168,7 @@ struct CategoryCircularButton: View {
             // Error stroke
             if hasError {
                 Circle()
-                    .stroke(Color(hex: "#FA003F"), lineWidth: 2)
+                    .stroke(Color.Grock.accentDanger, lineWidth: 2)
                     .frame(width: 34 + 8, height: 34 + 8)
             }
             
@@ -228,7 +259,16 @@ struct CategoryCircularButton: View {
         vaultService.displayEmoji(forCategoryName: name)
     }
 
+    private func isLockedCustomCategoryName(_ name: String) -> Bool {
+        vaultService.isCategoryLockedByPlan(named: name)
+    }
+
     private func presentCreateCategorySheet() {
+        guard subscriptionManager.isPro else {
+            presentProPaywallForCategoryCreation()
+            return
+        }
+
         dismissKeyboard()
         // Wait for the Menu to close before presenting the sheet.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
@@ -296,6 +336,11 @@ struct CategoryCircularButton: View {
     }
 
     private func saveCategoryFromQuickCreateSheet() {
+        guard subscriptionManager.isPro else {
+            presentProPaywallForCategoryCreation()
+            return
+        }
+
         createCategoryViewModel.createCategoryError = nil
 
         let trimmedName = createCategoryViewModel.newCategoryName.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -330,6 +375,14 @@ struct CategoryCircularButton: View {
         selectedCategoryName = createdCategory.name
         HapticManager.shared.playSuccess()
         showCreateCategorySheet = false
+    }
+
+    private func presentProPaywallForCategoryCreation() {
+        HapticManager.shared.playMedium()
+        if showCreateCategorySheet {
+            showCreateCategorySheet = false
+        }
+        showPaywall = true
     }
 
     private func resetCreateCategoryForm() {
@@ -425,7 +478,7 @@ struct CategoryLockTooltipView: View {
 struct SimpleLockBadge: View {
     var body: some View {
         HStack(spacing: 4) {
-            Image(systemName: "lock.fill")
+            Text("💎")
                 .font(.system(size: 10))
             Text("Locked")
                 .font(.system(size: 10, weight: .medium))
