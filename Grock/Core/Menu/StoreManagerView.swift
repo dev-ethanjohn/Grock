@@ -9,6 +9,7 @@ struct StoreManagerView: View {
     @State private var showingAddStore = false
     @State private var newStoreName = ""
     @State private var storeToRename: String?
+    @State private var showPaywall = false
     
     var body: some View {
         ZStack {
@@ -17,22 +18,37 @@ struct StoreManagerView: View {
                     ContentUnavailableView("No Stores", systemImage: "storefront", description: Text("Add a store to get started."))
                 } else {
                     ForEach(stores, id: \.self) { store in
+                        let isLockedStore = vaultService.isStoreLockedByPlan(named: store)
                         HStack {
                             HStack(spacing: 4) {
                                 Text(store)
                                     .lexend(.body)
+                                    .foregroundStyle(isLockedStore ? .gray : .black)
+                                if isLockedStore {
+                                    Text("💎")
+                                        .font(.footnote)
+                                }
                                 Text("✏️")
                                     .font(.footnote)
+                                    .foregroundStyle(isLockedStore ? .gray : .primary)
                             }
                             .contentShape(Rectangle())
                             .onTapGesture {
+                                guard !isLockedStore else {
+                                    showPaywall = true
+                                    return
+                                }
                                 prepareRename(store)
                             }
                             
                             Spacer()
                             
-                            Button(role: .destructive) {
-                                deleteStore(store)
+                            Button {
+                                if isLockedStore {
+                                    showPaywall = true
+                                } else {
+                                    deleteStore(store)
+                                }
                             } label: {
                                 Text("🗑️")
                                     .font(.footnote)
@@ -41,6 +57,7 @@ struct StoreManagerView: View {
                             .padding(.leading, 8)
                         }
                         .contentShape(Rectangle())
+                        .opacity(isLockedStore ? 0.58 : 1)
                     }
                 }
             }
@@ -73,6 +90,10 @@ struct StoreManagerView: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {
+                    guard !vaultService.isStoreLimitReached() else {
+                        showPaywall = true
+                        return
+                    }
                     newStoreName = ""
                     showingAddStore = true
                 } label: {
@@ -82,9 +103,21 @@ struct StoreManagerView: View {
         }
         .sheet(isPresented: $showingAddStore) {
             AddStoreSheet(storeName: $newStoreName, isPresented: $showingAddStore) { name in
+                guard vaultService.canUseStoreName(name) else {
+                    showingAddStore = false
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+                        showPaywall = true
+                    }
+                    return
+                }
                 vaultService.addStore(name)
                 loadStores()
                 showingAddStore = false
+            }
+        }
+        .fullScreenCover(isPresented: $showPaywall) {
+            GrockPaywallView {
+                showPaywall = false
             }
         }
         .onAppear {

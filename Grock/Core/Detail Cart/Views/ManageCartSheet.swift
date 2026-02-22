@@ -456,6 +456,7 @@ struct ManageCartSheet: View {
                     searchText: searchText,
                     navigationDirection: navigationDirection,
                     isEditingLocked: isLockedCustomCategory(named: selectedCategoryName),
+                    enforceStoreLocks: cart.isPlanning,
                     onLockedEditAttempt: presentProPaywallForLockedCategory
                 )
             }
@@ -978,6 +979,7 @@ struct CategoryItemsListView: View {
     let searchText: String
     let navigationDirection: ManageCartSheet.NavigationDirection
     let isEditingLocked: Bool
+    let enforceStoreLocks: Bool
     let onLockedEditAttempt: () -> Void
     
     @Environment(VaultService.self) private var vaultService
@@ -1044,6 +1046,7 @@ struct CategoryItemsListView: View {
                     categoryColor: categoryColor,
                     localActiveItems: $localActiveItems,
                     isEditingLocked: isEditingLocked,
+                    enforceStoreLocks: enforceStoreLocks,
                     onLockedEditAttempt: onLockedEditAttempt,
                     onDeleteVaultItem: { item in
                         let itemId = item.id
@@ -1098,6 +1101,7 @@ struct ManageCartItemsListView: View {
     let categoryColor: Color
     @Binding var localActiveItems: [String: Double]
     let isEditingLocked: Bool
+    let enforceStoreLocks: Bool
     let onLockedEditAttempt: () -> Void
     let onDeleteVaultItem: (Item) -> Void
     
@@ -1110,10 +1114,6 @@ struct ManageCartItemsListView: View {
     @State private var itemToDelete: Item?
     @State private var showDeleteConfirmation = false
 
-    private var lockedRowsOpacity: Double {
-        isEditingLocked ? 0.82 : 1
-    }
-    
     var body: some View {
         List {
             // Add top padding for the list items
@@ -1124,6 +1124,7 @@ struct ManageCartItemsListView: View {
                 .listRowBackground(Color.clear)
             
             ForEach(availableStores, id: \.self) { store in
+                let isStoreLockedByPlan = enforceStoreLocks && vaultService.isStoreLockedByPlan(named: store)
                 ManageCartStoreSection(
                     storeName: store,
                     items: itemsForStore(store),
@@ -1132,6 +1133,7 @@ struct ManageCartItemsListView: View {
                     hasBackgroundImage: stateManager.hasBackgroundImage,
                     localActiveItems: $localActiveItems,
                     isEditingLocked: isEditingLocked,
+                    isStoreLockedByPlan: isStoreLockedByPlan,
                     onLockedEditAttempt: onLockedEditAttempt,
                     onDeleteVaultItem: { item in
                         itemToDelete = item
@@ -1240,6 +1242,7 @@ struct ManageCartStoreSection: View {
     let hasBackgroundImage: Bool
     @Binding var localActiveItems: [String: Double]
     let isEditingLocked: Bool
+    let isStoreLockedByPlan: Bool
     let onLockedEditAttempt: () -> Void
     let onDeleteVaultItem: (Item) -> Void
     
@@ -1255,8 +1258,12 @@ struct ManageCartStoreSection: View {
         hasBackgroundImage ? .white : categoryColor.saturated(by: 0.3).darker(by: 0.5)
     }
 
+    private var isReadOnly: Bool {
+        isEditingLocked || isStoreLockedByPlan
+    }
+
     private var lockedRowsOpacity: Double {
-        isEditingLocked ? 0.82 : 1
+        isReadOnly ? 0.82 : 1
     }
     
     var body: some View {
@@ -1270,6 +1277,11 @@ struct ManageCartStoreSection: View {
                     Text(storeName)
                         .lexendFont(11, weight: .bold)
                         .foregroundStyle(headerForegroundColor)
+                    if isStoreLockedByPlan {
+                        Text("💎")
+                            .lexendFont(10, weight: .bold)
+                            .foregroundStyle(headerForegroundColor.opacity(0.9))
+                    }
                 }
                 .padding(.horizontal, 8)
                 .padding(.vertical, 3)
@@ -1279,7 +1291,7 @@ struct ManageCartStoreSection: View {
             }
             .padding(.leading)
             .listRowInsets(EdgeInsets())
-            .saturation(isEditingLocked ? 0 : 1)
+            .saturation(isReadOnly ? 0 : 1)
             .opacity(lockedRowsOpacity)
         ) {
             ForEach(itemsWithStableIdentifiers, id: \.id) { tuple in
@@ -1290,7 +1302,7 @@ struct ManageCartStoreSection: View {
                         categoryName: categoryName,
                         categoryColor: categoryColor,
                         localActiveItems: $localActiveItems,
-                        isEditingLocked: isEditingLocked,
+                        isEditingLocked: isReadOnly,
                         onLockedEditAttempt: onLockedEditAttempt,
                         onDeleteVaultItem: onDeleteVaultItem
                     )
@@ -1305,7 +1317,7 @@ struct ManageCartStoreSection: View {
                     }
                 }
                 .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                    if isEditingLocked {
+                    if isReadOnly {
                         Button {
                             onLockedEditAttempt()
                         } label: {
@@ -1337,7 +1349,7 @@ struct ManageCartStoreSection: View {
                         .combined(with: .opacity)
                 ))
                 .animation(.spring(response: 0.4, dampingFraction: 0.75), value: itemsWithStableIdentifiers.map { $0.id })
-                .saturation(isEditingLocked ? 0 : 1)
+                .saturation(isReadOnly ? 0 : 1)
                 .opacity(lockedRowsOpacity)
             }
         }

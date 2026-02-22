@@ -16,20 +16,18 @@ struct VaultItemsListView: View {
         items.count >= 6
     }
 
-    private var lockedRowsOpacity: Double {
-        isEditingLocked ? 0.82 : 1
-    }
-    
     var body: some View {
         List {
             ForEach(availableStores, id: \.self) { store in
                 let storeItems = itemsForStore(store)
+                let isStoreLockedByPlan = !isEditingLocked && vaultService.isStoreLockedByPlan(named: store)
                 StoreSection(
                     storeName: store,
                     items: storeItems,
                     categoryColor: categoryColor,
                     onDeleteItem: onDeleteItem,
                     isEditingLocked: isEditingLocked,
+                    isStoreLockedByPlan: isStoreLockedByPlan,
                     onLockedEditAttempt: onLockedEditAttempt,
                     isLastStore: store == availableStores.last
                 )
@@ -131,6 +129,7 @@ struct StoreSection: View {
     var hasBackgroundImage: Bool = false
     var onDeleteItem: ((Item) -> Void)?
     var isEditingLocked: Bool = false
+    var isStoreLockedByPlan: Bool = false
     var onLockedEditAttempt: (() -> Void)? = nil
     let isLastStore: Bool
     
@@ -146,8 +145,12 @@ struct StoreSection: View {
         hasBackgroundImage ? .white : categoryColor.saturated(by: 0.3).darker(by: 0.5)
     }
 
+    private var isReadOnly: Bool {
+        isEditingLocked || isStoreLockedByPlan
+    }
+
     private var lockedRowsOpacity: Double {
-        isEditingLocked ? 0.82 : 1
+        isReadOnly ? 0.82 : 1
     }
     
     var body: some View {
@@ -161,6 +164,11 @@ struct StoreSection: View {
                 Text(storeName)
                     .lexendFont(11, weight: .bold)
                     .foregroundStyle(headerForegroundColor)
+                if isStoreLockedByPlan {
+                    Text("💎")
+                        .lexendFont(10, weight: .bold)
+                        .foregroundStyle(headerForegroundColor.opacity(0.9))
+                }
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
@@ -172,7 +180,7 @@ struct StoreSection: View {
             .padding(.leading)
             .padding(.vertical, 4)
             .listRowInsets(EdgeInsets())
-            .saturation(isEditingLocked ? 0 : 1)
+            .saturation(isReadOnly ? 0 : 1)
             .opacity(lockedRowsOpacity)
         ) {
             ForEach(itemsWithStableIdentifiers, id: \.id) { tuple in
@@ -181,15 +189,19 @@ struct StoreSection: View {
                         item: tuple.item,
                         storeName: storeName,
                         categoryColor: categoryColor,
-                        isEditingLocked: isEditingLocked,
+                        isEditingLocked: isReadOnly,
                         onLockedEditAttempt: onLockedEditAttempt
                     )
                     .contextMenu {
-                        if isEditingLocked {
+                        if isReadOnly {
                             Button {
                                 onLockedEditAttempt?()
                             } label: {
-                                Label("Unlock Pro to Edit", systemImage: "lock.fill")
+                                Label {
+                                    Text("Unlock Pro to Edit")
+                                } icon: {
+                                    Text("💎")
+                                }
                             }
                         } else {
                             Button(role: .destructive) {
@@ -210,11 +222,15 @@ struct StoreSection: View {
                     }
                 }
                 .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                    if isEditingLocked {
+                    if isReadOnly {
                         Button {
                             onLockedEditAttempt?()
                         } label: {
-                            Label("Pro", systemImage: "lock.fill")
+                            Label {
+                                Text("Pro")
+                            } icon: {
+                                Text("💎")
+                            }
                         }
                         .tint(.orange)
                     } else {
@@ -238,7 +254,7 @@ struct StoreSection: View {
                         .combined(with: .opacity)
                 ))
                 .animation(.spring(response: 0.4, dampingFraction: 0.75), value: itemsWithStableIdentifiers.map { $0.id })
-                .saturation(isEditingLocked ? 0 : 1)
+                .saturation(isReadOnly ? 0 : 1)
                 .opacity(lockedRowsOpacity)
             }
         }

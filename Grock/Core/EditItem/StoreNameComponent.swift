@@ -7,6 +7,7 @@ struct StoreNameComponent: View {
     @State private var showAddStoreSheet = false
     @State private var newStoreName = ""
     @State private var showDropdown = false
+    @State private var showPaywall = false
     let hasError: Bool
     
     var onStoreChange: (() -> Void)?
@@ -17,21 +18,26 @@ struct StoreNameComponent: View {
     private var availableStores: [String] {
         vaultService.getAllStores()
     }
+
+    private var editableStores: [String] {
+        availableStores.filter { !vaultService.isStoreLockedByPlan(named: $0) }
+    }
     
     //Prioritize last selected store, then most recent
     private var defaultStore: String? {
         // 1. If lastSelectedStore exists and is still valid, use it
-        if !lastSelectedStore.isEmpty && availableStores.contains(where: { $0.lowercased() == lastSelectedStore.lowercased() }) {
+        if !lastSelectedStore.isEmpty && editableStores.contains(where: { $0.lowercased() == lastSelectedStore.lowercased() }) {
             return lastSelectedStore
         }
         
         // 2. Otherwise, use most recently added store
-        if let recentStore = vaultService.getMostRecentStore() {
+        if let recentStore = vaultService.getMostRecentStore(),
+           !vaultService.isStoreLockedByPlan(named: recentStore) {
             return recentStore
         }
         
-        // 3. Fallback to first alphabetical store
-        return availableStores.first
+        // 3. Fallback to first editable store
+        return editableStores.first
     }
     
     var body: some View {
@@ -57,6 +63,10 @@ struct StoreNameComponent: View {
                 // Dropdown (stores >0)
                 Menu {
                     Button(action: {
+                        guard !vaultService.isStoreLimitReached() else {
+                            showPaywall = true
+                            return
+                        }
                         newStoreName = ""
                         showAddStoreSheet = true
                     }) {
@@ -66,7 +76,12 @@ struct StoreNameComponent: View {
                     Divider()
                     
                     ForEach(availableStores, id: \.self) { store in
+                        let isLockedStore = vaultService.isStoreLockedByPlan(named: store)
                         Button(action: {
+                            guard !isLockedStore else {
+                                showPaywall = true
+                                return
+                            }
                             storeName = store
                             // Save the selected store
                             lastSelectedStore = store
@@ -74,7 +89,11 @@ struct StoreNameComponent: View {
                         }) {
                             HStack {
                                 Text(store)
-                                if storeName == store {
+                                    .foregroundStyle(isLockedStore ? .gray : .black)
+                                if isLockedStore {
+                                    Text("💎")
+                                }
+                                if storeName == store && !isLockedStore {
                                     Image(systemName: "checkmark")
                                         .foregroundColor(.blue)
                                 }
@@ -109,12 +128,23 @@ struct StoreNameComponent: View {
                 storeName: $newStoreName,
                 isPresented: $showAddStoreSheet,
                 onSave: { newStore in
-                    vaultService.addStore(newStore)
-                    storeName = newStore
+                    let trimmedNewStore = newStore.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !trimmedNewStore.isEmpty else { return }
+
+                    guard vaultService.canUseStoreName(trimmedNewStore) else {
+                        showAddStoreSheet = false
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+                            showPaywall = true
+                        }
+                        return
+                    }
+
+                    vaultService.addStore(trimmedNewStore)
+                    storeName = trimmedNewStore
                     //  Save newly added store as last selected
-                    lastSelectedStore = newStore
+                    lastSelectedStore = trimmedNewStore
                     showAddStoreSheet = false
-                    print("➕ New store added and persisted: \(newStore)")
+                    print("➕ New store added and persisted: \(trimmedNewStore)")
                     onStoreChange?()
                     
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
@@ -123,9 +153,18 @@ struct StoreNameComponent: View {
                 }
             )
         }
+        .fullScreenCover(isPresented: $showPaywall) {
+            GrockPaywallView {
+                showPaywall = false
+            }
+        }
         .onAppear {
             //  Use defaultStore computed property
             if storeName.isEmpty, let store = defaultStore {
+                storeName = store
+            } else if !storeName.isEmpty,
+                      vaultService.isStoreLockedByPlan(named: storeName),
+                      let store = defaultStore {
                 storeName = store
             }
             
@@ -149,6 +188,11 @@ struct StoreNameComponent: View {
             
             //  Update to default store when stores change (only if empty)
             if storeName.isEmpty, let store = defaultStore {
+                storeName = store
+                onStoreChange?()
+            } else if !storeName.isEmpty,
+                      vaultService.isStoreLockedByPlan(named: storeName),
+                      let store = defaultStore {
                 storeName = store
                 onStoreChange?()
             }

@@ -221,6 +221,11 @@ final class SubscriptionManager {
         self.isPro = proIsActive
         UserDefaults.standard.isPro = proIsActive
 
+        if previousIsPro && !proIsActive {
+            // Always force re-pick of editable stores on every Pro -> Free transition.
+            UserDefaults.standard.freeEditableStoreKeys = []
+        }
+
         if previousIsPro != proIsActive {
             NotificationCenter.default.post(
                 name: .subscriptionStatusChanged,

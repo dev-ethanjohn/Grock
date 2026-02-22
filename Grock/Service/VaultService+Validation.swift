@@ -44,13 +44,22 @@ extension VaultService {
     /// - (Name + Store) must be unique in the vault.
     func validateItemName(_ name: String, store: String, excluding itemId: String? = nil) -> (isValid: Bool, errorMessage: String?) {
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedStore = store.trimmingCharacters(in: .whitespacesAndNewlines)
 
         if trimmedName.isEmpty {
             return (false, "Item name cannot be empty")
         }
 
-        if isItemNameDuplicate(trimmedName, store: store, excluding: itemId) {
-            return (false, "An item with name '\(trimmedName)' already exists at \(store)")
+        if trimmedStore.isEmpty {
+            return (false, "Store name cannot be empty")
+        }
+
+        if !canUseStoreName(trimmedStore) {
+            return (false, storeLimitErrorMessage())
+        }
+
+        if isItemNameDuplicate(trimmedName, store: trimmedStore, excluding: itemId) {
+            return (false, "An item with name '\(trimmedName)' already exists at \(trimmedStore)")
         }
 
         return (true, nil)

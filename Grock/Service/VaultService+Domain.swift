@@ -41,6 +41,7 @@ extension VaultService {
             let isPro = UserDefaults.standard.isPro
             reconcilePlanEntitlementState(isPro: isPro)
             reconcileCartBackgroundEntitlementState(isPro: isPro)
+            reconcileStoreEntitlementState(isPro: isPro)
         } catch {
             self.error = error
             print("❌ Failed to load user and vault: \(error)")
@@ -117,6 +118,17 @@ extension VaultService {
         NotificationCenter.default.post(
             name: NSNotification.Name("DataUpdated"),
             object: nil
+        )
+    }
+
+    /// Triggers UI refresh for plan-based store lock state.
+    ///
+    /// Store locks are computed dynamically from current entitlement, so no data mutation is required.
+    func reconcileStoreEntitlementState(isPro: Bool) {
+        NotificationCenter.default.post(
+            name: NSNotification.Name("DataUpdated"),
+            object: nil,
+            userInfo: ["isPro": isPro]
         )
     }
 
@@ -1007,12 +1019,223 @@ extension VaultService {
 }
 
 extension VaultService {
+    private static let freeStoreLimit = 2
+
+    private func normalizedStoreKey(_ storeName: String) -> String {
+        storeName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+
+    private func orderedStoreNamesForEntitlementEvaluation() -> [String] {
+        getAllStores()
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }
+
+    private func orderedUniqueStoreEntriesForEntitlementEvaluation() -> [(name: String, key: String)] {
+        var seenKeys = Set<String>()
+        var orderedEntries: [(name: String, key: String)] = []
+
+        for name in orderedStoreNamesForEntitlementEvaluation() {
+            let key = normalizedStoreKey(name)
+            guard !key.isEmpty else { continue }
+            guard !seenKeys.contains(key) else { continue }
+
+            orderedEntries.append((name: name, key: key))
+            seenKeys.insert(key)
+        }
+
+        return orderedEntries
+    }
+
+    private func orderedUniqueStoreKeysForEntitlementEvaluation() -> [String] {
+        orderedUniqueStoreEntriesForEntitlementEvaluation().map { $0.key }
+    }
+
+    private func persistedFreeEditableStoreKeys() -> [String] {
+        var seen = Set<String>()
+        return UserDefaults.standard.freeEditableStoreKeys
+            .map { normalizedStoreKey($0) }
+            .filter { key in
+                guard !key.isEmpty else { return false }
+                if seen.contains(key) { return false }
+                seen.insert(key)
+                return true
+            }
+    }
+
+    private func validPersistedFreeEditableStoreKeys(isPro: Bool = UserDefaults.standard.isPro) -> [String] {
+        let orderedKeys = orderedUniqueStoreKeysForEntitlementEvaluation()
+        guard !isPro else { return orderedKeys }
+
+        let validKeys = Set(orderedKeys)
+        return persistedFreeEditableStoreKeys().filter { validKeys.contains($0) }
+    }
+
+    private func freeEditableStoreKeysForCurrentData(isPro: Bool = UserDefaults.standard.isPro) -> [String] {
+        let orderedKeys = orderedUniqueStoreKeysForEntitlementEvaluation()
+        guard !isPro else { return orderedKeys }
+
+        if orderedKeys.count <= Self.freeStoreLimit {
+            return orderedKeys
+        }
+
+        let validPersistedKeys = validPersistedFreeEditableStoreKeys(isPro: isPro)
+        if validPersistedKeys.count >= Self.freeStoreLimit {
+            return Array(validPersistedKeys.prefix(Self.freeStoreLimit))
+        }
+
+        // No implicit defaults: require explicit user selection when over the Free limit.
+        return validPersistedKeys
+    }
+
+    private func replacePersistedFreeEditableStoreKey(oldKey: String, newKey: String) {
+        var keys = persistedFreeEditableStoreKeys()
+        guard !keys.isEmpty else { return }
+
+        var didChange = false
+        for index in keys.indices where keys[index] == oldKey {
+            keys[index] = newKey
+            didChange = true
+        }
+
+        guard didChange else { return }
+
+        var deduped: [String] = []
+        var seen = Set<String>()
+        for key in keys where !key.isEmpty && !seen.contains(key) {
+            deduped.append(key)
+            seen.insert(key)
+        }
+        UserDefaults.standard.freeEditableStoreKeys = deduped
+    }
+
+    private func removePersistedFreeEditableStoreKey(_ key: String) {
+        let keys = persistedFreeEditableStoreKeys().filter { $0 != key }
+        UserDefaults.standard.freeEditableStoreKeys = keys
+    }
+
+    private func uniqueStoreKeys() -> Set<String> {
+        Set(orderedUniqueStoreKeysForEntitlementEvaluation())
+    }
+
+    private func unlockedStoreKeys(isPro: Bool = UserDefaults.standard.isPro) -> Set<String> {
+        Set(freeEditableStoreKeysForCurrentData(isPro: isPro))
+    }
+
+    var storeLimitForCurrentPlan: Int? {
+        UserDefaults.standard.isPro ? nil : Self.freeStoreLimit
+    }
+
+    func storesForFreeSelection() -> [String] {
+        orderedUniqueStoreEntriesForEntitlementEvaluation().map { $0.name }
+    }
+
+    func isFreeStoreSelectionRequired(isPro: Bool = UserDefaults.standard.isPro) -> Bool {
+        guard !isPro else { return false }
+
+        let orderedUniqueKeys = orderedUniqueStoreKeysForEntitlementEvaluation()
+        guard orderedUniqueKeys.count > Self.freeStoreLimit else { return false }
+
+        return validPersistedFreeEditableStoreKeys(isPro: isPro).count < Self.freeStoreLimit
+    }
+
+    func preselectedStoresForFreeSelection(isPro: Bool = UserDefaults.standard.isPro) -> [String] {
+        let entries = orderedUniqueStoreEntriesForEntitlementEvaluation()
+        guard !entries.isEmpty else { return [] }
+
+        let requiredCount = min(Self.freeStoreLimit, entries.count)
+        let selectedKeys = Array(validPersistedFreeEditableStoreKeys(isPro: isPro).prefix(requiredCount))
+
+        let displayNameByKey = Dictionary(uniqueKeysWithValues: entries.map { ($0.key, $0.name) })
+        return selectedKeys.compactMap { displayNameByKey[$0] }
+    }
+
+    @discardableResult
+    func applyFreeStoreSelection(_ selectedStoreNames: [String], isPro: Bool = UserDefaults.standard.isPro) -> Bool {
+        guard !isPro else { return true }
+
+        let entries = orderedUniqueStoreEntriesForEntitlementEvaluation()
+        let requiredCount = min(Self.freeStoreLimit, entries.count)
+        if requiredCount == 0 {
+            UserDefaults.standard.freeEditableStoreKeys = []
+            reconcileStoreEntitlementState(isPro: false)
+            return true
+        }
+
+        let availableKeys = Set(entries.map { $0.key })
+        var selectedKeys: [String] = []
+
+        for storeName in selectedStoreNames {
+            let key = normalizedStoreKey(storeName)
+            guard availableKeys.contains(key) else { continue }
+            guard !selectedKeys.contains(key) else { continue }
+            selectedKeys.append(key)
+        }
+
+        guard selectedKeys.count == requiredCount else { return false }
+
+        UserDefaults.standard.freeEditableStoreKeys = selectedKeys
+        reconcileStoreEntitlementState(isPro: false)
+        return true
+    }
+
+    func unlockedStoreNamesForCurrentPlan(isPro: Bool = UserDefaults.standard.isPro) -> [String] {
+        let orderedStores = orderedStoreNamesForEntitlementEvaluation()
+        guard !isPro else { return orderedStores }
+
+        let unlockedKeys = unlockedStoreKeys(isPro: isPro)
+        return orderedStores.filter { unlockedKeys.contains(normalizedStoreKey($0)) }
+    }
+
+    func isStoreLimitReached(isPro: Bool = UserDefaults.standard.isPro) -> Bool {
+        guard !isPro else { return false }
+        return uniqueStoreKeys().count >= Self.freeStoreLimit
+    }
+
+    func isStoreLockedByPlan(named storeName: String, isPro: Bool = UserDefaults.standard.isPro) -> Bool {
+        let normalized = normalizedStoreKey(storeName)
+        guard !normalized.isEmpty else { return false }
+        guard !isPro else { return false }
+        return !unlockedStoreKeys(isPro: isPro).contains(normalized)
+    }
+
+    /// Returns whether a store can be used under the current plan.
+    ///
+    /// Pro:
+    /// - Any store is allowed.
+    ///
+    /// Free:
+    /// - Only unlocked stores (selected 2) are editable.
+    /// - A brand-new store is allowed only while under the 2-store limit.
+    func canUseStoreName(_ storeName: String, isPro: Bool = UserDefaults.standard.isPro) -> Bool {
+        let normalized = normalizedStoreKey(storeName)
+        guard !normalized.isEmpty else { return false }
+
+        guard !isPro else { return true }
+
+        let existingKeys = uniqueStoreKeys()
+        if existingKeys.contains(normalized) {
+            return unlockedStoreKeys(isPro: isPro).contains(normalized)
+        }
+
+        return existingKeys.count < Self.freeStoreLimit
+    }
+
+    func storeLimitErrorMessage() -> String {
+        "Free supports up to \(Self.freeStoreLimit) stores. Upgrade to Pro to add more."
+    }
+
     /// Adds a store to the vault store list (deduped case-insensitively).
     func addStore(_ storeName: String) {
         guard let vault = vault else { return }
 
         let trimmedStore = storeName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedStore.isEmpty else { return }
+
+        guard canUseStoreName(trimmedStore) else {
+            print("🔒 Store limit reached on Free (\(Self.freeStoreLimit))")
+            return
+        }
 
         if !vault.stores.contains(where: { $0.name.lowercased() == trimmedStore.lowercased() }) {
             let newStore = Store(name: trimmedStore)
@@ -1079,6 +1302,20 @@ extension VaultService {
         let trimmedNewName = newName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedNewName.isEmpty else { return }
 
+        let normalizedOldName = normalizedStoreKey(oldName)
+        let normalizedNewName = normalizedStoreKey(trimmedNewName)
+        guard !normalizedOldName.isEmpty, !normalizedNewName.isEmpty else { return }
+
+        if !UserDefaults.standard.isPro {
+            guard !isStoreLockedByPlan(named: oldName, isPro: false) else { return }
+
+            let existingKeys = uniqueStoreKeys()
+            let keysAfterRename = existingKeys.subtracting([normalizedOldName])
+            if !keysAfterRename.contains(normalizedNewName) && keysAfterRename.count >= Self.freeStoreLimit {
+                return
+            }
+        }
+
         if let store = vault.stores.first(where: { $0.name == oldName }) {
             store.name = trimmedNewName
         }
@@ -1093,6 +1330,11 @@ extension VaultService {
             }
         }
 
+        replacePersistedFreeEditableStoreKey(
+            oldKey: normalizedOldName,
+            newKey: normalizedNewName
+        )
+
         saveContext()
         print("✏️ Store renamed from '\(oldName)' to '\(trimmedNewName)'")
     }
@@ -1104,8 +1346,14 @@ extension VaultService {
     func deleteStore(_ storeName: String) {
         guard let vault = vault else { return }
 
+        if !UserDefaults.standard.isPro,
+           isStoreLockedByPlan(named: storeName, isPro: false) {
+            return
+        }
+
         if let index = vault.stores.firstIndex(where: { $0.name == storeName }) {
             vault.stores.remove(at: index)
+            removePersistedFreeEditableStoreKey(normalizedStoreKey(storeName))
             saveContext()
             print("🗑️ Store deleted: \(storeName)")
         }

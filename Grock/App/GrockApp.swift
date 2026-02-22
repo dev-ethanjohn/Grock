@@ -86,11 +86,14 @@ import UserJot
 import RevenueCat
 
 struct ContentView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @Environment(\.modelContext) private var modelContext
     @State private var vaultService: VaultService
     @State private var cartViewModel: CartViewModel
     @State private var homeViewModel: HomeViewModel
     @State private var cartStateManager: CartStateManager  // Add this
+    @State private var subscriptionManager = SubscriptionManager.shared
+    @State private var showFreeStoreSelectionSheet = false
     
     init(modelContext: ModelContext) {
         let vaultService = VaultService(modelContext: modelContext)
@@ -123,6 +126,38 @@ struct ContentView: View {
                     .environment(homeViewModel)
                     .environment(cartStateManager)
             }
+        }
+        .onAppear {
+            refreshStoreSelectionRequirement()
+            refreshSubscriptionStatus()
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            guard newPhase == .active else { return }
+            refreshSubscriptionStatus()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .subscriptionStatusChanged)) { notification in
+            let isPro = (notification.userInfo?["isPro"] as? Bool) ?? subscriptionManager.isPro
+            refreshStoreSelectionRequirement(isPro: isPro)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("DataUpdated"))) { _ in
+            refreshStoreSelectionRequirement(isPro: subscriptionManager.isPro)
+        }
+        .sheet(isPresented: $showFreeStoreSelectionSheet) {
+            FreeStoreSelectionSheet(isPresented: $showFreeStoreSelectionSheet)
+                .environment(vaultService)
+                .interactiveDismissDisabled(true)
+        }
+    }
+
+    private func refreshStoreSelectionRequirement(isPro: Bool? = nil) {
+        let resolvedIsPro = isPro ?? subscriptionManager.isPro
+        showFreeStoreSelectionSheet = vaultService.isFreeStoreSelectionRequired(isPro: resolvedIsPro)
+    }
+
+    private func refreshSubscriptionStatus() {
+        Task { @MainActor in
+            await subscriptionManager.refreshCustomerInfo()
+            refreshStoreSelectionRequirement(isPro: subscriptionManager.isPro)
         }
     }
 }

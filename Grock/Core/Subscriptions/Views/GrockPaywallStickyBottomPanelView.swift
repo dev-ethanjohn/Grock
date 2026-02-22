@@ -35,9 +35,9 @@ struct GrockPaywallStickyBottomPanelView: View {
     private var selectedPlanContextSecondaryLine: String {
         switch selectedPlan {
         case .yearly:
-            return "Smarter habits for less than a coffee a month."
+            return "Save more on every grocery trip."
         case .monthly:
-            return "Smarter habits at a low weekly cost."
+            return "Start saving more on groceries every week."
         }
     }
 

@@ -1,6 +1,6 @@
 import SwiftUI
 
-//NOTE: LIMIT TO ONLY 1 store for free users
+// NOTE: Free plan allows up to 2 stores.
 struct AddStoreSheet: View {
     @Binding var storeName: String
     @Binding var isPresented: Bool
