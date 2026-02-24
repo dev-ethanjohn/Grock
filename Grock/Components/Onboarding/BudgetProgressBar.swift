@@ -12,6 +12,7 @@ struct FluidBudgetPillView: View {
     @Environment(VaultService.self) private var vaultService
     @Namespace private var animationNamespace
     @State private var pillWidth: CGFloat = 0
+    @State private var didSetInitialPillWidth = false
     
     private var displayedSpent: Double {
         customTotalSpent ?? cart.totalSpent
@@ -71,10 +72,6 @@ struct FluidBudgetPillView: View {
         0.5
     }
     
-    private var shouldShowTextInside: Bool {
-        pillWidth >= 100
-    }
-    
     private var hasBudget: Bool {
         animatedBudget > 0
     }
@@ -89,6 +86,8 @@ struct FluidBudgetPillView: View {
                 let targetWidth = CGFloat(progress) * geometry.size.width
                 let indicatorWidth = CGFloat(indicatorProgress) * geometry.size.width
                 let visualWidth = max(20, targetWidth)
+                let effectivePillWidth = didSetInitialPillWidth ? pillWidth : visualWidth
+                let shouldShowTextInside = effectivePillWidth >= 100
                 let barTopOffset = max(0, geometry.size.height - barHeight)
                 
                 ZStack(alignment: .topLeading) {
@@ -112,7 +111,7 @@ struct FluidBudgetPillView: View {
                         .offset(y: barTopOffset + 1)
                     
                     // Animated progress fill with gradient
-                    if shouldShowTextInside && pillWidth > 30 {
+                    if shouldShowTextInside && effectivePillWidth > 30 {
                         Capsule()
                             .fill(
                                 LinearGradient(
@@ -124,7 +123,7 @@ struct FluidBudgetPillView: View {
                                     endPoint: .trailing
                                 )
                             )
-                            .frame(width: pillWidth, height: 22)
+                            .frame(width: effectivePillWidth, height: 22)
                             .overlay(
                                 Capsule()
                                     .stroke(.black, lineWidth: 1)
@@ -147,7 +146,7 @@ struct FluidBudgetPillView: View {
                     }
                     
                     HStack(spacing: 8) {
-                        if shouldShowTextInside && pillWidth > 30 {
+                        if shouldShowTextInside && effectivePillWidth > 30 {
                             // Text INSIDE the pill
                             Text(displayedSpent.formattedCurrency)
                                 .lexendFont(14, weight: .bold)
@@ -161,16 +160,16 @@ struct FluidBudgetPillView: View {
                                         .combined(with: .opacity)
                                         .combined(with: .scale(scale: 0.95))
                                 ))
-                                .frame(width: pillWidth - 24, height: barHeight, alignment: .trailing)
+                                .frame(width: effectivePillWidth - 24, height: barHeight, alignment: .trailing)
                                 .padding(.leading, 12)
                                 .offset(y: barTopOffset)
                         }
                         
-                        if !shouldShowTextInside || pillWidth < 40 {
+                        if !shouldShowTextInside || effectivePillWidth < 40 {
                             // Mini pill when too narrow
                             Capsule()
                                 .fill(budgetProgressColor)
-                                .frame(width: max(20, pillWidth), height: 22)
+                                .frame(width: max(20, effectivePillWidth), height: 22)
                                 .overlay(
                                     Capsule()
                                         .stroke(.black, lineWidth: 1)
@@ -199,8 +198,14 @@ struct FluidBudgetPillView: View {
                 }
                 .onAppear {
                     pillWidth = visualWidth
+                    didSetInitialPillWidth = true
                 }
                 .onChange(of: visualWidth) { oldValue, newValue in
+                    guard didSetInitialPillWidth else {
+                        pillWidth = newValue
+                        didSetInitialPillWidth = true
+                        return
+                    }
                     withAnimation(.interpolatingSpring(stiffness: 300, damping: 25)) {
                         pillWidth = newValue
                     }

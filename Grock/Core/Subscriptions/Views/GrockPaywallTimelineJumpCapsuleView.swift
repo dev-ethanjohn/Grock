@@ -6,18 +6,17 @@ struct GrockPaywallTimelineJumpCapsuleView: View {
     var body: some View {
         Button(action: action) {
             Text("How your free trial works")
-                .lexend(.caption2, weight: .bold)
+                .lexend(.caption, weight: .semibold)
                 .foregroundColor(.black)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 4)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 6)
                 .background(
                     Capsule(style: .continuous)
                         .fill(Color.white)
                         .overlay(
                             Capsule(style: .continuous)
-                                .stroke(Color.black.opacity(0.12), lineWidth: 1)
+                                .stroke(Color.black.opacity(0.5), lineWidth: 1)
                         )
-                        .shadow(color: Color.black.opacity(0.16), radius: 4, x: 0, y: 2)
                 )
         }
         .buttonStyle(.plain)

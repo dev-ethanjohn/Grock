@@ -70,7 +70,7 @@ struct GrockPaywallStickyPlanCardView: View {
             cardShape
                 .fill(
                     model.isEnabled
-                    ? (isSelected ? selectedFillColor.opacity(0.5 ) : .white)
+                    ? (isSelected ? selectedFillColor.opacity(0.24) : .white)
                     : .white
                 )
                 .clipShape(cardShape)
@@ -79,7 +79,7 @@ struct GrockPaywallStickyPlanCardView: View {
                         cardShape
                             .stroke(
                                 selectedBorderColor,
-                                lineWidth: 2.5
+                                lineWidth: 1.5
                             )
                     } else {
                         cardShape
