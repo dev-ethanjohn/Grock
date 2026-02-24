@@ -5,30 +5,36 @@ struct GrockPaywallStickyPlanCardView: View {
     let isSelected: Bool
     private let badgeClearance: CGFloat = 11
     private let cardCornerRadius: CGFloat = 14
-    private let selectedAccent = Color.Grock.budgetSafe
+    private let selectedAccent = Color(hex: "6F9F20")
+    private let selectedBorderColor = Color(hex: "6F9F20")
     private let unselectedBorderColor = Color.black.opacity(0.16)
+    private let selectedFillColor = Color(hex: "EAF4AF")
     
     private var cardShape: RoundedRectangle {
         RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous)
     }
-    
+
     @ViewBuilder
     private func badgeLabel(_ badge: String) -> some View {
         let uppercasedBadge = badge.uppercased()
         let components = uppercasedBadge.split(separator: " ", omittingEmptySubsequences: true)
+        let isSaveBadge = uppercasedBadge.contains("SAVE")
+        let baseTextStyle: Font.TextStyle = isSaveBadge ? .subheadline : .footnote
+        let badgeWeight: Font.Weight = isSaveBadge ? .black : .semibold
+        let trackingAmount: CGFloat = isSaveBadge ? 0.55 : 0.3
         
-        if let percentIndex = components.firstIndex(where: { $0.contains("%") }) {
+        if components.contains(where: { $0.contains("%") }) {
             HStack(alignment: .firstTextBaseline, spacing: 1) {
                 ForEach(Array(components.enumerated()), id: \.offset) { index, component in
                     Text("\(component)\(index < components.count - 1 ? " " : "")")
-                        .lexend(.footnote, weight: index == percentIndex ? .bold : .semibold)
-                        .tracking(0.3)
+                        .lexend(baseTextStyle, weight: badgeWeight)
+                        .tracking(trackingAmount)
                 }
             }
         } else {
             Text(uppercasedBadge)
-                .lexend(.footnote, weight: .semibold)
-                .tracking(0.3)
+                .lexend(baseTextStyle, weight: badgeWeight)
+                .tracking(trackingAmount)
         }
     }
     
@@ -36,21 +42,21 @@ struct GrockPaywallStickyPlanCardView: View {
         VStack(alignment: .center, spacing: 8) {
             VStack(alignment: .center, spacing: 0) {
                 Text(model.title)
-                    .lexend(.callout)
-                    .foregroundColor(isSelected ? .white.opacity(0.7) : .black.opacity(0.7))
+                    .lexend(.subheadline)
+                    .foregroundColor(.black.opacity(0.7))
                     .padding(.top, 8)
                 
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
                     Text(model.price)
                         .lexend(.title3, weight: .semibold)
-                        .foregroundColor(isSelected ? .white : .black)
+                        .foregroundColor(.black)
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
                         .allowsTightening(true)
                     
                     Text(model.cadence)
                         .lexend(.footnote, weight: .medium)
-                        .foregroundColor(isSelected ? .white.opacity(0.8) : .gray)
+                        .foregroundColor(.gray)
                         .lineLimit(1)
                 }
             }
@@ -61,31 +67,21 @@ struct GrockPaywallStickyPlanCardView: View {
         .padding(.horizontal, 4)
         .frame(maxWidth: .infinity, alignment: .center)
         .background(
-            ZStack {
-                cardShape
-                    .fill(
-                        model.isEnabled
-                        ? .white
-                        : Color.white.opacity(0.85)
-                    )
-                
-                if isSelected {
-                    cardShape
-                        .fill(Color.clear)
-                        .overlay {
-                            Image("selected_sub")
-                                .resizable()
-                                .scaledToFill()
-                        }
-                        .clipShape(cardShape)
-                        .transition(.scale(scale: 0.92).combined(with: .opacity))
-                        .allowsHitTesting(false)
-                }
-            }
+            cardShape
+                .fill(
+                    model.isEnabled
+                    ? (isSelected ? selectedFillColor.opacity(0.5 ) : .white)
+                    : .white
+                )
                 .clipShape(cardShape)
-                .clipped()
                 .overlay {
-                    if !isSelected {
+                    if isSelected {
+                        cardShape
+                            .stroke(
+                                selectedBorderColor,
+                                lineWidth: 2.5
+                            )
+                    } else {
                         cardShape
                             .stroke(
                                 unselectedBorderColor,
@@ -93,33 +89,22 @@ struct GrockPaywallStickyPlanCardView: View {
                             )
                     }
                 }
-                .overlay {
-                    if isSelected {
-                        ShoppingModeGradientView(
-                            cornerRadius: cardCornerRadius,
-                            hasBackgroundImage: true
-                        )
-                        .clipShape(cardShape)
-                    }
-                }
         )
         .overlay(alignment: .topLeading) {
             if let badge = model.badge {
+                let isSaveBadge = badge.localizedCaseInsensitiveContains("save")
                 badgeLabel(badge)
-                    .foregroundColor(.black.opacity(0.86))
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
+                    .foregroundColor(isSaveBadge ? .white : .black.opacity(0.86))
+                    .padding(.horizontal, isSaveBadge ? 6 : 8)
+                    .padding(.vertical, isSaveBadge ? 2 : 2)
                     .background(
                         ZStack {
-                            if badge.localizedCaseInsensitiveContains("save") {
-                                Capsule(style: .continuous)
+                            if isSaveBadge {
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
                                     .fill(
-                                        LinearGradient(
-                                            colors: [Color(hex: "FFE08A"), Color(hex: "FFC94A")],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        )
+                                        selectedBorderColor
                                     )
+                                
                             } else {
                                 Capsule(style: .continuous)
                                     .fill(isSelected ? selectedAccent : .white)
@@ -127,8 +112,15 @@ struct GrockPaywallStickyPlanCardView: View {
                         }
                     )
                     .overlay(
-                        Capsule()
-                            .stroke(isSelected ? .clear : unselectedBorderColor, lineWidth: 1)
+                        Group {
+                            if isSaveBadge {
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .stroke(selectedBorderColor.opacity(0.55), lineWidth: 0.8)
+                            } else {
+                                Capsule()
+                                    .stroke(isSelected ? .clear : unselectedBorderColor, lineWidth: 1)
+                            }
+                        }
                     )
                     .offset(y: -badgeClearance)
                     .offset(x: 8)
@@ -137,7 +129,7 @@ struct GrockPaywallStickyPlanCardView: View {
         .overlay(alignment: .topTrailing) {
             Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                 .font(.system(size: 20))
-                .foregroundStyle(isSelected ? selectedAccent : Color.gray.opacity(0.5))
+                .foregroundStyle(isSelected ? selectedBorderColor : Color.gray.opacity(0.5))
                 .padding(.top, 6)
                 .padding(.trailing, 6)
         }

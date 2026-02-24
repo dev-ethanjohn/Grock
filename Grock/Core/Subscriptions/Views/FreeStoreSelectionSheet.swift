@@ -149,12 +149,16 @@ struct FreeStoreSelectionSheet: View {
                             .lineLimit(1)
 
                         Circle()
-                            .fill(Color.black)
+                            .fill(Color.white)
                             .frame(width: 18, height: 18)
+                            .overlay(
+                                Circle()
+                                    .stroke(Color.black.opacity(0.28), lineWidth: 1)
+                            )
                             .overlay(
                                 Image(systemName: "chevron.right")
                                     .font(.system(size: 11, weight: .bold))
-                                    .foregroundStyle(Color.white)
+                                    .foregroundStyle(Color.black)
                             )
                     }
                     .padding(.leading, 10)
@@ -193,7 +197,7 @@ struct FreeStoreSelectionSheet: View {
         .presentationBackground(Color.white)
         .presentationDetents([.medium, .large], selection: $selectedDetent)
         .fullScreenCover(isPresented: $showPaywall) {
-            GrockPaywallView {
+            GrockPaywallView(initialFeatureFocus: .stores) {
                 showPaywall = false
             }
         }

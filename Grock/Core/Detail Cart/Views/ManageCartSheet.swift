@@ -15,6 +15,7 @@ struct ManageCartSheet: View {
     @State private var isSearching: Bool = false
     @State private var subscriptionManager = SubscriptionManager.shared
     @State private var showPaywall = false
+    @State private var paywallFeatureFocus: GrockPaywallFeatureFocus?
     @Namespace private var searchNamespace
     @Namespace private var categoryManagerNamespace
     
@@ -128,6 +129,12 @@ struct ManageCartSheet: View {
 
     private func isLockedCustomCategory(named categoryName: String) -> Bool {
         vaultService.isCategoryLockedByPlan(named: categoryName)
+    }
+
+    private var isCurrentCartPlanningLocked: Bool {
+        guard cart.status == .planning else { return false }
+        if cartViewModel.activeCarts.count <= 1 { return false }
+        return !vaultService.canEditPlanning(for: cart)
     }
 
     private func openCategoryManager() {
@@ -244,8 +251,10 @@ struct ManageCartSheet: View {
                 }
             }
             .fullScreenCover(isPresented: $showPaywall) {
-                GrockPaywallView {
+                GrockPaywallView(initialFeatureFocus: paywallFeatureFocus) {
+                    paywallFeatureFocus = nil
                     showPaywall = false
+                    NotificationCenter.default.post(name: NSNotification.Name("ManageCartDismissEditSheets"), object: nil)
                 }
             }
             .presentationDragIndicator(.visible)
@@ -371,7 +380,7 @@ struct ManageCartSheet: View {
                                     itemCount: getActiveItemCount(forCategoryNamed: categoryName),
                                     hasItems: hasItems(inCategoryNamed: categoryName),
                                     iconText: vaultService.displayEmoji(forCategoryName: categoryName),
-                                    isLocked: isLockedCustomCategory(named: categoryName),
+                                    isLocked: isCurrentCartPlanningLocked && isLockedCustomCategory(named: categoryName),
                                     action: {
                                         // Dismiss keyboard immediately when tapping category
                                         UIApplication.shared.endEditing()
@@ -455,8 +464,9 @@ struct ManageCartSheet: View {
                     localActiveItems: $localActiveItems,
                     searchText: searchText,
                     navigationDirection: navigationDirection,
-                    isEditingLocked: isLockedCustomCategory(named: selectedCategoryName),
-                    enforceStoreLocks: cart.isPlanning,
+                    // The primary Free cart is fully editable; only excess active carts are locked.
+                    isEditingLocked: isCurrentCartPlanningLocked,
+                    enforceStoreLocks: false,
                     onLockedEditAttempt: presentProPaywallForLockedCategory
                 )
             }
@@ -628,6 +638,11 @@ struct ManageCartSheet: View {
     private func updateCartWithSelectedItems() {
         print("🔄 Updating cart with selected items")
 
+        if cart.status == .planning && !vaultService.canEditPlanning(for: cart) {
+            print("🔒 Planning edits are locked for cart: \(cart.name)")
+            return
+        }
+
         let selectedEntries: [(itemId: String, store: String?, quantity: Double)] = localActiveItems
             .compactMap { key, quantity in
                 guard quantity > 0 else { return nil }
@@ -742,6 +757,14 @@ struct ManageCartSheet: View {
     private func presentProPaywallForLockedCategory() {
         UIApplication.shared.endEditing()
         HapticManager.shared.playMedium()
+        if isCurrentCartPlanningLocked {
+            paywallFeatureFocus = .activeCarts
+        } else if let selectedCategoryName, isLockedCustomCategory(named: selectedCategoryName) {
+            paywallFeatureFocus = .categories
+        } else {
+            paywallFeatureFocus = .stores
+        }
+        NotificationCenter.default.post(name: NSNotification.Name("ManageCartDismissEditSheets"), object: nil)
         showPaywall = true
     }
     
@@ -1149,7 +1172,7 @@ struct ManageCartItemsListView: View {
             if isEditingLocked {
                 VStack(spacing: 0) {
                     HStack(alignment: .center, spacing: 0) {
-                        Text("Bring back “\(categoryName)” \(vaultService.displayEmoji(forCategoryName: categoryName)) for complete planning, shopping, and budget tracking.")
+                        Text("This cart is locked on Free. Keep editing in your primary active cart, or unlock Pro to edit all active carts.")
                             .fuzzyBubblesFont(14, weight: .bold)
                             .foregroundStyle(Color.black.opacity(0.9))
                             .lineLimit(3)
@@ -1394,6 +1417,12 @@ struct ManageCartItemRow: View {
         item.priceOptions.first(where: { $0.store.caseInsensitiveCompare(storeName) == .orderedSame })
         ?? item.priceOptions.first
     }
+
+    private func requestUnlock() {
+        showEditSheet = false
+        isFocused = false
+        onLockedEditAttempt()
+    }
     
     var body: some View {
         HStack(alignment: .bottom, spacing: 4) {
@@ -1450,7 +1479,7 @@ struct ManageCartItemRow: View {
         .animation(.spring(response: 0.4, dampingFraction: 0.7), value: isActive)
         .onTapGesture {
             guard !isEditingLocked else {
-                onLockedEditAttempt()
+                requestUnlock()
                 return
             }
             if !isFocused {
@@ -1469,10 +1498,18 @@ struct ManageCartItemRow: View {
             .presentationCornerRadius(24)
             .presentationBackground(.white)
         }
+        .onChange(of: showEditSheet) { _, isPresented in
+            guard isPresented, isEditingLocked else { return }
+            showEditSheet = false
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ManageCartDismissEditSheets"))) { _ in
+            showEditSheet = false
+            isFocused = false
+        }
         .contextMenu {
             if isEditingLocked {
                 Button {
-                    onLockedEditAttempt()
+                    requestUnlock()
                 } label: {
                     Label {
                         Text("Unlock Pro to Edit")
@@ -1530,7 +1567,7 @@ struct ManageCartItemRow: View {
     private var minusButton: some View {
         Button {
             guard !isEditingLocked else {
-                onLockedEditAttempt()
+                requestUnlock()
                 return
             }
             handleMinus()
@@ -1591,7 +1628,7 @@ struct ManageCartItemRow: View {
     private var plusButton: some View {
         Button(action: {
             guard !isEditingLocked else {
-                onLockedEditAttempt()
+                requestUnlock()
                 return
             }
             if isActive {
@@ -1617,7 +1654,7 @@ struct ManageCartItemRow: View {
     
     private func handlePlus() {
         guard !isEditingLocked else {
-            onLockedEditAttempt()
+            requestUnlock()
             return
         }
 
@@ -1635,7 +1672,7 @@ struct ManageCartItemRow: View {
     
     private func handleMinus() {
         guard !isEditingLocked else {
-            onLockedEditAttempt()
+            requestUnlock()
             return
         }
 
@@ -1653,7 +1690,7 @@ struct ManageCartItemRow: View {
     
     private func commitTextField() {
         guard !isEditingLocked else {
-            onLockedEditAttempt()
+            requestUnlock()
             isFocused = false
             textValue = formatValue(currentQuantity)
             return
@@ -1689,7 +1726,7 @@ struct ManageCartItemRow: View {
 
     private func setSelectionQuantity(_ quantity: Double) {
         guard !isEditingLocked else {
-            onLockedEditAttempt()
+            requestUnlock()
             return
         }
 

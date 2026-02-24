@@ -467,6 +467,10 @@ struct CartDetailScreen: View {
     }
     
     private func handleDeleteItem(_ cartItem: CartItem) {
+        if cart.status == .planning && !vaultService.canEditPlanning(for: cart) {
+            return
+        }
+
         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
             // 1. Manually update local state for instant UI response
             let storeKeys = Array(itemsByStore.keys)
@@ -698,6 +702,10 @@ struct CartDetailAllModifiers: ViewModifier {
               cartId == cart.id,
               let newQuantity = notification.userInfo?["newQuantity"] as? Double,
               let itemId = notification.userInfo?["itemId"] as? String else { return }
+
+        if cart.status == .planning && !vaultService.canEditPlanning(for: cart) {
+            return
+        }
         
         if let cartItem = cart.cartItems.first(where: { $0.itemId == itemId }) {
             cartItem.quantity = newQuantity
@@ -931,6 +939,8 @@ struct CartDetailContent: View {
     @Environment(CartStateManager.self) private var stateManager
     
     @State private var fulfilledCount: Int = 0
+    @State private var showPaywall = false
+    @State private var paywallFeatureFocus: GrockPaywallFeatureFocus?
     
     private var currentFulfilledCount: Int {
         cart.cartItems.filter { $0.isFulfilled }.count
@@ -1095,6 +1105,13 @@ struct CartDetailContent: View {
                 stateManager.selectedColor = matched
             } else {
                 stateManager.selectedColor = fallback
+            }
+        }
+        .fullScreenCover(isPresented: $showPaywall) {
+            GrockPaywallView(initialFeatureFocus: paywallFeatureFocus) {
+                paywallFeatureFocus = nil
+                showPaywall = false
+                itemToEdit = nil
             }
         }
     }
@@ -1285,6 +1302,47 @@ struct CartDetailContent: View {
     }
     
     // MARK: - Item Handlers
+    private func planningRestrictionFocus(for cartItem: CartItem, item: Item?) -> GrockPaywallFeatureFocus? {
+        guard cart.status == .planning else { return nil }
+
+        if !vaultService.canEditPlanning(for: cart) {
+            return .activeCarts
+        }
+
+        let categoryCandidates = [
+            item?.category?.name,
+            vaultService.getCategoryName(for: cartItem.itemId),
+            cartItem.shoppingOnlyCategory,
+            cartItem.vaultItemCategorySnapshot
+        ]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+        if categoryCandidates.contains(where: { vaultService.isCategoryLockedByPlan(named: $0) }) {
+            return .categories
+        }
+
+        let storeCandidates = [
+            cartItem.getStore(cart: cart),
+            cartItem.plannedStore,
+            cartItem.shoppingOnlyStore ?? ""
+        ]
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+        if storeCandidates.contains(where: { vaultService.isStoreLockedByPlan(named: $0) }) {
+            return .stores
+        }
+
+        return nil
+    }
+
+    private func presentPaywall(for featureFocus: GrockPaywallFeatureFocus) {
+        itemToEdit = nil
+        paywallFeatureFocus = featureFocus
+        showPaywall = true
+    }
+
     private func handleEditItem(cartItem: CartItem) {
         var itemToUse = vaultService.findItemById(cartItem.itemId)
         
@@ -1305,6 +1363,11 @@ struct CartDetailContent: View {
                 shoppingPrice: cartItem.shoppingOnlyPrice,
                 shoppingUnit: cartItem.shoppingOnlyUnit
             )
+        }
+
+        if let featureFocus = planningRestrictionFocus(for: cartItem, item: itemToUse) {
+            presentPaywall(for: featureFocus)
+            return
         }
         
         if let found = itemToUse {

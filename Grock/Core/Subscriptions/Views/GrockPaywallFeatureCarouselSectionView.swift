@@ -28,16 +28,21 @@ struct GrockPaywallFeatureCarouselSectionView: View {
 
     private var pageCount: Int {
         guard features.count > 1 else { return features.count }
-        return features.count + 1
+        return features.count + 2
     }
 
     private var maxPageIndex: Int {
         max(0, pageCount - 1)
     }
 
+    private var leadingLoopPageIndex: Int? {
+        guard features.count > 1 else { return nil }
+        return 0
+    }
+
     private var trailingLoopPageIndex: Int? {
         guard features.count > 1 else { return nil }
-        return features.count
+        return features.count + 1
     }
 
     private var videoResourceNamesSignature: String {
@@ -66,40 +71,69 @@ struct GrockPaywallFeatureCarouselSectionView: View {
         "\(features.count)-\(selectedIndex)-\(selectedVideoDuration ?? -1)"
     }
 
+    private func featureIndexForPage(_ pageIndex: Int) -> Int {
+        guard !features.isEmpty else { return 0 }
+        guard features.count > 1 else { return 0 }
+
+        if pageIndex == 0 {
+            return features.count - 1
+        }
+
+        if let trailingLoopPageIndex, pageIndex == trailingLoopPageIndex {
+            return 0
+        }
+
+        return min(max(pageIndex - 1, 0), features.count - 1)
+    }
+
+    private func pageIndexForFeatureIndex(_ featureIndex: Int) -> Int {
+        guard !features.isEmpty else { return 0 }
+        let clampedFeatureIndex = min(max(featureIndex, 0), features.count - 1)
+        guard features.count > 1 else { return clampedFeatureIndex }
+        return clampedFeatureIndex + 1
+    }
+
     private func featureForPage(_ pageIndex: Int) -> GrockPaywallFeature {
-        features[pageIndex % features.count]
+        features[featureIndexForPage(pageIndex)]
     }
 
     private func syncTabSelectionToResolvedIndex() {
         guard !features.isEmpty else { return }
-        if let trailingLoopPageIndex, tabSelection == trailingLoopPageIndex { return }
+        if let leadingLoopPageIndex,
+           tabSelection == leadingLoopPageIndex,
+           resolvedIndex == features.count - 1 {
+            return
+        }
+        if let trailingLoopPageIndex,
+           tabSelection == trailingLoopPageIndex,
+           resolvedIndex == 0 {
+            return
+        }
 
-        let safeIndex = min(resolvedIndex, max(0, features.count - 1))
-        if tabSelection != safeIndex {
+        let safePageIndex = pageIndexForFeatureIndex(resolvedIndex)
+        if tabSelection != safePageIndex {
             isProgrammaticTabChange = true
             var transaction = Transaction()
             transaction.disablesAnimations = true
             withTransaction(transaction) {
-                tabSelection = safeIndex
+                tabSelection = safePageIndex
             }
         }
     }
 
-    private func scheduleLoopResetIfNeeded(for pageIndex: Int) {
+    private func scheduleLoopReset(from loopPageIndex: Int, to targetPageIndex: Int) {
         loopResetTask?.cancel()
-
-        guard let trailingLoopPageIndex, pageIndex == trailingLoopPageIndex else { return }
 
         loopResetTask = Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(360))
             guard !Task.isCancelled else { return }
-            guard tabSelection == trailingLoopPageIndex else { return }
+            guard tabSelection == loopPageIndex else { return }
 
             isProgrammaticTabChange = true
             var transaction = Transaction()
             transaction.disablesAnimations = true
             withTransaction(transaction) {
-                tabSelection = 0
+                tabSelection = targetPageIndex
             }
         }
     }
@@ -109,22 +143,33 @@ struct GrockPaywallFeatureCarouselSectionView: View {
         let shouldNotifyManualInteraction = !isProgrammaticTabChange
         isProgrammaticTabChange = false
 
+        if let leadingLoopPageIndex,
+           features.count > 1,
+           newValue == leadingLoopPageIndex {
+            if shouldNotifyManualInteraction {
+                onManualInteraction()
+            }
+            selectedIndex = features.count - 1
+            scheduleLoopReset(from: newValue, to: features.count)
+            return
+        }
+
         if let trailingLoopPageIndex, newValue == trailingLoopPageIndex {
             if shouldNotifyManualInteraction {
                 onManualInteraction()
             }
             selectedIndex = 0
-            scheduleLoopResetIfNeeded(for: newValue)
+            scheduleLoopReset(from: newValue, to: 1)
             return
         }
 
         loopResetTask?.cancel()
-        let clampedValue = min(max(newValue, 0), max(0, features.count - 1))
-        if clampedValue != selectedIndex {
+        let resolvedFeatureIndex = featureIndexForPage(newValue)
+        if resolvedFeatureIndex != selectedIndex {
             if shouldNotifyManualInteraction {
                 onManualInteraction()
             }
-            selectedIndex = clampedValue
+            selectedIndex = resolvedFeatureIndex
         }
     }
 
@@ -184,11 +229,21 @@ struct GrockPaywallFeatureCarouselSectionView: View {
                         ForEach(0..<pageCount, id: \.self) { pageIndex in
                             VStack(spacing: 0) {
                                 if let videoResourceName = featureForPage(pageIndex).videoResourceName {
-                                    LoopingVideoView(resourceName: videoResourceName)
-                                        .frame(maxWidth: .infinity)
-                                        .frame(height: videoHeight)
-                                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                                        .id("\(videoResourceName)-\(pageIndex)")
+                                    if tabSelection == pageIndex {
+                                        LoopingVideoView(
+                                            resourceName: videoResourceName,
+                                            isActive: true
+                                        )
+                                            .frame(maxWidth: .infinity)
+                                            .frame(height: videoHeight)
+                                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                                            .id("\(videoResourceName)-\(pageIndex)")
+                                    } else {
+                                        Color.black.opacity(0.05)
+                                            .frame(maxWidth: .infinity)
+                                            .frame(height: videoHeight)
+                                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                                    }
                                 } else {
                                     Color.clear
                                         .frame(maxWidth: .infinity)
@@ -205,31 +260,6 @@ struct GrockPaywallFeatureCarouselSectionView: View {
                     .tabViewStyle(.page(indexDisplayMode: .never))
                 }
 
-                HStack(spacing: 8) {
-                    ForEach(Array(features.indices), id: \.self) { index in
-                        Button {
-                            onManualInteraction()
-                            loopResetTask?.cancel()
-                            withAnimation(carouselAnimation) {
-                                selectedIndex = index
-                                isProgrammaticTabChange = true
-                                tabSelection = index
-                            }
-                        } label: {
-                            Circle()
-                                .fill(
-                                    resolvedIndex == index
-                                        ? Color.Grock.subscriptionAccent
-                                        : Color.black.opacity(0.22)
-                                )
-                                .frame(
-                                    width: resolvedIndex == index ? 8 : 6,
-                                    height: resolvedIndex == index ? 8 : 6
-                                )
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
             }
             .frame(minHeight: carouselHeight)
             .frame(maxWidth: .infinity, alignment: .center)
@@ -279,12 +309,10 @@ struct GrockPaywallFeatureCarouselSectionView: View {
         var title = AttributedString(feature.title)
         title.font = .custom("Lexend-SemiBold", size: 16)
         title.foregroundColor = .black
-        title.backgroundColor = Color(hex: "FFE08A")
 
         var body = AttributedString(feature.body)
         body.font = .custom("Lexend-Regular", size: 12)
         body.foregroundColor = .black
-        body.backgroundColor = Color(hex: "FFE08A")
 
         var combined = AttributedString()
         combined.append(title)

@@ -105,6 +105,8 @@ struct MenuView: View {
             ZStack(alignment: .topLeading) {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 10) {
+                        manageGrockProRow
+
                         Menu {
                             Text("Current: \(currencyMenuTitleString(for: currencyManager.selectedCurrency, includeSelection: false))")
                                 .lexendFont(14, weight: .bold)
@@ -191,9 +193,6 @@ struct MenuView: View {
                             .padding(.vertical, 2)
                         }
 
-                        subscriptionSection
-                            .padding(.top, sectionGapAfterPrimaryRows)
-                        
                         feedbackSupportSection
                             .padding(.top, sectionGapAfterPrimaryRows)
                         rateAndShareSection
@@ -313,56 +312,21 @@ struct MenuView: View {
         }
     }
 
-    private var subscriptionSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            DashedLine()
-                .stroke(style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
-                .frame(height: 1)
-                .foregroundColor(Color.Grock.neutral300)
-                .padding(.horizontal, rowHorizontalPadding)
-                .padding(.top, 4)
-                .padding(.bottom, 8)
-
-            Button {
-                if subscriptionManager.isPro {
-                    showingCustomerCenter = true
-                } else {
-                    showingPaywall = true
-                }
-            } label: {
-                feedbackRow(
-                    title: subscriptionManager.isPro ? "Manage Grock Pro" : "Unlock Grock Pro",
-                    icon: "✨",
-                    isHighlighted: !subscriptionManager.isPro
-                )
-            }
-            .buttonStyle(.plain)
-
-            Button(action: handleRestorePurchasesTapped) {
-                feedbackRow(title: "Restore Purchases", icon: "↩️")
-            }
-            .buttonStyle(.plain)
-
-            Button {
+    private var manageGrockProRow: some View {
+        Button {
+            if subscriptionManager.isPro {
                 showingCustomerCenter = true
-            } label: {
-                feedbackRow(title: "Customer Center", icon: "🧾")
-            }
-            .buttonStyle(.plain)
-
-            if subscriptionManager.isLoadingCustomerInfo || subscriptionManager.isLoadingOfferings {
-                ProgressView()
-                    .tint(.black)
-                    .padding(.horizontal, rowHorizontalPadding)
-                    .padding(.top, 4)
             } else {
-                Text(subscriptionManager.isPro ? "Grock Pro is active" : "Currently on Free plan")
-                    .lexend(.caption2, weight: .regular)
-                    .foregroundColor(.gray)
-                    .padding(.horizontal, rowHorizontalPadding + 32)
-                    .padding(.top, 2)
+                showingPaywall = true
             }
+        } label: {
+            feedbackRow(
+                title: subscriptionManager.isPro ? "Manage Grock Pro" : "Unlock Grock Pro",
+                icon: "✨",
+                isHighlighted: !subscriptionManager.isPro
+            )
         }
+        .buttonStyle(.plain)
     }
     
     private var feedbackSupportSection: some View {
@@ -400,18 +364,11 @@ struct MenuView: View {
             Button(action: {}) {
                 HStack(spacing: 8) {
                     menuEmoji("⭐️")
-                    
-                    VStack(alignment: .leading, spacing: 0) {
-                        Text("Rate Grock")
-                            .lexendFont(16)
-                            .fontWeight(.medium)
-                            .foregroundColor(.black)
-                        
-                        Text("I value your feedback.")
-                            .lexend(.caption2, weight: .regular)
-                            .foregroundColor(Color(.systemGray3))
-                            .padding(.bottom, 2)
-                    }
+
+                    Text("Rate Grock")
+                        .lexendFont(16)
+                        .fontWeight(.medium)
+                        .foregroundColor(.black)
                     
                     Spacer()
                     
@@ -422,6 +379,7 @@ struct MenuView: View {
                 .padding(.vertical, 2)
             }
             .buttonStyle(.plain)
+            // CSV export entry is intentionally disabled for a future update.
             
             ShareLink(item: shareAppURL, subject: Text("Grock"), message: Text(shareAppMessage)) {
                 HStack(spacing: 8) {
@@ -557,22 +515,6 @@ struct MenuView: View {
         let isSelectedRegion = (currencyRegionByCode[currencyManager.selectedCurrency.code] ?? "Other") == region
         let dot = isSelectedRegion ? "●" : "○"
         return "\(region)   \(dot)"
-    }
-
-    private func handleRestorePurchasesTapped() {
-        Task {
-            let result = await subscriptionManager.restorePurchases()
-            switch result {
-            case .success:
-                subscriptionAlertMessage = "Restore completed."
-            case .cancelled:
-                subscriptionAlertMessage = "Restore cancelled."
-            case .failure(let message):
-                subscriptionAlertMessage = message
-            }
-
-            showSubscriptionAlert = true
-        }
     }
     
     private func contactSupportTapped() {

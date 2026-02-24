@@ -515,6 +515,7 @@ struct FinishTripSheet: View {
                     cartTotal: cartTotal,
                     totalSpent: totalSpent
                 )
+                .frame(maxWidth: .infinity, alignment: .top)
                 .background(
                     Color.white
                         .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)

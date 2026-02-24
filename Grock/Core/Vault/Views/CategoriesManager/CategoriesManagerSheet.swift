@@ -21,6 +21,7 @@ struct CategoriesManagerSheet: View {
     @State private var addButtonDidAppear = false
     @State private var subscriptionManager = SubscriptionManager.shared
     @State private var showPaywall = false
+    @State private var paywallFeatureFocus: GrockPaywallFeatureFocus?
     @Namespace private var addButtonNamespace
 
     init(
@@ -412,7 +413,8 @@ struct CategoriesManagerSheet: View {
             await subscriptionManager.refreshCustomerInfo()
         }
         .fullScreenCover(isPresented: $showPaywall) {
-            GrockPaywallView {
+            GrockPaywallView(initialFeatureFocus: paywallFeatureFocus) {
+                paywallFeatureFocus = nil
                 showPaywall = false
             }
         }
@@ -1257,6 +1259,7 @@ struct CategoriesManagerSheet: View {
         if viewModel.showCategoryPopover {
             dismissCategoryPopover()
         }
+        paywallFeatureFocus = .categories
         showPaywall = true
     }
 

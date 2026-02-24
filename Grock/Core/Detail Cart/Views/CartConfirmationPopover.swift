@@ -29,12 +29,12 @@ extension View {
     }
 }
 
-struct ScrollOffsetPreferenceKey: PreferenceKey {
-    static var defaultValue: CGPoint = .zero
-    
-    /// with this function, we can get the scroll view indicator position
-    static func reduce(value: inout CGPoint, nextValue: () -> CGPoint) { }
-}
+//struct ScrollOffsetPreferenceKey: PreferenceKey {
+//    static var defaultValue: CGPoint = .zero
+//    
+//    /// with this function, we can get the scroll view indicator position
+//    static func reduce(value: inout CGPoint, nextValue: () -> CGPoint) { }
+//}
 
 struct OffsetKey: PreferenceKey {
     static var defaultValue: CGRect = .zero
@@ -91,19 +91,19 @@ struct VerticalScrollViewWithCustomIndicator<Content: View>: View {
                                         }
                                 }
                             )
-                            .background(
-                                GeometryReader { geometry in
-                                    Color.clear
-                                        .preference(
-                                            key: ScrollOffsetPreferenceKey.self,
-                                            value: geometry.frame(in: .named(Constants.offsetNameSpace)).origin
-                                        )
-                                }
-                            )
-                            .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
-                                self.scrollPosition = value
-                                updateIndicatorOffset(viewHeight: geometryParent.size.height)
-                            }
+//                            .background(
+//                                GeometryReader { geometry in
+//                                    Color.clear
+//                                        .preference(
+//                                            key: ScrollOffsetPreferenceKey.self,
+//                                            value: geometry.frame(in: .named(Constants.offsetNameSpace)).origin
+//                                        )
+//                                }
+//                            )
+//                            .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
+//                                self.scrollPosition = value
+//                                updateIndicatorOffset(viewHeight: geometryParent.size.height)
+//                            }
                     }
                     .coordinateSpace(name: Constants.offsetNameSpace)
                 }

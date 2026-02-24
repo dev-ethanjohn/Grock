@@ -21,6 +21,7 @@ struct CategoryCircularButton: View {
     @State private var createCategoryViewModel = CategoriesManagerViewModel(startOnHiddenTab: true)
     @State private var subscriptionManager = SubscriptionManager.shared
     @State private var showPaywall = false
+    @State private var paywallFeatureFocus: GrockPaywallFeatureFocus?
     
     var body: some View {
         HStack {
@@ -44,16 +45,19 @@ struct CategoryCircularButton: View {
                             }
                             selectedCategoryName = categoryName
                         } label: {
-                            HStack(spacing: 8) {
-                                Text("\(categoryName) \(emojiForCategoryName(categoryName))")
-                                    .foregroundStyle(isLocked ? Color.secondary : Color.primary)
-                                    .saturation(isLocked ? 0 : 1)
-
-                                if isLocked {
-                                    Text("💎")
-                                } else if selectedCategoryName == categoryName {
-                                    Image(systemName: "checkmark")
+                            if isLocked {
+                                Label("\(categoryName) \(emojiForCategoryName(categoryName))", systemImage: "lock.fill")
+                                    .foregroundStyle(Color.secondary)
+                                    .saturation(0)
+                            } else {
+                                HStack(spacing: 8) {
+                                    Text("\(categoryName) \(emojiForCategoryName(categoryName))")
                                         .foregroundStyle(Color.primary)
+
+                                    if selectedCategoryName == categoryName {
+                                        Image(systemName: "checkmark")
+                                            .foregroundStyle(Color.primary)
+                                    }
                                 }
                             }
                         }
@@ -132,7 +136,8 @@ struct CategoryCircularButton: View {
             await subscriptionManager.refreshCustomerInfo()
         }
         .fullScreenCover(isPresented: $showPaywall) {
-            GrockPaywallView {
+            GrockPaywallView(initialFeatureFocus: paywallFeatureFocus) {
+                paywallFeatureFocus = nil
                 showPaywall = false
             }
         }
@@ -382,6 +387,7 @@ struct CategoryCircularButton: View {
         if showCreateCategorySheet {
             showCreateCategorySheet = false
         }
+        paywallFeatureFocus = .categories
         showPaywall = true
     }
 

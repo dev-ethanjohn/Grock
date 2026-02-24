@@ -8,7 +8,7 @@ struct CategoryTabsModel: Identifiable {
 
     enum Tab: String, CaseIterable {
         case shown = "My Bar"
-        case hidden = "More"
+        case hidden = "Archive"
     }
 }
 

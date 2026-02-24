@@ -16,7 +16,7 @@ enum GrockPaywallPreviewFixtures {
             subtitle: "Free: Basic colors",
             body: "Make every cart feel personal.",
             systemImage: "photo.on.rectangle.angled",
-            videoResourceName: "custom_background"
+            videoResourceName: nil
         ),
         .init(
             id: "active-carts",
@@ -32,7 +32,7 @@ enum GrockPaywallPreviewFixtures {
             subtitle: "Free: 2 stores max",
             body: "Find the cheapest option fast.",
             systemImage: "storefront.fill",
-            videoResourceName: nil
+            videoResourceName: "unlimited_stores"
         )
     ]
 
@@ -40,20 +40,20 @@ enum GrockPaywallPreviewFixtures {
         .init(
             id: "today",
             title: "Today",
-            subtitle: "Get instant access to all Grock Pro features.",
-            systemImage: "lock.fill"
+            subtitle: "Unlimited free access to all Grock Pro features.",
+            emoji: "🎁"
         ),
         .init(
             id: "day-5",
             title: "Day 5",
-            subtitle: "We’ll remind you that your trial is ending soon.",
-            systemImage: "bell.fill"
+            subtitle: "Get a reminder that your 7-day trial is about to end.",
+            emoji: "📬"
         ),
         .init(
             id: "day-7",
             title: "Day 7",
-            subtitle: "You’ll be charged on May 17, 2026. Cancel anytime before.",
-            systemImage: "star.fill"
+            subtitle: "You’ll be charged on May 17, 2026. Cancel anytime before Day 7.",
+            emoji: "💳"
         )
     ]
 

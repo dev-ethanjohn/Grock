@@ -125,6 +125,8 @@ struct EditItemSheet: View {
     @State private var validationTask: Task<Void, Never>?
     @FocusState private var itemNameFieldIsFocused: Bool
     @State private var showRemoveFromVaultConfirmation = false
+
+    private var bypassPlanLocks: Bool { false }
     
     // MARK: - Initializers
     
@@ -177,7 +179,8 @@ struct EditItemSheet: View {
                             onStoreChange: {
                                 triggerRealTimeValidation()
                             },
-                            isCategoryEditable: true
+                            isCategoryEditable: true,
+                            bypassPlanLocks: bypassPlanLocks
                         )
                         
                         
@@ -369,6 +372,12 @@ struct EditItemSheet: View {
         // Only allow editing in planning mode
         guard cart.status == .planning else {
             print("⚠️ ERROR: Can only edit items in planning mode")
+            return false
+        }
+
+        guard vaultService.canEditPlanning(for: cart) else {
+            duplicateError = "Planning edits are locked for this cart on Free."
+            print("🔒 Planning edits are locked for cart: \(cart.name)")
             return false
         }
         

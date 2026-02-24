@@ -5,12 +5,14 @@ import UIKit
 struct LoopingVideoView: View {
     let resourceName: String
     var fileExtension: String = "mov"
+    var isActive: Bool = true
 
     @StateObject private var playerModel: LoopingVideoPlayerModel
 
-    init(resourceName: String, fileExtension: String = "mov") {
+    init(resourceName: String, fileExtension: String = "mov", isActive: Bool = true) {
         self.resourceName = resourceName
         self.fileExtension = fileExtension
+        self.isActive = isActive
         _playerModel = StateObject(
             wrappedValue: LoopingVideoPlayerModel(
                 resourceName: resourceName,
@@ -31,9 +33,20 @@ struct LoopingVideoView: View {
         }
         .mask(bottomFadeMask)
         .onAppear {
-            playerModel.play()
+            syncPlaybackState()
+        }
+        .onChange(of: isActive) { _, _ in
+            syncPlaybackState()
         }
         .onDisappear {
+            playerModel.pause()
+        }
+    }
+
+    private func syncPlaybackState() {
+        if isActive {
+            playerModel.play()
+        } else {
             playerModel.pause()
         }
     }
@@ -76,6 +89,13 @@ private final class LoopingVideoPlayerModel: ObservableObject {
         isReady = true
 
         updateAspectRatio(from: url)
+    }
+
+    deinit {
+        looper?.disableLooping()
+        looper = nil
+        player.pause()
+        player.removeAllItems()
     }
 
     private static func resolveResourceURL(resourceName: String, preferredExtension: String) -> URL? {

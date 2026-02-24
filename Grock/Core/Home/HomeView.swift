@@ -55,6 +55,7 @@ struct HomeView: View {
     
     @State private var subscriptionManager = SubscriptionManager.shared
     @State private var showPaywall = false
+    @State private var paywallFeatureFocus: GrockPaywallFeatureFocus?
     
     // Name entry sheet state
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding: Bool = false
@@ -145,6 +146,7 @@ struct HomeView: View {
                         } else if cartViewModel.isActiveCartLimitReached() {
                             showCreateCartPopover = false
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+                                paywallFeatureFocus = .activeCarts
                                 showPaywall = true
                             }
                         }
@@ -157,7 +159,8 @@ struct HomeView: View {
                 )
             }
             .fullScreenCover(isPresented: $showPaywall) {
-                GrockPaywallView {
+                GrockPaywallView(initialFeatureFocus: paywallFeatureFocus) {
+                    paywallFeatureFocus = nil
                     showPaywall = false
                 }
             }
@@ -543,6 +546,7 @@ struct HomeView: View {
     private var createCartButton: some View {
         Button(action: {
             guard !cartViewModel.isActiveCartLimitReached() else {
+                paywallFeatureFocus = .activeCarts
                 showPaywall = true
                 return
             }

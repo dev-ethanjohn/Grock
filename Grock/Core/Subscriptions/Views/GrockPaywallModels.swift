@@ -1,5 +1,12 @@
 import Foundation
 
+enum GrockPaywallFeatureFocus: String, CaseIterable {
+    case categories = "categories"
+    case backgrounds = "backgrounds"
+    case activeCarts = "active-carts"
+    case stores = "stores"
+}
+
 struct GrockPaywallFeature: Identifiable, Hashable {
     let id: String
     let title: String
@@ -30,5 +37,5 @@ struct GrockPaywallTimelineItem: Identifiable, Hashable {
     let id: String
     let title: String
     let subtitle: String
-    let systemImage: String
+    let emoji: String
 }

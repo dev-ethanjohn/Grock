@@ -36,7 +36,8 @@ final class CurrencyManager {
             let formatter = NumberFormatter()
             formatter.numberStyle = .currency
             formatter.currencyCode = code
-            let symbol = formatter.currencySymbol ?? code
+            let rawSymbol = formatter.currencySymbol ?? code
+            let symbol = normalizedSymbol(for: code, rawSymbol: rawSymbol)
             let name = locale.localizedString(forCurrencyCode: code) ?? code
             
             currencies.append(Currency(code: code, symbol: symbol, name: name))
@@ -74,5 +75,12 @@ final class CurrencyManager {
     private func saveSelectedCurrency() {
         UserDefaults.standard.set(selectedCurrency.code, forKey: "selectedCurrencyCode")
         UserDefaults.standard.set(selectedCurrency.symbol, forKey: "selectedCurrencySymbol")
+    }
+
+    private func normalizedSymbol(for code: String, rawSymbol: String) -> String {
+        if code.uppercased() == "USD" {
+            return "$"
+        }
+        return rawSymbol
     }
 }

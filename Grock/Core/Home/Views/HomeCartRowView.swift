@@ -526,7 +526,7 @@ struct HomeCartRowView: View {
                           Text(category.emoji)
                             .lexendFont(11)
                     }
-                    .opacity(isFulfilled ? 1.0 : 0.5)
+                    .opacity(isFulfilled ? 1.0 : 0.32)
                   }
               }
               .padding(.horizontal, 4)

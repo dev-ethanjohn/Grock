@@ -8,12 +8,15 @@ import Foundation
 /// - Mark what you actually paid
 /// - Finish the trip and save results
 extension VaultService {
+    private static let freePlanningEditableCartLimit = 1
+
     /// Creates a planning cart and persists it to the vault.
     func createCart(name: String, budget: Double) -> Cart {
         let newCart = Cart(name: name, budget: budget, status: .planning)
         vault?.carts.append(newCart)
         UserDefaults.standard.set(ColorOption.defaultColor.hex, forKey: "cartBackgroundColor_\(newCart.id)")
         saveContext()
+        reconcileCartPlanningEntitlementState(isPro: UserDefaults.standard.isPro)
         return newCart
     }
 
@@ -42,6 +45,97 @@ extension VaultService {
         saveContext()
 
         return newCart
+    }
+
+    var planningEditableCartLimitForCurrentPlan: Int? {
+        UserDefaults.standard.isPro ? nil : Self.freePlanningEditableCartLimit
+    }
+
+    func primaryEditableCartIdForCurrentPlan(isPro: Bool = UserDefaults.standard.isPro) -> String? {
+        resolvedPrimaryEditableCartIdForCurrentPlan(isPro: isPro)
+    }
+
+    func canEditPlanning(for cart: Cart, isPro: Bool = UserDefaults.standard.isPro) -> Bool {
+        !isCartPlanningLockedByPlan(cart, isPro: isPro)
+    }
+
+    func isCartPlanningLockedByPlan(_ cart: Cart, isPro: Bool = UserDefaults.standard.isPro) -> Bool {
+        guard cart.status == .planning else { return false }
+        return isNonPrimaryActiveCartOnFree(cart, isPro: isPro)
+    }
+
+    /// Persists a deterministic primary cart on Free so planning edits stay predictable.
+    func reconcileCartPlanningEntitlementState(isPro: Bool) {
+        let resolvedPrimaryCartId: String? = isPro ? nil : resolvedPrimaryEditableCartIdForCurrentPlan(isPro: false)
+        let previousPrimaryCartId = UserDefaults.standard.freePrimaryEditableCartId
+
+        guard previousPrimaryCartId != resolvedPrimaryCartId else { return }
+
+        UserDefaults.standard.freePrimaryEditableCartId = resolvedPrimaryCartId
+
+        NotificationCenter.default.post(
+            name: NSNotification.Name("DataUpdated"),
+            object: nil,
+            userInfo: [
+                "isPro": isPro,
+                "freePrimaryEditableCartId": resolvedPrimaryCartId as Any
+            ]
+        )
+    }
+
+    private func planningCartsForPlanEntitlementEvaluation() -> [Cart] {
+        guard let vault else { return [] }
+        return vault.carts.filter { $0.isPlanning && !$0.isDeleted }
+    }
+
+    private func resolvedPrimaryEditableCartIdForCurrentPlan(isPro: Bool = UserDefaults.standard.isPro) -> String? {
+        let planningCarts = planningCartsForPlanEntitlementEvaluation()
+        guard !planningCarts.isEmpty else { return nil }
+
+        if isPro || planningCarts.count <= Self.freePlanningEditableCartLimit {
+            return rankedEditableCartCandidates(from: planningCarts).first?.id
+        }
+
+        if let persistedCartId = UserDefaults.standard.freePrimaryEditableCartId,
+           planningCarts.contains(where: { $0.id == persistedCartId }) {
+            return persistedCartId
+        }
+
+        return rankedEditableCartCandidates(from: planningCarts).first?.id
+    }
+
+    private func rankedEditableCartCandidates(from carts: [Cart]) -> [Cart] {
+        carts.sorted { lhs, rhs in
+            let lhsDate = cartRecencyDate(lhs)
+            let rhsDate = cartRecencyDate(rhs)
+
+            if lhsDate != rhsDate {
+                return lhsDate > rhsDate
+            }
+
+            if lhs.createdAt != rhs.createdAt {
+                return lhs.createdAt > rhs.createdAt
+            }
+
+            return lhs.id < rhs.id
+        }
+    }
+
+    private func cartRecencyDate(_ cart: Cart) -> Date {
+        let latestItemDate = cart.cartItems.compactMap(\.addedAt).max() ?? .distantPast
+        return max(max(cart.updatedAt, cart.createdAt), latestItemDate)
+    }
+
+    private func isNonPrimaryActiveCartOnFree(_ cart: Cart, isPro: Bool = UserDefaults.standard.isPro) -> Bool {
+        guard !isPro else { return false }
+        guard cart.isPlanning else { return false }
+
+        let planningCarts = planningCartsForPlanEntitlementEvaluation()
+        guard planningCarts.count > Self.freePlanningEditableCartLimit else { return false }
+        guard planningCarts.contains(where: { $0.id == cart.id }) else { return false }
+        guard let primaryCartId = resolvedPrimaryEditableCartIdForCurrentPlan(isPro: false) else { return false }
+
+        return cart.id != primaryCartId
     }
 
     /// Enforces plan-based background limitations for carts.
@@ -123,6 +217,7 @@ extension VaultService {
             cart.deletedAt = Date()
             vault.deletedCarts.append(cart)
             saveContext()
+            reconcileCartPlanningEntitlementState(isPro: UserDefaults.standard.isPro)
             NotificationCenter.default.post(name: NSNotification.Name("DataUpdated"), object: nil)
             print("🗑️ Moved completed cart to Trash: \(cart.name)")
             return
@@ -131,6 +226,7 @@ extension VaultService {
         vault.carts.removeAll { $0.id == cart.id }
         modelContext.delete(cart)
         saveContext()
+        reconcileCartPlanningEntitlementState(isPro: UserDefaults.standard.isPro)
         NotificationCenter.default.post(name: NSNotification.Name("DataUpdated"), object: nil)
         CartBackgroundImageManager.shared.deleteImage(forCartId: cart.id)
         UserDefaults.standard.removeObject(forKey: "cartBackgroundColor_\(cart.id)")
@@ -150,6 +246,7 @@ extension VaultService {
             vault.carts.append(cart)
         }
         saveContext()
+        reconcileCartPlanningEntitlementState(isPro: UserDefaults.standard.isPro)
         NotificationCenter.default.post(name: NSNotification.Name("DataUpdated"), object: nil)
     }
     
@@ -160,6 +257,7 @@ extension VaultService {
         let cart = vault.deletedCarts.remove(at: index)
         modelContext.delete(cart)
         saveContext()
+        reconcileCartPlanningEntitlementState(isPro: UserDefaults.standard.isPro)
         NotificationCenter.default.post(name: NSNotification.Name("DataUpdated"), object: nil)
         CartBackgroundImageManager.shared.deleteImage(forCartId: cartId)
         UserDefaults.standard.removeObject(forKey: "cartBackgroundColor_\(cartId)")
@@ -191,6 +289,7 @@ extension VaultService {
         cart.updatedAt = Date()
         updateCartTotals(cart: cart)
         saveContext()
+        reconcileCartPlanningEntitlementState(isPro: UserDefaults.standard.isPro)
         print("🛒 Started shopping for: \(cart.name)")
     }
 
@@ -217,6 +316,7 @@ extension VaultService {
         cart.updatedAt = Date()
         updateCartTotals(cart: cart)
         saveContext()
+        reconcileCartPlanningEntitlementState(isPro: UserDefaults.standard.isPro)
 
         print("🎉 Shopping completed! Vault prices updated.")
     }
@@ -291,6 +391,7 @@ extension VaultService {
 
         updateCartTotals(cart: cart)
         saveContext()
+        reconcileCartPlanningEntitlementState(isPro: UserDefaults.standard.isPro)
         print("🔄 Reopened cart: \(cart.name) - Now using current prices")
     }
 
@@ -312,6 +413,11 @@ extension VaultService {
 extension VaultService {
     /// Adds a vault item to a cart (planning or shopping). If already present, increments quantity.
     func addVaultItemToCart(item: Item, cart: Cart, quantity: Double, selectedStore: String? = nil) {
+        if cart.status == .planning && isCartPlanningLockedByPlan(cart) {
+            print("🔒 Planning edits are locked for cart: \(cart.name)")
+            return
+        }
+
         let store = selectedStore ?? item.priceOptions.first?.store ?? "Unknown Store"
         let priceOption = item.priceOptions.first(where: { $0.store == store })
 
@@ -366,6 +472,11 @@ extension VaultService {
         quantity: Double = 1,
         category: GroceryCategory? = nil
     ) {
+        if cart.status == .planning && isCartPlanningLockedByPlan(cart) {
+            print("🔒 Planning edits are locked for cart: \(cart.name)")
+            return
+        }
+
         print("🛍️ Adding shopping-only item: \(name)")
 
         let cartItem = CartItem.createShoppingOnlyItem(
@@ -402,6 +513,11 @@ extension VaultService {
         quantity: Double = 1,
         categoryName: String?
     ) {
+        if cart.status == .planning && isCartPlanningLockedByPlan(cart) {
+            print("🔒 Planning edits are locked for cart: \(cart.name)")
+            return
+        }
+
         print("🛍️ Adding shopping-only item: \(name)")
 
         let normalizedName = categoryName?.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -441,6 +557,11 @@ extension VaultService {
     /// - Shopping + vault item: mark skipped (so it can be restored).
     /// - Planning: remove from cart.
     func removeItemFromCart(cart: Cart, itemId: String) {
+        if cart.status == .planning && isCartPlanningLockedByPlan(cart) {
+            print("🔒 Planning edits are locked for cart: \(cart.name)")
+            return
+        }
+
         guard let cartItem = cart.cartItems.first(where: { $0.itemId == itemId }) else {
             print("⚠️ Item not found in cart")
             return
@@ -522,6 +643,10 @@ extension VaultService {
         if let cartItem = cart.cartItems.first(where: { $0.itemId == itemId }) {
             switch cart.status {
             case .planning:
+                guard !isCartPlanningLockedByPlan(cart) else {
+                    print("🔒 Planning edits are locked for cart: \(cart.name)")
+                    return
+                }
                 cartItem.plannedStore = newStore
                 if let newPrice = cartItem.getCurrentPrice(from: vault, store: newStore) {
                     cartItem.plannedPrice = newPrice
@@ -745,6 +870,10 @@ extension VaultService {
     /// - Restores original planning quantities when available.
     func returnToPlanning(cart: Cart) {
         guard cart.status == .shopping else { return }
+        guard !isNonPrimaryActiveCartOnFree(cart) else {
+            print("🔒 Planning mode is locked for cart: \(cart.name)")
+            return
+        }
 
         print("🔄 Returning cart '\(cart.name)' to planning mode")
 
@@ -787,6 +916,7 @@ extension VaultService {
 
         updateCartTotals(cart: cart)
         saveContext()
+        reconcileCartPlanningEntitlementState(isPro: UserDefaults.standard.isPro)
 
         print("✅ Cart '\(cart.name)' reset to planning mode")
         print("   Kept \(cart.cartItems.count) planned vault items")

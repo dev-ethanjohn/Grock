@@ -224,6 +224,7 @@ final class SubscriptionManager {
         if previousIsPro && !proIsActive {
             // Always force re-pick of editable stores on every Pro -> Free transition.
             UserDefaults.standard.freeEditableStoreKeys = []
+            UserDefaults.standard.freePrimaryEditableCartId = nil
         }
 
         if previousIsPro != proIsActive {

@@ -43,7 +43,7 @@ final class GrockPaywallViewModel {
             subtitle: "Free: Basic colors",
             body: "Make every cart feel personal.",
             systemImage: "photo.on.rectangle.angled",
-            videoResourceName: "custom_background"
+            videoResourceName: nil
         ),
         .init(
             id: "active-carts",
@@ -59,7 +59,7 @@ final class GrockPaywallViewModel {
             subtitle: "Free: 2 stores max",
             body: "Find the cheapest option fast.",
             systemImage: "storefront.fill",
-            videoResourceName: nil
+            videoResourceName: "unlimited_stores"
         )
     ]
 
@@ -90,20 +90,20 @@ final class GrockPaywallViewModel {
             .init(
                 id: "today",
                 title: "Today",
-                subtitle: "Get instant access to all Grock Pro features.",
-                systemImage: "lock.fill"
+                subtitle: "Unlimited free access to all Grock Pro features.",
+                emoji: "🎁"
             ),
             .init(
                 id: "reminder",
                 title: "Day \(reminderDay)",
-                subtitle: "We’ll remind you that your trial is ending soon.",
-                systemImage: "bell.fill"
+                subtitle: "Get a reminder that your \(selectedTrialDays)-day trial is about to end.",
+                emoji: "📬"
             ),
             .init(
                 id: "charge",
                 title: "Day \(selectedTrialDays)",
-                subtitle: "You’ll be charged on \(trialChargeDateString). Cancel anytime before.",
-                systemImage: "star.fill"
+                subtitle: "You’ll be charged on \(trialChargeDateString). Cancel anytime before Day \(selectedTrialDays).",
+                emoji: "💳"
             )
         ]
     }

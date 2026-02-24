@@ -40,6 +40,7 @@ extension VaultService {
 
             let isPro = UserDefaults.standard.isPro
             reconcilePlanEntitlementState(isPro: isPro)
+            reconcileCartPlanningEntitlementState(isPro: isPro)
             reconcileCartBackgroundEntitlementState(isPro: isPro)
             reconcileStoreEntitlementState(isPro: isPro)
         } catch {
@@ -679,6 +680,11 @@ extension VaultService {
 
         switch cart.status {
         case .planning:
+            guard !isCartPlanningLockedByPlan(cart) else {
+                print("🔒 Planning edits are locked for cart: \(cart.name)")
+                return false
+            }
+
             var currentGroceryCategory: GroceryCategory = GroceryCategory.allCases.first!
             if let currentCategory = getCategory(for: itemId),
                let groceryCategory = GroceryCategory.allCases.first(where: { $0.title == currentCategory.name }) {

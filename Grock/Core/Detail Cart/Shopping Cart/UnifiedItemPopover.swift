@@ -101,8 +101,13 @@ struct UnifiedItemPopover: View {
         livePrice * liveQuantity
     }
     
+    private var plannedBaselineQuantity: Double {
+        // Compare against the frozen planning snapshot when available.
+        cartItem.originalPlanningQuantity ?? currentQuantity
+    }
+    
     private var plannedTotalCost: Double {
-        plannedPrice * currentQuantity
+        plannedPrice * plannedBaselineQuantity
     }
     
     private var totalCostDelta: Double {

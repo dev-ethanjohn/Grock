@@ -9,6 +9,7 @@ struct ItemFormContent: View {
     var isCheckingDuplicate: Bool = false
     var onStoreChange: (() -> Void)? = nil
     var isCategoryEditable: Bool = true
+    var bypassPlanLocks: Bool = false
     
     @Environment(VaultService.self) private var vaultService
     @State private var showUnitPicker = false
@@ -74,7 +75,8 @@ struct ItemFormContent: View {
                     StoreNameComponent(
                           storeName: $formViewModel.storeName,
                           hasError: formViewModel.attemptedSubmission && formViewModel.firstMissingField == "Store Name",
-                          onStoreChange: onStoreChange 
+                          bypassPlanLocks: bypassPlanLocks,
+                          onStoreChange: onStoreChange
                       )
                     .offset(x: storeNameShakeOffset)
                     
@@ -148,7 +150,8 @@ struct ItemFormContent: View {
                     WeightedHStack(spacing: 8, weights: [5, 6]) {
                         UnitButton(
                             unit: $formViewModel.unit,
-                            hasError: formViewModel.attemptedSubmission && formViewModel.firstMissingField == "Unit"
+                            hasError: formViewModel.attemptedSubmission && formViewModel.firstMissingField == "Unit",
+                            bypassPlanLocks: bypassPlanLocks
                         )
                         .offset(x: unitShakeOffset)
                         

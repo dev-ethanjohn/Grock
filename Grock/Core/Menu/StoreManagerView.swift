@@ -10,6 +10,7 @@ struct StoreManagerView: View {
     @State private var newStoreName = ""
     @State private var storeToRename: String?
     @State private var showPaywall = false
+    @State private var paywallFeatureFocus: GrockPaywallFeatureFocus?
     
     var body: some View {
         ZStack {
@@ -20,22 +21,13 @@ struct StoreManagerView: View {
                     ForEach(stores, id: \.self) { store in
                         let isLockedStore = vaultService.isStoreLockedByPlan(named: store)
                         HStack {
-                            HStack(spacing: 4) {
-                                Text(store)
-                                    .lexend(.body)
-                                    .foregroundStyle(isLockedStore ? .gray : .black)
-                                if isLockedStore {
-                                    Text("💎")
-                                        .font(.footnote)
-                                }
-                                Text("✏️")
-                                    .font(.footnote)
-                                    .foregroundStyle(isLockedStore ? .gray : .primary)
-                            }
+                            Text(store)
+                                .lexend(.body)
+                                .foregroundStyle(isLockedStore ? .gray : .black)
                             .contentShape(Rectangle())
                             .onTapGesture {
                                 guard !isLockedStore else {
-                                    showPaywall = true
+                                    presentPaywall(for: .stores)
                                     return
                                 }
                                 prepareRename(store)
@@ -45,12 +37,12 @@ struct StoreManagerView: View {
                             
                             Button {
                                 if isLockedStore {
-                                    showPaywall = true
+                                    presentPaywall(for: .stores)
                                 } else {
                                     deleteStore(store)
                                 }
                             } label: {
-                                Text("🗑️")
+                                Text(isLockedStore ? "💎" : "🗑️")
                                     .font(.footnote)
                             }
                             .buttonStyle(.plain)
@@ -91,7 +83,7 @@ struct StoreManagerView: View {
             ToolbarItem(placement: .primaryAction) {
                 Button {
                     guard !vaultService.isStoreLimitReached() else {
-                        showPaywall = true
+                        presentPaywall(for: .stores)
                         return
                     }
                     newStoreName = ""
@@ -106,7 +98,7 @@ struct StoreManagerView: View {
                 guard vaultService.canUseStoreName(name) else {
                     showingAddStore = false
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
-                        showPaywall = true
+                        presentPaywall(for: .stores)
                     }
                     return
                 }
@@ -116,7 +108,8 @@ struct StoreManagerView: View {
             }
         }
         .fullScreenCover(isPresented: $showPaywall) {
-            GrockPaywallView {
+            GrockPaywallView(initialFeatureFocus: paywallFeatureFocus) {
+                paywallFeatureFocus = nil
                 showPaywall = false
             }
         }
@@ -138,5 +131,10 @@ struct StoreManagerView: View {
             vaultService.deleteStore(name)
             loadStores()
         }
+    }
+
+    private func presentPaywall(for featureFocus: GrockPaywallFeatureFocus) {
+        paywallFeatureFocus = featureFocus
+        showPaywall = true
     }
 }

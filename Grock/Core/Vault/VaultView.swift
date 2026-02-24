@@ -100,6 +100,7 @@ struct VaultView: View {
     @State private var isSearching: Bool = false
     @State private var subscriptionManager = SubscriptionManager.shared
     @State private var showPaywall = false
+    @State private var paywallFeatureFocus: GrockPaywallFeatureFocus?
     @Namespace private var searchNamespace
     @Namespace private var categoryManagerNamespace
     
@@ -295,7 +296,8 @@ struct VaultView: View {
                 await subscriptionManager.refreshCustomerInfo()
             }
             .fullScreenCover(isPresented: $showPaywall) {
-                GrockPaywallView {
+                GrockPaywallView(initialFeatureFocus: paywallFeatureFocus) {
+                    paywallFeatureFocus = nil
                     showPaywall = false
                 }
             }
@@ -952,12 +954,18 @@ struct VaultView: View {
     private func presentProPaywallForLockedCategory() {
         dismissKeyboard()
         HapticManager.shared.playMedium()
+        if let selectedCategoryName, isLockedCustomCategory(named: selectedCategoryName) {
+            paywallFeatureFocus = .categories
+        } else {
+            paywallFeatureFocus = .stores
+        }
         showPaywall = true
     }
 
     private func presentProPaywallForActiveCartLimit() {
         dismissKeyboard()
         HapticManager.shared.playMedium()
+        paywallFeatureFocus = .activeCarts
         showPaywall = true
     }
     

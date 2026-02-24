@@ -219,6 +219,7 @@ struct ColorPickerButton: View {
     @State private var hasBackgroundImage: Bool = false
     @State private var subscriptionManager = SubscriptionManager.shared
     @State private var showPaywall = false
+    @State private var paywallFeatureFocus: GrockPaywallFeatureFocus?
     
     var body: some View {
         Button(action: { showingColorPicker.toggle() }) {
@@ -284,6 +285,7 @@ struct ColorPickerButton: View {
                 onLockedImageTap: {
                     showingColorPicker = false
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+                        paywallFeatureFocus = .backgrounds
                         showPaywall = true
                     }
                 }
@@ -296,7 +298,8 @@ struct ColorPickerButton: View {
             await subscriptionManager.refreshCustomerInfo()
         }
         .fullScreenCover(isPresented: $showPaywall) {
-            GrockPaywallView {
+            GrockPaywallView(initialFeatureFocus: paywallFeatureFocus) {
+                paywallFeatureFocus = nil
                 showPaywall = false
             }
         }

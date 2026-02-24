@@ -286,22 +286,14 @@ struct HeaderView: View {
             }
             
         case .shopping:
-            let symbol = timeOfDaySymbol(for: today)
-            // 20% smaller than 12 is 9.6
-            let symbolText = Text(Image(systemName: symbol)).lexendFont(9.6)
-            
-            func withSymbol(_ str: String) -> Text {
-                styled(str + " ") + symbolText
-            }
-            
             let todayDateStr = today.formatted(.dateTime.month(.abbreviated).day())
             
             guard let startedAt = cart.startedAt else {
-                return withSymbol("Shopping • \(todayDateStr) Today")
+                return styled("Shopping • \(todayDateStr) Today")
             }
             
             if calendar.isDate(startedAt, inSameDayAs: today) {
-                return withSymbol("Shopping • \(todayDateStr) Today")
+                return styled("Shopping • \(todayDateStr) Today")
             }
             
             let startStr = startedAt.formatted(.dateTime.month(.abbreviated).day())
@@ -309,9 +301,9 @@ struct HeaderView: View {
             if calendar.isDate(startedAt, equalTo: today, toGranularity: .month) {
                 // Same month: Jan 30-31
                 let endDayStr = today.formatted(.dateTime.day())
-                return withSymbol("Shopping • \(startStr)-\(endDayStr) Today")
+                return styled("Shopping • \(startStr)-\(endDayStr) Today")
             } else {
-                 return withSymbol("Shopping • \(startStr) – \(todayDateStr) Today")
+                 return styled("Shopping • \(startStr) – \(todayDateStr) Today")
             }
             
         case .completed:
@@ -328,16 +320,6 @@ struct HeaderView: View {
         }
     }
     
-    private func timeOfDaySymbol(for date: Date) -> String {
-        let hour = Calendar.current.component(.hour, from: date)
-        switch hour {
-        case 5..<12: return "sunrise.fill"
-        case 12..<17: return "sun.max.fill"
-        case 17..<20: return "sunset.fill"
-        default: return "moon.stars.fill"
-        }
-    }
-
     func formatDateRange(start: Date, end: Date) -> String {
         let calendar = Calendar.current
         let startDay = calendar.startOfDay(for: start)

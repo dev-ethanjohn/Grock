@@ -12,6 +12,9 @@ struct GrockPaywallStickyBottomPanelView: View {
     let onTerms: () -> Void
     let onPrivacy: () -> Void
     private let valueEmoji = "✨"
+    private let primaryCTAColor = Color.Grock.budgetSafe
+    private let primaryCTAOverlayDarkness = 0.10
+    private let primaryCTACornerRadius: CGFloat = 100
 
     private var selectedPlanContextPrimaryLine: String {
         guard let selectedCard = planCards.first(where: { $0.id == selectedPlan }) else {
@@ -35,9 +38,9 @@ struct GrockPaywallStickyBottomPanelView: View {
     private var selectedPlanContextSecondaryLine: String {
         switch selectedPlan {
         case .yearly:
-            return "Save more on every grocery trip."
+            return "Less than a coffee a month."
         case .monthly:
-            return "Start saving more on groceries every week."
+            return "Save more on every grocery trip"
         }
     }
 
@@ -55,10 +58,10 @@ struct GrockPaywallStickyBottomPanelView: View {
     private var panelShape: UnevenRoundedRectangle {
         UnevenRoundedRectangle(
             cornerRadii: .init(
-                topLeading: 28,
+                topLeading: 0,
                 bottomLeading: 0,
                 bottomTrailing: 0,
-                topTrailing: 28
+                topTrailing: 0
             ),
             style: .continuous
         )
@@ -86,6 +89,30 @@ struct GrockPaywallStickyBottomPanelView: View {
             .allowsHitTesting(false)
     }
 
+    private var primaryCTAButtonBackground: some View {
+        let buttonShape = RoundedRectangle(cornerRadius: primaryCTACornerRadius, style: .continuous)
+
+        return buttonShape
+            .fill(primaryCTAColor)
+            .overlay {
+                Image("selected_sub")
+                    .resizable()
+                    .scaledToFill()
+            }
+            .overlay {
+                buttonShape
+                    .fill(Color.black.opacity(primaryCTAOverlayDarkness))
+            }
+            .clipShape(buttonShape)
+            .overlay {
+                ShoppingModeGradientView(
+                    cornerRadius: primaryCTACornerRadius,
+                    hasBackgroundImage: true
+                )
+                .clipShape(buttonShape)
+            }
+    }
+
     var body: some View {
         VStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
@@ -93,7 +120,7 @@ struct GrockPaywallStickyBottomPanelView: View {
                 VStack(spacing: 2) {
                     ZStack {
                         Text(selectedPlanContextPrimaryLine)
-                            .lexend(.title3, weight: .medium)
+                            .lexendFont(18, weight: .semibold)
                             .lineLimit(1)
                             .minimumScaleFactor(0.9)
                             .id(selectedPlanContextPrimaryLine)
@@ -110,7 +137,7 @@ struct GrockPaywallStickyBottomPanelView: View {
                         showsUnderline: false
                     )
                     .lexend(.footnote)
-                    .foregroundStyle(.black)
+                    .foregroundStyle(Color.black.opacity(0.56))
                     .lineLimit(1)
                     .minimumScaleFactor(0.88)
                     .frame(maxWidth: .infinity, alignment: .center)
@@ -152,22 +179,11 @@ struct GrockPaywallStickyBottomPanelView: View {
                 }
             }
             
-            DashedLine()
-                .stroke(style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
-                .frame(height: 1)
-                .foregroundColor(Color(.systemGray5))
-                .padding(.horizontal)
-//
-//            Text("Cancel anytime :)")
-//                .lexend(.footnote, weight: .medium)
-//                .foregroundColor(Color.Grock.budgetSafe.darker(by: 0.24))
-//                .frame(maxWidth: .infinity, alignment: .center)
-
             Button(action: onPrimaryAction) {
                 HStack(spacing: 8) {
                     if isProcessingAction {
                         ProgressView()
-                            .tint(.black)
+                            .tint(.white)
                     }
 
                     Text(primaryButtonTitle)
@@ -176,11 +192,7 @@ struct GrockPaywallStickyBottomPanelView: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 10)
-                .background(
-                    RoundedRectangle(cornerRadius: 100, style: .continuous)
-//                        .fill(Color.Grock.budgetSafe)
-                        .fill(.black)
-                )
+                .background(primaryCTAButtonBackground)
             }
             .disabled(!isPrimaryActionEnabled)
             .opacity(isPrimaryActionEnabled ? 1 : 0.6)

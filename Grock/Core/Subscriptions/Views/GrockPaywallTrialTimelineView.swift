@@ -4,79 +4,186 @@ struct GrockPaywallTrialTimelineView: View {
     let items: [GrockPaywallTimelineItem]
     let summaryText: String
 
+    private let markerDiameter: CGFloat = 48
+    private let connectorWidth: CGFloat = 3
+
+    private let timelineGradient = LinearGradient(
+        stops: [
+            .init(color: Color(hex: "F6D95F").opacity(0.95), location: 0.0),
+            .init(color: Color(hex: "8BCF5F").opacity(0.90), location: 0.5),
+            .init(color: Color(hex: "75B8FF").opacity(0.80), location: 1.0)
+        ],
+        startPoint: .top,
+        endPoint: .bottom
+    )
+
+    private func markerTint(for index: Int) -> Color {
+        switch index {
+        case 0:  return Color(hex: "F6D95F")
+        case 1:  return Color(hex: "8BCF5F")
+        default: return Color(hex: "75B8FF")
+        }
+    }
+
     var body: some View {
-        let markerHeight = CGFloat(max(188, (items.count - 1) * 72 + 34))
-
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 24) {
             Text("How your free trial works")
-                .lexend(.title3, weight: .semibold)
+                .lexend(.title2, weight: .bold)
+                .lineSpacing(1)
+                .multilineTextAlignment(.center)
                 .foregroundColor(.black)
+                .frame(maxWidth: .infinity, alignment: .center)
 
-            HStack(alignment: .top, spacing: 14) {
-                ZStack(alignment: .top) {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    Color(hex: "70D4B8"),
-                                    Color(hex: "73B9E5"),
-                                    Color(hex: "D5D9FB")
-                                ],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
-                        .frame(width: 16, height: markerHeight)
+            TimelineBodyView(
+                items: items,
+                summaryText: summaryText,
+                markerDiameter: markerDiameter,
+                connectorWidth: connectorWidth,
+                timelineGradient: timelineGradient,
+                markerTint: markerTint
+            )
+        }
+    }
+}
 
-                    VStack(spacing: 42) {
-                        ForEach(items) { item in
-                            Image(systemName: item.systemImage)
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundStyle(Color(hex: "1F7DBF"))
-                                .frame(width: 30, height: 30)
-                                .background(
-                                    Circle()
-                                        .fill(Color.white.opacity(0.98))
-                                        .overlay(
-                                            Circle()
-                                                .stroke(Color.black.opacity(0.06), lineWidth: 1)
-                                        )
-                                )
+private struct TimelineBodyView: View {
+    let items: [GrockPaywallTimelineItem]
+    let summaryText: String
+    let markerDiameter: CGFloat
+    let connectorWidth: CGFloat
+    let timelineGradient: LinearGradient
+    let markerTint: (Int) -> Color
+
+    @State private var circleCentres: [Int: CGFloat] = [:]
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+
+            // ── Single continuous gradient line drawn behind all circles ──
+            if circleCentres.count == items.count,
+               let firstY = circleCentres[0],
+               let lastY  = circleCentres[items.count - 1],
+               lastY > firstY {
+
+                timelineGradient
+                    .frame(width: connectorWidth, height: lastY - firstY - 8)
+                    // position: centre of the line segment
+                    .position(
+                        x: markerDiameter / 2,
+                        y: firstY + (lastY - firstY) / 2
+                    )
+            }
+
+            // ── Row items (circles + text) ────────────────────────────────
+            VStack(alignment: .leading, spacing: 28) {
+                ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                    HStack(alignment: .top, spacing: 14) {
+
+                        let tint = markerTint(index)
+                        let isReminderStep = items.count > 2 && index == items.count - 2
+                        let isChargeStep = index == items.count - 1
+
+                        ZStack {
+                            Circle()
+                                .fill(Color(hex: "F5F0F0"))
+                                .frame(width: markerDiameter, height: markerDiameter)
+
+                            if isChargeStep {
+                                Circle()
+                                    .fill(
+                                        LinearGradient(
+                                            stops: [
+                                                .init(color: tint.opacity(0.2), location: 0.0),
+                                                .init(color: tint.opacity(0.16), location: 0.3),
+                                                .init(color: tint.opacity(0), location: 1.0)
+                                            ],
+                                            startPoint: .top,
+                                            endPoint: .bottom
+                                        ),
+                                    )
+                                    
+                                    .frame(width: markerDiameter, height: markerDiameter)
+                            } else {
+                                Circle()
+                                    .fill(tint.opacity(0.2))
+                                    .frame(width: markerDiameter, height: markerDiameter)
+                            }
+
+                            //MARK: Stroke ring
+                            if isReminderStep {
+                                Circle()
+                                    .stroke(
+                                        LinearGradient(
+                                            stops: [
+                                                .init(color: tint.opacity(1.0), location: 0.0),
+                                                .init(color: tint.opacity(0.55), location: 0.55),
+                                                .init(color: tint.opacity(0.0), location: 1.0)
+                                            ],
+                                            startPoint: .top,
+                                            endPoint: .bottom
+                                        ),
+                                        lineWidth: 1.5
+                                    )
+                                    .frame(width: markerDiameter, height: markerDiameter)
+                            } else if !isChargeStep {
+                                Circle()
+                                    .stroke(tint.opacity(0.70), lineWidth: 1.5)
+                                    .frame(width: markerDiameter, height: markerDiameter)
+                            }
+
+                            Text(item.emoji)
+                                .font(.system(size: 20))
                         }
-                    }
-                    .padding(.top, 2)
-                }
-                .frame(width: 32, alignment: .center)
+                        .background(
+                            GeometryReader { geo in
+                                Color.clear
+                                    .onAppear {
+                                        let frame = geo.frame(in: .named("timeline"))
+                                        circleCentres[index] = frame.midY
+                                    }
+                                    .onChange(of: geo.size) {
+                                        let frame = geo.frame(in: .named("timeline"))
+                                        circleCentres[index] = frame.midY
+                                    }
+                            }
+                        )
+                        .zIndex(1)
 
-                VStack(alignment: .leading, spacing: 18) {
-                    ForEach(items) { item in
-                        VStack(alignment: .leading, spacing: 4) {
+                        //MARK: Text
+                        VStack(alignment: .leading, spacing: 6) {
                             Text(item.title)
-                                .lexend(.title3, weight: .semibold)
+                                .lexend(.headline, weight: .medium)
                                 .foregroundColor(.black)
 
-                            Text(item.subtitle)
-                                .lexend(.body, weight: .regular)
-                                .foregroundColor(.gray)
+                            Text(index == 0 ? summaryText : item.subtitle)
+                                .lexend(.footnote, weight: .medium)
+                                .foregroundColor(Color.black.opacity(0.6))
+                                .lineSpacing(1)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
+                        .padding(.top, (markerDiameter - 28) / 2)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
             }
-
-            Text(summaryText)
-                .lexend(.body, weight: .regular)
-                .foregroundColor(.black.opacity(0.82))
-                .fixedSize(horizontal: false, vertical: true)
+            .zIndex(0)
+            
         }
+        .padding(20)
+//        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+//        .background(
+//            RoundedRectangle(cornerRadius: 20, style: .continuous)
+//                .fill(.white)
+//                .shadow(color: Color.black.opacity(0.16), radius: 4, x: 0, y: 1)
+//        )
+        .coordinateSpace(name: "timeline")
     }
 }
 
 #Preview {
     GrockPaywallTrialTimelineView(
         items: GrockPaywallPreviewFixtures.timelineItems,
-        summaryText: "Unlimited free access for 7 days, then $39.99/yr ($3.33/mo)."
+        summaryText: "Unlimited free access for 7 days, then ₱5,990.00/year. Cancel anytime."
     )
     .padding()
-    .background(Color.Grock.surfaceMuted)
 }

@@ -8,7 +8,9 @@ struct StoreNameComponent: View {
     @State private var newStoreName = ""
     @State private var showDropdown = false
     @State private var showPaywall = false
+    @State private var paywallFeatureFocus: GrockPaywallFeatureFocus?
     let hasError: Bool
+    var bypassPlanLocks: Bool = false
     
     var onStoreChange: (() -> Void)?
     
@@ -20,7 +22,7 @@ struct StoreNameComponent: View {
     }
 
     private var editableStores: [String] {
-        availableStores.filter { !vaultService.isStoreLockedByPlan(named: $0) }
+        bypassPlanLocks ? availableStores : availableStores.filter { !vaultService.isStoreLockedByPlan(named: $0) }
     }
     
     //Prioritize last selected store, then most recent
@@ -32,7 +34,7 @@ struct StoreNameComponent: View {
         
         // 2. Otherwise, use most recently added store
         if let recentStore = vaultService.getMostRecentStore(),
-           !vaultService.isStoreLockedByPlan(named: recentStore) {
+           (bypassPlanLocks || !vaultService.isStoreLockedByPlan(named: recentStore)) {
             return recentStore
         }
         
@@ -63,8 +65,8 @@ struct StoreNameComponent: View {
                 // Dropdown (stores >0)
                 Menu {
                     Button(action: {
-                        guard !vaultService.isStoreLimitReached() else {
-                            showPaywall = true
+                        guard bypassPlanLocks || !vaultService.isStoreLimitReached() else {
+                            presentPaywall(for: .stores)
                             return
                         }
                         newStoreName = ""
@@ -76,10 +78,10 @@ struct StoreNameComponent: View {
                     Divider()
                     
                     ForEach(availableStores, id: \.self) { store in
-                        let isLockedStore = vaultService.isStoreLockedByPlan(named: store)
+                        let isLockedStore = !bypassPlanLocks && vaultService.isStoreLockedByPlan(named: store)
                         Button(action: {
                             guard !isLockedStore else {
-                                showPaywall = true
+                                presentPaywall(for: .stores)
                                 return
                             }
                             storeName = store
@@ -87,16 +89,15 @@ struct StoreNameComponent: View {
                             lastSelectedStore = store
                             onStoreChange?()
                         }) {
-                            HStack {
+                            if isLockedStore {
+                                Label(store, systemImage: "lock.fill")
+                                    .foregroundStyle(.gray)
+                            } else if storeName == store {
+                                Label(store, systemImage: "checkmark")
+                                    .foregroundStyle(.black)
+                            } else {
                                 Text(store)
-                                    .foregroundStyle(isLockedStore ? .gray : .black)
-                                if isLockedStore {
-                                    Text("💎")
-                                }
-                                if storeName == store && !isLockedStore {
-                                    Image(systemName: "checkmark")
-                                        .foregroundColor(.blue)
-                                }
+                                    .foregroundStyle(.black)
                             }
                         }
                     }
@@ -131,10 +132,10 @@ struct StoreNameComponent: View {
                     let trimmedNewStore = newStore.trimmingCharacters(in: .whitespacesAndNewlines)
                     guard !trimmedNewStore.isEmpty else { return }
 
-                    guard vaultService.canUseStoreName(trimmedNewStore) else {
+                    guard bypassPlanLocks || vaultService.canUseStoreName(trimmedNewStore) else {
                         showAddStoreSheet = false
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
-                            showPaywall = true
+                            presentPaywall(for: .stores)
                         }
                         return
                     }
@@ -154,7 +155,8 @@ struct StoreNameComponent: View {
             )
         }
         .fullScreenCover(isPresented: $showPaywall) {
-            GrockPaywallView {
+            GrockPaywallView(initialFeatureFocus: paywallFeatureFocus) {
+                paywallFeatureFocus = nil
                 showPaywall = false
             }
         }
@@ -163,7 +165,7 @@ struct StoreNameComponent: View {
             if storeName.isEmpty, let store = defaultStore {
                 storeName = store
             } else if !storeName.isEmpty,
-                      vaultService.isStoreLockedByPlan(named: storeName),
+                      !bypassPlanLocks && vaultService.isStoreLockedByPlan(named: storeName),
                       let store = defaultStore {
                 storeName = store
             }
@@ -191,7 +193,7 @@ struct StoreNameComponent: View {
                 storeName = store
                 onStoreChange?()
             } else if !storeName.isEmpty,
-                      vaultService.isStoreLockedByPlan(named: storeName),
+                      !bypassPlanLocks && vaultService.isStoreLockedByPlan(named: storeName),
                       let store = defaultStore {
                 storeName = store
                 onStoreChange?()
@@ -204,5 +206,11 @@ struct StoreNameComponent: View {
             }
             onStoreChange?()
         }
+    }
+
+    private func presentPaywall(for featureFocus: GrockPaywallFeatureFocus) {
+        guard !bypassPlanLocks else { return }
+        paywallFeatureFocus = featureFocus
+        showPaywall = true
     }
 }

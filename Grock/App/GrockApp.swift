@@ -167,7 +167,7 @@ struct GrockApp: App {
     let container: ModelContainer
     private static let userJotProjectIdKey = "USERJOT_PROJECT_ID"
     private static let revenueCatApiKeyKey = "REVENUECAT_API_KEY"
-    private static let fallbackRevenueCatApiKey = "test_uifCKvbwWxUoARrWWcwzcpSlIud"
+    private static let debugFallbackRevenueCatApiKey = "test_uifCKvbwWxUoARrWWcwzcpSlIud"
     
 //    init() {
 //        do {
@@ -259,13 +259,24 @@ struct GrockApp: App {
         if let infoPlistApiKey, !infoPlistApiKey.isEmpty, infoPlistApiKey != "YOUR_REVENUECAT_API_KEY" {
             apiKey = infoPlistApiKey
         } else {
-            apiKey = Self.fallbackRevenueCatApiKey
+            #if DEBUG
+            apiKey = Self.debugFallbackRevenueCatApiKey
+            print("⚠️ Using RevenueCat Test Store key in DEBUG.")
+            #else
+            print("❌ Missing REVENUECAT_API_KEY in Info.plist. RevenueCat not configured.")
+            return
+            #endif
         }
 
         #if DEBUG
         Purchases.logLevel = .debug
         #else
         Purchases.logLevel = .warn
+
+        if apiKey.lowercased().hasPrefix("test_") {
+            print("❌ Test Store API key detected in RELEASE build. RevenueCat not configured.")
+            return
+        }
         #endif
 
         if Purchases.isConfigured {
