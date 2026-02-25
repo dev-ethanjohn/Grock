@@ -229,21 +229,13 @@ struct GrockPaywallFeatureCarouselSectionView: View {
                         ForEach(0..<pageCount, id: \.self) { pageIndex in
                             VStack(spacing: 0) {
                                 if let videoResourceName = featureForPage(pageIndex).videoResourceName {
-                                    if tabSelection == pageIndex {
-                                        LoopingVideoView(
-                                            resourceName: videoResourceName,
-                                            isActive: true
-                                        )
-                                            .frame(maxWidth: .infinity)
-                                            .frame(height: videoHeight)
-                                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                                            .id("\(videoResourceName)-\(pageIndex)")
-                                    } else {
-                                        Color.black.opacity(0.05)
-                                            .frame(maxWidth: .infinity)
-                                            .frame(height: videoHeight)
-                                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                                    }
+                                    LoopingVideoView(
+                                        resourceName: videoResourceName,
+                                        isActive: tabSelection == pageIndex
+                                    )
+                                    .frame(maxWidth: .infinity)
+                                    .frame(height: videoHeight)
+                                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                                 } else {
                                     Color.clear
                                         .frame(maxWidth: .infinity)

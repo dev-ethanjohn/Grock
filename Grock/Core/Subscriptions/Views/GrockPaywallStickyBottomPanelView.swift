@@ -40,7 +40,7 @@ struct GrockPaywallStickyBottomPanelView: View {
         case .yearly:
             return "Less than a coffee a month."
         case .monthly:
-            return "Save more on every grocery trip"
+            return "Save more on every cart"
         }
     }
 

@@ -45,7 +45,7 @@ struct LoopingVideoView: View {
 
     private func syncPlaybackState() {
         if isActive {
-            playerModel.play()
+            playerModel.play(resetToStart: true)
         } else {
             playerModel.pause()
         }
@@ -114,8 +114,11 @@ private final class LoopingVideoPlayerModel: ObservableObject {
         return nil
     }
 
-    func play() {
+    func play(resetToStart: Bool = false) {
         guard isReady else { return }
+        if resetToStart {
+            player.seek(to: .zero, toleranceBefore: .zero, toleranceAfter: .zero)
+        }
         player.play()
     }
 

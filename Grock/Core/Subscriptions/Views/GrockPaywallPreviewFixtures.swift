@@ -20,11 +20,11 @@ enum GrockPaywallPreviewFixtures {
         ),
         .init(
             id: "active-carts",
-            title: "Multiple Active Trips",
+            title: "Multiple Active Carts",
             subtitle: "Free: 1 cart only",
             body: "Plan without limits.",
             systemImage: "cart.fill",
-            videoResourceName: nil
+            videoResourceName: "multi_active_carts"
         ),
         .init(
             id: "stores",

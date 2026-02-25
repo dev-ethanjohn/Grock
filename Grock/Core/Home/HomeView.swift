@@ -368,7 +368,7 @@ struct HomeView: View {
             .animation(.spring(response: 0.4, dampingFraction: 0.65), value: isVaultButtonExpanded)
 
             if viewModel.hasCarts {
-                Text("Your Trip")
+                Text("Your Carts")
                     .lexendFont(13)
                     .foregroundStyle(.black)
                     .padding(.horizontal, 12)
@@ -635,7 +635,7 @@ struct HomeView: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("History")
-                .accessibilityHint("View your completed shopping trips")
+                .accessibilityHint("View your completed carts")
             } else {
                 Button(action: {
                     showInsights = true
@@ -677,7 +677,7 @@ struct HomeView: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("History")
-                .accessibilityHint("View your completed shopping trips")
+                .accessibilityHint("View your completed carts")
             }
         }
     }
