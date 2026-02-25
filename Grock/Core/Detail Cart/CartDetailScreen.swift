@@ -364,10 +364,8 @@ struct CartDetailScreen: View {
     private func loadBackgroundImage() {
         let cartId = cart.id
         stateManager.backgroundImageCartId = cartId
-        stateManager.backgroundImage = nil
 
         let hasImage = CartBackgroundImageManager.shared.hasBackgroundImage(forCartId: cartId)
-        stateManager.hasBackgroundImage = hasImage
 
         if !(stateManager.selectedColor.hex == "FFFFFF" || hasImage) {
             stateManager.backgroundImage = nil
@@ -380,6 +378,9 @@ struct CartDetailScreen: View {
             stateManager.hasBackgroundImage = true
             return
         }
+
+        // Keep current visual mode while loading to avoid premature style flips.
+        stateManager.hasBackgroundImage = stateManager.backgroundImage != nil
 
         Task.detached(priority: .userInitiated) { [cartId] in
             let image = CartBackgroundImageManager.shared.loadImage(forCartId: cartId)?.resized(to: 1800)
@@ -1271,10 +1272,8 @@ struct CartDetailContent: View {
     private func loadBackgroundImage() {
         let cartId = cart.id
         stateManager.backgroundImageCartId = cartId
-        stateManager.backgroundImage = nil
 
         let hasImage = CartBackgroundImageManager.shared.hasBackgroundImage(forCartId: cartId)
-        stateManager.hasBackgroundImage = hasImage
         
         if !(stateManager.selectedColor.hex == "FFFFFF" || hasImage) {
             stateManager.backgroundImage = nil
@@ -1287,6 +1286,9 @@ struct CartDetailContent: View {
             stateManager.hasBackgroundImage = true
             return
         }
+
+        // Keep current visual mode while loading to avoid premature style flips.
+        stateManager.hasBackgroundImage = stateManager.backgroundImage != nil
         
         Task.detached(priority: .userInitiated) { [cartId] in
             let image = CartBackgroundImageManager.shared.loadImage(forCartId: cartId)?.resized(to: 1800)

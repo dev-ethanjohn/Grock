@@ -43,7 +43,7 @@ final class GrockPaywallViewModel {
             subtitle: "Free: Basic colors",
             body: "Make every cart feel personal.",
             systemImage: "photo.on.rectangle.angled",
-            videoResourceName: nil
+            videoResourceName: "photo_backgrounds"
         ),
         .init(
             id: "active-carts",

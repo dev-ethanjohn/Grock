@@ -217,6 +217,7 @@ struct ColorPickerButton: View {
     let cart: Cart
     
     @State private var hasBackgroundImage: Bool = false
+    @State private var previewImage: UIImage? = nil
     @State private var subscriptionManager = SubscriptionManager.shared
     @State private var showPaywall = false
     @State private var paywallFeatureFocus: GrockPaywallFeatureFocus?
@@ -224,7 +225,7 @@ struct ColorPickerButton: View {
     var body: some View {
         Button(action: { showingColorPicker.toggle() }) {
             ZStack {
-                if hasBackgroundImage, let image = CartBackgroundImageManager.shared.loadImage(forCartId: cart.id) {
+                if hasBackgroundImage, let image = previewImage {
                     Image(uiImage: image)
                         .resizable()
                         .scaledToFill()
@@ -306,7 +307,8 @@ struct ColorPickerButton: View {
     }
     
     private func checkForBackgroundImage() {
-        hasBackgroundImage = CartBackgroundImageManager.shared.hasBackgroundImage(forCartId: cart.id)
+        previewImage = CartBackgroundImageManager.shared.loadImage(forCartId: cart.id)
+        hasBackgroundImage = previewImage != nil
     }
 }
 // MARK: - ColorPickerPopup

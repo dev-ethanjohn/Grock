@@ -670,6 +670,25 @@ private struct ListBackgroundView: View {
         let sameState = displayedHasBackgroundImage == hasBackgroundImage && sameImageObject
         
         guard !sameState else { return }
+
+        // Only animate when swapping one image to another image.
+        // Color -> image should appear instantly after selection.
+        let shouldAnimateImageSwap =
+            displayedHasBackgroundImage &&
+            hasBackgroundImage &&
+            displayedImage != nil &&
+            backgroundImage != nil
+
+        guard shouldAnimateImageSwap else {
+            transitionID = UUID() // Invalidate any pending completion from a prior animation.
+            isTransitioning = false
+            previousHasBackgroundImage = false
+            previousImage = nil
+            displayedHasBackgroundImage = hasBackgroundImage
+            displayedImage = backgroundImage
+            transitionProgress = 1
+            return
+        }
         
         previousHasBackgroundImage = displayedHasBackgroundImage
         previousImage = displayedImage
