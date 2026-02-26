@@ -140,6 +140,7 @@ struct CategoryCircularButton: View {
                 paywallFeatureFocus = nil
                 showPaywall = false
             }
+            .ignoresSafeArea(.keyboard)
         }
         .onChange(of: selectedCategoryName) { oldValue, newValue in
             guard let newValue else { return }
@@ -387,8 +388,13 @@ struct CategoryCircularButton: View {
         if showCreateCategorySheet {
             showCreateCategorySheet = false
         }
-        paywallFeatureFocus = .categories
-        showPaywall = true
+        dismissKeyboard()
+
+        // Let keyboard dismissal + menu/sheet transitions settle before presenting.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+            paywallFeatureFocus = .categories
+            showPaywall = true
+        }
     }
 
     private func resetCreateCategoryForm() {

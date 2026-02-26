@@ -295,7 +295,12 @@ struct VaultView: View {
             .task {
                 await subscriptionManager.refreshCustomerInfo()
             }
-            .fullScreenCover(isPresented: $showPaywall) {
+            .fullScreenCover(
+                isPresented: $showPaywall,
+                onDismiss: {
+                    paywallFeatureFocus = nil
+                }
+            ) {
                 GrockPaywallView(initialFeatureFocus: paywallFeatureFocus) {
                     paywallFeatureFocus = nil
                     showPaywall = false

@@ -7,6 +7,7 @@ struct RenamePopover: View {
     let placeholder: String
     let saveButtonTitle: String
     let useLexendInputFont: Bool
+    let adjustForKeyboard: Bool
     let currentName: String
     let onSave: (String) -> Void
     let onDismiss: (() -> Void)?
@@ -29,6 +30,7 @@ struct RenamePopover: View {
         placeholder: String = "Enter new name...",
         saveButtonTitle: String = "Update Name",
         useLexendInputFont: Bool = false,
+        adjustForKeyboard: Bool = true,
         currentName: String,
         onSave: @escaping (String) -> Void,
         onDismiss: (() -> Void)?
@@ -38,6 +40,7 @@ struct RenamePopover: View {
         self.placeholder = placeholder
         self.saveButtonTitle = saveButtonTitle
         self.useLexendInputFont = useLexendInputFont
+        self.adjustForKeyboard = adjustForKeyboard
         self.currentName = currentName
         self.onSave = onSave
         self.onDismiss = onDismiss
@@ -196,7 +199,7 @@ struct RenamePopover: View {
             .background(Color.white)
             .cornerRadius(24)
             .scaleEffect(contentScale)
-            .offset(y: -popoverKeyboardShift)
+            .offset(y: adjustForKeyboard ? -popoverKeyboardShift : 0)
             .shadow(color: Color.black.opacity(0.15), radius: 20, x: 0, y: 10)
             .animation(.spring(response: 0.2, dampingFraction: 0.7, blendDuration: 0.1), value: isValidName)
             .animation(.spring(response: 0.35, dampingFraction: 0.8), value: keyboardHeight)

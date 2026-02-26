@@ -11,8 +11,12 @@ struct FreeStoreSelectionSheet: View {
     @State private var selectedDetent: PresentationDetent = .medium
     @State private var showPaywall = false
 
+    private var freeStoreLimit: Int {
+        max(1, vaultService.storeLimitForCurrentPlan ?? 1)
+    }
+
     private var requiredSelectionCount: Int {
-        min(2, availableStores.count)
+        min(freeStoreLimit, availableStores.count)
     }
 
     private var selectedCount: Int {
@@ -27,25 +31,38 @@ struct FreeStoreSelectionSheet: View {
         selectedCount == requiredSelectionCount && requiredSelectionCount > 0
     }
 
+    private let sheetTitle = "Choose Your Main Store"
+    private let sheetSubtitle = "On Free, you can fully edit one store at a time. Your other stores stay saved and view-only"
+
+    private var applyButtonTitle: String {
+        "Set as Main Store"
+    }
+
+    private let secondaryCtaTitle = "Unlock unlimited stores"
+
+    private var secondaryCtaLeadingPadding: CGFloat {
+        12
+    }
+
+    private var selectionAlertTitle: String {
+        "Select \(freeStoreLimit) \(freeStoreLimit == 1 ? "store" : "stores")"
+    }
+
+    private var selectionAlertMessage: String {
+        "Choose exactly \(freeStoreLimit) \(freeStoreLimit == 1 ? "store" : "stores") to continue on Free."
+    }
+
     var body: some View {
         NavigationStack {
             VStack(spacing: 16) {
                 VStack(alignment: .center, spacing: 6) {
-                    VStack(spacing: 2) {
-                        Text("Free Plan includes")
-                            .fuzzyBubblesFont(22, weight: .bold)
-                            .foregroundStyle(Color.black.opacity(0.92))
-                            .multilineTextAlignment(.center)
-                            .lineLimit(1)
-
-                        Text("2 active stores 🧺")
-                            .fuzzyBubblesFont(22, weight: .bold)
-                            .foregroundStyle(Color.black.opacity(0.92))
-                            .multilineTextAlignment(.center)
-                            .lineLimit(1)
-                    }
+                    Text(sheetTitle)
+                        .fuzzyBubblesFont(22, weight: .bold)
+                        .foregroundStyle(Color.black.opacity(0.92))
+                        .multilineTextAlignment(.center)
+                        .lineLimit(1)
   
-                    Text("You can keep 2 stores fully editable on Free. All other stores remain saved and view-only.")
+                    Text(sheetSubtitle)
                         .lexendFont(13, weight: .light)
                         .foregroundStyle(Color.gray)
                         .multilineTextAlignment(.center)
@@ -69,7 +86,9 @@ struct FreeStoreSelectionSheet: View {
                             ForEach(Array(availableStores.enumerated()), id: \.offset) { index, store in
                                 let key = normalizedStoreKey(store)
                                 let isSelected = selectedStoreKeys.contains(key)
-                                let canSelect = isSelected || selectedCount < requiredSelectionCount
+                                let canSelect = requiredSelectionCount == 1
+                                    ? true
+                                    : (isSelected || selectedCount < requiredSelectionCount)
 
                                 HStack(spacing: 8) {
                                     Text(store)
@@ -116,7 +135,7 @@ struct FreeStoreSelectionSheet: View {
                 .padding(.top, 4)
 
                 FormCompletionButton(
-                    title: "Apply 2 Stores",
+                    title: applyButtonTitle,
                     isEnabled: canConfirm,
                     cornerRadius: 100,
                     verticalPadding: 12,
@@ -143,7 +162,7 @@ struct FreeStoreSelectionSheet: View {
                     showPaywall = true
                 } label: {
                     HStack(spacing: 8) {
-                        Text("Need unlimited stores?")
+                        Text(secondaryCtaTitle)
                             .lexendFont(13, weight: .semibold)
                             .foregroundStyle(Color.black.opacity(0.9))
                             .lineLimit(1)
@@ -161,7 +180,7 @@ struct FreeStoreSelectionSheet: View {
                                     .foregroundStyle(Color.black)
                             )
                     }
-                    .padding(.leading, 10)
+                    .padding(.leading, secondaryCtaLeadingPadding)
                     .padding(.trailing, 6)
                     .padding(.vertical, 6)
                     .background(
@@ -178,10 +197,10 @@ struct FreeStoreSelectionSheet: View {
             }
             .padding(.horizontal)
             .padding(.top, 32)
-            .alert("Select 2 stores", isPresented: $showSelectionError) {
+            .alert(selectionAlertTitle, isPresented: $showSelectionError) {
                 Button("OK", role: .cancel) {}
             } message: {
-                Text("Choose exactly 2 stores to continue on Free.")
+                Text(selectionAlertMessage)
             }
             .onAppear {
                 selectedDetent = .medium
@@ -210,7 +229,7 @@ struct FreeStoreSelectionSheet: View {
     private func refreshStoresAndSelection() {
         let stores = vaultService.storesForFreeSelection()
         availableStores = stores
-        let requiredCount = min(2, stores.count)
+        let requiredCount = min(freeStoreLimit, stores.count)
 
         var keysToSelect = Set(vaultService.preselectedStoresForFreeSelection().map(normalizedStoreKey))
         if keysToSelect.count > requiredCount {
@@ -225,6 +244,13 @@ struct FreeStoreSelectionSheet: View {
 
     private func toggleStoreSelection(_ store: String) {
         let key = normalizedStoreKey(store)
+        guard !key.isEmpty else { return }
+
+        if requiredSelectionCount == 1 {
+            selectedStoreKeys = [key]
+            return
+        }
+
         if selectedStoreKeys.contains(key) {
             selectedStoreKeys.remove(key)
             return

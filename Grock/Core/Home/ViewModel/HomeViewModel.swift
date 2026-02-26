@@ -45,13 +45,16 @@ final class HomeViewModel {
 
     // Cached display carts to avoid re-sorting/filtering on every render
     var displayedCarts: [Cart] {
-        // Always show active carts since we removed tabs
+        // Always show active carts since we removed tabs.
+        // Home view now presents a single active cart card.
         let baseCarts = cartViewModel.activeCarts.sorted { $0.createdAt > $1.createdAt }
         
         // Filter out hidden carts
-        return baseCarts.filter { cart in
+        let visibleCarts = baseCarts.filter { cart in
             !hiddenCartIds.contains(cart.id)
         }
+        
+        return Array(visibleCarts.prefix(1))
     }
     
     var carts: [Cart] {

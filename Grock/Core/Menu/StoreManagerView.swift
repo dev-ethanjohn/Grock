@@ -2,6 +2,10 @@ import SwiftUI
 import SwiftData
 
 struct StoreManagerView: View {
+    private struct PendingStoreDeletion: Identifiable {
+        let id = UUID()
+        let name: String
+    }
     
     @Environment(VaultService.self) private var vaultService
     
@@ -9,8 +13,11 @@ struct StoreManagerView: View {
     @State private var showingAddStore = false
     @State private var newStoreName = ""
     @State private var storeToRename: String?
+    @State private var pendingStoreDeletion: PendingStoreDeletion?
     @State private var showPaywall = false
     @State private var paywallFeatureFocus: GrockPaywallFeatureFocus?
+    @State private var listRefreshID = UUID()
+    @AppStorage("lastSelectedStore") private var lastSelectedStore: String = ""
     
     var body: some View {
         ZStack {
@@ -21,38 +28,56 @@ struct StoreManagerView: View {
                     ForEach(stores, id: \.self) { store in
                         let isLockedStore = vaultService.isStoreLockedByPlan(named: store)
                         HStack {
-                            Text(store)
-                                .lexend(.body)
-                                .foregroundStyle(isLockedStore ? .gray : .black)
-                            .contentShape(Rectangle())
-                            .onTapGesture {
+                            HStack(spacing: 4) {
+                                Text(store)
+                                    .lexend(.body)
+                                    .foregroundStyle(isLockedStore ? .gray : .black)
+
+                                if isActiveStore(store) && !isLockedStore {
+                                    Text("✏️")
+                                        .font(.system(size: 11))
+                                }
+                            }
+                            
+                            Spacer()
+
+                            if isLockedStore {
+                                Text("💎")
+                                    .font(.footnote)
+                            }
+                        }
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            guard !isLockedStore else {
+                                presentPaywall(for: .stores)
+                                return
+                            }
+                            prepareRename(store)
+                        }
+                        .opacity(isLockedStore ? 0.58 : 1)
+                        .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                            Button {
                                 guard !isLockedStore else {
                                     presentPaywall(for: .stores)
                                     return
                                 }
                                 prepareRename(store)
-                            }
-                            
-                            Spacer()
-                            
-                            Button {
-                                if isLockedStore {
-                                    presentPaywall(for: .stores)
-                                } else {
-                                    deleteStore(store)
-                                }
                             } label: {
-                                Text(isLockedStore ? "💎" : "🗑️")
-                                    .font(.footnote)
+                                Label("Rename", systemImage: "pencil")
                             }
-                            .buttonStyle(.plain)
-                            .padding(.leading, 8)
+                            .tint(.blue)
                         }
-                        .contentShape(Rectangle())
-                        .opacity(isLockedStore ? 0.58 : 1)
+                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                            Button(role: .destructive) {
+                                pendingStoreDeletion = PendingStoreDeletion(name: store)
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                        }
                     }
                 }
             }
+            .id(listRefreshID)
             
             if let storeToRename {
                 RenamePopover(
@@ -64,9 +89,13 @@ struct StoreManagerView: View {
                     placeholder: "Enter store name...",
                     saveButtonTitle: "Update Store",
                     useLexendInputFont: true,
+                    adjustForKeyboard: false,
                     currentName: storeToRename,
                     onSave: { newName in
                         vaultService.renameStore(oldName: storeToRename, newName: newName)
+                        if normalizedStoreKey(lastSelectedStore) == normalizedStoreKey(storeToRename) {
+                            lastSelectedStore = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+                        }
                         loadStores()
                         self.storeToRename = nil
                     },
@@ -79,17 +108,20 @@ struct StoreManagerView: View {
             }
         }
         .navigationTitle("Manage Stores")
+        .navigationBarBackButtonHidden(storeToRename != nil)
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    guard !vaultService.isStoreLimitReached() else {
-                        presentPaywall(for: .stores)
-                        return
+            if storeToRename == nil {
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        guard !vaultService.isStoreLimitReached() else {
+                            presentPaywall(for: .stores)
+                            return
+                        }
+                        newStoreName = ""
+                        showingAddStore = true
+                    } label: {
+                        Image(systemName: "plus")
                     }
-                    newStoreName = ""
-                    showingAddStore = true
-                } label: {
-                    Image(systemName: "plus")
                 }
             }
         }
@@ -113,7 +145,23 @@ struct StoreManagerView: View {
                 showPaywall = false
             }
         }
+        .alert(item: $pendingStoreDeletion) { pending in
+            Alert(
+                title: Text(deleteAlertTitle(for: pending.name)),
+                message: Text(deleteAlertMessage(for: pending.name)),
+                primaryButton: .destructive(Text("Delete Store")) {
+                    deleteStore(pending.name)
+                },
+                secondaryButton: .cancel()
+            )
+        }
         .onAppear {
+            loadStores()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("DataUpdated"))) { _ in
+            loadStores()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .subscriptionStatusChanged)) { _ in
             loadStores()
         }
     }
@@ -124,13 +172,82 @@ struct StoreManagerView: View {
     
     private func loadStores() {
         stores = vaultService.getAllStores()
+        listRefreshID = UUID()
     }
     
     private func deleteStore(_ name: String) {
         withAnimation {
             vaultService.deleteStore(name)
+            if normalizedStoreKey(lastSelectedStore) == normalizedStoreKey(name) {
+                lastSelectedStore = ""
+            }
             loadStores()
         }
+    }
+
+    private func isActiveStore(_ storeName: String) -> Bool {
+        let storeKey = normalizedStoreKey(storeName)
+        guard !storeKey.isEmpty else { return false }
+
+        if UserDefaults.standard.isPro {
+            return true
+        }
+
+        return storeKey == activeStoreKey
+    }
+
+    private var activeStoreKey: String {
+        let storedKey = normalizedStoreKey(lastSelectedStore)
+        if !storedKey.isEmpty,
+           let storedStore = stores.first(where: { normalizedStoreKey($0) == storedKey }),
+           !vaultService.isStoreLockedByPlan(named: storedStore) {
+            return storedKey
+        }
+
+        if let recentStore = vaultService.getMostRecentStore() {
+            let recentKey = normalizedStoreKey(recentStore)
+            if !recentKey.isEmpty,
+               let visibleRecentStore = stores.first(where: { normalizedStoreKey($0) == recentKey }),
+               !vaultService.isStoreLockedByPlan(named: visibleRecentStore) {
+                return recentKey
+            }
+        }
+
+        if let firstUnlockedStore = stores.first(where: { !vaultService.isStoreLockedByPlan(named: $0) }) {
+            return normalizedStoreKey(firstUnlockedStore)
+        }
+
+        return ""
+    }
+
+    private func deleteAlertTitle(for storeName: String) -> String {
+        isDeletingLastStore(named: storeName) ? "Delete Last Store?" : "Delete Store?"
+    }
+
+    private func deleteAlertMessage(for storeName: String) -> String {
+        if isDeletingLastStore(named: storeName) {
+            return """
+Deleting "\(storeName)" will remove every item tied to this store from Vault and Manage Cart, and remove this store from all pickers.
+
+This is your last store, so this may leave your vault with no stores and no items.
+"""
+        }
+
+        return """
+Deleting "\(storeName)" will remove every item tied to this store from Vault and Manage Cart, and remove this store from all pickers.
+"""
+    }
+
+    private func isDeletingLastStore(named storeName: String) -> Bool {
+        let targetKey = normalizedStoreKey(storeName)
+        guard !targetKey.isEmpty else { return false }
+
+        let remainingKeys = Set(stores.map(normalizedStoreKey)).subtracting([targetKey])
+        return remainingKeys.isEmpty
+    }
+
+    private func normalizedStoreKey(_ storeName: String) -> String {
+        storeName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }
 
     private func presentPaywall(for featureFocus: GrockPaywallFeatureFocus) {

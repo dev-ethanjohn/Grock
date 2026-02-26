@@ -268,14 +268,17 @@ struct GrockPaywallView: View {
                         .padding(.horizontal, 16)
                         .id(trialTimelineSectionID)
                         
-                        Text("✓ No payment today  •  Cancel anytime!")
-                            .frame(width: UIScreen.main.bounds.size.width * 0.7)
-                            .lexend(.footnote)
-                            .foregroundStyle(.black)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .multilineTextAlignment(.center)
-                            .lineLimit(2)
-                            .padding(.top, 36)
+                        VStack(spacing: 2) {
+                            Text("✓ No payment today")
+                            Text("Cancel anytime!")
+                        }
+                        .frame(width: UIScreen.main.bounds.size.width * 0.7)
+                        .lexend(.subheadline, weight: .medium)
+                        .foregroundStyle(.black)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2)
+                        .padding(.top, 16)
                         
                     
                     }
@@ -392,6 +395,7 @@ struct GrockPaywallView: View {
                 showTrialJumpCapsule = false
                 showLeftChevron = true
                 showRightChevron = true
+                appliedInitialFeatureFocus = false
                 leftChevronScale = 1.0
                 leftChevronOpacity = 1.0
                 rightChevronScale = 1.0

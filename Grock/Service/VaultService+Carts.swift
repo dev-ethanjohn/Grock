@@ -376,6 +376,12 @@ extension VaultService {
     /// - All items are marked unfulfilled and need to be re-confirmed.
     func reopenCart(cart: Cart) {
         guard cart.status == .completed else { return }
+        
+        if let vault,
+           vault.carts.contains(where: { $0.id != cart.id && $0.isActive && !$0.isDeleted }) {
+            print("🔒 Cannot reactivate cart while another active cart exists")
+            return
+        }
 
         cart.status = .shopping
         cart.completedAt = nil

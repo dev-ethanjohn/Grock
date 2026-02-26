@@ -56,7 +56,7 @@ final class GrockPaywallViewModel {
         .init(
             id: "stores",
             title: "Unlimited Store Comparison",
-            subtitle: "Free: 2 stores max",
+            subtitle: "Free: 1 store max",
             body: "Find the cheapest option fast.",
             systemImage: "storefront.fill",
             videoResourceName: "unlimited_stores"
@@ -91,7 +91,7 @@ final class GrockPaywallViewModel {
                 id: "today",
                 title: "Today",
                 subtitle: "Unlimited free access to all Grock Pro features.",
-                emoji: "🎁"
+                emoji: "💎"
             ),
             .init(
                 id: "reminder",

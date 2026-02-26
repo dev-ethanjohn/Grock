@@ -66,7 +66,7 @@ class CartViewModel {
         print("🛒 CartViewModel: Creating cart with \(activeCartItems.count) active items (notifyChanges: \(notifyChanges))")
 
         guard canCreateAnotherActiveCart() else {
-            print("🔒 CartViewModel: Active cart limit reached on Free (\(freeActiveCartLimit))")
+            print("🔒 CartViewModel: Active cart limit reached (\(freeActiveCartLimit))")
             return nil
         }
         
@@ -148,14 +148,20 @@ class CartViewModel {
     }
 
     var activeCartLimitForCurrentPlan: Int? {
-        UserDefaults.standard.isPro ? nil : freeActiveCartLimit
+        let isPro = SubscriptionManager.shared.isPro || UserDefaults.standard.isPro
+        return isPro ? nil : freeActiveCartLimit
     }
 
-    func canCreateAnotherActiveCart(isPro: Bool = UserDefaults.standard.isPro) -> Bool {
-        isPro || currentActiveCartCount() < freeActiveCartLimit
+    func canCreateAnotherActiveCart(
+        isPro: Bool = SubscriptionManager.shared.isPro || UserDefaults.standard.isPro
+    ) -> Bool {
+        guard !isPro else { return true }
+        return currentActiveCartCount() < freeActiveCartLimit
     }
 
-    func isActiveCartLimitReached(isPro: Bool = UserDefaults.standard.isPro) -> Bool {
+    func isActiveCartLimitReached(
+        isPro: Bool = SubscriptionManager.shared.isPro || UserDefaults.standard.isPro
+    ) -> Bool {
         !canCreateAnotherActiveCart(isPro: isPro)
     }
 
@@ -226,7 +232,7 @@ class CartViewModel {
         print("🛒 CartViewModel: Creating empty cart '\(name)' with budget \(budget)")
 
         guard canCreateAnotherActiveCart() else {
-            print("🔒 CartViewModel: Active cart limit reached on Free (\(freeActiveCartLimit))")
+            print("🔒 CartViewModel: Active cart limit reached (\(freeActiveCartLimit))")
             return nil
         }
         

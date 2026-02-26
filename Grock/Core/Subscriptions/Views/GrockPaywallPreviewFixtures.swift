@@ -29,7 +29,7 @@ enum GrockPaywallPreviewFixtures {
         .init(
             id: "stores",
             title: "Unlimited Store Comparison",
-            subtitle: "Free: 2 stores max",
+            subtitle: "Free: 1 store max",
             body: "Find the cheapest option fast.",
             systemImage: "storefront.fill",
             videoResourceName: "unlimited_stores"

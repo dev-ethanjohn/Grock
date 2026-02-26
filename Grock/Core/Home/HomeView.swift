@@ -158,7 +158,12 @@ struct HomeView: View {
                     isPresented: $showCreateCartPopover,
                 )
             }
-            .fullScreenCover(isPresented: $showPaywall) {
+            .fullScreenCover(
+                isPresented: $showPaywall,
+                onDismiss: {
+                    paywallFeatureFocus = nil
+                }
+            ) {
                 GrockPaywallView(initialFeatureFocus: paywallFeatureFocus) {
                     paywallFeatureFocus = nil
                     showPaywall = false
@@ -368,7 +373,7 @@ struct HomeView: View {
             .animation(.spring(response: 0.4, dampingFraction: 0.65), value: isVaultButtonExpanded)
 
             if viewModel.hasCarts {
-                Text("Your Carts")
+                Text("Your Cart")
                     .lexendFont(13)
                     .foregroundStyle(.black)
                     .padding(.horizontal, 12)

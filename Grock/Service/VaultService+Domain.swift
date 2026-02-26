@@ -745,17 +745,21 @@ extension VaultService {
         saveContext()
     }
 
+    func deleteItem(itemId: String) {
+        deleteItem(itemId: itemId, bypassPlanSuppression: false)
+    }
+
     /// Removes an item from the vault by ID (moves it to Trash).
     ///
     /// Behavior:
     /// - Moves item out of its Category into `vault.deletedItems`.
     /// - Removes item from all ACTIVE carts (Planning/Shopping).
     /// - Keeps item data available for historical (Completed) carts.
-    func deleteItem(itemId: String) {
+    private func deleteItem(itemId: String, bypassPlanSuppression: Bool) {
         guard let vault = vault else { return }
         guard let item = findVaultItemById(itemId) else { return }
 
-        guard UserDefaults.standard.isPro || !item.isPlanSuppressed else {
+        guard bypassPlanSuppression || UserDefaults.standard.isPro || !item.isPlanSuppressed else {
             return
         }
         
@@ -1025,7 +1029,7 @@ extension VaultService {
 }
 
 extension VaultService {
-    private static let freeStoreLimit = 2
+    private static let freeStoreLimit = 1
 
     private func normalizedStoreKey(_ storeName: String) -> String {
         storeName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
@@ -1211,8 +1215,8 @@ extension VaultService {
     /// - Any store is allowed.
     ///
     /// Free:
-    /// - Only unlocked stores (selected 2) are editable.
-    /// - A brand-new store is allowed only while under the 2-store limit.
+    /// - Only unlocked stores (selected in Free Store Selection) are editable.
+    /// - A brand-new store is allowed only while under the Free store limit.
     func canUseStoreName(_ storeName: String, isPro: Bool = UserDefaults.standard.isPro) -> Bool {
         let normalized = normalizedStoreKey(storeName)
         guard !normalized.isEmpty else { return false }
@@ -1228,7 +1232,8 @@ extension VaultService {
     }
 
     func storeLimitErrorMessage() -> String {
-        "Free supports up to \(Self.freeStoreLimit) stores. Upgrade to Pro to add more."
+        let noun = Self.freeStoreLimit == 1 ? "store" : "stores"
+        return "Free supports up to \(Self.freeStoreLimit) \(noun). Upgrade to Pro to add more."
     }
 
     /// Adds a store to the vault store list (deduped case-insensitively).
@@ -1299,40 +1304,62 @@ extension VaultService {
         addStore(storeName)
     }
 
-    /// Renames a store and updates every item’s price options that reference it.
+    /// Renames a store and updates every vault/cart reference that points to it.
     ///
     /// Implications:
     /// - This is a bulk update across the vault; call sites should expect UI refresh.
     func renameStore(oldName: String, newName: String) {
         guard let vault = vault else { return }
+        let trimmedOldName = oldName.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedNewName = newName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedNewName.isEmpty else { return }
+        guard !trimmedOldName.isEmpty, !trimmedNewName.isEmpty else { return }
 
-        let normalizedOldName = normalizedStoreKey(oldName)
+        let normalizedOldName = normalizedStoreKey(trimmedOldName)
         let normalizedNewName = normalizedStoreKey(trimmedNewName)
         guard !normalizedOldName.isEmpty, !normalizedNewName.isEmpty else { return }
 
         if !UserDefaults.standard.isPro {
-            guard !isStoreLockedByPlan(named: oldName, isPro: false) else { return }
-
-            let existingKeys = uniqueStoreKeys()
-            let keysAfterRename = existingKeys.subtracting([normalizedOldName])
-            if !keysAfterRename.contains(normalizedNewName) && keysAfterRename.count >= Self.freeStoreLimit {
-                return
-            }
+            guard !isStoreLockedByPlan(named: trimmedOldName, isPro: false) else { return }
         }
 
-        if let store = vault.stores.first(where: { $0.name == oldName }) {
+        for store in vault.stores where normalizedStoreKey(store.name) == normalizedOldName {
             store.name = trimmedNewName
         }
 
         for category in vault.categories {
             for item in category.items {
                 for priceOption in item.priceOptions {
-                    if priceOption.store == oldName {
+                    if normalizedStoreKey(priceOption.store) == normalizedOldName {
                         priceOption.store = trimmedNewName
                     }
                 }
+            }
+        }
+
+        for cart in vault.carts {
+            var cartNeedsTotalsRefresh = false
+
+            for cartItem in cart.cartItems {
+                if normalizedStoreKey(cartItem.plannedStore) == normalizedOldName {
+                    cartItem.plannedStore = trimmedNewName
+                    cartNeedsTotalsRefresh = true
+                }
+
+                if let actualStore = cartItem.actualStore,
+                   normalizedStoreKey(actualStore) == normalizedOldName {
+                    cartItem.actualStore = trimmedNewName
+                    cartNeedsTotalsRefresh = true
+                }
+
+                if let shoppingOnlyStore = cartItem.shoppingOnlyStore,
+                   normalizedStoreKey(shoppingOnlyStore) == normalizedOldName {
+                    cartItem.shoppingOnlyStore = trimmedNewName
+                    cartNeedsTotalsRefresh = true
+                }
+            }
+
+            if cartNeedsTotalsRefresh && cart.isActive {
+                updateCartTotals(cart: cart)
             }
         }
 
@@ -1341,28 +1368,98 @@ extension VaultService {
             newKey: normalizedNewName
         )
 
+        itemCache.removeAll()
+        invalidateCategoryCache()
         saveContext()
+
+        NotificationCenter.default.post(
+            name: NSNotification.Name("DataUpdated"),
+            object: nil
+        )
+
         print("✏️ Store renamed from '\(oldName)' to '\(trimmedNewName)'")
     }
 
-    /// Deletes a store entry from the vault store list.
+    /// Deletes a store and cleans up all active data tied to it.
     ///
-    /// Note:
-    /// - Items that still reference this store keep the raw store string; it becomes “legacy”.
+    /// Behavior:
+    /// - Removes the store entry from vault stores (if present).
+    /// - Removes matching store price options from vault items.
+    /// - Soft-deletes items that no longer have any price options left.
+    /// - Removes matching store rows from active carts.
     func deleteStore(_ storeName: String) {
         guard let vault = vault else { return }
+        let normalizedKey = normalizedStoreKey(storeName)
+        guard !normalizedKey.isEmpty else { return }
 
-        if !UserDefaults.standard.isPro,
-           isStoreLockedByPlan(named: storeName, isPro: false) {
-            return
+        // Remove explicit store entries (covers case-insensitive duplicates too).
+        vault.stores.removeAll { normalizedStoreKey($0.name) == normalizedKey }
+
+        var orphanedItemIDs = Set<String>()
+
+        // Remove store price options from active vault items.
+        for category in vault.categories {
+            for item in category.items {
+                let matchingOptions = item.priceOptions.filter {
+                    normalizedStoreKey($0.store) == normalizedKey
+                }
+                guard !matchingOptions.isEmpty else { continue }
+
+                let hasAlternateStore = item.priceOptions.contains {
+                    normalizedStoreKey($0.store) != normalizedKey
+                }
+
+                if hasAlternateStore {
+                    item.priceOptions.removeAll { normalizedStoreKey($0.store) == normalizedKey }
+                    for option in matchingOptions {
+                        modelContext.delete(option)
+                    }
+                } else {
+                    // No alternate store remains; remove the entire item from active vault/cart surfaces.
+                    orphanedItemIDs.insert(item.id)
+                }
+            }
         }
 
-        if let index = vault.stores.firstIndex(where: { $0.name == storeName }) {
-            vault.stores.remove(at: index)
-            removePersistedFreeEditableStoreKey(normalizedStoreKey(storeName))
-            saveContext()
-            print("🗑️ Store deleted: \(storeName)")
+        // Remove matching rows from active carts so Manage Cart / Cart Detail stay in sync.
+        for cart in vault.carts where cart.isActive {
+            let originalCount = cart.cartItems.count
+            cart.cartItems.removeAll { cartItem in
+                if cartItem.isShoppingOnlyItem {
+                    let shoppingStoreKey = normalizedStoreKey(cartItem.shoppingOnlyStore ?? cartItem.plannedStore)
+                    return shoppingStoreKey == normalizedKey
+                }
+
+                let plannedStoreKey = normalizedStoreKey(cartItem.plannedStore)
+                let actualStoreKey = normalizedStoreKey(cartItem.actualStore ?? "")
+                return plannedStoreKey == normalizedKey || actualStoreKey == normalizedKey
+            }
+
+            if cart.cartItems.count != originalCount {
+                updateCartTotals(cart: cart)
+            }
         }
+
+        // Soft-delete items that lost their only store.
+        for itemId in orphanedItemIDs {
+            deleteItem(itemId: itemId, bypassPlanSuppression: true)
+        }
+
+        // Keep free editable keys in sync with current data.
+        if !uniqueStoreKeys().contains(normalizedKey) {
+            removePersistedFreeEditableStoreKey(normalizedKey)
+        }
+
+        itemCache.removeAll()
+        invalidateCategoryCache()
+        saveContext()
+
+        NotificationCenter.default.post(
+            name: NSNotification.Name("DataUpdated"),
+            object: nil
+        )
+
+        print("🗑️ Store deleted with data cleanup: \(storeName)")
     }
 }
 
