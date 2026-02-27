@@ -261,24 +261,26 @@ struct GrockPaywallView: View {
                             }
                         )
                         
-                        GrockPaywallTrialTimelineView(
-                            items: viewModel.trialTimelineItems,
-                            summaryText: viewModel.selectedPlanSummaryText
-                        )
-                        .padding(.horizontal, 16)
-                        .id(trialTimelineSectionID)
-                        
-                        VStack(spacing: 2) {
-                            Text("✓ No payment today")
-                            Text("Cancel anytime!")
+                        if viewModel.showsTrialMessaging {
+                            GrockPaywallTrialTimelineView(
+                                items: viewModel.trialTimelineItems,
+                                summaryText: viewModel.selectedPlanSummaryText
+                            )
+                            .padding(.horizontal, 16)
+                            .id(trialTimelineSectionID)
+                            
+                            VStack(spacing: 2) {
+                                Text("✓ No payment today")
+                                Text("Cancel anytime!")
+                            }
+                            .frame(width: UIScreen.main.bounds.size.width * 0.7)
+                            .lexend(.subheadline, weight: .medium)
+                            .foregroundStyle(.black)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .multilineTextAlignment(.center)
+                            .lineLimit(2)
+                            .padding(.top, 16)
                         }
-                        .frame(width: UIScreen.main.bounds.size.width * 0.7)
-                        .lexend(.subheadline, weight: .medium)
-                        .foregroundStyle(.black)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .multilineTextAlignment(.center)
-                        .lineLimit(2)
-                        .padding(.top, 16)
                         
                     
                     }
@@ -320,7 +322,7 @@ struct GrockPaywallView: View {
                 VStack(spacing: 6) {
                     ZStack {
                         // Capsule — centered
-                        if showTrialJumpCapsule {
+                        if showTrialJumpCapsule && viewModel.showsTrialMessaging {
                             GrockPaywallTimelineJumpCapsuleView {
                                 handleTrialJumpTap(using: scrollProxy)
                             }

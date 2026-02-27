@@ -11,6 +11,7 @@ import Lottie
 struct FirstItemTooltip: View {
     let itemId: String
     @Binding var isPresented: Bool
+    let allowsTapToDismiss: Bool
     @Environment(VaultService.self) private var vaultService
     
     @State private var showing = false
@@ -18,12 +19,19 @@ struct FirstItemTooltip: View {
     private var item: Item? {
         vaultService.findItemById(itemId)
     }
+
+    init(itemId: String, isPresented: Binding<Bool>, allowsTapToDismiss: Bool = true) {
+        self.itemId = itemId
+        self._isPresented = isPresented
+        self.allowsTapToDismiss = allowsTapToDismiss
+    }
     
     var body: some View {
         ZStack(alignment: .center) {
             Color.clear
                 .contentShape(Rectangle())
                 .onTapGesture {
+                    guard allowsTapToDismiss else { return }
                     dismissTooltip()
                 }
             
@@ -53,6 +61,7 @@ struct FirstItemTooltip: View {
             }
         }
         .onTapGesture {
+            guard allowsTapToDismiss else { return }
             dismissTooltip()
         }
         .onAppear {

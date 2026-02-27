@@ -6,18 +6,33 @@ struct CelebrationView: View {
     @Binding var isPresented: Bool
     let title: String
     let subtitle: String?
+    let allowsTapToDismiss: Bool
     
     @State private var showing = false
     @State private var opacity: Double = 0
     
-    init(isPresented: Binding<Bool>, title: String, subtitle: String? = nil) {
+    init(
+        isPresented: Binding<Bool>,
+        title: String,
+        subtitle: String? = nil,
+        allowsTapToDismiss: Bool = false
+    ) {
         self._isPresented = isPresented
         self.title = title
         self.subtitle = subtitle
+        self.allowsTapToDismiss = allowsTapToDismiss
     }
     
     var body: some View {
         ZStack(alignment: .bottom) {
+            Color.black.opacity(0.001)
+                .contentShape(Rectangle())
+                .ignoresSafeArea()
+                .onTapGesture {
+                    guard allowsTapToDismiss else { return }
+                    dismissCelebration()
+                }
+
             VStack(spacing: 0) {
                 Spacer()
                 
@@ -56,6 +71,12 @@ struct CelebrationView: View {
             .padding(.horizontal, 40)
         }
         .ignoresSafeArea()
+        .highPriorityGesture(
+            TapGesture().onEnded {
+                guard allowsTapToDismiss else { return }
+                dismissCelebration()
+            }
+        )
         .onAppear {
             withAnimation(.spring(response: 0.6, dampingFraction: 0.6)) {
                 showing = true

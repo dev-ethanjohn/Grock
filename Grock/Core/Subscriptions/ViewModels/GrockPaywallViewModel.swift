@@ -7,7 +7,7 @@ import RevenueCat
 final class GrockPaywallViewModel {
     let termsURL = URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!
     let privacyURL = URL(string: "https://grock.app/privacy")!
-    private let fallbackTrialDays = 7
+    private let yearlyTrialDays = 7
 
     var selectedPlan: GrockPaywallPlanCardModel.Plan = .yearly
     var isProcessingAction = false
@@ -71,6 +71,10 @@ final class GrockPaywallViewModel {
         !isProcessingAction && selectedPackage != nil
     }
 
+    var showsTrialMessaging: Bool {
+        selectedPlan == .yearly
+    }
+
     var primaryButtonTitle: String {
         if isProcessingAction {
             return "Processing..."
@@ -78,6 +82,10 @@ final class GrockPaywallViewModel {
 
         guard selectedPackage != nil else {
             return "Unavailable"
+        }
+
+        if !showsTrialMessaging {
+            return "Get Grock Pro"
         }
 
         let trialDays = selectedTrialDays
@@ -124,7 +132,7 @@ final class GrockPaywallViewModel {
             return "Unlimited free access for \(trialDays) days, then \(price)/yr."
 
         case .monthly:
-            return "Unlimited free access for \(trialDays) days, then \(price)/mo."
+            return "Unlock all Grock Pro features for \(price)/mo."
         }
     }
 
@@ -274,10 +282,7 @@ final class GrockPaywallViewModel {
     }
 
     private var selectedTrialDays: Int {
-        trialDurationDays(for: selectedPackage)
-            ?? trialDurationDays(for: subscriptionManager.yearlyPackage)
-            ?? trialDurationDays(for: subscriptionManager.monthlyPackage)
-            ?? fallbackTrialDays
+        yearlyTrialDays
     }
 
     private var reminderDay: Int {
@@ -304,27 +309,6 @@ final class GrockPaywallViewModel {
         alertMessage = message
         if !showAlert {
             showAlert = true
-        }
-    }
-
-    private func trialDurationDays(for package: Package?) -> Int? {
-        guard let discount = package?.storeProduct.introductoryDiscount,
-              discount.paymentMode == .freeTrial else {
-            return nil
-        }
-
-        let period = discount.subscriptionPeriod
-        switch period.unit {
-        case .day:
-            return period.value
-        case .week:
-            return period.value * 7
-        case .month:
-            return period.value * 30
-        case .year:
-            return period.value * 365
-        @unknown default:
-            return nil
         }
     }
 

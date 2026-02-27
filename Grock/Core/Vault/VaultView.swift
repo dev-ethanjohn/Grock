@@ -74,12 +74,34 @@ struct VaultView: View {
     
     // Name entry popover
     @State private var showNameEntrySheet = false
+    @State private var showAddItemGuide = false
+    @State private var addItemGuideTaskID = UUID()
     
     @AppStorage("userName") private var userName: String = ""
     @State private var isCelebrationSequenceActive = false
+    @State private var canDismissCelebration = false
+    @State private var celebrationDismissGateID = UUID()
+    private let celebrationMinimumDisplayDuration: TimeInterval = 3.35
     
     private var hasEnteredName: Bool {
         !userName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var trimmedUserName: String {
+        userName.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var guideDisplayName: String {
+        trimmedUserName.isEmpty ? "there" : trimmedUserName
+    }
+
+    private var shouldBlockOnboardingInteractions: Bool {
+        !hasEnteredName && (
+            isCelebrationSequenceActive ||
+            showCelebration ||
+            showFirstItemTooltip ||
+            showNameEntrySheet
+        )
     }
     
     // Track keyboard state for immediate dismissal
@@ -257,9 +279,13 @@ struct VaultView: View {
             .applyTooltipModifiers(
                 showFirstItemTooltip: $showFirstItemTooltip,
                 firstItemId: firstItemId,
-                showNameEntrySheet: $showNameEntrySheet
+                showNameEntrySheet: $showNameEntrySheet,
+                allowsTooltipTapDismiss: hasEnteredName
             )
             .onChange(of: showCategoryPickerSheet) { _, isPresented in
+                if isPresented {
+                    dismissAddItemGuide()
+                }
                 if !isPresented {
                     categoryManagerStartOnHidden = false
                 }
@@ -290,6 +316,51 @@ struct VaultView: View {
             .onChange(of: userName) { _, _ in
                 if hasEnteredName {
                     isCelebrationSequenceActive = false
+                    scheduleAddItemGuideIfNeeded(delay: 0)
+                }
+            }
+            .onChange(of: showNameEntrySheet) { _, isPresented in
+                if isPresented {
+                    dismissAddItemGuide()
+                } else {
+                    scheduleAddItemGuideIfNeeded(delay: 0)
+                }
+            }
+            .onChange(of: createCartButtonVisible) { _, isVisible in
+                if isVisible {
+                    scheduleAddItemGuideIfNeeded(delay: 0)
+                }
+            }
+            .onChange(of: showAddItemPopover) { _, isPresented in
+                if isPresented {
+                    dismissAddItemGuide()
+                }
+            }
+            .onChange(of: showPaywall) { _, isPresented in
+                if isPresented {
+                    dismissAddItemGuide()
+                }
+            }
+            .onChange(of: showCelebration) { _, isPresented in
+                if isPresented {
+                    dismissAddItemGuide()
+                    let gateID = UUID()
+                    celebrationDismissGateID = gateID
+                    canDismissCelebration = false
+                    
+                    if !hasEnteredName {
+                        isCelebrationSequenceActive = true
+                    }
+                    
+                    DispatchQueue.main.asyncAfter(deadline: .now() + celebrationMinimumDisplayDuration) {
+                        guard celebrationDismissGateID == gateID else { return }
+                        canDismissCelebration = true
+                        if showCelebration {
+                            showCelebration = false
+                        }
+                    }
+                } else {
+                    celebrationDismissGateID = UUID()
                 }
             }
             .task {
@@ -357,6 +428,7 @@ struct VaultView: View {
             }
             .applySheetModifiers(
                 showCelebration: $showCelebration,
+                canDismissCelebration: $canDismissCelebration,
                 showCartConfirmation: $showCartConfirmation,
                 pendingCartConfirmation: $pendingCartConfirmation,
                 showNameEntrySheet: $showNameEntrySheet,
@@ -375,12 +447,14 @@ struct VaultView: View {
         ZStack(alignment: .bottom) {
             if vaultReady {
                 mainContentStack
+                    .allowsHitTesting(!shouldBlockOnboardingInteractions)
             } else {
                 loadingView
             }
             
             if vaultService.vault != nil && !showCelebration && vaultReady {
                 bottomContent
+                    .allowsHitTesting(!shouldBlockOnboardingInteractions)
             }
             
             popoversOverlay
@@ -405,6 +479,8 @@ struct VaultView: View {
                 isSearching: $isSearching,
                 matchedNamespace: searchNamespace,
                 onAddTapped: {
+                    UserDefaults.standard.hasShownAddItemGuideAfterName = true
+                    dismissAddItemGuide()
                     dismissKeyboard()
                     withAnimation(.easeInOut(duration: 0.2)) {
                         showAddItemPopover = true
@@ -421,7 +497,9 @@ struct VaultView: View {
                 onClearTapped: {
                     cartViewModel.activeCartItems.removeAll()
                 },
-                showClearButton: hasActiveItems
+                showClearButton: hasActiveItems,
+                showAddGuidePopover: $showAddItemGuide,
+                addGuideText: "Hello \(guideDisplayName) 👋,\n\nGrow your vault by adding items here. Grock remembers it for you :)"
             )
             
             if let vault = vaultService.vault, !vault.categories.isEmpty {
@@ -510,7 +588,7 @@ struct VaultView: View {
         }
         .frame(maxHeight: .infinity)
     }
-    
+
     private var bottomContent: some View {
         VaultBottomContent(
             totalVaultItemsCount: totalVaultItemsCount,
@@ -518,7 +596,7 @@ struct VaultView: View {
             existingCart: existingCart,
             showLeftChevron: showLeftChevron,
             showRightChevron: showRightChevron,
-            createCartButtonVisible: createCartButtonVisible,
+            createCartButtonVisible: createCartButtonVisible && hasEnteredName,
             buttonScale: buttonScale,
             fillAnimation: fillAnimation,
             showCartConfirmation: $showCartConfirmation,
@@ -567,11 +645,13 @@ struct VaultView: View {
                 createCartButtonVisible = false
             }
         } else {
+            guard canDismissCelebration || hasEnteredName else { return }
+            
             withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                createCartButtonVisible = true
+                createCartButtonVisible = hasEnteredName
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                if hasActiveItems {
+                if hasEnteredName && hasActiveItems {
                     startButtonBounce()
                 }
             }
@@ -595,12 +675,65 @@ struct VaultView: View {
             }
         }
     }
+
+    private var shouldPresentAddItemGuide: Bool {
+        hasEnteredName &&
+        createCartButtonVisible &&
+        !UserDefaults.standard.hasShownAddItemGuideAfterName &&
+        !showNameEntrySheet &&
+        !showCelebration &&
+        !showAddItemPopover &&
+        !showCategoryPickerSheet &&
+        !showPaywall
+    }
+
+    private func scheduleAddItemGuideIfNeeded(delay: TimeInterval = 0.35) {
+        guard shouldPresentAddItemGuide else { return }
+
+        let taskID = UUID()
+        addItemGuideTaskID = taskID
+
+        let presentGuide: () -> Void = {
+            guard addItemGuideTaskID == taskID else { return }
+            guard shouldPresentAddItemGuide else { return }
+
+            UserDefaults.standard.hasShownAddItemGuideAfterName = true
+            withAnimation(.spring(response: 0.45, dampingFraction: 0.82)) {
+                showAddItemGuide = true
+            }
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 7.0) {
+                guard addItemGuideTaskID == taskID else { return }
+                dismissAddItemGuide()
+            }
+        }
+
+        if delay <= 0 {
+            presentGuide()
+            return
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+            presentGuide()
+        }
+    }
+
+    private func dismissAddItemGuide() {
+        addItemGuideTaskID = UUID()
+        guard showAddItemGuide else { return }
+
+        withAnimation(.easeOut(duration: 0.2)) {
+            showAddItemGuide = false
+        }
+    }
     
     private func handleOnAppear() {
         // Ensure Create Cart button is hidden if name is not entered
         if !hasEnteredName {
             createCartButtonVisible = false
         }
+
+        migrateLegacyActiveSelectionKeys()
         
         initializeActiveItemsFromExistingCart()
         
@@ -643,10 +776,39 @@ struct VaultView: View {
         }
         
         setupNotificationObservers()
+        scheduleAddItemGuideIfNeeded()
+    }
+
+    private func migrateLegacyActiveSelectionKeys() {
+        var migratedItems: [(oldKey: String, newKey: String, quantity: Double)] = []
+        
+        for (key, quantity) in cartViewModel.activeCartItems {
+            let parsed = ActiveItemSelectionKey.parse(key)
+            guard parsed.store == nil else { continue }
+            guard let item = vaultService.findItemById(parsed.itemId) else { continue }
+            guard let preferredStore = item.priceOptions.first?.store else { continue }
+            
+            let newKey = ActiveItemSelectionKey.make(itemId: parsed.itemId, store: preferredStore)
+            guard newKey != key else { continue }
+            
+            migratedItems.append((oldKey: key, newKey: newKey, quantity: quantity))
+        }
+        
+        guard !migratedItems.isEmpty else { return }
+        
+        for migration in migratedItems {
+            if let existingQuantity = cartViewModel.activeCartItems[migration.newKey] {
+                cartViewModel.activeCartItems[migration.newKey] = max(existingQuantity, migration.quantity)
+            } else {
+                cartViewModel.activeCartItems[migration.newKey] = migration.quantity
+            }
+            cartViewModel.activeCartItems.removeValue(forKey: migration.oldKey)
+        }
     }
     
     private func handleOnDisappear() {
         NotificationCenter.default.removeObserver(self)
+        dismissAddItemGuide()
         dismissKeyboard()
     }
     
@@ -1012,6 +1174,9 @@ struct VaultView: View {
         
         print("🎉 ✅ CONDITIONS MET - Starting celebration!")
         showCelebration = true
+        if !hasEnteredName {
+            isCelebrationSequenceActive = true
+        }
         UserDefaults.standard.set(true, forKey: "hasSeenVaultCelebration")
     }
     
@@ -1184,6 +1349,7 @@ extension View {
     
     func applySheetModifiers(
         showCelebration: Binding<Bool>,
+        canDismissCelebration: Binding<Bool>,
         showCartConfirmation: Binding<Bool>,
         pendingCartConfirmation: Binding<PendingCartConfirmation?>,
         showNameEntrySheet: Binding<Bool>,
@@ -1214,13 +1380,35 @@ extension View {
                 .presentationCornerRadius(24)
                 .interactiveDismissDisabled(true)
             }
-            .fullScreenCover(isPresented: showCelebration) {
+            .fullScreenCover(
+                isPresented: Binding(
+                    get: { showCelebration.wrappedValue },
+                    set: { newValue in
+                        if newValue {
+                            showCelebration.wrappedValue = true
+                        } else if canDismissCelebration.wrappedValue {
+                            showCelebration.wrappedValue = false
+                        }
+                    }
+                )
+            ) {
                 CelebrationView(
-                    isPresented: showCelebration,
+                    isPresented: Binding(
+                        get: { showCelebration.wrappedValue },
+                        set: { newValue in
+                            if newValue {
+                                showCelebration.wrappedValue = true
+                            } else if canDismissCelebration.wrappedValue {
+                                showCelebration.wrappedValue = false
+                            }
+                        }
+                    ),
                     title: "Welcome to Your Vault!",
-                    subtitle: nil
+                    subtitle: nil,
+                    allowsTapToDismiss: false
                 )
                 .presentationBackground(.clear)
+                .interactiveDismissDisabled(true)
             }
             .fullScreenCover(isPresented: showCartConfirmation, onDismiss: {
                 guard let pending = pendingCartConfirmation.wrappedValue else { return }
@@ -1312,12 +1500,17 @@ extension View {
     func applyTooltipModifiers(
         showFirstItemTooltip: Binding<Bool>,
         firstItemId: String?,
-        showNameEntrySheet: Binding<Bool>
+        showNameEntrySheet: Binding<Bool>,
+        allowsTooltipTapDismiss: Bool
     ) -> some View {
         self
             .overlay {
                 if showFirstItemTooltip.wrappedValue, let firstItemId = firstItemId {
-                    FirstItemTooltip(itemId: firstItemId, isPresented: showFirstItemTooltip)
+                    FirstItemTooltip(
+                        itemId: firstItemId,
+                        isPresented: showFirstItemTooltip,
+                        allowsTapToDismiss: allowsTooltipTapDismiss
+                    )
                 }
             }
             .onChange(of: showFirstItemTooltip.wrappedValue) {_, newValue in

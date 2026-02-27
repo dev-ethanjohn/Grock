@@ -94,8 +94,10 @@ struct OnboardingCompletedHomeView: View {
         }
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-            cartViewModel.activeCartItems[item.id] = 1.0
-            print("✅ Preloaded onboarding item '\(itemName)' with DEFAULT quantity 1 into activeCartItems")
+            let preferredStore = item.priceOptions.first?.store
+            let selectionKey = ActiveItemSelectionKey.make(itemId: item.id, store: preferredStore)
+            cartViewModel.activeCartItems[selectionKey] = 1.0
+            print("✅ Preloaded onboarding item '\(itemName)' with DEFAULT quantity 1 into activeCartItems (key: \(selectionKey))")
             UserDefaults.standard.removeObject(forKey: "onboardingItemData")
         }
     }

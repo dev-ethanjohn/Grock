@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct FluidBudgetPillView: View {
     let cart: Cart
@@ -31,13 +32,19 @@ struct FluidBudgetPillView: View {
     }
     
     private var budgetProgressColor: Color {
-        let progress = self.progress
-        if progress < 0.7 {
-            return Color.Grock.budgetSafe
-        } else if progress < 0.9 {
-            return Color.Grock.budgetWarning
+        let clampedProgress = min(max(self.progress, 0), 1)
+        let safe = UIColor(Color.Grock.budgetSafe)
+        let warning = UIColor(Color.Grock.budgetWarning)
+        let over = UIColor(Color.Grock.budgetOver)
+        
+        if clampedProgress <= 0.7 {
+            return Color(safe)
+        } else if clampedProgress <= 0.9 {
+            let ratio = CGFloat((clampedProgress - 0.7) / 0.2)
+            return mixedColor(from: safe, to: warning, ratio: ratio)
         } else {
-            return Color.Grock.budgetOver
+            let ratio = CGFloat((clampedProgress - 0.9) / 0.1)
+            return mixedColor(from: warning, to: over, ratio: ratio)
         }
     }
     
@@ -96,6 +103,8 @@ struct FluidBudgetPillView: View {
                         Text("you spent \(customIndicatorSpent.formattedCurrency)")
                             .lexendFont(12)
                             .foregroundColor(Color.Grock.textSecondary)
+                            .contentTransition(.numericText())
+                            .animation(.easeInOut(duration: 0.25), value: customIndicatorSpent)
                             .fixedSize()
                             .position(x: clampedCenterX, y: 6)
                     }
@@ -130,6 +139,7 @@ struct FluidBudgetPillView: View {
                             )
                             .matchedGeometryEffect(id: "pillFill", in: animationNamespace)
                             .offset(y: barTopOffset)
+                            .animation(.easeInOut(duration: 0.28), value: progress)
                     }
                     
                     if customIndicatorSpent != nil {
@@ -151,6 +161,8 @@ struct FluidBudgetPillView: View {
                             Text(displayedSpent.formattedCurrency)
                                 .lexendFont(14, weight: .bold)
                                 .foregroundColor(insidePillTextColor)
+                                .contentTransition(.numericText())
+                                .animation(.easeInOut(duration: 0.25), value: displayedSpent)
                                 .matchedGeometryEffect(id: "amount", in: animationNamespace)
                                 .transition(.asymmetric(
                                     insertion: .move(edge: .leading)
@@ -175,11 +187,14 @@ struct FluidBudgetPillView: View {
                                         .stroke(.black, lineWidth: 1)
                                 )
                                 .offset(y: barTopOffset)
+                                .animation(.easeInOut(duration: 0.28), value: progress)
                             
                             // Text OUTSIDE the pill
                             Text(displayedSpent.formattedCurrency)
                                 .lexendFont(14, weight: .bold)
                                 .foregroundColor(outsidePillTextColor)
+                                .contentTransition(.numericText())
+                                .animation(.easeInOut(duration: 0.25), value: displayedSpent)
                                 .matchedGeometryEffect(id: "amount", in: animationNamespace)
                                 .transition(.asymmetric(
                                     insertion: .move(edge: .trailing)
@@ -227,5 +242,30 @@ struct FluidBudgetPillView: View {
             .frame(height: barHeight)
         }
         .frame(height: totalHeight)
+    }
+
+    private func mixedColor(from start: UIColor, to end: UIColor, ratio: CGFloat) -> Color {
+        let clampedRatio = min(max(ratio, 0), 1)
+        
+        var r1: CGFloat = 0
+        var g1: CGFloat = 0
+        var b1: CGFloat = 0
+        var a1: CGFloat = 0
+        var r2: CGFloat = 0
+        var g2: CGFloat = 0
+        var b2: CGFloat = 0
+        var a2: CGFloat = 0
+        
+        guard start.getRed(&r1, green: &g1, blue: &b1, alpha: &a1),
+              end.getRed(&r2, green: &g2, blue: &b2, alpha: &a2) else {
+            return Color(end)
+        }
+        
+        let red = r1 + (r2 - r1) * clampedRatio
+        let green = g1 + (g2 - g1) * clampedRatio
+        let blue = b1 + (b2 - b1) * clampedRatio
+        let alpha = a1 + (a2 - a1) * clampedRatio
+        
+        return Color(UIColor(red: red, green: green, blue: blue, alpha: alpha))
     }
 }

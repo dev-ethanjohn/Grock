@@ -48,12 +48,6 @@ struct HomeView: View {
     @State private var cartToDelete: Cart? = nil
     @State private var showingDeleteAlert = false
     
-    // Backup & Restore
-    @State private var showingRestoreAlert = false
-    @State private var showingBackupSuccessAlert = false
-    @Environment(\.modelContext) private var modelContext
-    
-    @State private var subscriptionManager = SubscriptionManager.shared
     @State private var showPaywall = false
     @State private var paywallFeatureFocus: GrockPaywallFeatureFocus?
     
@@ -186,25 +180,6 @@ struct HomeView: View {
                 } else {
                     Text("Are you sure you want to delete this cart? This action cannot be undone.")
                 }
-            }
-            // Backup Alerts
-            .alert("Restore Vault?", isPresented: $showingRestoreAlert) {
-                Button("Cancel", role: .cancel) { }
-                Button("Restore", role: .destructive) {
-                    let backupService = VaultBackupService(modelContext: modelContext, vaultService: vaultService)
-                    do {
-                        try backupService.restore()
-                        viewModel.loadCarts()
-                        cartViewModel.loadCarts()
-                    } catch {
-                        print("Restore failed: \(error)")
-                    }
-                }
-            } message: {
-                Text("This will restore your vault items from the last saved backup. Carts are not restored.")
-            }
-            .alert("Backup Saved", isPresented: $showingBackupSuccessAlert) {
-                Button("OK") { }
             }
             .onChange(of: viewModel.showVault) { oldValue, newValue in
                 if !newValue {
@@ -419,57 +394,12 @@ struct HomeView: View {
                 }
             }
             
-            // Vault Backup Icon
-            Menu {
-                Button("Save Vault Items Backup", systemImage: "square.and.arrow.down") {
-                    let backupService = VaultBackupService(modelContext: modelContext, vaultService: vaultService)
-                    do {
-                        try backupService.backup()
-                        showingBackupSuccessAlert = true
-                    } catch {
-                        print("Backup failed: \(error)")
-                    }
-                }
-                
-                Button("Restore Vault Items Backup", systemImage: "arrow.clockwise.icloud") {
-                    showingRestoreAlert = true
-                }
-            } label: {
-                Image(systemName: "externaldrive") // or "archivebox" or "server.rack"
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 24, height: 20)
-                    .foregroundColor(.black)
-            }
-            
             Menu {
                 Section {
                     Button(role: .destructive, action: viewModel.resetApp) {
                         Label(
                             "Reset App (Testing)",
                             systemImage: "arrow.counterclockwise"
-                        )
-                    }
-                    
-                    Button {
-                        Task {
-                            await subscriptionManager.refreshCustomerInfo()
-                        }
-                    } label: {
-                        Label(
-                            "Refresh Subscription",
-                            systemImage: "arrow.clockwise"
-                        )
-                    }
-                    
-                    Button {
-                        Task {
-                            _ = await subscriptionManager.restorePurchases()
-                        }
-                    } label: {
-                        Label(
-                            "Restore Purchases",
-                            systemImage: "arrow.uturn.backward.circle"
                         )
                     }
                 }

@@ -64,10 +64,10 @@ struct OnboardingWelcomeView: View {
             VStack(spacing: 8) {
                 Text("⟢   see your true costs   ⟣")
                 Text("⟢   stop leaks, save more   ⟣")
-                Text("⟢   forget paper & Excel   ⟣")
-                Text("⟢   SHOP SMARTER!   ⟣")
+                Text("⟢   forget paper & spreadsheets !   ⟣")
+                Text("⟢   PLAN & SHOP SMARTER   ⟣")
             }
-            .fuzzyBubblesFont(18, weight: .regular)
+            .fuzzyBubblesFont(17, weight: .regular)
             .foregroundStyle(.black.opacity(0.7))
             .multilineTextAlignment(.center)
       
@@ -82,8 +82,44 @@ struct OnboardingWelcomeView: View {
             .foregroundStyle(.white)
             .padding(.vertical, 10)
             .padding(.horizontal, 24)
-            .background(.black)
-            .clipShape(RoundedRectangle(cornerRadius: 20))
+            .background(
+                ZStack {
+                    Capsule()
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    .black.opacity(0.90),
+                                    .black
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+
+                    ShoppingModeGradientView(
+                        cornerRadius: 22,
+                        hasBackgroundImage: true
+                    )
+                    .clipShape(Capsule())
+                }
+            )
+            .clipShape(Capsule())
+            .overlay(
+                Capsule()
+                    .stroke(
+                        LinearGradient(
+                            colors: [
+                                .white.opacity(0.28),
+                                .white.opacity(0.08)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1
+                    )
+            )
+            .shadow(color: .black.opacity(0.3), radius: 10, x: 0, y: 5)
+            .buttonStyle(.plain)
         }
         .padding()
     }

@@ -46,7 +46,6 @@ final class HomeViewModel {
     // Cached display carts to avoid re-sorting/filtering on every render
     var displayedCarts: [Cart] {
         // Always show active carts since we removed tabs.
-        // Home view now presents a single active cart card.
         let baseCarts = cartViewModel.activeCarts.sorted { $0.createdAt > $1.createdAt }
         
         // Filter out hidden carts
@@ -54,7 +53,7 @@ final class HomeViewModel {
             !hiddenCartIds.contains(cart.id)
         }
         
-        return Array(visibleCarts.prefix(1))
+        return visibleCarts
     }
     
     var carts: [Cart] {
@@ -258,6 +257,7 @@ final class HomeViewModel {
         UserDefaults.standard.userName = nil
         UserDefaults.standard.hasPromptedForNameAfterOnboarding = false
         UserDefaults.standard.hasPromptedForNameAfterVaultCelebration = false
+        UserDefaults.standard.hasShownAddItemGuideAfterName = false
         
         // Reset vault animation flag
         UserDefaults.standard.set(false, forKey: "hasShownVaultAnimation")
@@ -276,6 +276,7 @@ final class HomeViewModel {
         print("   - userName: cleared")
         print("   - hasPromptedForNameAfterOnboarding: false")
         print("   - hasPromptedForNameAfterVaultCelebration: false")
+        print("   - hasShownAddItemGuideAfterName: false")
     }
     
     // MARK: - UI Helpers

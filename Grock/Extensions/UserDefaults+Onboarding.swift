@@ -13,6 +13,7 @@ extension UserDefaults {
         static let userName = "userName"
         static let hasPromptedForNameAfterOnboarding = "hasPromptedForNameAfterOnboarding"
         static let hasPromptedForNameAfterVaultCelebration = "hasPromptedForNameAfterVaultCelebration"
+        static let hasShownAddItemGuideAfterName = "hasShownAddItemGuideAfterName"
     }
     
     var hasCompletedOnboarding: Bool {
@@ -38,5 +39,10 @@ extension UserDefaults {
     var hasPromptedForNameAfterVaultCelebration: Bool {
         get { bool(forKey: Keys.hasPromptedForNameAfterVaultCelebration) }
         set { set(newValue, forKey: Keys.hasPromptedForNameAfterVaultCelebration) }
+    }
+
+    var hasShownAddItemGuideAfterName: Bool {
+        get { bool(forKey: Keys.hasShownAddItemGuideAfterName) }
+        set { set(newValue, forKey: Keys.hasShownAddItemGuideAfterName) }
     }
 }

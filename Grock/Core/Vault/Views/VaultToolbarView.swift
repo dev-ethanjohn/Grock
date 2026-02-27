@@ -10,6 +10,8 @@ struct VaultToolbarView: View {
     var onDismissTapped: (() -> Void)?
     var onClearTapped: (() -> Void)?
     var showClearButton: Bool = false
+    var showAddGuidePopover: Binding<Bool> = .constant(false)
+    var addGuideText: String? = nil
     
     @State private var addButtonScale: CGFloat = 1.0
     @Namespace private var buttonNamespace
@@ -85,6 +87,15 @@ struct VaultToolbarView: View {
                             .matchedGeometryEffect(id: "buttonBackground", in: buttonNamespace)
                     )
                     .scaleEffect(addButtonScale)
+                }
+                .popover(
+                    isPresented: showAddGuidePopover,
+                    attachmentAnchor: .rect(.bounds),
+                    arrowEdge: .top
+                ) {
+                    if let addGuideText, !addGuideText.isEmpty {
+                        addGuidePopoverContent(text: addGuideText)
+                    }
                 }
                 .animation(.spring(response: 0.4, dampingFraction: 0.65), value: showClearButton)
                 .padding(.trailing, 20)
@@ -211,6 +222,45 @@ struct VaultToolbarView: View {
                 addButtonScale = 1.0
             }
         }
+    }
+
+    @ViewBuilder
+    private func addGuidePopoverContent(text: String) -> some View {
+        let parts = text.components(separatedBy: "\n\n")
+        let headline = parts.first ?? text
+        let body = parts.dropFirst().joined(separator: "\n\n")
+
+        if #available(iOS 16.4, *) {
+            guidePopoverTextContent(headline: headline, body: body)
+                .presentationCompactAdaptation(.popover)
+                .presentationBackground(Color.white)
+        } else {
+            guidePopoverTextContent(headline: headline, body: body)
+        }
+    }
+
+    private func guidePopoverTextContent(headline: String, body: String) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(headline)
+                .lexendFont(13, weight: .bold)
+                .foregroundStyle(Color.black)
+                .multilineTextAlignment(.leading)
+                .lineLimit(nil)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(width: 248, alignment: .leading)
+
+            if !body.isEmpty {
+                Text(body)
+                    .lexendFont(13, weight: .regular)
+                    .foregroundStyle(Color.black)
+                    .multilineTextAlignment(.leading)
+                    .lineLimit(nil)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(width: 248, alignment: .leading)
+            }
+        }
+        .padding(24)
+        .background(Color.white)
     }
 }
 
