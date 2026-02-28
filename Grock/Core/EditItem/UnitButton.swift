@@ -52,6 +52,14 @@ struct UnitButton: View {
         isProUser || bypassPlanLocks
     }
 
+    private var isOnboardingPhase: Bool {
+        !UserDefaults.standard.hasCompletedOnboarding
+    }
+
+    private var shouldShowCustomUnitControls: Bool {
+        !isOnboardingPhase
+    }
+
     private var allUnitOptions: [(abbr: String, full: String)] {
         continuousUnits + discreteUnits + customUnitOptions
     }
@@ -78,13 +86,22 @@ struct UnitButton: View {
     
     var body: some View {
         Menu {
-            Button(action: handleAddUnitTap) {
-                Label("Add New Unit", systemImage: canManageCustomUnits ? "plus.circle.fill" : "lock.fill")
-                    .foregroundStyle(canManageCustomUnits ? Color.primary : Color.gray)
+            if isOnboardingPhase {
+                Text("Choose Unit")
+                    .lexend(.subheadline, weight: .semibold)
+                    .foregroundStyle(.secondary)
+                Divider()
             }
-            
-            Divider()
-            
+
+            if shouldShowCustomUnitControls {
+                Button(action: handleAddUnitTap) {
+                    Label("Add New Unit", systemImage: canManageCustomUnits ? "plus.circle.fill" : "lock.fill")
+                        .foregroundStyle(canManageCustomUnits ? Color.primary : Color.gray)
+                }
+
+                Divider()
+            }
+
             // Continuous Units Section
             Section(header: Text("Weight/Volume")) {
                 ForEach(continuousUnits, id: \.abbr) { unitOption in
@@ -99,7 +116,7 @@ struct UnitButton: View {
                 }
             }
 
-            if !customUnitOptions.isEmpty {
+            if shouldShowCustomUnitControls && !customUnitOptions.isEmpty {
                 Section(header: Text("My units")) {
                     ForEach(customUnitOptions, id: \.abbr) { unitOption in
                         if canManageCustomUnits {
@@ -150,7 +167,10 @@ struct UnitButton: View {
             )
         }
         .fullScreenCover(isPresented: $showPaywall) {
-            GrockPaywallView(initialFeatureFocus: paywallFeatureFocus) {
+            GrockPaywallView(
+                initialFeatureFocus: paywallFeatureFocus,
+                celebrationContext: .customUnits
+            ) {
                 paywallFeatureFocus = nil
                 showPaywall = false
             }
@@ -192,6 +212,8 @@ struct UnitButton: View {
     }
 
     private func handleAddUnitTap() {
+        guard shouldShowCustomUnitControls else { return }
+
         guard canManageCustomUnits else {
             presentPaywall(for: .categories)
             return

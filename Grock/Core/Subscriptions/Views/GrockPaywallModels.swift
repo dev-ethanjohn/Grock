@@ -7,6 +7,10 @@ enum GrockPaywallFeatureFocus: String, CaseIterable {
     case stores = "stores"
 }
 
+enum ProUnlockCelebrationContext: String, CaseIterable {
+    case customUnits = "custom-units"
+}
+
 struct GrockPaywallFeature: Identifiable, Hashable {
     let id: String
     let title: String

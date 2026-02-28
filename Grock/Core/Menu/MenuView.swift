@@ -106,6 +106,7 @@ struct MenuView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 10) {
                         manageGrockProRow
+                        debugProCelebrationRow
 
                         Menu {
                             Text("Current: \(currencyMenuTitleString(for: currencyManager.selectedCurrency, includeSelection: false))")
@@ -196,6 +197,8 @@ struct MenuView: View {
                         feedbackSupportSection
                             .padding(.top, sectionGapAfterPrimaryRows)
                         rateAndShareSection
+                            .padding(.top, sectionGapBetweenSecondarySections)
+                        legalAndVersionSection
                             .padding(.top, sectionGapBetweenSecondarySections)
                     }
                     .padding(.leading, listHorizontalPadding)
@@ -328,6 +331,16 @@ struct MenuView: View {
         }
         .buttonStyle(.plain)
     }
+
+    // Temporary testing hook to verify the Pro unlock celebration UI.
+    private var debugProCelebrationRow: some View {
+        Button {
+            NotificationCenter.default.post(name: .toggleProUnlockedCelebration, object: nil)
+        } label: {
+            feedbackRow(title: "Toggle Pro Celebration (Temp)", icon: "🎉")
+        }
+        .buttonStyle(.plain)
+    }
     
     private var feedbackSupportSection: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -407,6 +420,22 @@ struct MenuView: View {
             .buttonStyle(.plain)
         }
     }
+
+    private var legalAndVersionSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            DashedLine()
+                .stroke(style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
+                .frame(height: 1)
+                .foregroundColor(Color.Grock.neutral300)
+                .padding(.horizontal, rowHorizontalPadding)
+                .padding(.top, 4)
+                .padding(.bottom, 8)
+
+            legalInfoRow(title: "Privacy Policy", icon: "🔒")
+            legalInfoRow(title: "Terms of Service", icon: "📄")
+            legalInfoRow(title: "Version", icon: "🏷️", trailingText: appVersionLabel)
+        }
+    }
     
     private func feedbackRow(title: String, icon: String, isHighlighted: Bool = false) -> some View {
         HStack(spacing: 8) {
@@ -455,6 +484,35 @@ struct MenuView: View {
             .scaledToFit()
             .frame(width: 18, height: 18)
             .foregroundColor(color)
+    }
+
+    private func legalInfoRow(title: String, icon: String, trailingText: String? = nil) -> some View {
+        HStack(spacing: 8) {
+            menuEmoji(icon)
+
+            Text(title)
+                .lexendFont(16)
+                .fontWeight(.medium)
+                .foregroundColor(.black)
+
+            Spacer()
+
+            if let trailingText {
+                Text(trailingText)
+                    .lexendFont(13)
+                    .foregroundColor(.gray)
+                    .padding(.trailing, 4)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, rowHorizontalPadding)
+        .padding(.vertical, 2)
+    }
+
+    private var appVersionLabel: String {
+        let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+        let buildNumber = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
+        return "v\(appVersion) (\(buildNumber))"
     }
     
     private var menuCurrencies: [Currency] {

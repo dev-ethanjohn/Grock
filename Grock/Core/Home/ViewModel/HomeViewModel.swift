@@ -258,6 +258,7 @@ final class HomeViewModel {
         UserDefaults.standard.hasPromptedForNameAfterOnboarding = false
         UserDefaults.standard.hasPromptedForNameAfterVaultCelebration = false
         UserDefaults.standard.hasShownAddItemGuideAfterName = false
+        UserDefaults.standard.set("[]", forKey: "customUnitAbbreviationsJSON")
         
         // Reset vault animation flag
         UserDefaults.standard.set(false, forKey: "hasShownVaultAnimation")
@@ -277,6 +278,7 @@ final class HomeViewModel {
         print("   - hasPromptedForNameAfterOnboarding: false")
         print("   - hasPromptedForNameAfterVaultCelebration: false")
         print("   - hasShownAddItemGuideAfterName: false")
+        print("   - custom units: cleared")
     }
     
     // MARK: - UI Helpers

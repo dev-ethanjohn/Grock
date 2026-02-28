@@ -139,6 +139,23 @@ struct ContentView: View {
             let isPro = (notification.userInfo?["isPro"] as? Bool) ?? subscriptionManager.isPro
             refreshStoreSelectionRequirement(isPro: isPro)
         }
+        .onReceive(NotificationCenter.default.publisher(for: .showProUnlockedCelebration)) { notification in
+            Task { @MainActor in
+                let featureRawValue = notification.userInfo?["featureFocus"] as? String
+                let featureFocus = featureRawValue.flatMap(GrockPaywallFeatureFocus.init(rawValue:))
+                let contextRawValue = notification.userInfo?["celebrationContext"] as? String
+                let celebrationContext = contextRawValue.flatMap(ProUnlockCelebrationContext.init(rawValue:))
+                ProUnlockedCelebrationPresenter.shared.show(
+                    featureFocus: featureFocus,
+                    celebrationContext: celebrationContext
+                )
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .toggleProUnlockedCelebration)) { _ in
+            Task { @MainActor in
+                ProUnlockedCelebrationPresenter.shared.toggle()
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("DataUpdated"))) { _ in
             refreshStoreSelectionRequirement(isPro: subscriptionManager.isPro)
         }

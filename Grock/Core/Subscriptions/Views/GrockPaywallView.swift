@@ -26,6 +26,7 @@ struct GrockPaywallView: View {
     @State private var rightChevronOpacity: Double = 1.0
     @State private var showLeftChevron = true
     @State private var showRightChevron = true
+    @State private var shouldShowProCelebrationAfterDismiss = false
     
     // 🐛 Debug state — uncomment to enable
     // @State private var debugMinY: CGFloat = 0
@@ -35,15 +36,18 @@ struct GrockPaywallView: View {
     private let hideThreshold: CGFloat = 126  // 156 - 30
     
     private let initialFeatureFocus: GrockPaywallFeatureFocus?
+    private let celebrationContext: ProUnlockCelebrationContext?
     private let onUnlocked: (() -> Void)?
     private let trialTimelineSectionID = "paywall-trial-timeline-section"
     private let trialTimelineJumpAnchor = UnitPoint(x: 0.5, y: 0.12)
     
     init(
         initialFeatureFocus: GrockPaywallFeatureFocus? = nil,
+        celebrationContext: ProUnlockCelebrationContext? = nil,
         onUnlocked: (() -> Void)? = nil
     ) {
         self.initialFeatureFocus = initialFeatureFocus
+        self.celebrationContext = celebrationContext
         self.onUnlocked = onUnlocked
     }
     
@@ -394,6 +398,21 @@ struct GrockPaywallView: View {
                 updateFloatingControlsVisibility(minY: newVal)
             }
             .onDisappear {
+                if shouldShowProCelebrationAfterDismiss {
+                    var userInfo: [AnyHashable: Any] = [:]
+                    if let featureFocus = initialFeatureFocus {
+                        userInfo["featureFocus"] = featureFocus.rawValue
+                    }
+                    if let celebrationContext {
+                        userInfo["celebrationContext"] = celebrationContext.rawValue
+                    }
+                    NotificationCenter.default.post(
+                        name: .showProUnlockedCelebration,
+                        object: nil,
+                        userInfo: userInfo.isEmpty ? nil : userInfo
+                    )
+                }
+                shouldShowProCelebrationAfterDismiss = false
                 showTrialJumpCapsule = false
                 showLeftChevron = true
                 showRightChevron = true
@@ -426,6 +445,7 @@ struct GrockPaywallView: View {
             defer { purchaseTapGate = false }
             let unlocked = await viewModel.purchaseSelectedPlan()
             if unlocked {
+                shouldShowProCelebrationAfterDismiss = true
                 onUnlocked?()
                 dismiss()
             }
@@ -436,6 +456,7 @@ struct GrockPaywallView: View {
         Task {
             let restored = await viewModel.restorePurchases()
             if restored {
+                shouldShowProCelebrationAfterDismiss = true
                 onUnlocked?()
                 dismiss()
             }
