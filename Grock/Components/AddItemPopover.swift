@@ -60,23 +60,30 @@ struct AddItemPopover: View {
                 )
                 
                 if formViewModel.isFormValid && duplicateError == nil {
-                    Image(systemName: "chevron.down.dotted.2")
-                        .font(.body)
-                        .symbolEffect(.wiggle.down.byLayer, options: .repeat(.continuous))
-                        .scaleEffect(1.0)
-                        .padding(.vertical, 8)
-                        .padding(.top, 4)
-                        .foregroundStyle(Color(.systemGray))
-                        .transition(
-                            .asymmetric(
-                                insertion: .scale(scale: 0.8, anchor: .center)
-                                    .combined(with: .opacity)
-                                    .animation(.spring(response: 0.4, dampingFraction: 0.6, blendDuration: 0.2)),
-                                removal: .scale(scale: 0.8, anchor: .center)
-                                    .combined(with: .opacity)
-                                    .animation(.spring(response: 0.3, dampingFraction: 0.7, blendDuration: 0.1))
-                            )
+                    Group {
+                        if #available(iOS 18.0, *) {
+                            Image(systemName: "chevron.down.dotted.2")
+                                .font(.body)
+                                .symbolEffect(.wiggle.down.byLayer, options: .repeat(.continuous))
+                        } else {
+                            Image(systemName: "chevron.down.dotted.2")
+                                .font(.body)
+                        }
+                    }
+                    .scaleEffect(1.0)
+                    .padding(.vertical, 8)
+                    .padding(.top, 4)
+                    .foregroundStyle(Color(.systemGray))
+                    .transition(
+                        .asymmetric(
+                            insertion: .scale(scale: 0.8, anchor: .center)
+                                .combined(with: .opacity)
+                                .animation(.spring(response: 0.4, dampingFraction: 0.6, blendDuration: 0.2)),
+                            removal: .scale(scale: 0.8, anchor: .center)
+                                .combined(with: .opacity)
+                                .animation(.spring(response: 0.3, dampingFraction: 0.7, blendDuration: 0.1))
                         )
+                    )
                 }
                 
                 FormCompletionButton.doneButton(

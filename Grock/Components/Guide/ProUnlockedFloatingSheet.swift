@@ -5,7 +5,7 @@ struct ProUnlockedFloatingSheet: View {
 
     var body: some View {
         VStack(alignment: .center, spacing: 8) {
-            Text("You made a power move. 💪")
+            Text("You made a power move 💪")
                 .lexendFont(17, weight: .semibold)
                 .foregroundStyle(.black)
                 .multilineTextAlignment(.leading)

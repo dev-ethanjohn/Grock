@@ -22,7 +22,7 @@ class OnboardingViewModel {
     var showCategoryTooltip = false
     
     // Form data using shared ViewModel
-    var formViewModel = ItemFormViewModel(requiresPortion: true, requiresStore: true)
+    var formViewModel = ItemFormViewModel(requiresPortion: false, requiresStore: true)
     
     // Animation States
     var showTextField = false
@@ -37,7 +37,7 @@ class OnboardingViewModel {
     
     // Computed Properties
     var calculatedTotal: Double {
-        let portionValue = formViewModel.portion ?? 0
+        let portionValue = formViewModel.requiresPortion ? (formViewModel.portion ?? 0) : 1
         let priceValue = Double(formViewModel.itemPrice) ?? 0
         return portionValue * priceValue
     }

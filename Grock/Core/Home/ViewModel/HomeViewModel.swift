@@ -230,8 +230,15 @@ final class HomeViewModel {
     }
     
     // MARK: - App Management
-    func resetApp() {
-        // Fully reset SwiftData user and vault so app behaves like a new install
+    func resetLocalCache() -> Bool {
+        let preservedUserName = (
+            vaultService.currentUser?.name ??
+            UserDefaults.standard.userName ??
+            ""
+        )
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Erase local user/vault data while keeping onboarding completion state.
         do {
             let descriptor = FetchDescriptor<User>()
             let users = try modelContext.fetch(descriptor)
@@ -244,24 +251,20 @@ final class HomeViewModel {
             
             vaultService.currentUser = nil
             vaultService.loadUserAndVault()
+
+            if !preservedUserName.isEmpty {
+                vaultService.updateUserName(preservedUserName)
+                UserDefaults.standard.userName = preservedUserName
+            }
         } catch {
             print("❌ Error resetting user and vault: \(error)")
+            return false
         }
 
-        // Reset celebration flags
-        UserDefaults.standard.set(false, forKey: "hasSeenFirstShoppingCartCelebration")
-        UserDefaults.standard.set(false, forKey: "hasSeenVaultCelebration")
-        UserDefaults.standard.hasCompletedOnboarding = false
-        
-        // Reset name-related flags
-        UserDefaults.standard.userName = nil
-        UserDefaults.standard.hasPromptedForNameAfterOnboarding = false
-        UserDefaults.standard.hasPromptedForNameAfterVaultCelebration = false
-        UserDefaults.standard.hasShownAddItemGuideAfterName = false
+        // Clear user-entered local preference payloads tied to vault usage.
         UserDefaults.standard.set("[]", forKey: "customUnitAbbreviationsJSON")
-        
-        // Reset vault animation flag
-        UserDefaults.standard.set(false, forKey: "hasShownVaultAnimation")
+        UserDefaults.standard.freeEditableStoreKeys = []
+        UserDefaults.standard.freePrimaryEditableCartId = nil
 
         // Clear hidden cart state
         hiddenCartIds.removeAll()
@@ -270,15 +273,8 @@ final class HomeViewModel {
         // Reload carts to reflect the reset state
         cartViewModel.loadCarts()
 
-        print("✅ Reset done: Vault cleared and celebration flags reset")
-        print("   - hasSeenFirstShoppingCartCelebration: false")
-        print("   - hasSeenVaultCelebration: false")
-        print("   - hasCompletedOnboarding: false")
-        print("   - userName: cleared")
-        print("   - hasPromptedForNameAfterOnboarding: false")
-        print("   - hasPromptedForNameAfterVaultCelebration: false")
-        print("   - hasShownAddItemGuideAfterName: false")
-        print("   - custom units: cleared")
+        print("✅ Reset local cache complete: local vault and user data cleared")
+        return true
     }
     
     // MARK: - UI Helpers

@@ -24,9 +24,10 @@ struct GrockPaywallStickyBottomPanelView: View {
         switch selectedPlan {
         case .yearly:
             if let monthlyEquivalent = normalizedMonthlyEquivalent(from: selectedCard.detail) {
-                return "Just \(monthlyEquivalent) \(valueEmoji)"
+                let monthlyDisplay = monthlyEquivalent.replacingOccurrences(of: "/mo", with: "/month")
+                return "Free trial for just \(monthlyDisplay) \(valueEmoji)"
             }
-            return "Just \(selectedCard.price)/yr \(valueEmoji)"
+            return "Free trial for just \(selectedCard.price)/year \(valueEmoji)"
         case .monthly:
             if let weeklyEquivalent = normalizedWeeklyEquivalent(from: selectedCard.detail) {
                 return "About \(weeklyEquivalent) \(valueEmoji)"

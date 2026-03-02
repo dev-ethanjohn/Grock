@@ -5,8 +5,6 @@ import RevenueCat
 @MainActor
 @Observable
 final class GrockPaywallViewModel {
-    let termsURL = URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!
-    let privacyURL = URL(string: "https://grock.app/privacy")!
     private let yearlyTrialDays = 7
 
     var selectedPlan: GrockPaywallPlanCardModel.Plan = .yearly
@@ -93,6 +91,41 @@ final class GrockPaywallViewModel {
         return "Start \(trialDays)-\(dayUnit) Free Trial"
     }
 
+    var shouldShowOfferingsLoadingState: Bool {
+        subscriptionManager.isLoadingOfferings && !hasAnyAvailablePackage
+    }
+
+    var shouldShowOfferingsUnavailableState: Bool {
+        !subscriptionManager.isLoadingOfferings
+        && !hasAnyAvailablePackage
+        && subscriptionManager.hasLoadedAtLeastOnce
+    }
+
+    var offeringsUnavailableTitle: String {
+        isLikelyNetworkIssue ? "No internet connection" : "Unable to load plans"
+    }
+
+    var offeringsUnavailableMessage: String {
+        if isLikelyNetworkIssue {
+            return "We couldn't load Grock Pro plans. Check your connection and try again."
+        }
+
+        if let message = subscriptionManager.lastErrorMessage,
+           !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return message
+        }
+
+        return "We couldn't load Grock Pro plans right now. Please try again."
+    }
+
+    var shouldShowConnectionWarningBanner: Bool {
+        hasAnyAvailablePackage && isLikelyNetworkIssue
+    }
+
+    var connectionWarningMessage: String {
+        "You're offline. Showing last available plans."
+    }
+
     var trialTimelineItems: [GrockPaywallTimelineItem] {
         [
             .init(
@@ -139,6 +172,10 @@ final class GrockPaywallViewModel {
     func refreshAll() async {
         await subscriptionManager.refreshAll()
         alignDefaultPlanToAvailability()
+    }
+
+    func retryOfferingsLoad() async {
+        await refreshAll()
     }
 
     func purchaseSelectedPlan() async -> Bool {
@@ -213,6 +250,27 @@ final class GrockPaywallViewModel {
         case .yearly:
             return subscriptionManager.yearlyPackage
         }
+    }
+
+    private var hasAnyAvailablePackage: Bool {
+        subscriptionManager.monthlyPackage != nil || subscriptionManager.yearlyPackage != nil
+    }
+
+    private var isLikelyNetworkIssue: Bool {
+        let message = (subscriptionManager.lastErrorMessage ?? "").lowercased()
+        guard !message.isEmpty else { return false }
+
+        let offlineMarkers = [
+            "internet",
+            "offline",
+            "network",
+            "timed out",
+            "timeout",
+            "could not connect",
+            "not connected"
+        ]
+
+        return offlineMarkers.contains(where: { message.contains($0) })
     }
 
     private var monthlyModel: GrockPaywallPlanCardModel {

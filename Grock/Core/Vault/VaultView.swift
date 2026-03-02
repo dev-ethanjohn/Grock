@@ -692,6 +692,7 @@ struct VaultView: View {
 
         let taskID = UUID()
         addItemGuideTaskID = taskID
+        let resolvedDelay = max(delay, 0.5)
 
         let presentGuide: () -> Void = {
             guard addItemGuideTaskID == taskID else { return }
@@ -708,12 +709,7 @@ struct VaultView: View {
             }
         }
 
-        if delay <= 0 {
-            presentGuide()
-            return
-        }
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + resolvedDelay) {
             presentGuide()
         }
     }

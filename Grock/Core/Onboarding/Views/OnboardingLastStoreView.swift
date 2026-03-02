@@ -3,6 +3,7 @@ import SwiftUI
 struct OnboardingLastStoreView: View {
     @Bindable var viewModel: OnboardingViewModel
     @FocusState private var storeFieldIsFocused: Bool
+    @State private var infoPopoverTaskID = UUID()
     
     var body: some View {
         VStack {
@@ -23,8 +24,12 @@ struct OnboardingLastStoreView: View {
         }
         .onAppear {
             viewModel.animateStoreFieldAppearance()
-            viewModel.showInfoDropdownWithDelay()
+            presentInfoPopoverOnFirstAppearance()
             storeFieldIsFocused = true
+        }
+        .onDisappear {
+            infoPopoverTaskID = UUID()
+            viewModel.showInfoDropdown = false
         }
         .onChange(of: viewModel.formViewModel.storeName) { oldValue, newValue in
             if viewModel.formViewModel.isValidStoreName {
@@ -99,52 +104,45 @@ struct OnboardingLastStoreView: View {
     
     private var infoButton: some View {
         Button(action: {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                viewModel.showInfoDropdown = true
-            }
-            
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                    viewModel.showInfoDropdown = false
-                }
-            }
+            presentInfoPopover()
         }) {
             Image(systemName: "info.circle")
                 .font(.system(size: 20))
                 .foregroundColor(.secondary)
                 .padding(.top)
         }
-        .overlay(alignment: .topLeading) {
-            if viewModel.showInfoDropdown {
-                infoDropdown
-            }
+        .popover(
+            isPresented: $viewModel.showInfoDropdown,
+            attachmentAnchor: .point(.center),
+            arrowEdge: .bottom
+        ) {
+            infoPopoverContent
         }
     }
     
-    private var infoDropdown: some View {
+    @ViewBuilder
+    private var infoPopoverContent: some View {
+        if #available(iOS 16.4, *) {
+            infoPopoverBody
+                .presentationCompactAdaptation(.popover)
+                .presentationBackground(Color.white)
+        } else {
+            infoPopoverBody
+        }
+    }
+
+    private var infoPopoverBody: some View {
         VStack(alignment: .leading, spacing: 0) {
             Text("Add store so prices match where you shop — not just estimates.")
-                .font(.caption)
-                .foregroundColor(.primary)
-                .padding(12)
+                .lexendFont(13, weight: .regular)
+                .foregroundStyle(Color.black)
                 .multilineTextAlignment(.leading)
+                .lineLimit(nil)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(width: 248, alignment: .leading)
         }
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Material.ultraThick)
-                .shadow(color: .black.opacity(0.2), radius: 20, x: 0, y: 4)
-        )
-        .frame(width: 240)
-        .frame(height: 200)
-        .offset(x: 12, y: -120)
-        .transition(.asymmetric(
-            insertion: .scale(scale: 0.85, anchor: .topLeading)
-                .combined(with: .opacity)
-                .animation(.spring(response: 0.3, dampingFraction: 0.5)),
-            removal: .scale(scale: 0.95, anchor: .topLeading)
-                .combined(with: .opacity)
-                .animation(.spring(response: 0.15, dampingFraction: 0.75))
-        ))
+        .padding(24)
+        .background(Color.white)
     }
     
     private var nextButton: some View {
@@ -160,6 +158,53 @@ struct OnboardingLastStoreView: View {
             }
             
             viewModel.navigateToFirstItemDataScreen()
+        }
+    }
+
+    private func presentInfoPopoverOnFirstAppearance() {
+        guard !viewModel.hasShownInfoDropdown else { return }
+        viewModel.hasShownInfoDropdown = true
+
+        let taskID = UUID()
+        infoPopoverTaskID = taskID
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+            guard infoPopoverTaskID == taskID else { return }
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                viewModel.showInfoDropdown = true
+            }
+            scheduleInfoPopoverDismiss(taskID: taskID)
+        }
+    }
+
+    private func presentInfoPopover() {
+        let taskID = UUID()
+        infoPopoverTaskID = taskID
+
+        if viewModel.showInfoDropdown {
+            viewModel.showInfoDropdown = false
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                guard infoPopoverTaskID == taskID else { return }
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    viewModel.showInfoDropdown = true
+                }
+                scheduleInfoPopoverDismiss(taskID: taskID)
+            }
+            return
+        }
+
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            viewModel.showInfoDropdown = true
+        }
+        scheduleInfoPopoverDismiss(taskID: taskID)
+    }
+
+    private func scheduleInfoPopoverDismiss(taskID: UUID) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+            guard infoPopoverTaskID == taskID else { return }
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                viewModel.showInfoDropdown = false
+            }
         }
     }
 }

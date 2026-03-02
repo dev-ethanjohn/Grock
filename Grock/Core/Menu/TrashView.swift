@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import Lottie
 
 struct TrashView: View {
     private enum RestoreBlockReason {
@@ -75,7 +76,10 @@ struct TrashView: View {
                         Text("Trash is empty")
                             .fuzzyBubblesFont(28, weight: .bold)
                     } icon: {
-                        Image(systemName: "trash")
+                        LottieView(animation: .named("Trash"))
+                            .playing(.fromProgress(0, toProgress: 1, loopMode: .loop))
+                            .allowsHitTesting(false)
+                            .frame(width: 96, height: 96)
                     }
                 } description: {
                     Text("Deleted items will appear here.")

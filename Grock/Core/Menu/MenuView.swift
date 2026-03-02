@@ -2,7 +2,6 @@ import SwiftUI
 import UserJot
 import WebKit
 import Darwin
-import RevenueCatUI
 
 struct MenuView: View {
     @Environment(VaultService.self) private var vaultService
@@ -14,9 +13,11 @@ struct MenuView: View {
     @State private var showMailUnavailableAlert = false
     @State private var subscriptionManager = SubscriptionManager.shared
     @State private var showingPaywall = false
-    @State private var showingCustomerCenter = false
-    @State private var showSubscriptionAlert = false
-    @State private var subscriptionAlertMessage = ""
+    @State private var showingManageSubscriptionSheet = false
+    @State private var showingPrivacyPolicySheet = false
+    @State private var showingTermsOfServiceSheet = false
+    @State private var showingResetLocalCacheAlert = false
+    @State private var showingResetLocalCacheSuccessAlert = false
     private let selectedAccent = Color.Grock.budgetSafe
     private let stickyHeaderHeight: CGFloat = 156
     private let listHorizontalPadding: CGFloat = 12
@@ -95,9 +96,14 @@ struct MenuView: View {
     private let supportEmailAddress = "support@grock.app"
     private let shareAppURL = URL(string: "https://grock.app")!
     private let shareAppMessage = "Check out Grock for tracking trips, items, and grocery budgets."
+    private let onResetLocalCache: () -> Bool
     
-    init(isEditingName: Binding<Bool> = .constant(false)) {
+    init(
+        isEditingName: Binding<Bool> = .constant(false),
+        onResetLocalCache: @escaping () -> Bool = { true }
+    ) {
         self._isEditingName = isEditingName
+        self.onResetLocalCache = onResetLocalCache
     }
     
     var body: some View {
@@ -105,8 +111,7 @@ struct MenuView: View {
             ZStack(alignment: .topLeading) {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 10) {
-                        manageGrockProRow
-                        debugProCelebrationRow
+                        manageGrockProSection
 
                         Menu {
                             Text("Current: \(currencyMenuTitleString(for: currencyManager.selectedCurrency, includeSelection: false))")
@@ -137,7 +142,7 @@ struct MenuView: View {
                                 
                                 Text("Currency")
                                     .lexendFont(16)
-                                    .fontWeight(.medium)
+                                    .fontWeight(.regular)
                                     .foregroundColor(Color.black)
                                 
                                 Spacer()
@@ -162,7 +167,7 @@ struct MenuView: View {
                                 
                                 Text("Manage Stores")
                                     .lexendFont(16)
-                                    .fontWeight(.medium)
+                                    .fontWeight(.regular)
                                     .foregroundColor(Color.black)
                                 
                                 Spacer()
@@ -182,7 +187,7 @@ struct MenuView: View {
                                 
                                 Text("Trash")
                                     .lexendFont(16)
-                                    .fontWeight(.medium)
+                                    .fontWeight(.regular)
                                     .foregroundColor(Color.black)
                                 
                                 Spacer()
@@ -199,6 +204,8 @@ struct MenuView: View {
                         rateAndShareSection
                             .padding(.top, sectionGapBetweenSecondarySections)
                         legalAndVersionSection
+                            .padding(.top, sectionGapBetweenSecondarySections)
+                        resetSection
                             .padding(.top, sectionGapBetweenSecondarySections)
                     }
                     .padding(.leading, listHorizontalPadding)
@@ -221,13 +228,38 @@ struct MenuView: View {
         } message: {
             Text("Please set up the Mail app to contact support.")
         }
-        .alert("Subscription", isPresented: $showSubscriptionAlert) {
+        .alert("Reset Local Cache", isPresented: $showingResetLocalCacheAlert) {
+            Button("Cancel", role: .cancel) {}
+            Button("Reset Local Cache", role: .destructive) {
+                if onResetLocalCache() {
+                    showingResetLocalCacheSuccessAlert = true
+                }
+            }
+        } message: {
+            Text("This will erase local data on this device: vault items, custom categories, stores, carts, trip history, and custom units. This cannot be undone.")
+        }
+        .alert("Local Cache Reset", isPresented: $showingResetLocalCacheSuccessAlert) {
             Button("OK", role: .cancel) { }
         } message: {
-            Text(subscriptionAlertMessage)
+            Text("Your local Grock data was cleared successfully.")
         }
         .sheet(isPresented: $showingFeedbackSheet) {
             MenuUserJotFeedbackScreen()
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $showingManageSubscriptionSheet) {
+            ManageSubscriptionSheet()
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $showingPrivacyPolicySheet) {
+            LegalDocumentSheet(document: .privacyPolicy)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $showingTermsOfServiceSheet) {
+            LegalDocumentSheet(document: .termsOfService)
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
         }
@@ -236,18 +268,6 @@ struct MenuView: View {
                 showingPaywall = false
             }
         }
-        .presentCustomerCenter(
-            isPresented: $showingCustomerCenter,
-            restoreCompleted: { _ in
-                Task {
-                    await subscriptionManager.refreshCustomerInfo()
-                }
-            },
-            restoreFailed: { error in
-                subscriptionAlertMessage = "Restore failed: \(error.localizedDescription)"
-                showSubscriptionAlert = true
-            }
-        )
     }
     
     private var stickyHeader: some View {
@@ -298,14 +318,14 @@ struct MenuView: View {
     private var menuHeaderBackground: some View {
         ZStack {
             Rectangle()
-                .fill(.white)
+                .fill(.ultraThinMaterial)
                 .mask(
                     LinearGradient(
                         stops: [
                             .init(color: .white, location: 0),
-                            .init(color: .white, location: 0.7),
-                            .init(color: .white.opacity(0.9), location: 0.85),
-                            .init(color: .white.opacity(0.7), location: 0.95),
+                            .init(color: .white, location: 0.82),
+                            .init(color: .white.opacity(0.8), location: 0.9),
+                            .init(color: .white.opacity(0.4), location: 0.96),
                             .init(color: .white.opacity(0), location: 1.0)
                         ],
                         startPoint: .top,
@@ -316,32 +336,70 @@ struct MenuView: View {
     }
 
     private var manageGrockProRow: some View {
-        Button {
-            if subscriptionManager.isPro {
-                showingCustomerCenter = true
+        let isPro = subscriptionManager.isPro
+        let title = isPro ? "Grock Pro Active" : "Unlock Grock Pro"
+        let subtitle = isPro
+            ? "Everything in Grock is unlocked for you."
+            : "Unlimited carts, stores, categories, units, and more..."
+        let cardShape = RoundedRectangle(cornerRadius: 16, style: .continuous)
+
+        return Button {
+            if isPro {
+                showingManageSubscriptionSheet = true
             } else {
                 showingPaywall = true
             }
         } label: {
-            feedbackRow(
-                title: subscriptionManager.isPro ? "Manage Grock Pro" : "Unlock Grock Pro",
-                icon: "✨",
-                isHighlighted: !subscriptionManager.isPro
-            )
+            HStack(alignment: .top, spacing: 10) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .fuzzyBubblesFont(18, weight: .bold)
+                        .foregroundStyle(.white)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    Text(subtitle)
+                        .lexendFont(11, weight: .light)
+                        .foregroundStyle(Color.white.opacity(0.92))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                trailingForwardIcon(color: .white.opacity(0.88))
+                    .padding(.top, 2)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background {
+                cardShape
+                    .fill(Color.Grock.budgetSafe)
+                    .overlay {
+                        Image("selected_sub")
+                            .resizable()
+                            .scaledToFill()
+                    }
+                    .overlay {
+                        cardShape
+                            .fill(Color.black.opacity(0.2))
+                    }
+                    .clipShape(cardShape)
+            }
+            .overlay {
+                cardShape
+                    .stroke(Color.white.opacity(0.18), lineWidth: 1)
+            }
+            .clipShape(cardShape)
         }
         .buttonStyle(.plain)
+        .padding(.horizontal, rowHorizontalPadding)
     }
 
-    // Temporary testing hook to verify the Pro unlock celebration UI.
-    private var debugProCelebrationRow: some View {
-        Button {
-            NotificationCenter.default.post(name: .toggleProUnlockedCelebration, object: nil)
-        } label: {
-            feedbackRow(title: "Toggle Pro Celebration (Temp)", icon: "🎉")
+    private var manageGrockProSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            manageGrockProRow
         }
-        .buttonStyle(.plain)
     }
-    
+
     private var feedbackSupportSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             DashedLine()
@@ -380,7 +438,7 @@ struct MenuView: View {
 
                     Text("Rate Grock")
                         .lexendFont(16)
-                        .fontWeight(.medium)
+                        .fontWeight(.regular)
                         .foregroundColor(.black)
                     
                     Spacer()
@@ -400,7 +458,7 @@ struct MenuView: View {
                     
                     Text("Share Grock")
                         .lexendFont(16)
-                        .fontWeight(.medium)
+                        .fontWeight(.regular)
                         .foregroundColor(.black)
                     
                     Spacer()
@@ -431,9 +489,52 @@ struct MenuView: View {
                 .padding(.top, 4)
                 .padding(.bottom, 8)
 
-            legalInfoRow(title: "Privacy Policy", icon: "🔒")
-            legalInfoRow(title: "Terms of Service", icon: "📄")
+            Button {
+                showingPrivacyPolicySheet = true
+            } label: {
+                legalInfoRow(title: "Privacy Policy", icon: "🔒", showsChevron: true)
+            }
+            .buttonStyle(.plain)
+
+            Button {
+                showingTermsOfServiceSheet = true
+            } label: {
+                legalInfoRow(title: "Terms of Service", icon: "📄", showsChevron: true)
+            }
+            .buttonStyle(.plain)
+
             legalInfoRow(title: "Version", icon: "🏷️", trailingText: appVersionLabel)
+        }
+    }
+
+    private var resetSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            DashedLine()
+                .stroke(style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
+                .frame(height: 1)
+                .foregroundColor(Color.Grock.neutral300)
+                .padding(.horizontal, rowHorizontalPadding)
+                .padding(.top, 4)
+                .padding(.bottom, 8)
+
+            Button(role: .destructive) {
+                showingResetLocalCacheAlert = true
+            } label: {
+                HStack(spacing: 8) {
+                    menuEmoji("♻️")
+
+                    Text("Reset Local Cache")
+                        .lexendFont(16)
+                        .fontWeight(.regular)
+                        .foregroundColor(.red)
+
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, rowHorizontalPadding)
+                .padding(.vertical, 2)
+            }
+            .buttonStyle(.plain)
         }
     }
     
@@ -443,7 +544,7 @@ struct MenuView: View {
             
             Text(title)
                 .lexendFont(16)
-                .fontWeight(.medium)
+                .fontWeight(.regular)
                 .foregroundColor(.black)
             
             Spacer()
@@ -486,13 +587,18 @@ struct MenuView: View {
             .foregroundColor(color)
     }
 
-    private func legalInfoRow(title: String, icon: String, trailingText: String? = nil) -> some View {
+    private func legalInfoRow(
+        title: String,
+        icon: String,
+        trailingText: String? = nil,
+        showsChevron: Bool = false
+    ) -> some View {
         HStack(spacing: 8) {
             menuEmoji(icon)
 
             Text(title)
                 .lexendFont(16)
-                .fontWeight(.medium)
+                .fontWeight(.regular)
                 .foregroundColor(.black)
 
             Spacer()
@@ -502,6 +608,8 @@ struct MenuView: View {
                     .lexendFont(13)
                     .foregroundColor(.gray)
                     .padding(.trailing, 4)
+            } else if showsChevron {
+                trailingForwardIcon()
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -511,8 +619,7 @@ struct MenuView: View {
 
     private var appVersionLabel: String {
         let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
-        let buildNumber = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
-        return "v\(appVersion) (\(buildNumber))"
+        return appVersion
     }
     
     private var menuCurrencies: [Currency] {

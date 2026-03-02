@@ -8,9 +8,6 @@
 
 /* Begin PBXBuildFile section */
 		4C5FE1352F3C6F03006400BE /* RevenueCat in Frameworks */ = {isa = PBXBuildFile; productRef = 4C5FE1342F3C6F03006400BE /* RevenueCat */; };
-		4C5FE1372F3C6F03006400BE /* RevenueCatUI in Frameworks */ = {isa = PBXBuildFile; productRef = 4C5FE1362F3C6F03006400BE /* RevenueCatUI */; };
-		4C69B5B52F2613130078BEBF /* Glur in Frameworks */ = {isa = PBXBuildFile; productRef = 4C69B5B42F2613130078BEBF /* Glur */; };
-		4C76BFED2ED6B13400F98D86 /* SwiftUIIntrospect in Frameworks */ = {isa = PBXBuildFile; productRef = 4C76BFEC2ED6B13400F98D86 /* SwiftUIIntrospect */; };
 		4CA62ABE2F3F908700916837 /* UserJot in Frameworks */ = {isa = PBXBuildFile; productRef = 4CA62ABD2F3F908700916837 /* UserJot */; };
 		4CA669322EB55D3F00769F3F /* Lottie in Frameworks */ = {isa = PBXBuildFile; productRef = 4CA669312EB55D3F00769F3F /* Lottie */; };
 /* End PBXBuildFile section */
@@ -54,10 +51,7 @@
 			files = (
 				4C5FE1352F3C6F03006400BE /* RevenueCat in Frameworks */,
 				4CA669322EB55D3F00769F3F /* Lottie in Frameworks */,
-				4C76BFED2ED6B13400F98D86 /* SwiftUIIntrospect in Frameworks */,
 				4CA62ABE2F3F908700916837 /* UserJot in Frameworks */,
-				4C5FE1372F3C6F03006400BE /* RevenueCatUI in Frameworks */,
-				4C69B5B52F2613130078BEBF /* Glur in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -101,10 +95,7 @@
 			name = Grock;
 			packageProductDependencies = (
 				4CA669312EB55D3F00769F3F /* Lottie */,
-				4C76BFEC2ED6B13400F98D86 /* SwiftUIIntrospect */,
-				4C69B5B42F2613130078BEBF /* Glur */,
 				4C5FE1342F3C6F03006400BE /* RevenueCat */,
-				4C5FE1362F3C6F03006400BE /* RevenueCatUI */,
 				4CA62ABD2F3F908700916837 /* UserJot */,
 			);
 			productName = Grock;
@@ -137,8 +128,6 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				4CA669302EB55D3F00769F3F /* XCRemoteSwiftPackageReference "lottie-ios" */,
-				4C76BFEB2ED6B13400F98D86 /* XCRemoteSwiftPackageReference "swiftui-introspect" */,
-				4C69B5B32F2613130078BEBF /* XCRemoteSwiftPackageReference "Glur" */,
 				4C5FE1332F3C6F03006400BE /* XCRemoteSwiftPackageReference "purchases-ios-spm" */,
 				4CA62ABC2F3F908700916837 /* XCRemoteSwiftPackageReference "userjot-ios" */,
 			);
@@ -301,8 +290,9 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 1.0;
 				DEVELOPMENT_TEAM = 23C886DGJJ;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -310,20 +300,21 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
+				INFOPLIST_KEY_UIStatusBarHidden = NO;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
-				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1;
+				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.origethanjohnpaguntalan.grock;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
 		};
@@ -332,8 +323,9 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 1.0;
 				DEVELOPMENT_TEAM = 23C886DGJJ;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -341,20 +333,21 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
+				INFOPLIST_KEY_UIStatusBarHidden = NO;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
-				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1;
+				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ethanjohnpaguntalan.ios.GrockBudgeting;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Release;
 		};
@@ -390,22 +383,6 @@
 				minimumVersion = 5.58.0;
 			};
 		};
-		4C69B5B32F2613130078BEBF /* XCRemoteSwiftPackageReference "Glur" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/joogps/Glur";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 1.1.0;
-			};
-		};
-		4C76BFEB2ED6B13400F98D86 /* XCRemoteSwiftPackageReference "swiftui-introspect" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/siteline/swiftui-introspect";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 26.0.0;
-			};
-		};
 		4CA62ABC2F3F908700916837 /* XCRemoteSwiftPackageReference "userjot-ios" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/UserJot/userjot-ios";
@@ -429,21 +406,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 4C5FE1332F3C6F03006400BE /* XCRemoteSwiftPackageReference "purchases-ios-spm" */;
 			productName = RevenueCat;
-		};
-		4C5FE1362F3C6F03006400BE /* RevenueCatUI */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 4C5FE1332F3C6F03006400BE /* XCRemoteSwiftPackageReference "purchases-ios-spm" */;
-			productName = RevenueCatUI;
-		};
-		4C69B5B42F2613130078BEBF /* Glur */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 4C69B5B32F2613130078BEBF /* XCRemoteSwiftPackageReference "Glur" */;
-			productName = Glur;
-		};
-		4C76BFEC2ED6B13400F98D86 /* SwiftUIIntrospect */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 4C76BFEB2ED6B13400F98D86 /* XCRemoteSwiftPackageReference "swiftui-introspect" */;
-			productName = SwiftUIIntrospect;
 		};
 		4CA62ABD2F3F908700916837 /* UserJot */ = {
 			isa = XCSwiftPackageProductDependency;

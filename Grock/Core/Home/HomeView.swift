@@ -65,7 +65,10 @@ struct HomeView: View {
             ZStack(alignment: .top) {
                 Color(hex: "#ffffff").ignoresSafeArea()
                 
-                MenuView(isEditingName: $isEditingName)
+                MenuView(
+                    isEditingName: $isEditingName,
+                    onResetLocalCache: viewModel.resetLocalCache
+                )
                     .opacity(viewModel.showMenu ? 1 : 0)
                     .offset(x: viewModel.showMenu ? 0 : -300)
                     .rotation3DEffect(
@@ -387,27 +390,9 @@ struct HomeView: View {
     }
     
     private var homeMenu: some View {
-        HStack {
-            MenuIcon {
-                withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
-                    viewModel.toggleMenu()
-                }
-            }
-            
-            Menu {
-                Section {
-                    Button(role: .destructive, action: viewModel.resetApp) {
-                        Label(
-                            "Reset App (Testing)",
-                            systemImage: "arrow.counterclockwise"
-                        )
-                    }
-                }
-            } label: {
-                Image(systemName: "arrow.counterclockwise")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 24, height: 20)
+        MenuIcon {
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+                viewModel.toggleMenu()
             }
         }
         .padding(.top, safeAreaTopPadding + 8)
@@ -735,6 +720,8 @@ struct HomeView: View {
         guard !hasShownVaultAnimation,
               !viewModel.showVault,
               viewModel.selectedCart == nil,
+              viewModel.pendingSelectedCart == nil,
+              viewModel.pendingCartToShow == nil,
               hasCompletedOnboarding,
               let name = vaultService.currentUser?.name, !name.isEmpty else {
             print("DEBUG: Conditions not met for vault animation")

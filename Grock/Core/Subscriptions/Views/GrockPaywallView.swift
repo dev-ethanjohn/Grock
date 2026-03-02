@@ -3,7 +3,6 @@ import SwiftUI
 //MARK: commented code are for debugs later.
 struct GrockPaywallView: View {
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.openURL) private var openURL
     
     @State private var viewModel = GrockPaywallViewModel()
     @State private var selectedFeatureIndex = 0
@@ -27,6 +26,8 @@ struct GrockPaywallView: View {
     @State private var showLeftChevron = true
     @State private var showRightChevron = true
     @State private var shouldShowProCelebrationAfterDismiss = false
+    @State private var showingPrivacyPolicySheet = false
+    @State private var showingTermsOfServiceSheet = false
     
     // 🐛 Debug state — uncomment to enable
     // @State private var debugMinY: CGFloat = 0
@@ -206,6 +207,92 @@ struct GrockPaywallView: View {
         }
         .buttonStyle(.plain)
     }
+
+    private var shouldShowOfferingsFallback: Bool {
+        viewModel.shouldShowOfferingsLoadingState || viewModel.shouldShowOfferingsUnavailableState
+    }
+
+    private var offeringsFallbackSection: some View {
+        VStack(spacing: 14) {
+            Image(systemName: viewModel.shouldShowOfferingsLoadingState ? "hourglass" : "wifi.exclamationmark")
+                .font(.system(size: 30, weight: .semibold))
+                .foregroundStyle(.black.opacity(0.75))
+
+            Text(viewModel.shouldShowOfferingsLoadingState ? "Loading Grock Pro plans..." : viewModel.offeringsUnavailableTitle)
+                .lexend(.title3, weight: .semibold)
+                .foregroundStyle(.black)
+                .multilineTextAlignment(.center)
+
+            if !viewModel.shouldShowOfferingsLoadingState {
+                Text(viewModel.offeringsUnavailableMessage)
+                    .lexend(.subheadline, weight: .regular)
+                    .foregroundStyle(.black.opacity(0.72))
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if viewModel.shouldShowOfferingsLoadingState {
+                ProgressView()
+                    .progressViewStyle(.circular)
+                    .tint(.black)
+            } else {
+                Button {
+                    Task { @MainActor in
+                        await viewModel.retryOfferingsLoad()
+                        applyInitialFeatureFocusIfNeeded()
+                    }
+                } label: {
+                    Text("Retry")
+                        .lexend(.subheadline, weight: .semibold)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 10)
+                        .background(
+                            Capsule()
+                                .fill(Color.black.opacity(0.86))
+                        )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 22)
+        .background(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .fill(.white.opacity(0.9))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                )
+                .shadow(color: .black.opacity(0.10), radius: 14, x: 0, y: 6)
+        )
+        .padding(.horizontal, 16)
+        .padding(.top, 10)
+    }
+
+    private var connectionWarningBanner: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "wifi.slash")
+                .font(.system(size: 12, weight: .semibold))
+            Text(viewModel.connectionWarningMessage)
+                .lexend(.footnote, weight: .medium)
+                .lineLimit(2)
+        }
+        .foregroundStyle(.black.opacity(0.82))
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(
+            Capsule()
+                .fill(.white.opacity(0.88))
+                .overlay(
+                    Capsule()
+                        .stroke(Color.black.opacity(0.10), lineWidth: 1)
+                )
+        )
+        .padding(.horizontal, 20)
+        .padding(.top, 6)
+    }
     
     var body: some View {
         ScrollViewReader { scrollProxy in
@@ -237,53 +324,61 @@ struct GrockPaywallView: View {
                 ScrollView(showsIndicators: false) {
                     VStack(alignment: .center, spacing: 18) {
                         GrockPaywallTopHeaderView()
-                        
-                        GrockPaywallFeatureCarouselSectionView(
-                            features: viewModel.features,
-                            selectedIndex: $selectedFeatureIndex,
-                            onManualInteraction: {}
-                        )
-                        .padding(.horizontal, 20)
-                        .background(
-                            GeometryReader { proxy in
-                                let minY = proxy.frame(in: .global).minY
-                                let maxY = proxy.frame(in: .global).maxY
-                                
-                                Color.clear
-                                    .preference(
-                                        key: PaywallCarouselMaxYPreferenceKey.self,
-                                        value: maxY
-                                    )
-                                    .onChange(of: minY) { _, newVal in
-                                        // debugMinY = newVal
-                                        carouselGlobalMinY = newVal
-                                    }
-                                    .onChange(of: maxY) { _, newVal in
-                                        // debugMaxY = newVal
-                                        carouselGlobalMaxY = newVal
-                                    }
+
+                        if shouldShowOfferingsFallback {
+                            offeringsFallbackSection
+                        } else {
+                            if viewModel.shouldShowConnectionWarningBanner {
+                                connectionWarningBanner
                             }
-                        )
-                        
-                        if viewModel.showsTrialMessaging {
-                            GrockPaywallTrialTimelineView(
-                                items: viewModel.trialTimelineItems,
-                                summaryText: viewModel.selectedPlanSummaryText
+
+                            GrockPaywallFeatureCarouselSectionView(
+                                features: viewModel.features,
+                                selectedIndex: $selectedFeatureIndex,
+                                onManualInteraction: {}
                             )
-                            .padding(.horizontal, 16)
-                            .id(trialTimelineSectionID)
+                            .padding(.horizontal, 20)
+                            .background(
+                                GeometryReader { proxy in
+                                    let minY = proxy.frame(in: .global).minY
+                                    let maxY = proxy.frame(in: .global).maxY
+                                    
+                                    Color.clear
+                                        .preference(
+                                            key: PaywallCarouselMaxYPreferenceKey.self,
+                                            value: maxY
+                                        )
+                                        .onChange(of: minY) { _, newVal in
+                                            // debugMinY = newVal
+                                            carouselGlobalMinY = newVal
+                                        }
+                                        .onChange(of: maxY) { _, newVal in
+                                            // debugMaxY = newVal
+                                            carouselGlobalMaxY = newVal
+                                        }
+                                }
+                            )
                             
-                            VStack(spacing: 2) {
-                                Text("✓ No payment today")
-                                Text("Cancel anytime!")
+                            if viewModel.showsTrialMessaging {
+                                GrockPaywallTrialTimelineView(
+                                    items: viewModel.trialTimelineItems,
+                                    summaryText: viewModel.selectedPlanSummaryText
+                                )
+                                .padding(.horizontal, 16)
+                                .id(trialTimelineSectionID)
+                                
+                                VStack(spacing: 2) {
+                                    Text("✓ No payment today")
+                                    Text("Cancel anytime!")
+                                }
+                                .frame(width: UIScreen.main.bounds.size.width * 0.7)
+                                .lexend(.subheadline, weight: .medium)
+                                .foregroundStyle(.black)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .multilineTextAlignment(.center)
+                                .lineLimit(2)
+                                .padding(.top, 16)
                             }
-                            .frame(width: UIScreen.main.bounds.size.width * 0.7)
-                            .lexend(.subheadline, weight: .medium)
-                            .foregroundStyle(.black)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .multilineTextAlignment(.center)
-                            .lineLimit(2)
-                            .padding(.top, 16)
                         }
                         
                     
@@ -324,37 +419,39 @@ struct GrockPaywallView: View {
             }
             .overlay(alignment: .bottom) {
                 VStack(spacing: 6) {
-                    ZStack {
-                        // Capsule — centered
-                        if showTrialJumpCapsule && viewModel.showsTrialMessaging {
-                            GrockPaywallTimelineJumpCapsuleView {
-                                handleTrialJumpTap(using: scrollProxy)
+                    if !shouldShowOfferingsFallback {
+                        ZStack {
+                            // Capsule — centered
+                            if showTrialJumpCapsule && viewModel.showsTrialMessaging {
+                                GrockPaywallTimelineJumpCapsuleView {
+                                    handleTrialJumpTap(using: scrollProxy)
+                                }
+                                .scaleEffect(trialJumpCapsuleScale)
+                                .opacity(trialJumpCapsuleOpacity)
                             }
-                            .scaleEffect(trialJumpCapsuleScale)
-                            .opacity(trialJumpCapsuleOpacity)
-                        }
-                        
-                        if showLeftChevron {
-                            HStack {
-                                chevronButton(systemName: "chevron.left", action: selectPreviousFeature)
-                                    .padding(.leading, 20)
-                                    .scaleEffect(leftChevronScale, anchor: .leading)
-                                    .opacity(leftChevronOpacity)
-                                Spacer()
+                            
+                            if showLeftChevron {
+                                HStack {
+                                    chevronButton(systemName: "chevron.left", action: selectPreviousFeature)
+                                        .padding(.leading, 20)
+                                        .scaleEffect(leftChevronScale, anchor: .leading)
+                                        .opacity(leftChevronOpacity)
+                                    Spacer()
+                                }
+                            }
+                            
+                            if showRightChevron {
+                                HStack {
+                                    Spacer()
+                                    chevronButton(systemName: "chevron.right", action: selectNextFeature)
+                                        .padding(.trailing, 20)
+                                        .scaleEffect(rightChevronScale, anchor: .trailing)
+                                        .opacity(rightChevronOpacity)
+                                }
                             }
                         }
-                        
-                        if showRightChevron {
-                            HStack {
-                                Spacer()
-                                chevronButton(systemName: "chevron.right", action: selectNextFeature)
-                                    .padding(.trailing, 20)
-                                    .scaleEffect(rightChevronScale, anchor: .trailing)
-                                    .opacity(rightChevronOpacity)
-                            }
-                        }
+                        .frame(maxWidth: .infinity)
                     }
-                    .frame(maxWidth: .infinity)
                     
                     GrockPaywallStickyBottomPanelView(
                         planCards: viewModel.planCards,
@@ -434,6 +531,16 @@ struct GrockPaywallView: View {
             } message: {
                 Text(viewModel.alertMessage)
             }
+            .sheet(isPresented: $showingTermsOfServiceSheet) {
+                LegalDocumentSheet(document: .termsOfService)
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.visible)
+            }
+            .sheet(isPresented: $showingPrivacyPolicySheet) {
+                LegalDocumentSheet(document: .privacyPolicy)
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.visible)
+            }
         }
     }
     
@@ -464,11 +571,11 @@ struct GrockPaywallView: View {
     }
     
     private func openTerms() {
-        openURL(viewModel.termsURL)
+        showingTermsOfServiceSheet = true
     }
     
     private func openPrivacy() {
-        openURL(viewModel.privacyURL)
+        showingPrivacyPolicySheet = true
     }
     
     private func applyInitialFeatureFocusIfNeeded() {
