@@ -3,6 +3,7 @@ import SwiftUI
 //MARK: commented code are for debugs later.
 struct GrockPaywallView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     
     @State private var viewModel = GrockPaywallViewModel()
     @State private var selectedFeatureIndex = 0
@@ -456,6 +457,8 @@ struct GrockPaywallView: View {
                     GrockPaywallStickyBottomPanelView(
                         planCards: viewModel.planCards,
                         selectedPlan: selectedPlanBinding,
+                        selectedPlanContextPrimaryLine: viewModel.stickyPanelPrimaryLine,
+                        selectedPlanContextSecondaryLine: viewModel.stickyPanelSecondaryLine,
                         isProcessingAction: viewModel.isProcessingAction || purchaseTapGate,
                         isPrimaryActionEnabled: viewModel.isPrimaryActionEnabled && !purchaseTapGate,
                         primaryButtonTitle: viewModel.primaryButtonTitle,
@@ -490,6 +493,20 @@ struct GrockPaywallView: View {
                         trialJumpCapsuleOpacity = 1.0
                     }
                 }
+
+                #if DEBUG
+                print("ℹ️ [Paywall] If you switched Sandbox testers, reinstall the app before validating storefront pricing to clear cached session data.")
+                #endif
+
+                Task { @MainActor in
+                    await refreshOfferingsForVisiblePaywall(reason: "paywall-appeared")
+                }
+            }
+            .onChange(of: scenePhase) { _, newPhase in
+                guard newPhase == .active else { return }
+                Task { @MainActor in
+                    await refreshOfferingsForVisiblePaywall(reason: "app-became-active")
+                }
             }
             .onChange(of: carouselGlobalMinY) { _, newVal in
                 updateFloatingControlsVisibility(minY: newVal)
@@ -521,10 +538,6 @@ struct GrockPaywallView: View {
                 trialJumpCapsuleScale = 1.0
                 trialJumpCapsuleOpacity = 1.0
                 capsuleWasDismissedByTap = false
-            }
-            .task {
-                await viewModel.refreshAll()
-                applyInitialFeatureFocusIfNeeded()
             }
             .alert("Subscription", isPresented: showAlertBinding) {
                 Button("OK", role: .cancel) { }
@@ -586,6 +599,12 @@ struct GrockPaywallView: View {
         guard let focusedFeatureIndex = viewModel.features.firstIndex(where: { $0.id == initialFeatureFocus.rawValue }) else { return }
         
         selectedFeatureIndex = focusedFeatureIndex
+    }
+
+    @MainActor
+    private func refreshOfferingsForVisiblePaywall(reason: String) async {
+        await viewModel.refreshOfferingsForPaywall(reason: reason)
+        applyInitialFeatureFocusIfNeeded()
     }
 }
 

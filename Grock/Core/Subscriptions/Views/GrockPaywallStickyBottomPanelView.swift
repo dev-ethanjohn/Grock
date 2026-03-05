@@ -4,6 +4,8 @@ import Lottie
 struct GrockPaywallStickyBottomPanelView: View {
     let planCards: [GrockPaywallPlanCardModel]
     @Binding var selectedPlan: GrockPaywallPlanCardModel.Plan
+    let selectedPlanContextPrimaryLine: String
+    let selectedPlanContextSecondaryLine: String
     let isProcessingAction: Bool
     let isPrimaryActionEnabled: Bool
     let primaryButtonTitle: String
@@ -11,50 +13,9 @@ struct GrockPaywallStickyBottomPanelView: View {
     let onRestore: () -> Void
     let onTerms: () -> Void
     let onPrivacy: () -> Void
-    private let valueEmoji = "✨"
     private let primaryCTAColor = Color.Grock.budgetSafe
     private let primaryCTAOverlayDarkness = 0.10
     private let primaryCTACornerRadius: CGFloat = 100
-
-    private var selectedPlanContextPrimaryLine: String {
-        guard let selectedCard = planCards.first(where: { $0.id == selectedPlan }) else {
-            return ""
-        }
-
-        switch selectedPlan {
-        case .yearly:
-            if let monthlyEquivalent = normalizedMonthlyEquivalent(from: selectedCard.detail) {
-                let monthlyDisplay = monthlyEquivalent.replacingOccurrences(of: "/mo", with: "/month")
-                return "Free trial for just \(monthlyDisplay) \(valueEmoji)"
-            }
-            return "Free trial for just \(selectedCard.price)/year \(valueEmoji)"
-        case .monthly:
-            if let weeklyEquivalent = normalizedWeeklyEquivalent(from: selectedCard.detail) {
-                return "About \(weeklyEquivalent) \(valueEmoji)"
-            }
-            return "Just \(selectedCard.price)/mo \(valueEmoji)"
-        }
-    }
-
-    private var selectedPlanContextSecondaryLine: String {
-        switch selectedPlan {
-        case .yearly:
-            return "Less than a coffee a month."
-        case .monthly:
-            return "Save more on every cart"
-        }
-    }
-
-    private func normalizedMonthlyEquivalent(from detail: String) -> String? {
-        guard detail.contains("/mo") else { return nil }
-        return detail
-            .replacingOccurrences(of: "Only ", with: "")
-    }
-
-    private func normalizedWeeklyEquivalent(from detail: String) -> String? {
-        guard detail.contains("/week") else { return nil }
-        return detail.replacingOccurrences(of: "About ", with: "")
-    }
 
     private var panelShape: UnevenRoundedRectangle {
         UnevenRoundedRectangle(
@@ -121,7 +82,7 @@ struct GrockPaywallStickyBottomPanelView: View {
                 VStack(spacing: 2) {
                     ZStack {
                         Text(selectedPlanContextPrimaryLine)
-                            .lexendFont(18, weight: .semibold)
+                            .lexendFont(14, weight: .semibold)
                             .lineLimit(1)
                             .minimumScaleFactor(0.9)
                             .id(selectedPlanContextPrimaryLine)
@@ -234,6 +195,8 @@ private struct GrockPaywallStickyBottomPanelPreview: View {
         GrockPaywallStickyBottomPanelView(
             planCards: [GrockPaywallPreviewFixtures.yearlyPlan, GrockPaywallPreviewFixtures.monthlyPlan],
             selectedPlan: $selectedPlan,
+            selectedPlanContextPrimaryLine: "Free trial, then just $2.99/month ✨",
+            selectedPlanContextSecondaryLine: "About $0.10/day for a year of saving.",
             isProcessingAction: false,
             isPrimaryActionEnabled: true,
             primaryButtonTitle: "Start 7-Day Free Trial",

@@ -13,6 +13,8 @@ final class GrockPaywallViewModel {
     var alertMessage = ""
 
     private let subscriptionManager: SubscriptionManager
+    private let countryContextProvider: PaywallCountryContextProvider
+    private var lastLoggedStorefrontSignature: String?
 
     private static let chargeDateFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -21,8 +23,12 @@ final class GrockPaywallViewModel {
         return formatter
     }()
 
-    init(subscriptionManager: SubscriptionManager = .shared) {
+    init(
+        subscriptionManager: SubscriptionManager = .shared,
+        countryContextProvider: PaywallCountryContextProvider = .shared
+    ) {
         self.subscriptionManager = subscriptionManager
+        self.countryContextProvider = countryContextProvider
     }
 
     // Ordered by strongest user demand/pain first.
@@ -169,9 +175,46 @@ final class GrockPaywallViewModel {
         }
     }
 
+    var stickyPanelPrimaryLine: String {
+        logStorefrontSource(reason: "before-sticky-render")
+        let template = contextTemplateForCurrentCountry
+        let rawTemplate: String
+
+        switch selectedPlan {
+        case .yearly:
+            rawTemplate = template.yearlyPrimary
+        case .monthly:
+            rawTemplate = template.monthlyPrimary
+        }
+
+        return renderTemplate(rawTemplate, values: stickyContextValues)
+    }
+
+    var stickyPanelSecondaryLine: String {
+        logStorefrontSource(reason: "before-sticky-render")
+        let template = contextTemplateForCurrentCountry
+        let rawTemplate: String
+
+        switch selectedPlan {
+        case .yearly:
+            rawTemplate = template.yearlySecondary
+        case .monthly:
+            rawTemplate = template.monthlySecondary
+        }
+
+        return renderTemplate(rawTemplate, values: stickyContextValues)
+    }
+
     func refreshAll() async {
         await subscriptionManager.refreshAll()
         alignDefaultPlanToAvailability()
+        logStorefrontSource(reason: "refresh-all")
+    }
+
+    func refreshOfferingsForPaywall(reason: String) async {
+        await subscriptionManager.refreshOfferings()
+        alignDefaultPlanToAvailability()
+        logStorefrontSource(reason: reason)
     }
 
     func retryOfferingsLoad() async {
@@ -304,11 +347,12 @@ final class GrockPaywallViewModel {
     }
 
     private var yearlyMonthlyEquivalentText: String? {
-        guard let yearlyProduct = subscriptionManager.yearlyPackage?.storeProduct,
-              let pricePerMonth = yearlyProduct.pricePerMonth else {
+        guard let yearlyProduct = subscriptionManager.yearlyPackage?.storeProduct else {
             return nil
         }
 
+        let monthsPerYear = NSDecimalNumber(value: 12)
+        let pricePerMonth = yearlyProduct.priceDecimalNumber.dividing(by: monthsPerYear)
         return formattedPrice(pricePerMonth, formatter: yearlyProduct.priceFormatter)
     }
 
@@ -317,8 +361,7 @@ final class GrockPaywallViewModel {
             return nil
         }
 
-        // Convert monthly subscription cost to an approximate weekly spend for clearer shopper context.
-        let weeksPerMonth = NSDecimalNumber(value: 52.0 / 12.0)
+        let weeksPerMonth = NSDecimalNumber(value: 4)
         let pricePerWeek = monthlyProduct.priceDecimalNumber.dividing(by: weeksPerMonth)
         return formattedPrice(pricePerWeek, formatter: monthlyProduct.priceFormatter)
     }
@@ -337,6 +380,89 @@ final class GrockPaywallViewModel {
         guard percent >= 5 else { return nil }
 
         return "SAVE \(percent)%"
+    }
+
+    private var yearlyDailyCostText: String? {
+        guard let yearlyProduct = subscriptionManager.yearlyPackage?.storeProduct else {
+            return nil
+        }
+
+        let daysPerYear = NSDecimalNumber(value: 365)
+        let dailyCost = yearlyProduct.priceDecimalNumber.dividing(by: daysPerYear)
+
+        if let formattedDailyCost = formattedPrice(dailyCost, formatter: yearlyProduct.priceFormatter) {
+            return formattedDailyCost
+        }
+
+        return nil
+    }
+
+    private var yearlyDailyPesoWordText: String? {
+        guard let yearlyProduct = subscriptionManager.yearlyPackage?.storeProduct else {
+            return nil
+        }
+
+        guard yearlyProduct.priceFormatter?.currencyCode?.uppercased() == "PHP" else {
+            return nil
+        }
+
+        let daysPerYear = NSDecimalNumber(value: 365)
+        let dailyCost = yearlyProduct.priceDecimalNumber.dividing(by: daysPerYear)
+        let roundedDailyPeso = max(1, Int(dailyCost.doubleValue.rounded()))
+        let unitLabel = roundedDailyPeso == 1 ? "peso" : "pesos"
+        return "\(roundedDailyPeso) \(unitLabel)"
+    }
+
+    private var contextTemplateForCurrentCountry: PaywallCountryContextTemplate {
+        countryContextProvider.template(for: detectedStorefrontCountryCode)
+    }
+
+    private var detectedStorefrontCountryCode: String? {
+        let storefrontLocale =
+            selectedPackage?.storeProduct.priceFormatter?.locale
+            ?? subscriptionManager.yearlyPackage?.storeProduct.priceFormatter?.locale
+            ?? subscriptionManager.monthlyPackage?.storeProduct.priceFormatter?.locale
+            ?? Locale.autoupdatingCurrent
+
+        return storefrontLocale.region?.identifier.uppercased()
+    }
+
+    private var stickyContextValues: [String: String] {
+        let monthlyPrice = displayedPrice(for: subscriptionManager.monthlyPackage)
+        let yearlyPrice = displayedPrice(for: subscriptionManager.yearlyPackage)
+        let monthlyWeekly = monthlyWeeklyEquivalentText ?? monthlyPrice
+        let yearlyMonthly = yearlyMonthlyEquivalentText ?? yearlyPrice
+        let yearlyDaily = yearlyDailyCostText ?? yearlyMonthly
+        let yearlyDailyPesoWord = yearlyDailyPesoWordText ?? yearlyDaily
+
+        return [
+            "monthly_price": monthlyPrice,
+            "monthly_weekly": monthlyWeekly,
+            "yearly_price": yearlyPrice,
+            "yearly_monthly": yearlyMonthly,
+            "yearly_daily": yearlyDaily,
+            "yearly_daily_peso_word": yearlyDailyPesoWord
+        ]
+    }
+
+    private func renderTemplate(_ template: String, values: [String: String]) -> String {
+        var rendered = template
+        for (token, value) in values {
+            rendered = rendered.replacingOccurrences(of: "{{\(token)}}", with: value)
+        }
+
+        rendered = rendered.replacingOccurrences(
+            of: #"\{\{[A-Za-z0-9_]+\}\}"#,
+            with: "",
+            options: .regularExpression
+        )
+        rendered = rendered.replacingOccurrences(
+            of: #"\s{2,}"#,
+            with: " ",
+            options: .regularExpression
+        )
+
+        return rendered.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private var selectedTrialDays: Int {
@@ -388,5 +514,20 @@ final class GrockPaywallViewModel {
             with: "",
             options: .regularExpression
         )
+    }
+
+    private func logStorefrontSource(reason: String) {
+        guard let monthlyProduct = subscriptionManager.monthlyPackage?.storeProduct else { return }
+
+        let monthlyPrice = monthlyProduct.localizedPriceString
+        let monthlyLocale = monthlyProduct.priceFormatter?.locale
+        let localeIdentifier = monthlyLocale?.identifier ?? "unknown"
+        let regionCode = monthlyLocale?.region?.identifier ?? "unknown"
+        let signature = "\(monthlyPrice)|\(localeIdentifier)|\(regionCode)"
+
+        guard signature != lastLoggedStorefrontSignature else { return }
+        lastLoggedStorefrontSignature = signature
+
+        print("ℹ️ [Paywall][\(reason)] monthly localizedPriceString=\(monthlyPrice), priceFormatter.locale=\(localeIdentifier), storefrontRegion=\(regionCode)")
     }
 }

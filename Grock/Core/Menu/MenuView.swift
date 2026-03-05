@@ -93,7 +93,7 @@ struct MenuView: View {
     ]
     
     // Replace with your real support inbox.
-    private let supportEmailAddress = "support@grock.app"
+    private let supportEmailAddress = "grocksupport@proton.me"
     private let shareAppURL = URL(string: "https://grock.app")!
     private let shareAppMessage = "Check out Grock for tracking trips, items, and grocery budgets."
     private let onResetLocalCache: () -> Bool

@@ -70,9 +70,21 @@ final class SubscriptionManager {
 
         do {
             let offerings = try await Purchases.shared.offerings()
-            currentOffering = offerings.current
+            currentOffering = offerings.current ?? offerings["default"]
+
+            guard currentOffering != nil else {
+                setError("No active offering found. Set a current offering in RevenueCat and add monthly/yearly packages.")
+                return
+            }
+
+            if monthlyPackage == nil, yearlyPackage == nil {
+                setError("Offering loaded, but no monthly/yearly packages were detected.")
+                return
+            }
+
             clearError()
         } catch {
+            currentOffering = nil
             setError("Could not load offerings: \(error.localizedDescription)")
         }
     }
@@ -201,6 +213,8 @@ final class SubscriptionManager {
         return offering.package(identifier: SubscriptionManager.monthlyPackageID)
             ?? offering.package(identifier: "$rc_monthly")
             ?? offering.monthly
+            ?? offering.availablePackages.first(where: { $0.packageType == .monthly })
+            ?? offering.availablePackages.first(where: { $0.storeProduct.productIdentifier.lowercased().contains("monthly") })
     }
 
     var yearlyPackage: Package? {
@@ -208,6 +222,8 @@ final class SubscriptionManager {
         return offering.package(identifier: SubscriptionManager.yearlyPackageID)
             ?? offering.package(identifier: "$rc_annual")
             ?? offering.annual
+            ?? offering.availablePackages.first(where: { $0.packageType == .annual })
+            ?? offering.availablePackages.first(where: { $0.storeProduct.productIdentifier.lowercased().contains("yearly") || $0.storeProduct.productIdentifier.lowercased().contains("annual") })
     }
 
     @MainActor
