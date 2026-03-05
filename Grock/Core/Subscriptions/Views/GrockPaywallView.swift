@@ -296,8 +296,16 @@ struct GrockPaywallView: View {
     }
     
     var body: some View {
-        ScrollViewReader { scrollProxy in
-            ZStack {
+        Group {
+            if viewModel.isProUser {
+                Color.clear
+                    .ignoresSafeArea()
+                    .onAppear {
+                        dismiss()
+                    }
+            } else {
+                ScrollViewReader { scrollProxy in
+                    ZStack {
                 LinearGradient(
                     stops: [
                         .init(color: Color(hex: "FFFFFF"), location: 0.0),
@@ -499,12 +507,14 @@ struct GrockPaywallView: View {
                 #endif
 
                 Task { @MainActor in
+                    guard await verifyPaywallEligibility() else { return }
                     await refreshOfferingsForVisiblePaywall(reason: "paywall-appeared")
                 }
             }
             .onChange(of: scenePhase) { _, newPhase in
                 guard newPhase == .active else { return }
                 Task { @MainActor in
+                    guard await verifyPaywallEligibility() else { return }
                     await refreshOfferingsForVisiblePaywall(reason: "app-became-active")
                 }
             }
@@ -553,6 +563,8 @@ struct GrockPaywallView: View {
                 LegalDocumentSheet(document: .privacyPolicy)
                     .presentationDetents([.large])
                     .presentationDragIndicator(.visible)
+            }
+                }
             }
         }
     }
@@ -605,6 +617,22 @@ struct GrockPaywallView: View {
     private func refreshOfferingsForVisiblePaywall(reason: String) async {
         await viewModel.refreshOfferingsForPaywall(reason: reason)
         applyInitialFeatureFocusIfNeeded()
+    }
+
+    @MainActor
+    private func verifyPaywallEligibility() async -> Bool {
+        if viewModel.isProUser {
+            dismiss()
+            return false
+        }
+
+        let isProAfterRefresh = await viewModel.refreshEntitlementForPaywallGate()
+        if isProAfterRefresh {
+            dismiss()
+            return false
+        }
+
+        return true
     }
 }
 

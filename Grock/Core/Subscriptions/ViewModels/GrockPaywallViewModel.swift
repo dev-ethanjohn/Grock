@@ -205,6 +205,10 @@ final class GrockPaywallViewModel {
         return renderTemplate(rawTemplate, values: stickyContextValues)
     }
 
+    var isProUser: Bool {
+        subscriptionManager.isPro
+    }
+
     func refreshAll() async {
         await subscriptionManager.refreshAll()
         alignDefaultPlanToAvailability()
@@ -215,6 +219,11 @@ final class GrockPaywallViewModel {
         await subscriptionManager.refreshOfferings()
         alignDefaultPlanToAvailability()
         logStorefrontSource(reason: reason)
+    }
+
+    func refreshEntitlementForPaywallGate() async -> Bool {
+        await subscriptionManager.refreshCustomerInfo()
+        return subscriptionManager.isPro
     }
 
     func retryOfferingsLoad() async {

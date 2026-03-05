@@ -134,7 +134,7 @@ struct GrockApp: App {
         }
 
         let projectId = rawProjectId.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !projectId.isEmpty, projectId != "YOUR_PROJECT_ID" else {
+        guard !isUnconfiguredSecretValue(projectId), projectId != "YOUR_PROJECT_ID" else {
             print("⚠️ USERJOT_PROJECT_ID is not configured. Set it in Info.plist.")
             return
         }
@@ -149,7 +149,7 @@ struct GrockApp: App {
         }
 
         let apiKey = rawApiKey.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !apiKey.isEmpty, apiKey != "YOUR_REVENUECAT_API_KEY" else {
+        guard !isUnconfiguredSecretValue(apiKey), apiKey != "YOUR_REVENUECAT_API_KEY" else {
             print("❌ REVENUECAT_API_KEY is not configured. RevenueCat not configured.")
             return
         }
@@ -169,6 +169,11 @@ struct GrockApp: App {
         }
 
         Purchases.configure(withAPIKey: apiKey)
+    }
+
+    private func isUnconfiguredSecretValue(_ value: String) -> Bool {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty || (trimmed.hasPrefix("$(") && trimmed.hasSuffix(")"))
     }
 }
 

@@ -19,6 +19,7 @@ final class SubscriptionManager {
     static let grockProEntitlementID = "pro"
     static let monthlyPackageID = "monthly"
     static let yearlyPackageID = "yearly"
+    private static let fallbackSandboxAppUserID = "sbx_ph_qa01"
 
     private(set) var isPro: Bool = false
     private(set) var customerInfo: CustomerInfo?
@@ -31,6 +32,7 @@ final class SubscriptionManager {
     private var customerInfoStreamTask: Task<Void, Never>?
     private let purchaseLock = NSLock()
     private var isPurchaseInProgress = false
+    private var lastLoggedEntitlementSnapshot: String?
 
     private init() {
         self.isPro = UserDefaults.standard.isPro
@@ -53,6 +55,7 @@ final class SubscriptionManager {
         }
 
         Task {
+            await ensureStableSandboxAppUserIDIfNeeded()
             await refreshAll()
         }
     }
@@ -234,6 +237,8 @@ final class SubscriptionManager {
         let proIsActive = customerInfo.entitlements
             .activeInCurrentEnvironment[SubscriptionManager.grockProEntitlementID] != nil
 
+        debugLogEntitlements(customerInfo: customerInfo, proIsActive: proIsActive)
+
         self.isPro = proIsActive
         UserDefaults.standard.isPro = proIsActive
 
@@ -277,5 +282,46 @@ final class SubscriptionManager {
         purchaseLock.lock()
         isPurchaseInProgress = false
         purchaseLock.unlock()
+    }
+
+    private func ensureStableSandboxAppUserIDIfNeeded() async {
+        guard isSandboxReceiptBuild else { return }
+
+        let targetAppUserID = configuredSandboxAppUserID
+        let currentAppUserID = Purchases.shared.appUserID
+        guard currentAppUserID != targetAppUserID else { return }
+
+        do {
+            let result = try await Purchases.shared.logIn(targetAppUserID)
+            print("ℹ️ [Subscription] Sandbox/TestFlight identity set to \(targetAppUserID). created=\(result.created)")
+        } catch {
+            print("⚠️ [Subscription] Failed to set sandbox identity to \(targetAppUserID): \(error.localizedDescription)")
+        }
+    }
+
+    private var configuredSandboxAppUserID: String {
+        guard let rawValue = Bundle.main.object(forInfoDictionaryKey: "REVENUECAT_SANDBOX_APP_USER_ID") as? String else {
+            return Self.fallbackSandboxAppUserID
+        }
+
+        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? Self.fallbackSandboxAppUserID : trimmed
+    }
+
+    private var isSandboxReceiptBuild: Bool {
+        Bundle.main.appStoreReceiptURL?.lastPathComponent == "sandboxReceipt"
+    }
+
+    private func debugLogEntitlements(customerInfo: CustomerInfo, proIsActive: Bool) {
+        #if DEBUG
+        let allEntitlements = customerInfo.entitlements.all.keys.sorted()
+        let activeEntitlements = customerInfo.entitlements.activeInCurrentEnvironment.keys.sorted()
+        let snapshot = "all=\(allEntitlements.joined(separator: ","))|active=\(activeEntitlements.joined(separator: ","))|pro=\(proIsActive)|user=\(Purchases.shared.appUserID)"
+
+        guard snapshot != lastLoggedEntitlementSnapshot else { return }
+        lastLoggedEntitlementSnapshot = snapshot
+
+        print("ℹ️ [Subscription] Entitlements all=\(allEntitlements) active=\(activeEntitlements) proActive=\(proIsActive) appUserID=\(Purchases.shared.appUserID)")
+        #endif
     }
 }
