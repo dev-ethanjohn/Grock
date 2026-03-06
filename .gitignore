@@ -1,2 +1,3 @@
 # Local Xcode secrets
 Grock/Config/Secrets.local.xcconfig
+Grock/Config/Secrets.generated.xcconfig

@@ -1,1 +1,2 @@
+#include? "Secrets.generated.xcconfig"
 #include? "Secrets.local.xcconfig"
