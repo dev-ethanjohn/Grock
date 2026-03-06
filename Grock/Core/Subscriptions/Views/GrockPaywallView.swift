@@ -26,9 +26,10 @@ struct GrockPaywallView: View {
     @State private var rightChevronOpacity: Double = 1.0
     @State private var showLeftChevron = true
     @State private var showRightChevron = true
-    @State private var shouldShowProCelebrationAfterDismiss = false
     @State private var showingPrivacyPolicySheet = false
     @State private var showingTermsOfServiceSheet = false
+    @State private var restoreWarningToastTask: Task<Void, Never>?
+    @State private var suppressNextActiveRefresh = false
     
     // 🐛 Debug state — uncomment to enable
     // @State private var debugMinY: CGFloat = 0
@@ -426,6 +427,20 @@ struct GrockPaywallView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 }
             }
+            .overlay(alignment: .top) {
+                if viewModel.showRestoreWarningToast {
+                    restoreWarningToastView
+                        .padding(.top, 10)
+                        .padding(.horizontal, 16)
+                        .transition(
+                            .asymmetric(
+                                insertion: .move(edge: .top).combined(with: .opacity),
+                                removal: .move(edge: .top).combined(with: .opacity)
+                            )
+                        )
+                }
+            }
+            .animation(.spring(response: 0.28, dampingFraction: 0.86), value: viewModel.showRestoreWarningToast)
             .overlay(alignment: .bottom) {
                 VStack(spacing: 6) {
                     if !shouldShowOfferingsFallback {
@@ -467,6 +482,7 @@ struct GrockPaywallView: View {
                         selectedPlan: selectedPlanBinding,
                         selectedPlanContextPrimaryLine: viewModel.stickyPanelPrimaryLine,
                         selectedPlanContextSecondaryLine: viewModel.stickyPanelSecondaryLine,
+                        isPriceContextLoading: viewModel.isSelectedPlanPriceLoading,
                         isProcessingAction: viewModel.isProcessingAction || purchaseTapGate,
                         isPrimaryActionEnabled: viewModel.isPrimaryActionEnabled && !purchaseTapGate,
                         primaryButtonTitle: viewModel.primaryButtonTitle,
@@ -513,6 +529,12 @@ struct GrockPaywallView: View {
             }
             .onChange(of: scenePhase) { _, newPhase in
                 guard newPhase == .active else { return }
+
+                if suppressNextActiveRefresh {
+                    suppressNextActiveRefresh = false
+                    return
+                }
+
                 Task { @MainActor in
                     guard await verifyPaywallEligibility() else { return }
                     await refreshOfferingsForVisiblePaywall(reason: "app-became-active")
@@ -522,21 +544,8 @@ struct GrockPaywallView: View {
                 updateFloatingControlsVisibility(minY: newVal)
             }
             .onDisappear {
-                if shouldShowProCelebrationAfterDismiss {
-                    var userInfo: [AnyHashable: Any] = [:]
-                    if let featureFocus = initialFeatureFocus {
-                        userInfo["featureFocus"] = featureFocus.rawValue
-                    }
-                    if let celebrationContext {
-                        userInfo["celebrationContext"] = celebrationContext.rawValue
-                    }
-                    NotificationCenter.default.post(
-                        name: .showProUnlockedCelebration,
-                        object: nil,
-                        userInfo: userInfo.isEmpty ? nil : userInfo
-                    )
-                }
-                shouldShowProCelebrationAfterDismiss = false
+                restoreWarningToastTask?.cancel()
+                restoreWarningToastTask = nil
                 showTrialJumpCapsule = false
                 showLeftChevron = true
                 showRightChevron = true
@@ -548,6 +557,14 @@ struct GrockPaywallView: View {
                 trialJumpCapsuleScale = 1.0
                 trialJumpCapsuleOpacity = 1.0
                 capsuleWasDismissedByTap = false
+            }
+            .onChange(of: viewModel.showRestoreWarningToast) { _, isVisible in
+                if isVisible {
+                    scheduleRestoreWarningToastDismiss()
+                } else {
+                    restoreWarningToastTask?.cancel()
+                    restoreWarningToastTask = nil
+                }
             }
             .alert("Subscription", isPresented: showAlertBinding) {
                 Button("OK", role: .cancel) { }
@@ -571,27 +588,101 @@ struct GrockPaywallView: View {
     
     private func handlePrimaryAction() {
         guard !purchaseTapGate else { return }
+        suppressNextActiveRefresh = true
         purchaseTapGate = true
         
         Task { @MainActor in
             defer { purchaseTapGate = false }
             let unlocked = await viewModel.purchaseSelectedPlan()
             if unlocked {
-                shouldShowProCelebrationAfterDismiss = true
-                onUnlocked?()
-                dismiss()
+                completeUnlockFlow()
             }
         }
     }
     
     private func handleRestore() {
-        Task {
+        suppressNextActiveRefresh = true
+        Task { @MainActor in
             let restored = await viewModel.restorePurchases()
             if restored {
-                shouldShowProCelebrationAfterDismiss = true
-                onUnlocked?()
-                dismiss()
+                completeUnlockFlow()
             }
+        }
+    }
+
+    private func completeUnlockFlow() {
+        let userInfo = celebrationNotificationUserInfo()
+        onUnlocked?()
+        dismiss()
+
+        // Trigger after dismissal starts so the celebration appears above the underlying screen.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+            NotificationCenter.default.post(
+                name: .showProUnlockedCelebration,
+                object: nil,
+                userInfo: userInfo
+            )
+        }
+    }
+
+    private func celebrationNotificationUserInfo() -> [AnyHashable: Any]? {
+        var userInfo: [AnyHashable: Any] = [:]
+        if let featureFocus = initialFeatureFocus {
+            userInfo["featureFocus"] = featureFocus.rawValue
+        }
+        if let celebrationContext {
+            userInfo["celebrationContext"] = celebrationContext.rawValue
+        }
+        return userInfo.isEmpty ? nil : userInfo
+    }
+
+    private var restoreWarningToastView: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.white)
+
+            Text(viewModel.restoreWarningToastMessage)
+                .lexend(.footnote, weight: .medium)
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .lineLimit(2)
+
+            Button {
+                dismissRestoreWarningToast()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 18, height: 18)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(
+            Capsule()
+                .fill(Color.red)
+        )
+        .shadow(color: .black.opacity(0.14), radius: 6, x: 0, y: 3)
+    }
+
+    private func scheduleRestoreWarningToastDismiss() {
+        restoreWarningToastTask?.cancel()
+        restoreWarningToastTask = Task {
+            try? await Task.sleep(for: .seconds(5))
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                dismissRestoreWarningToast()
+            }
+        }
+    }
+
+    private func dismissRestoreWarningToast() {
+        restoreWarningToastTask?.cancel()
+        restoreWarningToastTask = nil
+        withAnimation(.easeInOut(duration: 0.2)) {
+            viewModel.dismissRestoreWarningToast()
         }
     }
     

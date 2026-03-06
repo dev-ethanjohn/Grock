@@ -35,6 +35,27 @@ struct GrockPaywallPlanCardModel: Identifiable, Hashable {
     let detail: String
     let badge: String?
     let isEnabled: Bool
+    let isPriceLoading: Bool
+
+    init(
+        id: Plan,
+        title: String,
+        price: String,
+        cadence: String,
+        detail: String,
+        badge: String?,
+        isEnabled: Bool,
+        isPriceLoading: Bool = false
+    ) {
+        self.id = id
+        self.title = title
+        self.price = price
+        self.cadence = cadence
+        self.detail = detail
+        self.badge = badge
+        self.isEnabled = isEnabled
+        self.isPriceLoading = isPriceLoading
+    }
 }
 
 struct GrockPaywallTimelineItem: Identifiable, Hashable {

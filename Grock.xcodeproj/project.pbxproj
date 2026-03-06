@@ -14,7 +14,7 @@
 
 /* Begin PBXFileReference section */
 		4C07F7B82E88245000B46866 /* Grock.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Grock.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		4CF7E00131A0000000ABCD01 /* AppConfig.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Grock/Config/AppConfig.xcconfig; sourceTree = "<group>"; };
+		4CF7E00131A0000000ABCD01 /* Grock/Config/AppConfig.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Grock/Config/AppConfig.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -62,7 +62,7 @@
 		4C07F7AF2E88245000B46866 = {
 			isa = PBXGroup;
 			children = (
-				4CF7E00131A0000000ABCD01 /* AppConfig.xcconfig */,
+				4CF7E00131A0000000ABCD01 /* Grock/Config/AppConfig.xcconfig */,
 				4C07F7BA2E88245000B46866 /* Grock */,
 				4C07F7B92E88245000B46866 /* Products */,
 			);
@@ -289,18 +289,19 @@
 		};
 		4C07F7C62E88245300B46866 /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 4CF7E00131A0000000ABCD01 /* AppConfig.xcconfig */;
+			baseConfigurationReference = 4CF7E00131A0000000ABCD01 /* Grock/Config/AppConfig.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 6;
+				CURRENT_PROJECT_VERSION = 9;
 				DEVELOPMENT_TEAM = 23C886DGJJ;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Grock/Info.plist;
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
+				INFOPLIST_KEY_CFBundleDisplayName = "Grock: Grocery List Tracker";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
@@ -323,18 +324,19 @@
 		};
 		4C07F7C72E88245300B46866 /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 4CF7E00131A0000000ABCD01 /* AppConfig.xcconfig */;
+			baseConfigurationReference = 4CF7E00131A0000000ABCD01 /* Grock/Config/AppConfig.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 6;
+				CURRENT_PROJECT_VERSION = 9;
 				DEVELOPMENT_TEAM = 23C886DGJJ;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Grock/Info.plist;
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
+				INFOPLIST_KEY_CFBundleDisplayName = "Grock: Grocery List Tracker";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;

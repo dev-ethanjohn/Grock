@@ -207,6 +207,8 @@ struct MenuView: View {
                             .padding(.top, sectionGapBetweenSecondarySections)
                         resetSection
                             .padding(.top, sectionGapBetweenSecondarySections)
+                        versionFooter
+                            .padding(.top, sectionGapBetweenSecondarySections)
                     }
                     .padding(.leading, listHorizontalPadding)
                     .padding(.trailing, listHorizontalPadding + 4)
@@ -481,14 +483,6 @@ struct MenuView: View {
 
     private var legalAndVersionSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            DashedLine()
-                .stroke(style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
-                .frame(height: 1)
-                .foregroundColor(Color.Grock.neutral300)
-                .padding(.horizontal, rowHorizontalPadding)
-                .padding(.top, 4)
-                .padding(.bottom, 8)
-
             Button {
                 showingPrivacyPolicySheet = true
             } label: {
@@ -502,9 +496,15 @@ struct MenuView: View {
                 legalInfoRow(title: "Terms of Service", icon: "📄", showsChevron: true)
             }
             .buttonStyle(.plain)
-
-            legalInfoRow(title: "Version", icon: "🏷️", trailingText: appVersionLabel)
         }
+    }
+
+    private var versionFooter: some View {
+        Text(appVersionLabel)
+            .lexendFont(13)
+            .foregroundColor(.gray)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, rowHorizontalPadding)
     }
 
     private var resetSection: some View {

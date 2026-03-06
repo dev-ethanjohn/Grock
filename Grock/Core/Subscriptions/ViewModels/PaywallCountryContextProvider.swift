@@ -2,15 +2,21 @@ import Foundation
 
 struct PaywallCountryContextCatalog: Decodable {
     let `default`: PaywallCountryContextTemplate
-    let countries: [String: PaywallCountryContextTemplate]
+    let countries: [String: PaywallCountryContextOverride]
 }
 
 struct PaywallCountryContextTemplate: Decodable {
-    let note: String?
     let yearlyPrimary: String
     let yearlySecondary: String
     let monthlyPrimary: String
     let monthlySecondary: String
+}
+
+struct PaywallCountryContextOverride: Decodable {
+    let yearlyPrimary: String?
+    let yearlySecondary: String?
+    let monthlyPrimary: String?
+    let monthlySecondary: String?
 }
 
 final class PaywallCountryContextProvider {
@@ -28,7 +34,23 @@ final class PaywallCountryContextProvider {
             return catalog.default
         }
 
-        return catalog.countries[code] ?? catalog.default
+        guard let override = catalog.countries[code] else {
+            return catalog.default
+        }
+
+        return mergedTemplate(base: catalog.default, override: override)
+    }
+
+    private func mergedTemplate(
+        base: PaywallCountryContextTemplate,
+        override: PaywallCountryContextOverride
+    ) -> PaywallCountryContextTemplate {
+        PaywallCountryContextTemplate(
+            yearlyPrimary: override.yearlyPrimary ?? base.yearlyPrimary,
+            yearlySecondary: override.yearlySecondary ?? base.yearlySecondary,
+            monthlyPrimary: override.monthlyPrimary ?? base.monthlyPrimary,
+            monthlySecondary: override.monthlySecondary ?? base.monthlySecondary
+        )
     }
 
     private static func loadCatalog(from bundle: Bundle) -> PaywallCountryContextCatalog {
@@ -69,11 +91,10 @@ final class PaywallCountryContextProvider {
     private static var fallbackCatalog: PaywallCountryContextCatalog {
         PaywallCountryContextCatalog(
             default: PaywallCountryContextTemplate(
-                note: "Fallback template.",
                 yearlyPrimary: "Free trial, then just {{yearly_monthly}}/month ✨",
-                yearlySecondary: "Less than a coffee a month.",
-                monthlyPrimary: "About {{monthly_weekly}} /week ✨",
-                monthlySecondary: "Save more every tme you shop"
+                yearlySecondary: "About {{yearly_daily}}/day for a full year of smarter groceries.",
+                monthlyPrimary: "Cancel Anytime ✨",
+                monthlySecondary: "Save more on groceries every month"
             ),
             countries: [:]
         )

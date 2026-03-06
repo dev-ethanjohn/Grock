@@ -5,6 +5,11 @@ struct ManageSubscriptionSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
     @State private var subscriptionManager = SubscriptionManager.shared
+    @State private var isRestoringPurchases = false
+    @State private var showRestoreResultAlert = false
+    @State private var restoreResultMessage = ""
+    @State private var showRestoreWarningToast = false
+    @State private var restoreWarningToastTask: Task<Void, Never>?
     private let currentPlanCardCornerRadius: CGFloat = 18
 
     private static let renewalDateFormatter: DateFormatter = {
@@ -102,18 +107,63 @@ struct ManageSubscriptionSheet: View {
                         tertiary: nil
                     )
                     
-                    FormCompletionButton(
-                        title: "Manage in App Store",
-                        isEnabled: true,
-                        cornerRadius: 100,
-                        verticalPadding: 12,
-                        maxRadius: 1000,
-                        bounceScale: (0.98, 1.05, 1.0),
-                        bounceTiming: (0.1, 0.3, 0.3),
-                        maxWidth: true
-                    ) {
-                        guard let appStoreManageURL else { return }
-                        openURL(appStoreManageURL)
+                    VStack(spacing: 8) {
+                        FormCompletionButton(
+                            title: "Manage in App Store",
+                            isEnabled: true,
+                            cornerRadius: 100,
+                            verticalPadding: 12,
+                            maxRadius: 1000,
+                            bounceScale: (0.98, 1.05, 1.0),
+                            bounceTiming: (0.1, 0.3, 0.3),
+                            maxWidth: true
+                        ) {
+                            guard let appStoreManageURL else { return }
+                            openURL(appStoreManageURL)
+                        }
+
+                        Button {
+                            guard !isRestoringPurchases else { return }
+                            isRestoringPurchases = true
+
+                            Task {
+                                let result = await subscriptionManager.restorePurchases()
+                                await subscriptionManager.refreshCustomerInfo()
+
+                                await MainActor.run {
+                                    switch result {
+                                    case .success:
+                                        if subscriptionManager.isPro {
+                                            restoreResultMessage = "Subscription already active."
+                                            showRestoreResultAlert = true
+                                        } else {
+                                            presentRestoreWarningToast()
+                                        }
+                                    case .cancelled:
+                                        restoreResultMessage = "Restore was cancelled."
+                                        showRestoreResultAlert = true
+                                    case .failure(let message):
+                                        restoreResultMessage = message
+                                        showRestoreResultAlert = true
+                                    }
+
+                                    isRestoringPurchases = false
+                                }
+                            }
+                        } label: {
+                            Text(isRestoringPurchases ? "Restoring..." : "Restore Purchases")
+                                .fuzzyBubblesFont(16, weight: .bold)
+                                .foregroundStyle(.black)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                                .padding(.horizontal, 20)
+                                .background(
+                                    Capsule()
+                                        .stroke(Color(.systemGray4), lineWidth: 1)
+                                )
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(isRestoringPurchases)
                     }
                     .padding(.top, 24)
                 }
@@ -135,9 +185,26 @@ struct ManageSubscriptionSheet: View {
                     .lexend(.subheadline, weight: .semibold)
                 }
             }
+            .overlay(alignment: .top) {
+                if showRestoreWarningToast {
+                    restoreWarningToastView
+                        .padding(.top, 8)
+                        .padding(.horizontal, 16)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                }
+            }
         }
         .task {
             await subscriptionManager.refreshAll()
+        }
+        .alert("Restore Purchases", isPresented: $showRestoreResultAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(restoreResultMessage)
+        }
+        .onDisappear {
+            restoreWarningToastTask?.cancel()
+            restoreWarningToastTask = nil
         }
     }
 
@@ -253,6 +320,62 @@ struct ManageSubscriptionSheet: View {
             return subscriptionManager.yearlyPackage?.storeProduct
         }
         return nil
+    }
+
+    private var restoreWarningToastView: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.white)
+
+            Text("No previous purchases were found for this account.")
+                .lexend(.subheadline, weight: .medium)
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .lineLimit(2)
+
+            Button {
+                dismissRestoreWarningToast()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 24, height: 24)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(
+            Capsule()
+                .fill(Color.red.opacity(0.9))
+        )
+        .shadow(color: .black.opacity(0.16), radius: 8, x: 0, y: 4)
+    }
+
+    private func presentRestoreWarningToast() {
+        restoreWarningToastTask?.cancel()
+
+        withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
+            showRestoreWarningToast = true
+        }
+
+        restoreWarningToastTask = Task {
+            try? await Task.sleep(for: .seconds(5))
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                dismissRestoreWarningToast()
+            }
+        }
+    }
+
+    private func dismissRestoreWarningToast() {
+        restoreWarningToastTask?.cancel()
+        restoreWarningToastTask = nil
+
+        withAnimation(.easeInOut(duration: 0.2)) {
+            showRestoreWarningToast = false
+        }
     }
 }
 

@@ -46,18 +46,31 @@ struct GrockPaywallStickyPlanCardView: View {
                     .foregroundColor(.black.opacity(0.7))
                     .padding(.top, 8)
                 
-                HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    Text(model.price)
-                        .lexend(.title3, weight: .semibold)
-                        .foregroundColor(.black)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-                        .allowsTightening(true)
-                    
-                    Text(model.cadence)
-                        .lexend(.footnote, weight: .medium)
-                        .foregroundColor(.gray)
-                        .lineLimit(1)
+                if model.isPriceLoading {
+                    HStack(spacing: 6) {
+                        ProgressView()
+                            .scaleEffect(0.72)
+                            .tint(.black.opacity(0.58))
+
+                        Text("Loading")
+                            .lexend(.footnote, weight: .medium)
+                            .foregroundColor(.gray)
+                    }
+                    .padding(.top, 4)
+                } else {
+                    HStack(alignment: .firstTextBaseline, spacing: 4) {
+                        Text(model.price)
+                            .lexend(.title3, weight: .semibold)
+                            .foregroundColor(.black)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                            .allowsTightening(true)
+                        
+                        Text(model.cadence)
+                            .lexend(.footnote, weight: .medium)
+                            .foregroundColor(.gray)
+                            .lineLimit(1)
+                    }
                 }
             }
             .multilineTextAlignment(.center)

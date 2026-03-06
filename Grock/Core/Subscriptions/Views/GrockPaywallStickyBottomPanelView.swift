@@ -6,6 +6,7 @@ struct GrockPaywallStickyBottomPanelView: View {
     @Binding var selectedPlan: GrockPaywallPlanCardModel.Plan
     let selectedPlanContextPrimaryLine: String
     let selectedPlanContextSecondaryLine: String
+    let isPriceContextLoading: Bool
     let isProcessingAction: Bool
     let isPrimaryActionEnabled: Bool
     let primaryButtonTitle: String
@@ -80,30 +81,49 @@ struct GrockPaywallStickyBottomPanelView: View {
             VStack(alignment: .leading, spacing: 2) {
                 
                 VStack(spacing: 2) {
-                    ZStack {
-                        Text(selectedPlanContextPrimaryLine)
-                            .lexendFont(14, weight: .semibold)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.9)
-                            .id(selectedPlanContextPrimaryLine)
-                            .transition(.scale.combined(with: .opacity))
-                    }
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .animation(.spring(response: 0.32, dampingFraction: 0.8), value: selectedPlanContextPrimaryLine)
+                    if isPriceContextLoading {
+                        HStack(spacing: 6) {
+                            ProgressView()
+                                .scaleEffect(0.72)
+                                .tint(.black.opacity(0.6))
+                            Text("Loading App Store price...")
+                                .lexendFont(14, weight: .semibold)
+                                .foregroundStyle(.black.opacity(0.76))
+                        }
+                        .frame(maxWidth: .infinity, alignment: .center)
 
-                    CharacterRevealView(
-                        text: selectedPlanContextSecondaryLine,
-                        delay: 0.15,
-                        animateOnChange: false,
-                        animateOnAppear: true,
-                        showsUnderline: false
-                    )
-                    .lexend(.footnote)
-                    .foregroundStyle(Color.black.opacity(0.56))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.88)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .id(selectedPlanContextSecondaryLine)
+                        Text("Checking your storefront currency.")
+                            .lexend(.footnote)
+                            .foregroundStyle(Color.black.opacity(0.56))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.88)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                    } else {
+                        ZStack {
+                            Text(selectedPlanContextPrimaryLine)
+                                .lexendFont(14, weight: .semibold)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.9)
+                                .id(selectedPlanContextPrimaryLine)
+                                .transition(.scale.combined(with: .opacity))
+                        }
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .animation(.spring(response: 0.32, dampingFraction: 0.8), value: selectedPlanContextPrimaryLine)
+
+                        CharacterRevealView(
+                            text: selectedPlanContextSecondaryLine,
+                            delay: 0.15,
+                            animateOnChange: false,
+                            animateOnAppear: true,
+                            showsUnderline: false
+                        )
+                        .lexend(.footnote)
+                        .foregroundStyle(Color.black.opacity(0.56))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.88)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .id(selectedPlanContextSecondaryLine)
+                    }
                 }
                 .padding(.top, 8)
 
@@ -197,6 +217,7 @@ private struct GrockPaywallStickyBottomPanelPreview: View {
             selectedPlan: $selectedPlan,
             selectedPlanContextPrimaryLine: "Free trial, then just $2.99/month ✨",
             selectedPlanContextSecondaryLine: "About $0.10/day for a year of saving.",
+            isPriceContextLoading: false,
             isProcessingAction: false,
             isPrimaryActionEnabled: true,
             primaryButtonTitle: "Start 7-Day Free Trial",

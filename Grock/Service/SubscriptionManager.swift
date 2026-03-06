@@ -19,7 +19,7 @@ final class SubscriptionManager {
     static let grockProEntitlementID = "pro"
     static let monthlyPackageID = "monthly"
     static let yearlyPackageID = "yearly"
-    private static let fallbackSandboxAppUserID = "sbx_ph_qa01"
+    private static let sandboxGeneratedAppUserIDDefaultsKey = "subscription.sandbox.generated_app_user_id"
 
     private(set) var isPro: Bool = false
     private(set) var customerInfo: CustomerInfo?
@@ -300,16 +300,29 @@ final class SubscriptionManager {
     }
 
     private var configuredSandboxAppUserID: String {
-        guard let rawValue = Bundle.main.object(forInfoDictionaryKey: "REVENUECAT_SANDBOX_APP_USER_ID") as? String else {
-            return Self.fallbackSandboxAppUserID
+        if let rawValue = Bundle.main.object(forInfoDictionaryKey: "REVENUECAT_SANDBOX_APP_USER_ID") as? String {
+            let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty, !isUnresolvedBuildSettingReference(trimmed) {
+                return trimmed
+            }
         }
 
-        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? Self.fallbackSandboxAppUserID : trimmed
+        if let existing = UserDefaults.standard.string(forKey: Self.sandboxGeneratedAppUserIDDefaultsKey),
+           !existing.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return existing
+        }
+
+        let generated = "sbx_\(UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased())"
+        UserDefaults.standard.set(generated, forKey: Self.sandboxGeneratedAppUserIDDefaultsKey)
+        return generated
     }
 
     private var isSandboxReceiptBuild: Bool {
         Bundle.main.appStoreReceiptURL?.lastPathComponent == "sandboxReceipt"
+    }
+
+    private func isUnresolvedBuildSettingReference(_ value: String) -> Bool {
+        value.hasPrefix("$(") && value.hasSuffix(")")
     }
 
     private func debugLogEntitlements(customerInfo: CustomerInfo, proIsActive: Bool) {
