@@ -1,7 +1,7 @@
 {
   "default": {
     "yearlyPrimary": "Free trial, then just {{yearly_monthly}}/month ✨",
-    "yearlySecondary": "About {{yearly_daily}}/day for a full year of smarter groceries.",
+    "yearlySecondary": "About {{yearly_daily}}/day for a full year",
     "monthlyPrimary": "Cancel Anytime ✨",
     "monthlySecondary": "Save more on groceries every month"
   },

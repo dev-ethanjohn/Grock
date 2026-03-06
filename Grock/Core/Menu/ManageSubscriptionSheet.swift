@@ -1,10 +1,12 @@
 import SwiftUI
 import RevenueCat
+import StoreKit
 
 struct ManageSubscriptionSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
     @State private var subscriptionManager = SubscriptionManager.shared
+    @State private var activePlanStorefrontPrice: String?
     @State private var isRestoringPurchases = false
     @State private var showRestoreResultAlert = false
     @State private var restoreResultMessage = ""
@@ -49,19 +51,16 @@ struct ManageSubscriptionSheet: View {
 
     private var currentPlanPriceLine: String? {
         guard subscriptionManager.isPro else { return nil }
+        guard let activePlanStorefrontPrice, !activePlanStorefrontPrice.isEmpty else { return nil }
 
-        if let product = resolvedStoreProduct {
-            switch resolvedPlanKind {
-            case .monthly:
-                return "\(product.localizedPriceString)/month"
-            case .yearly:
-                return "\(product.localizedPriceString)/year"
-            case .unknown:
-                return product.localizedPriceString
-            }
+        switch resolvedPlanKind {
+        case .monthly:
+            return "\(activePlanStorefrontPrice)/month"
+        case .yearly:
+            return "\(activePlanStorefrontPrice)/year"
+        case .unknown:
+            return activePlanStorefrontPrice
         }
-
-        return nil
     }
 
     private var renewalPrimaryLine: String {
@@ -197,6 +196,9 @@ struct ManageSubscriptionSheet: View {
         .task {
             await subscriptionManager.refreshAll()
         }
+        .task(id: activeProductIdentifier) {
+            await refreshActivePlanStorefrontPrice()
+        }
         .alert("Restore Purchases", isPresented: $showRestoreResultAlert) {
             Button("OK", role: .cancel) {}
         } message: {
@@ -311,17 +313,6 @@ struct ManageSubscriptionSheet: View {
         return .unknown
     }
 
-    private var resolvedStoreProduct: StoreProduct? {
-        guard let activeProductIdentifier else { return nil }
-        if subscriptionManager.monthlyPackage?.storeProduct.productIdentifier == activeProductIdentifier {
-            return subscriptionManager.monthlyPackage?.storeProduct
-        }
-        if subscriptionManager.yearlyPackage?.storeProduct.productIdentifier == activeProductIdentifier {
-            return subscriptionManager.yearlyPackage?.storeProduct
-        }
-        return nil
-    }
-
     private var restoreWarningToastView: some View {
         HStack(spacing: 10) {
             Image(systemName: "exclamationmark.triangle.fill")
@@ -375,6 +366,23 @@ struct ManageSubscriptionSheet: View {
 
         withAnimation(.easeInOut(duration: 0.2)) {
             showRestoreWarningToast = false
+        }
+    }
+
+    @MainActor
+    private func refreshActivePlanStorefrontPrice() async {
+        guard subscriptionManager.isPro, let activeProductIdentifier else {
+            activePlanStorefrontPrice = nil
+            return
+        }
+
+        do {
+            let products = try await StoreKit.Product.products(for: [activeProductIdentifier])
+            let activeProduct = products.first(where: { $0.id == activeProductIdentifier })
+            activePlanStorefrontPrice = activeProduct?.displayPrice
+        } catch {
+            activePlanStorefrontPrice = nil
+            print("⚠️ [Manage Subscription] Failed to load StoreKit price for \(activeProductIdentifier): \(error.localizedDescription)")
         }
     }
 }
