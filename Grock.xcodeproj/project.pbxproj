@@ -21,6 +21,9 @@
 		4C17E3F82E8A713700D57F3F /* Exceptions for "Grock" folder in "Grock" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				Config/AppConfig.xcconfig,
+				Config/Secrets.generated.xcconfig,
+				Config/Secrets.local.xcconfig,
 				Fonts/Fuzzy_Bubbles/OFL.txt,
 				Fonts/Lexend/OFL.txt,
 				Fonts/Lexend/README.txt,
