@@ -2,7 +2,14 @@
 
 set -eu
 
-CONFIG_DIR="${CI_WORKSPACE:-$PWD}/Grock/Config"
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+REPO_ROOT="$(CDPATH= cd -- "$SCRIPT_DIR/../.." && pwd)"
+
+if [ -n "${CI_PRIMARY_REPOSITORY_PATH:-}" ] && [ -d "${CI_PRIMARY_REPOSITORY_PATH}/Grock/Config" ]; then
+  REPO_ROOT="$CI_PRIMARY_REPOSITORY_PATH"
+fi
+
+CONFIG_DIR="$REPO_ROOT/Grock/Config"
 OUTPUT_FILE="$CONFIG_DIR/Secrets.generated.xcconfig"
 
 mkdir -p "$CONFIG_DIR"
