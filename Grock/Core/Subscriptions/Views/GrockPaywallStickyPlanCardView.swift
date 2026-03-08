@@ -14,6 +14,18 @@ struct GrockPaywallStickyPlanCardView: View {
         RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous)
     }
 
+    private var titleColor: Color {
+        .black.opacity(0.7)
+    }
+
+    private var priceColor: Color {
+        if !isSelected {
+            return titleColor
+        }
+
+        return .black
+    }
+
     @ViewBuilder
     private func badgeLabel(_ badge: String) -> some View {
         let uppercasedBadge = badge.uppercased()
@@ -43,7 +55,7 @@ struct GrockPaywallStickyPlanCardView: View {
             VStack(alignment: .center, spacing: 0) {
                 Text(model.title)
                     .lexend(.subheadline)
-                    .foregroundColor(.black.opacity(0.7))
+                    .foregroundColor(titleColor)
                     .padding(.top, 8)
                 
                 if model.isPriceLoading {
@@ -61,7 +73,7 @@ struct GrockPaywallStickyPlanCardView: View {
                     HStack(alignment: .firstTextBaseline, spacing: 4) {
                         Text(model.price)
                             .lexend(.title3, weight: .semibold)
-                            .foregroundColor(.black)
+                            .foregroundColor(priceColor)
                             .lineLimit(1)
                             .minimumScaleFactor(0.8)
                             .allowsTightening(true)
@@ -143,6 +155,15 @@ struct GrockPaywallStickyPlanCardView: View {
             Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                 .font(.system(size: 20))
                 .foregroundStyle(isSelected ? selectedBorderColor : Color.gray.opacity(0.5))
+                .scaleEffect(isSelected ? 1.07 : 1.0)
+                .contentTransition(.symbolEffect(.replace))
+                .symbolEffect(.bounce, value: isSelected)
+                .animation(
+                    .interactiveSpring(response: 0.24, dampingFraction: 0.64, blendDuration: 0.08),
+                    value: isSelected
+                )
+                .frame(width: 34, height: 34)
+                .contentShape(Rectangle())
                 .padding(.top, 6)
                 .padding(.trailing, 6)
         }

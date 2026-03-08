@@ -61,6 +61,15 @@ extension VaultService {
     static let removedEmojiSentinel = "__removed__"
     private static let planSuppressionReasonCustomCategory = "custom_category_requires_pro"
 
+    private func isAllowedLockedCategoryName(_ categoryName: String, allowedLockedCategoryNames: [String]) -> Bool {
+        let normalizedCategory = normalizedCategoryName(categoryName)
+        guard !normalizedCategory.isEmpty else { return false }
+
+        return allowedLockedCategoryNames.contains {
+            normalizedCategoryName($0) == normalizedCategory
+        }
+    }
+
     func isCategoryLockedByPlan(named categoryName: String) -> Bool {
         if let category = getCategory(named: categoryName) {
             return category.isPlanSuppressed
@@ -598,6 +607,12 @@ extension VaultService {
             targetCategory.items.append(item)
         }
 
+        applyPlanSuppression(
+            to: item,
+            isSuppressed: targetCategory.isPlanSuppressed,
+            reason: targetCategory.isPlanSuppressed ? Self.planSuppressionReasonCustomCategory : nil
+        )
+
         saveContext()
         updateActiveCartsContainingItem(itemId: item.id)
         return true
@@ -610,17 +625,31 @@ extension VaultService {
         newCategoryName: String,
         newStore: String,
         newPrice: Double,
-        newUnit: String
+        newUnit: String,
+        allowedLockedCategoryNames: [String] = [],
+        allowedLockedStoreNames: [String] = []
     ) -> Bool {
         guard let vault = vault else { return false }
 
-        let validation = validateItemName(newName, store: newStore, excluding: item.id)
+        let validation = validateItemName(
+            newName,
+            store: newStore,
+            excluding: item.id,
+            allowedLockedStoreNames: allowedLockedStoreNames
+        )
         guard validation.isValid else {
             print("❌ Cannot update item: \(validation.errorMessage ?? "Unknown error")")
             return false
         }
 
-        guard UserDefaults.standard.isPro || !item.isPlanSuppressed else {
+        let currentCategory = vault.categories.first { $0.items.contains(where: { $0.id == item.id }) }
+
+        guard UserDefaults.standard.isPro
+            || !item.isPlanSuppressed
+            || isAllowedLockedCategoryName(
+                currentCategory?.name ?? item.deletedFromCategoryName ?? "",
+                allowedLockedCategoryNames: allowedLockedCategoryNames
+            ) else {
             return false
         }
 
@@ -637,7 +666,6 @@ extension VaultService {
             item.priceOptions = [newPriceOption]
         }
 
-        let currentCategory = vault.categories.first { $0.items.contains(where: { $0.id == item.id }) }
         let trimmedCategory = newCategoryName.trimmingCharacters(in: .whitespacesAndNewlines)
         let existingTargetCategory = getCategory(named: trimmedCategory)
         guard UserDefaults.standard.isPro || existingTargetCategory != nil || isSystemCategory(named: trimmedCategory) else {
@@ -645,7 +673,12 @@ extension VaultService {
         }
         let targetCategory = existingTargetCategory ?? Category(name: trimmedCategory)
 
-        guard UserDefaults.standard.isPro || !targetCategory.isPlanSuppressed else {
+        guard UserDefaults.standard.isPro
+            || !targetCategory.isPlanSuppressed
+            || isAllowedLockedCategoryName(
+                targetCategory.name,
+                allowedLockedCategoryNames: allowedLockedCategoryNames
+            ) else {
             return false
         }
 
@@ -657,6 +690,12 @@ extension VaultService {
             }
             targetCategory.items.append(item)
         }
+
+        applyPlanSuppression(
+            to: item,
+            isSuppressed: targetCategory.isPlanSuppressed,
+            reason: targetCategory.isPlanSuppressed ? Self.planSuppressionReasonCustomCategory : nil
+        )
 
         saveContext()
         updateActiveCartsContainingItem(itemId: item.id)

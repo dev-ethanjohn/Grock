@@ -11,6 +11,7 @@ struct StoreNameComponent: View {
     @State private var paywallFeatureFocus: GrockPaywallFeatureFocus?
     let hasError: Bool
     var bypassPlanLocks: Bool = false
+    var allowedLockedStoreNames: [String] = []
     
     var onStoreChange: (() -> Void)?
     
@@ -22,7 +23,9 @@ struct StoreNameComponent: View {
     }
 
     private var editableStores: [String] {
-        bypassPlanLocks ? availableStores : availableStores.filter { !vaultService.isStoreLockedByPlan(named: $0) }
+        bypassPlanLocks ? availableStores : availableStores.filter {
+            !vaultService.isStoreLockedByPlan(named: $0) || isAllowedLockedStore($0)
+        }
     }
     
     //Prioritize last selected store, then most recent
@@ -78,7 +81,9 @@ struct StoreNameComponent: View {
                     Divider()
                     
                     ForEach(availableStores, id: \.self) { store in
-                        let isLockedStore = !bypassPlanLocks && vaultService.isStoreLockedByPlan(named: store)
+                        let isLockedStore = !bypassPlanLocks
+                            && vaultService.isStoreLockedByPlan(named: store)
+                            && !isAllowedLockedStore(store)
                         Button(action: {
                             guard !isLockedStore else {
                                 presentPaywall(for: .stores)
@@ -165,7 +170,9 @@ struct StoreNameComponent: View {
             if storeName.isEmpty, let store = defaultStore {
                 storeName = store
             } else if !storeName.isEmpty,
-                      !bypassPlanLocks && vaultService.isStoreLockedByPlan(named: storeName),
+                      !bypassPlanLocks
+                        && vaultService.isStoreLockedByPlan(named: storeName)
+                        && !isAllowedLockedStore(storeName),
                       let store = defaultStore {
                 storeName = store
             }
@@ -193,7 +200,9 @@ struct StoreNameComponent: View {
                 storeName = store
                 onStoreChange?()
             } else if !storeName.isEmpty,
-                      !bypassPlanLocks && vaultService.isStoreLockedByPlan(named: storeName),
+                      !bypassPlanLocks
+                        && vaultService.isStoreLockedByPlan(named: storeName)
+                        && !isAllowedLockedStore(storeName),
                       let store = defaultStore {
                 storeName = store
                 onStoreChange?()
@@ -212,5 +221,12 @@ struct StoreNameComponent: View {
         guard !bypassPlanLocks else { return }
         paywallFeatureFocus = featureFocus
         showPaywall = true
+    }
+
+    private func isAllowedLockedStore(_ store: String) -> Bool {
+        allowedLockedStoreNames.contains {
+            $0.trimmingCharacters(in: .whitespacesAndNewlines)
+                .caseInsensitiveCompare(store.trimmingCharacters(in: .whitespacesAndNewlines)) == .orderedSame
+        }
     }
 }

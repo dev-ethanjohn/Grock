@@ -5,6 +5,8 @@ import UIKit
 
 struct HeaderView: View {
     let cart: Cart
+    let currentBudget: Double
+    let animatedBudget: Double
     let dismiss: DismissAction
     var onBudgetTap: (() -> Void)?
     var onDeleteCart: (() -> Void)?
@@ -14,8 +16,8 @@ struct HeaderView: View {
     @Environment(\.modelContext) private var modelContext
     
     private var progress: Double {
-        guard stateManager.localBudget > 0 else { return 0 }
-        return min(cart.totalSpent / stateManager.localBudget, 1.0)
+        guard currentBudget > 0 else { return 0 }
+        return min(cart.totalSpent / currentBudget, 1.0)
     }
     
     @State private var headerHeight: CGFloat = 0
@@ -116,11 +118,12 @@ struct HeaderView: View {
                 VStack(spacing: 8) {
                     FluidBudgetPillView(
                         cart: cart,
-                        animatedBudget: stateManager.animatedBudget,
+                        animatedBudget: animatedBudget,
                         onBudgetTap: onBudgetTap,
                         hasBackgroundImage: stateManager.hasBackgroundImage,
                         isHeader: true // 👈 Mark as header
                     )
+                    .id("header-budget-pill-\(cart.id)")
                     .frame(height: 22)
                     
                     if cart.isShopping {

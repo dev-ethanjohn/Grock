@@ -1,8 +1,8 @@
 {
   "default": {
-    "yearlyPrimary": "Free trial, then just {{yearly_monthly}}/month ✨",
-    "yearlySecondary": "About {{yearly_daily}}/day for a full year",
-    "monthlyPrimary": "Cancel Anytime ✨",
+    "yearlyPrimary": "After free trial, only {{monthly}} a month, billed yearly",
+    "yearlySecondary": "About {{daily}}/day for a full year more savings",
+    "monthlyPrimary": "Cancel anytime, billed monthly",
     "monthlySecondary": "Save more on groceries every month"
   },
   "countries": {}

@@ -17,8 +17,6 @@ class CartViewModel {
     var duplicateError: String?
     
     private let vaultService: VaultService
-    private let freeActiveCartLimit = 1
-    
     var getVaultService: VaultService {
         return vaultService
     }
@@ -64,11 +62,6 @@ class CartViewModel {
     
     func createCartWithActiveItems(name: String, budget: Double, notifyChanges: Bool = true) -> Cart? {
         print("🛒 CartViewModel: Creating cart with \(activeCartItems.count) active items (notifyChanges: \(notifyChanges))")
-
-        guard canCreateAnotherActiveCart() else {
-            print("🔒 CartViewModel: Active cart limit reached (\(freeActiveCartLimit))")
-            return nil
-        }
         
         let newCart = vaultService.createCartWithActiveItems(
             name: name,
@@ -148,28 +141,21 @@ class CartViewModel {
     }
 
     var activeCartLimitForCurrentPlan: Int? {
-        let isPro = SubscriptionManager.shared.isPro || UserDefaults.standard.isPro
-        return isPro ? nil : freeActiveCartLimit
+        nil
     }
 
     func canCreateAnotherActiveCart(
         isPro: Bool = SubscriptionManager.shared.isPro || UserDefaults.standard.isPro
     ) -> Bool {
-        guard !isPro else { return true }
-        return currentActiveCartCount() < freeActiveCartLimit
+        _ = isPro
+        return true
     }
 
     func isActiveCartLimitReached(
         isPro: Bool = SubscriptionManager.shared.isPro || UserDefaults.standard.isPro
     ) -> Bool {
-        !canCreateAnotherActiveCart(isPro: isPro)
-    }
-
-    private func currentActiveCartCount() -> Int {
-        if let vault = vaultService.vault {
-            return vault.carts.filter { $0.isActive }.count
-        }
-        return carts.filter { $0.isActive }.count
+        _ = isPro
+        return false
     }
     
     // MARK: - Cart Item Updates
@@ -230,11 +216,6 @@ class CartViewModel {
     
     func createEmptyCart(name: String, budget: Double) -> Cart? {
         print("🛒 CartViewModel: Creating empty cart '\(name)' with budget \(budget)")
-
-        guard canCreateAnotherActiveCart() else {
-            print("🔒 CartViewModel: Active cart limit reached (\(freeActiveCartLimit))")
-            return nil
-        }
         
         let newCart = vaultService.createCartWithActiveItems(
             name: name,

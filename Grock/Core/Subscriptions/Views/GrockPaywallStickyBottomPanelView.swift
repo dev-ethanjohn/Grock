@@ -117,12 +117,12 @@ struct GrockPaywallStickyBottomPanelView: View {
                             animateOnAppear: true,
                             showsUnderline: false
                         )
-                        .lexend(.footnote)
-                        .foregroundStyle(Color.black.opacity(0.56))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.88)
-                        .frame(maxWidth: .infinity, alignment: .center)
-                        .id(selectedPlanContextSecondaryLine)
+                            .lexend(.footnote)
+                            .foregroundStyle(Color.black.opacity(0.56))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.88)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .id(selectedPlanContextSecondaryLine)
                     }
                 }
                 .padding(.top, 8)

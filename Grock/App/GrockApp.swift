@@ -43,7 +43,7 @@ struct ContentView: View {
             }
         }
         .onAppear {
-            refreshStoreSelectionRequirement()
+            refreshEntitlementSelectionRequirements()
             refreshSubscriptionStatus()
         }
         .onChange(of: scenePhase) { _, newPhase in
@@ -52,7 +52,7 @@ struct ContentView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .subscriptionStatusChanged)) { notification in
             let isPro = (notification.userInfo?["isPro"] as? Bool) ?? subscriptionManager.isPro
-            refreshStoreSelectionRequirement(isPro: isPro)
+            refreshEntitlementSelectionRequirements(isPro: isPro)
         }
         .onReceive(NotificationCenter.default.publisher(for: .showProUnlockedCelebration)) { notification in
             Task { @MainActor in
@@ -72,7 +72,7 @@ struct ContentView: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("DataUpdated"))) { _ in
-            refreshStoreSelectionRequirement(isPro: subscriptionManager.isPro)
+            refreshEntitlementSelectionRequirements(isPro: subscriptionManager.isPro)
         }
         .sheet(isPresented: $showFreeStoreSelectionSheet) {
             FreeStoreSelectionSheet(isPresented: $showFreeStoreSelectionSheet)
@@ -81,15 +81,18 @@ struct ContentView: View {
         }
     }
 
-    private func refreshStoreSelectionRequirement(isPro: Bool? = nil) {
+    private func refreshEntitlementSelectionRequirements(isPro: Bool? = nil) {
         let resolvedIsPro = isPro ?? subscriptionManager.isPro
+
         showFreeStoreSelectionSheet = vaultService.isFreeStoreSelectionRequired(isPro: resolvedIsPro)
     }
 
     private func refreshSubscriptionStatus() {
         Task { @MainActor in
+            guard !subscriptionManager.hasPurchaseInProgress else { return }
             await subscriptionManager.refreshCustomerInfo()
-            refreshStoreSelectionRequirement(isPro: subscriptionManager.isPro)
+            guard !subscriptionManager.hasPurchaseInProgress else { return }
+            refreshEntitlementSelectionRequirements(isPro: subscriptionManager.isPro)
         }
     }
 }

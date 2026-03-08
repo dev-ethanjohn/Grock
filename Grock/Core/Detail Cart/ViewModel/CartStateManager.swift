@@ -13,9 +13,6 @@ final class CartStateManager {
     
     // Budget editing
     var showingEditBudget = false
-    var localBudget: Double = 0
-    var animatedBudget: Double = 0
-    var isSavingBudget = false
     
     // Color management
     var selectedColor: ColorOption = .defaultColor

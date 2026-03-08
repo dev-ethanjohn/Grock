@@ -79,6 +79,7 @@ class EditItemValidationHandler {
         formViewModel: ItemFormViewModel,
         item: Item,
         vaultService: VaultService,
+        allowedLockedStoreNames: [String],
         duplicateError: Binding<String?>,
         validationTask: inout Task<Void, Never>?
     ) {
@@ -96,7 +97,12 @@ class EditItemValidationHandler {
             try? await Task.sleep(nanoseconds: 500_000_000)
             
             if !Task.isCancelled {
-                let validation = vaultService.validateItemName(itemName, store: storeName, excluding: item.id)
+                let validation = vaultService.validateItemName(
+                    itemName,
+                    store: storeName,
+                    excluding: item.id,
+                    allowedLockedStoreNames: allowedLockedStoreNames
+                )
                 await MainActor.run {
                     if !validation.isValid {
                         duplicateError.wrappedValue = validation.errorMessage
@@ -116,6 +122,7 @@ struct EditItemSheet: View {
     var onSave: ((Item) -> Void)?
     var onRemoveFromCart: ((CartItem) -> Void)?
     var context: EditContext = .vault
+    var allowedLockedStoreNames: [String] = []
     
     @Environment(VaultService.self) private var vaultService
     @Environment(\.dismiss) private var dismiss
@@ -127,6 +134,32 @@ struct EditItemSheet: View {
     @State private var showRemoveFromVaultConfirmation = false
 
     private var bypassPlanLocks: Bool { false }
+    private var allowedLockedCategoryNames: [String] {
+        guard context == .cart, let cart, let cartItem else { return [] }
+
+        let categoryCandidates = [
+            cartItem.vaultItemCategorySnapshot,
+            item.category?.name,
+            vaultService.getCategoryName(for: item.id)
+        ]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+        guard let lockedCategoryName = categoryCandidates.first(where: { vaultService.isCategoryLockedByPlan(named: $0) }) else {
+            return []
+        }
+
+        guard vaultService.canAdjustGrandfatheredPlanningSelection(
+            itemId: item.id,
+            categoryName: lockedCategoryName,
+            storeName: cartItem.plannedStore,
+            in: cart
+        ) else {
+            return []
+        }
+
+        return [lockedCategoryName]
+    }
     
     // MARK: - Initializers
     
@@ -136,13 +169,15 @@ struct EditItemSheet: View {
         cartItem: CartItem? = nil,
         onSave: ((Item) -> Void)? = nil,
         onRemoveFromCart: ((CartItem) -> Void)? = nil,
-        context: EditContext? = nil
+        context: EditContext? = nil,
+        allowedLockedStoreNames: [String] = []
     ) {
         self.item = item
         self.cart = cart
         self.cartItem = cartItem
         self.onSave = onSave
         self.onRemoveFromCart = onRemoveFromCart
+        self.allowedLockedStoreNames = allowedLockedStoreNames
         
         // Determine context
         if cart != nil && cartItem != nil {
@@ -180,7 +215,8 @@ struct EditItemSheet: View {
                                 triggerRealTimeValidation()
                             },
                             isCategoryEditable: true,
-                            bypassPlanLocks: bypassPlanLocks
+                            bypassPlanLocks: bypassPlanLocks,
+                            allowedLockedStoreNames: allowedLockedStoreNames
                         )
                         
                         
@@ -299,6 +335,7 @@ struct EditItemSheet: View {
             formViewModel: formViewModel,
             item: item,
             vaultService: vaultService,
+            allowedLockedStoreNames: allowedLockedStoreNames,
             duplicateError: $duplicateError,
             validationTask: &validationTask
         )
@@ -320,7 +357,8 @@ struct EditItemSheet: View {
         let validation = vaultService.validateItemName(
             formViewModel.itemName,
             store: formViewModel.storeName,
-            excluding: item.id
+            excluding: item.id,
+            allowedLockedStoreNames: allowedLockedStoreNames
         )
         if !validation.isValid {
             duplicateError = validation.errorMessage
@@ -375,12 +413,6 @@ struct EditItemSheet: View {
             return false
         }
 
-        guard vaultService.canEditPlanning(for: cart) else {
-            duplicateError = "Planning edits are locked for this cart on Free."
-            print("🔒 Planning edits are locked for cart: \(cart.name)")
-            return false
-        }
-        
         return saveCartItem(
             cart: cart,
             cartItem: cartItem,
@@ -411,7 +443,9 @@ struct EditItemSheet: View {
             newCategoryName: selectedCategoryName,
             newStore: trimmedStoreName,
             newPrice: priceValue,
-            newUnit: formViewModel.unit
+            newUnit: formViewModel.unit,
+            allowedLockedCategoryNames: allowedLockedCategoryNames,
+            allowedLockedStoreNames: allowedLockedStoreNames
         )
         
         if success {
@@ -472,7 +506,9 @@ struct EditItemSheet: View {
             newCategoryName: selectedCategoryName,
             newStore: formViewModel.storeName.trimmingCharacters(in: .whitespacesAndNewlines),
             newPrice: priceValue,
-            newUnit: formViewModel.unit
+            newUnit: formViewModel.unit,
+            allowedLockedCategoryNames: allowedLockedCategoryNames,
+            allowedLockedStoreNames: allowedLockedStoreNames
         )
     }
     

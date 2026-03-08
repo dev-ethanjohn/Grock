@@ -1,9 +1,9 @@
 import SwiftUI
+import UIKit
 
 //MARK: commented code are for debugs later.
 struct GrockPaywallView: View {
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.scenePhase) private var scenePhase
     
     @State private var viewModel = GrockPaywallViewModel()
     @State private var selectedFeatureIndex = 0
@@ -29,7 +29,8 @@ struct GrockPaywallView: View {
     @State private var showingPrivacyPolicySheet = false
     @State private var showingTermsOfServiceSheet = false
     @State private var restoreWarningToastTask: Task<Void, Never>?
-    @State private var suppressNextActiveRefresh = false
+    @State private var unlockCompletionTask: Task<Void, Never>?
+    @State private var paywallHostViewController: UIViewController?
     
     // 🐛 Debug state — uncomment to enable
     // @State private var debugMinY: CGFloat = 0
@@ -41,16 +42,19 @@ struct GrockPaywallView: View {
     private let initialFeatureFocus: GrockPaywallFeatureFocus?
     private let celebrationContext: ProUnlockCelebrationContext?
     private let onUnlocked: (() -> Void)?
+    private let shouldPresentUnlockCelebrationInternally: Bool
     private let trialTimelineSectionID = "paywall-trial-timeline-section"
     private let trialTimelineJumpAnchor = UnitPoint(x: 0.5, y: 0.12)
     
     init(
         initialFeatureFocus: GrockPaywallFeatureFocus? = nil,
         celebrationContext: ProUnlockCelebrationContext? = nil,
+        shouldPresentUnlockCelebrationInternally: Bool = true,
         onUnlocked: (() -> Void)? = nil
     ) {
         self.initialFeatureFocus = initialFeatureFocus
         self.celebrationContext = celebrationContext
+        self.shouldPresentUnlockCelebrationInternally = shouldPresentUnlockCelebrationInternally
         self.onUnlocked = onUnlocked
     }
     
@@ -237,24 +241,6 @@ struct GrockPaywallView: View {
                 ProgressView()
                     .progressViewStyle(.circular)
                     .tint(.black)
-            } else {
-                Button {
-                    Task { @MainActor in
-                        await viewModel.retryOfferingsLoad()
-                        applyInitialFeatureFocusIfNeeded()
-                    }
-                } label: {
-                    Text("Retry")
-                        .lexend(.subheadline, weight: .semibold)
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 18)
-                        .padding(.vertical, 10)
-                        .background(
-                            Capsule()
-                                .fill(Color.black.opacity(0.86))
-                        )
-                }
-                .buttonStyle(.plain)
             }
         }
         .frame(maxWidth: .infinity)
@@ -295,10 +281,14 @@ struct GrockPaywallView: View {
         .padding(.horizontal, 20)
         .padding(.top, 6)
     }
+
+    private var shouldDeferAutomaticPaywallChecks: Bool {
+        purchaseTapGate || viewModel.isProcessingAction
+    }
     
     var body: some View {
         Group {
-            if viewModel.isProUser {
+            if viewModel.isProUser && !shouldDeferAutomaticPaywallChecks {
                 Color.clear
                     .ignoresSafeArea()
                     .onAppear {
@@ -397,6 +387,11 @@ struct GrockPaywallView: View {
                     .padding(.bottom, 300)
                 }
                 .coordinateSpace(name: "paywallScroll")
+                .background(
+                    PaywallHostingControllerReader { controller in
+                        paywallHostViewController = controller
+                    }
+                )
             }
             .overlay(alignment: .top) {
                 GeometryReader { geo in
@@ -494,6 +489,7 @@ struct GrockPaywallView: View {
                 }
             }
             .onAppear {
+                viewModel.prepareForPresentation()
                 applyInitialFeatureFocusIfNeeded()
                 showLeftChevron = true
                 showRightChevron = true
@@ -521,24 +517,6 @@ struct GrockPaywallView: View {
                 #if DEBUG
                 print("ℹ️ [Paywall] If you switched Sandbox testers, reinstall the app before validating storefront pricing to clear cached session data.")
                 #endif
-
-                Task { @MainActor in
-                    guard await verifyPaywallEligibility() else { return }
-                    await refreshOfferingsForVisiblePaywall(reason: "paywall-appeared")
-                }
-            }
-            .onChange(of: scenePhase) { _, newPhase in
-                guard newPhase == .active else { return }
-
-                if suppressNextActiveRefresh {
-                    suppressNextActiveRefresh = false
-                    return
-                }
-
-                Task { @MainActor in
-                    guard await verifyPaywallEligibility() else { return }
-                    await refreshOfferingsForVisiblePaywall(reason: "app-became-active")
-                }
             }
             .onChange(of: carouselGlobalMinY) { _, newVal in
                 updateFloatingControlsVisibility(minY: newVal)
@@ -546,6 +524,8 @@ struct GrockPaywallView: View {
             .onDisappear {
                 restoreWarningToastTask?.cancel()
                 restoreWarningToastTask = nil
+                unlockCompletionTask?.cancel()
+                unlockCompletionTask = nil
                 showTrialJumpCapsule = false
                 showLeftChevron = true
                 showRightChevron = true
@@ -588,7 +568,6 @@ struct GrockPaywallView: View {
     
     private func handlePrimaryAction() {
         guard !purchaseTapGate else { return }
-        suppressNextActiveRefresh = true
         purchaseTapGate = true
         
         Task { @MainActor in
@@ -601,7 +580,6 @@ struct GrockPaywallView: View {
     }
     
     private func handleRestore() {
-        suppressNextActiveRefresh = true
         Task { @MainActor in
             let restored = await viewModel.restorePurchases()
             if restored {
@@ -611,29 +589,43 @@ struct GrockPaywallView: View {
     }
 
     private func completeUnlockFlow() {
-        let userInfo = celebrationNotificationUserInfo()
-        onUnlocked?()
-        dismiss()
+        unlockCompletionTask?.cancel()
+        unlockCompletionTask = Task { @MainActor in
+            await waitForStoreKitPresentationToSettle()
+            guard !Task.isCancelled else { return }
 
-        // Trigger after dismissal starts so the celebration appears above the underlying screen.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
-            NotificationCenter.default.post(
-                name: .showProUnlockedCelebration,
-                object: nil,
-                userInfo: userInfo
-            )
+            unlockCompletionTask = nil
+            onUnlocked?()
+            dismiss()
+
+            guard shouldPresentUnlockCelebrationInternally else { return }
+
+            // Trigger after dismissal starts so the celebration appears above the underlying screen.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+                Task { @MainActor in
+                    ProUnlockedCelebrationPresenter.shared.show(
+                        featureFocus: initialFeatureFocus,
+                        celebrationContext: celebrationContext
+                    )
+                }
+            }
         }
     }
 
-    private func celebrationNotificationUserInfo() -> [AnyHashable: Any]? {
-        var userInfo: [AnyHashable: Any] = [:]
-        if let featureFocus = initialFeatureFocus {
-            userInfo["featureFocus"] = featureFocus.rawValue
+    @MainActor
+    private func waitForStoreKitPresentationToSettle() async {
+        guard paywallHostViewController?.presentedViewController != nil else { return }
+
+        // If StoreKit still has a controller above the paywall, give it a brief moment to clear.
+        for _ in 0..<6 {
+            guard !Task.isCancelled else { return }
+
+            if paywallHostViewController?.presentedViewController == nil {
+                return
+            }
+
+            try? await Task.sleep(for: .milliseconds(75))
         }
-        if let celebrationContext {
-            userInfo["celebrationContext"] = celebrationContext.rawValue
-        }
-        return userInfo.isEmpty ? nil : userInfo
     }
 
     private var restoreWarningToastView: some View {
@@ -703,28 +695,6 @@ struct GrockPaywallView: View {
         
         selectedFeatureIndex = focusedFeatureIndex
     }
-
-    @MainActor
-    private func refreshOfferingsForVisiblePaywall(reason: String) async {
-        await viewModel.refreshOfferingsForPaywall(reason: reason)
-        applyInitialFeatureFocusIfNeeded()
-    }
-
-    @MainActor
-    private func verifyPaywallEligibility() async -> Bool {
-        if viewModel.isProUser {
-            dismiss()
-            return false
-        }
-
-        let isProAfterRefresh = await viewModel.refreshEntitlementForPaywallGate()
-        if isProAfterRefresh {
-            dismiss()
-            return false
-        }
-
-        return true
-    }
 }
 
 private struct PaywallCarouselMaxYPreferenceKey: PreferenceKey {
@@ -737,4 +707,34 @@ private struct PaywallCarouselMaxYPreferenceKey: PreferenceKey {
 
 #Preview("Paywall Full") {
     GrockPaywallView()
+}
+
+private struct PaywallHostingControllerReader: UIViewControllerRepresentable {
+    let onResolve: (UIViewController) -> Void
+
+    func makeUIViewController(context: Context) -> ResolverViewController {
+        ResolverViewController(onResolve: onResolve)
+    }
+
+    func updateUIViewController(_ uiViewController: ResolverViewController, context: Context) { }
+}
+
+private final class ResolverViewController: UIViewController {
+    private let onResolve: (UIViewController) -> Void
+
+    init(onResolve: @escaping (UIViewController) -> Void) {
+        self.onResolve = onResolve
+        super.init(nibName: nil, bundle: nil)
+        view.isHidden = true
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        onResolve(parent ?? self)
+    }
 }

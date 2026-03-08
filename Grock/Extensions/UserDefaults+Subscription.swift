@@ -5,6 +5,7 @@ extension UserDefaults {
         static let isPro = "isPro"
         static let freeEditableStoreKeys = "freeEditableStoreKeys"
         static let freePrimaryEditableCartId = "freePrimaryEditableCartId"
+        static let grandfatheredLockedPlanningSelectionKeysByCartId = "grandfatheredLockedPlanningSelectionKeysByCartId"
     }
 
     var isPro: Bool {
@@ -24,6 +25,19 @@ extension UserDefaults {
                 set(newValue, forKey: SubscriptionKeys.freePrimaryEditableCartId)
             } else {
                 removeObject(forKey: SubscriptionKeys.freePrimaryEditableCartId)
+            }
+        }
+    }
+
+    var grandfatheredLockedPlanningSelectionKeysByCartId: [String: [String]] {
+        get {
+            dictionary(forKey: SubscriptionKeys.grandfatheredLockedPlanningSelectionKeysByCartId) as? [String: [String]] ?? [:]
+        }
+        set {
+            if newValue.isEmpty {
+                removeObject(forKey: SubscriptionKeys.grandfatheredLockedPlanningSelectionKeysByCartId)
+            } else {
+                set(newValue, forKey: SubscriptionKeys.grandfatheredLockedPlanningSelectionKeysByCartId)
             }
         }
     }

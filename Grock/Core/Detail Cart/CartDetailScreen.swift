@@ -54,6 +54,15 @@ struct CartDetailScreen: View {
     @State private var cartInsights: CartInsights = CartInsights()
     @State private var sortedStores: [String] = []
     @State private var didLoadData = false
+    @State private var localBudget: Double
+    @State private var animatedBudget: Double
+    @State private var isSavingBudget = false
+
+    init(cart: Cart) {
+        self.cart = cart
+        self._localBudget = State(initialValue: cart.budget)
+        self._animatedBudget = State(initialValue: cart.budget)
+    }
     
     private var totalItemCount: Int {
         cart.cartItems.count
@@ -127,6 +136,9 @@ struct CartDetailScreen: View {
             hasItems: hasItems,
             shouldAnimateTransition: previousHasItems != hasItems,
             storeItems: { store in itemsByStore[store] ?? [] },
+            localBudget: $localBudget,
+            animatedBudget: $animatedBudget,
+            isSavingBudget: $isSavingBudget,
             showingDeleteAlert: $showingDeleteAlert,
             editingItem: $editingItem,
             showingCompleteAlert: $showingCompleteAlert,
@@ -327,8 +339,9 @@ struct CartDetailScreen: View {
         stateManager.tripCompletionMessage = ""
         stateManager.isTripFinishingFromSheet = false
         
-        stateManager.localBudget = cart.budget
-        stateManager.animatedBudget = cart.budget
+        localBudget = cart.budget
+        animatedBudget = cart.budget
+        isSavingBudget = false
 
         // Reset cart-specific visual state immediately to avoid flashing a previous cart's background.
         stateManager.backgroundImageCartId = cart.id
@@ -400,8 +413,8 @@ struct CartDetailScreen: View {
         stateManager.showFinishTripButton = false
         stateManager.showingCompletedSheet = false
 
-        if stateManager.localBudget != cart.budget {
-            cart.budget = stateManager.localBudget
+        if localBudget != cart.budget {
+            cart.budget = localBudget
             vaultService.updateCartTotals(cart: cart)
         }
         
@@ -924,6 +937,9 @@ struct CartDetailContent: View {
     let storeItems: (String) -> [(cartItem: CartItem, item: Item?)]
     
     // Only essential bindings
+    @Binding var localBudget: Double
+    @Binding var animatedBudget: Double
+    @Binding var isSavingBudget: Bool
     @Binding var showingDeleteAlert: Bool
     @Binding var editingItem: CartItem?
     @Binding var showingCompleteAlert: Bool
@@ -995,6 +1011,8 @@ struct CartDetailContent: View {
                     // CORRECTED: HeaderView with proper parameters
                     HeaderView(
                         cart: cart,
+                        currentBudget: localBudget,
+                        animatedBudget: animatedBudget,
                         dismiss: dismiss,
                         onBudgetTap: {
                             stateManager.showingEditBudget = true
@@ -1034,28 +1052,26 @@ struct CartDetailContent: View {
                         get: { stateManager.showingEditBudget },
                         set: { stateManager.showingEditBudget = $0 }
                     ),
-                    currentBudget: stateManager.localBudget,
+                    currentBudget: localBudget,
                     onSave: { newBudget in
-                        stateManager.isSavingBudget = true
+                        isSavingBudget = true
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                            stateManager.localBudget = newBudget
+                            localBudget = newBudget
                             
                             withAnimation(.spring(duration: 0.3)) {
-                                stateManager.animatedBudget = newBudget
+                                animatedBudget = newBudget
                             }
                             
                             cart.budget = newBudget
                             vaultService.updateCartTotals(cart: cart)
                             NotificationCenter.default.post(name: .cartBudgetUpdated, object: nil, userInfo: ["cartId": cart.id, "budget": newBudget])
                             
-                            stateManager.isSavingBudget = false
+                            isSavingBudget = false
                         }
                     },
                     onDismiss: {
-                        if !stateManager.isSavingBudget {
-                            withAnimation(.easeInOut(duration: 0.3)) {
-                                stateManager.animatedBudget = stateManager.localBudget
-                            }
+                        if !isSavingBudget {
+                            animatedBudget = localBudget
                         }
                     }
                 )
@@ -1079,11 +1095,9 @@ struct CartDetailContent: View {
         }
         .ignoresSafeArea(.keyboard)
         .onChange(of: cart.budget) { oldValue, newValue in
-            if stateManager.localBudget != newValue {
-                stateManager.localBudget = newValue
-                withAnimation(.easeInOut(duration: 0.3)) {
-                    stateManager.animatedBudget = newValue
-                }
+            if localBudget != newValue {
+                localBudget = newValue
+                animatedBudget = newValue
             }
         }
         .onChange(of: cart.status) { oldValue, newValue in
@@ -1320,10 +1334,6 @@ struct CartDetailContent: View {
             .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
 
-        if categoryCandidates.contains(where: { vaultService.isCategoryLockedByPlan(named: $0) }) {
-            return .categories
-        }
-
         let storeCandidates = [
             cartItem.getStore(cart: cart),
             cartItem.plannedStore,
@@ -1332,7 +1342,29 @@ struct CartDetailContent: View {
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
 
-        if storeCandidates.contains(where: { vaultService.isStoreLockedByPlan(named: $0) }) {
+        let hasLockedCategory = categoryCandidates.contains {
+            vaultService.isCategoryLockedByPlan(named: $0)
+        }
+        let hasLockedStore = storeCandidates.contains {
+            vaultService.isStoreLockedByPlan(named: $0)
+        }
+
+        guard hasLockedCategory || hasLockedStore else { return nil }
+
+        if vaultService.canAdjustGrandfatheredPlanningSelection(
+            itemId: cartItem.itemId,
+            categoryName: categoryCandidates.first,
+            storeName: storeCandidates.first,
+            in: cart
+        ) {
+            return nil
+        }
+
+        if hasLockedCategory {
+            return .categories
+        }
+
+        if hasLockedStore {
             return .stores
         }
 
@@ -1486,16 +1518,34 @@ extension View {
     ) -> some View {
         self
             .sheet(item: itemToEdit) { item in
+                let cartItem = cart.cartItems.first { $0.itemId == item.id }
+                let allowedLockedStoreNames: [String] = {
+                    guard let cartItem else { return [] }
+                    guard vaultService.canAdjustGrandfatheredPlanningSelection(
+                        itemId: item.id,
+                        categoryName: vaultService.getCategoryName(for: item.id),
+                        storeName: cartItem.plannedStore,
+                        in: cart
+                    ) else {
+                        return []
+                    }
+                    guard vaultService.isStoreLockedByPlan(named: cartItem.plannedStore) else {
+                        return []
+                    }
+                    return [cartItem.plannedStore]
+                }()
+
                 EditItemSheet(
                     item: item,
                     cart: cart,
-                    cartItem: cart.cartItems.first { $0.itemId == item.id },
+                    cartItem: cartItem,
                     onSave: { updatedItem in
                         print("💾 EditItemSheet saved")
                         vaultService.updateCartTotals(cart: cart)
                     },
                     onRemoveFromCart: onRemoveFromCart,
-                    context: .cart
+                    context: .cart,
+                    allowedLockedStoreNames: allowedLockedStoreNames
                 )
                 .presentationDetents([.medium, .large])
                 .presentationCornerRadius(24)

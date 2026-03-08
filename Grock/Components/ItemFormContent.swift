@@ -10,6 +10,7 @@ struct ItemFormContent: View {
     var onStoreChange: (() -> Void)? = nil
     var isCategoryEditable: Bool = true
     var bypassPlanLocks: Bool = false
+    var allowedLockedStoreNames: [String] = []
     
     @Environment(VaultService.self) private var vaultService
     @State private var showUnitPicker = false
@@ -76,6 +77,7 @@ struct ItemFormContent: View {
                           storeName: $formViewModel.storeName,
                           hasError: formViewModel.attemptedSubmission && formViewModel.firstMissingField == "Store Name",
                           bypassPlanLocks: bypassPlanLocks,
+                          allowedLockedStoreNames: allowedLockedStoreNames,
                           onStoreChange: onStoreChange
                       )
                     .offset(x: storeNameShakeOffset)

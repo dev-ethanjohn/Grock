@@ -41,7 +41,6 @@ struct ActiveCarts: View {
                  // Trigger refresh when any cart color changes
                  colorChangeTrigger = UUID()
              }
-        
     }
     
     private var cartListView: some View {
@@ -186,6 +185,7 @@ struct ActiveCarts: View {
         
         return start + createCart + middle + vault + end
     }
+
 }
 
 

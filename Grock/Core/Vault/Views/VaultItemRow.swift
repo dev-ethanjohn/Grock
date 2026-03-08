@@ -387,9 +387,9 @@ struct VaultItemRow: View {
             }
         }) {
             Image(systemName: "plus")
-                .lexend(.footnote)
+                .lexend(.subheadline)
                 .bold()
-                .foregroundColor(isActive ? Color.Grock.textDeep : Color.Grock.neutral500)
+                .foregroundColor(isEditingLocked ? Color.Grock.neutral500 : .black)
         }
         .frame(width: 24, height: 24)
         .background(.white)

@@ -32,8 +32,13 @@ struct NameEntrySheet: View {
                 .frame(height: 20)
             
             VStack(alignment: .leading, spacing: 4) {
-                TextField("You can call me...", text: $userName)
-                    .fuzzyBubblesFont(20, weight: .bold)
+                TextField(
+                    "",
+                    text: $userName,
+                    prompt: Text("You can call me...")
+                        .shantellSansFont(20)
+                )
+                    .shantellSansFont(20)
                     .foregroundColor(.primary)
                     .multilineTextAlignment(.center)
                     .focused($isTextFieldFocused)

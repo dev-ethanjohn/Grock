@@ -13,6 +13,7 @@ struct MenuView: View {
     @State private var showMailUnavailableAlert = false
     @State private var subscriptionManager = SubscriptionManager.shared
     @State private var showingPaywall = false
+    @State private var shouldShowPaywallUnlockCelebration = false
     @State private var showingManageSubscriptionSheet = false
     @State private var showingPrivacyPolicySheet = false
     @State private var showingTermsOfServiceSheet = false
@@ -265,8 +266,20 @@ struct MenuView: View {
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
         }
-        .fullScreenCover(isPresented: $showingPaywall) {
-            GrockPaywallView {
+        .fullScreenCover(
+            isPresented: $showingPaywall,
+            onDismiss: {
+                guard shouldShowPaywallUnlockCelebration else { return }
+                shouldShowPaywallUnlockCelebration = false
+                guard subscriptionManager.isPro else { return }
+
+                Task { @MainActor in
+                    ProUnlockedCelebrationPresenter.shared.show()
+                }
+            }
+        ) {
+            GrockPaywallView(shouldPresentUnlockCelebrationInternally: false) {
+                shouldShowPaywallUnlockCelebration = true
                 showingPaywall = false
             }
         }
@@ -619,7 +632,7 @@ struct MenuView: View {
 
     private var appVersionLabel: String {
         let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
-        return appVersion
+        return "v \(appVersion)"
     }
     
     private var menuCurrencies: [Currency] {

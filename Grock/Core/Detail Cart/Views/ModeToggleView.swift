@@ -156,6 +156,19 @@ struct PlanningButton: View {
     let cart: Cart
     
     @Environment(CartStateManager.self) private var stateManager
+    @Environment(VaultService.self) private var vaultService
+
+    private var canSwitchToPlanning: Bool {
+        if cart.isCompleted {
+            return false
+        }
+
+        if cart.isShopping {
+            return vaultService.canReturnToPlanning(for: cart)
+        }
+
+        return true
+    }
     
     var body: some View {
         Button(action: handlePlanningTap) {
@@ -167,7 +180,7 @@ struct PlanningButton: View {
                 .animation(.spring(response: 0.3, dampingFraction: 0.7), value: stateManager.anticipationOffset)
                 .animation(.easeInOut(duration: 0.2), value: cart.isPlanning)
         }
-        .disabled(cart.isCompleted)
+        .disabled(!canSwitchToPlanning)
         .buttonStyle(.plain)
     }
     

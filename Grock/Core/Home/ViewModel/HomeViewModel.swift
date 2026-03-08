@@ -265,6 +265,7 @@ final class HomeViewModel {
         UserDefaults.standard.set("[]", forKey: "customUnitAbbreviationsJSON")
         UserDefaults.standard.freeEditableStoreKeys = []
         UserDefaults.standard.freePrimaryEditableCartId = nil
+        UserDefaults.standard.grandfatheredLockedPlanningSelectionKeysByCartId = [:]
 
         // Clear hidden cart state
         hiddenCartIds.removeAll()

@@ -48,39 +48,87 @@ extension VaultService {
     }
 
     var planningEditableCartLimitForCurrentPlan: Int? {
-        UserDefaults.standard.isPro ? nil : Self.freePlanningEditableCartLimit
+        nil
     }
 
     func primaryEditableCartIdForCurrentPlan(isPro: Bool = UserDefaults.standard.isPro) -> String? {
-        resolvedPrimaryEditableCartIdForCurrentPlan(isPro: isPro)
+        nil
     }
 
     func canEditPlanning(for cart: Cart, isPro: Bool = UserDefaults.standard.isPro) -> Bool {
-        !isCartPlanningLockedByPlan(cart, isPro: isPro)
+        true
+    }
+
+    func canReturnToPlanning(for cart: Cart, isPro: Bool = UserDefaults.standard.isPro) -> Bool {
+        cart.status == .shopping
     }
 
     func isCartPlanningLockedByPlan(_ cart: Cart, isPro: Bool = UserDefaults.standard.isPro) -> Bool {
-        guard cart.status == .planning else { return false }
-        return isNonPrimaryActiveCartOnFree(cart, isPro: isPro)
+        false
     }
 
-    /// Persists a deterministic primary cart on Free so planning edits stay predictable.
+    func planningPremiumFeatureFocus(
+        itemId: String,
+        categoryName: String? = nil,
+        storeName: String? = nil,
+        isPro: Bool = UserDefaults.standard.isPro
+    ) -> GrockPaywallFeatureFocus? {
+        guard !isPro else { return nil }
+
+        let categoryCandidates = [
+            categoryName,
+            getCategoryName(for: itemId)
+        ]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+        if categoryCandidates.contains(where: { isCategoryLockedByPlan(named: $0) }) {
+            return .categories
+        }
+
+        let storeCandidates = [storeName]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+        if storeCandidates.contains(where: { isStoreLockedByPlan(named: $0, isPro: isPro) }) {
+            return .stores
+        }
+
+        return nil
+    }
+
+    func canAdjustGrandfatheredPlanningSelection(
+        itemId: String,
+        categoryName: String? = nil,
+        storeName: String? = nil,
+        in cart: Cart,
+        isPro: Bool = UserDefaults.standard.isPro
+    ) -> Bool {
+        guard cart.status == .planning else { return true }
+        guard planningPremiumFeatureFocus(
+            itemId: itemId,
+            categoryName: categoryName,
+            storeName: storeName,
+            isPro: isPro
+        ) != nil else {
+            return true
+        }
+
+        let selectionKey = ActiveItemSelectionKey.make(itemId: itemId, store: storeName)
+        let currentlyInCart = cart.cartItems.contains { cartItem in
+            !cartItem.isShoppingOnlyItem
+                && cartItem.itemId == itemId
+                && normalizedGrandfatheredStoreKey(cartItem.plannedStore) == normalizedGrandfatheredStoreKey(storeName)
+        }
+
+        return currentlyInCart
+            || grandfatheredLockedPlanningSelectionKeys(for: cart.id).contains(selectionKey)
+    }
+
+    /// Free no longer restricts editing to a single active cart.
+    /// Keep clearing any stale persisted selection so old downgrade state cannot resurface.
     func reconcileCartPlanningEntitlementState(isPro: Bool) {
-        let resolvedPrimaryCartId: String? = isPro ? nil : resolvedPrimaryEditableCartIdForCurrentPlan(isPro: false)
-        let previousPrimaryCartId = UserDefaults.standard.freePrimaryEditableCartId
-
-        guard previousPrimaryCartId != resolvedPrimaryCartId else { return }
-
-        UserDefaults.standard.freePrimaryEditableCartId = resolvedPrimaryCartId
-
-        NotificationCenter.default.post(
-            name: NSNotification.Name("DataUpdated"),
-            object: nil,
-            userInfo: [
-                "isPro": isPro,
-                "freePrimaryEditableCartId": resolvedPrimaryCartId as Any
-            ]
-        )
+        persistFreePrimaryEditableCartId(nil, isPro: isPro)
     }
 
     private func planningCartsForPlanEntitlementEvaluation() -> [Cart] {
@@ -96,12 +144,12 @@ extension VaultService {
             return rankedEditableCartCandidates(from: planningCarts).first?.id
         }
 
-        if let persistedCartId = UserDefaults.standard.freePrimaryEditableCartId,
-           planningCarts.contains(where: { $0.id == persistedCartId }) {
+        if let persistedCartId = validPersistedFreePrimaryEditableCartId(isPro: isPro) {
             return persistedCartId
         }
 
-        return rankedEditableCartCandidates(from: planningCarts).first?.id
+        // No implicit defaults: require explicit user selection when Free exceeds the planning limit.
+        return nil
     }
 
     private func rankedEditableCartCandidates(from carts: [Cart]) -> [Cart] {
@@ -133,9 +181,130 @@ extension VaultService {
         let planningCarts = planningCartsForPlanEntitlementEvaluation()
         guard planningCarts.count > Self.freePlanningEditableCartLimit else { return false }
         guard planningCarts.contains(where: { $0.id == cart.id }) else { return false }
-        guard let primaryCartId = resolvedPrimaryEditableCartIdForCurrentPlan(isPro: false) else { return false }
+        guard let primaryCartId = resolvedPrimaryEditableCartIdForCurrentPlan(isPro: false) else { return true }
 
         return cart.id != primaryCartId
+    }
+
+    var planningEditableCartLimitForFreeSelection: Int {
+        max(1, Self.freePlanningEditableCartLimit)
+    }
+
+    func planningCartsForFreeSelection() -> [Cart] {
+        rankedEditableCartCandidates(from: planningCartsForPlanEntitlementEvaluation())
+    }
+
+    func shoppingCartsForFreeSelectionSummary() -> [Cart] {
+        guard let vault else { return [] }
+
+        return vault.carts
+            .filter { $0.isShopping && !$0.isDeleted }
+            .sorted { lhs, rhs in
+                let lhsDate = cartRecencyDate(lhs)
+                let rhsDate = cartRecencyDate(rhs)
+
+                if lhsDate != rhsDate {
+                    return lhsDate > rhsDate
+                }
+
+                if lhs.createdAt != rhs.createdAt {
+                    return lhs.createdAt > rhs.createdAt
+                }
+
+                return lhs.id < rhs.id
+            }
+    }
+
+    func isFreeCartSelectionRequired(isPro: Bool = UserDefaults.standard.isPro) -> Bool {
+        false
+    }
+
+    func preselectedCartIdForFreeSelection(isPro: Bool = UserDefaults.standard.isPro) -> String? {
+        nil
+    }
+
+    func canChangeFreePrimaryEditableCartSelection(isPro: Bool = UserDefaults.standard.isPro) -> Bool {
+        true
+    }
+
+    @discardableResult
+    func applyFreeCartSelection(_ selectedCartId: String, isPro: Bool = UserDefaults.standard.isPro) -> Bool {
+        _ = selectedCartId
+        persistFreePrimaryEditableCartId(nil, isPro: isPro)
+        return true
+    }
+
+    private func validPersistedFreePrimaryEditableCartId(isPro: Bool = UserDefaults.standard.isPro) -> String? {
+        let planningCartIds = Set(planningCartsForPlanEntitlementEvaluation().map(\.id))
+        guard !isPro else {
+            return rankedEditableCartCandidates(from: planningCartsForPlanEntitlementEvaluation()).first?.id
+        }
+
+        guard let persistedCartId = UserDefaults.standard.freePrimaryEditableCartId else {
+            return nil
+        }
+
+        return planningCartIds.contains(persistedCartId) ? persistedCartId : nil
+    }
+
+    private func persistFreePrimaryEditableCartId(_ cartId: String?, isPro: Bool) {
+        let previousPrimaryCartId = UserDefaults.standard.freePrimaryEditableCartId
+        guard previousPrimaryCartId != cartId else { return }
+
+        UserDefaults.standard.freePrimaryEditableCartId = cartId
+
+        NotificationCenter.default.post(
+            name: NSNotification.Name("DataUpdated"),
+            object: nil,
+            userInfo: [
+                "isPro": isPro,
+                "freePrimaryEditableCartId": cartId as Any
+            ]
+        )
+    }
+
+    private func normalizedGrandfatheredStoreKey(_ storeName: String?) -> String {
+        storeName?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased() ?? ""
+    }
+
+    private func grandfatheredLockedPlanningSelectionKeys(for cartId: String) -> Set<String> {
+        let persisted = UserDefaults.standard.grandfatheredLockedPlanningSelectionKeysByCartId[cartId] ?? []
+        return Set(persisted)
+    }
+
+    private func recordGrandfatheredLockedPlanningSelection(
+        itemId: String,
+        categoryName: String? = nil,
+        storeName: String?,
+        cart: Cart,
+        isPro: Bool = UserDefaults.standard.isPro
+    ) {
+        guard cart.status == .planning else { return }
+        guard planningPremiumFeatureFocus(
+            itemId: itemId,
+            categoryName: categoryName,
+            storeName: storeName,
+            isPro: isPro
+        ) != nil else {
+            return
+        }
+
+        let selectionKey = ActiveItemSelectionKey.make(itemId: itemId, store: storeName)
+        var registry = UserDefaults.standard.grandfatheredLockedPlanningSelectionKeysByCartId
+        var keys = registry[cart.id] ?? []
+
+        guard !keys.contains(selectionKey) else { return }
+        keys.append(selectionKey)
+        registry[cart.id] = keys
+        UserDefaults.standard.grandfatheredLockedPlanningSelectionKeysByCartId = registry
+    }
+
+    private func clearGrandfatheredLockedPlanningSelections(for cartId: String) {
+        var registry = UserDefaults.standard.grandfatheredLockedPlanningSelectionKeysByCartId
+        guard registry.removeValue(forKey: cartId) != nil else { return }
+        UserDefaults.standard.grandfatheredLockedPlanningSelectionKeysByCartId = registry
     }
 
     /// Enforces plan-based background limitations for carts.
@@ -227,6 +396,7 @@ extension VaultService {
         modelContext.delete(cart)
         saveContext()
         reconcileCartPlanningEntitlementState(isPro: UserDefaults.standard.isPro)
+        clearGrandfatheredLockedPlanningSelections(for: cart.id)
         NotificationCenter.default.post(name: NSNotification.Name("DataUpdated"), object: nil)
         CartBackgroundImageManager.shared.deleteImage(forCartId: cart.id)
         UserDefaults.standard.removeObject(forKey: "cartBackgroundColor_\(cart.id)")
@@ -258,6 +428,7 @@ extension VaultService {
         modelContext.delete(cart)
         saveContext()
         reconcileCartPlanningEntitlementState(isPro: UserDefaults.standard.isPro)
+        clearGrandfatheredLockedPlanningSelections(for: cartId)
         NotificationCenter.default.post(name: NSNotification.Name("DataUpdated"), object: nil)
         CartBackgroundImageManager.shared.deleteImage(forCartId: cartId)
         UserDefaults.standard.removeObject(forKey: "cartBackgroundColor_\(cartId)")
@@ -587,6 +758,12 @@ extension VaultService {
                 print("⏸️ Skipped vault item \(itemName) during shopping")
             }
         } else {
+            recordGrandfatheredLockedPlanningSelection(
+                itemId: itemId,
+                categoryName: cartItem.vaultItemCategorySnapshot,
+                storeName: cartItem.plannedStore,
+                cart: cart
+            )
             if let index = cart.cartItems.firstIndex(where: { $0.itemId == itemId }) {
                 cart.cartItems.remove(at: index)
                 print("🗑️ Removed \(itemName) from cart: \(cart.name)")
@@ -876,7 +1053,7 @@ extension VaultService {
     /// - Restores original planning quantities when available.
     func returnToPlanning(cart: Cart) {
         guard cart.status == .shopping else { return }
-        guard !isNonPrimaryActiveCartOnFree(cart) else {
+        guard canReturnToPlanning(for: cart) else {
             print("🔒 Planning mode is locked for cart: \(cart.name)")
             return
         }

@@ -450,6 +450,7 @@ struct HomeCartRowView: View {
                 hasBackgroundImage: hasBackgroundImage,
                 isHeader: false
             )
+            .id("home-budget-pill-\(cart.id)")
             
             if cart.isShopping {
                 // Horizontal category list

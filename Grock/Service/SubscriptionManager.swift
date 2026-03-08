@@ -48,6 +48,7 @@ final class SubscriptionManager {
             customerInfoStreamTask = Task {
                 for await updatedInfo in Purchases.shared.customerInfoStream {
                     await MainActor.run {
+                        guard !self.hasPurchaseInProgress else { return }
                         self.apply(customerInfo: updatedInfo)
                     }
                 }
@@ -94,6 +95,7 @@ final class SubscriptionManager {
 
     func refreshCustomerInfo() async {
         guard Purchases.isConfigured else { return }
+        guard !hasPurchaseInProgress else { return }
 
         isLoadingCustomerInfo = true
         defer {
@@ -103,11 +105,14 @@ final class SubscriptionManager {
 
         do {
             let info = try await Purchases.shared.customerInfo()
+            guard !hasPurchaseInProgress else { return }
             await MainActor.run {
                 apply(customerInfo: info)
             }
+            guard !hasPurchaseInProgress else { return }
             clearError()
         } catch {
+            guard !hasPurchaseInProgress else { return }
             setError("Could not refresh subscription status: \(error.localizedDescription)")
         }
     }
@@ -227,6 +232,12 @@ final class SubscriptionManager {
             ?? offering.annual
             ?? offering.availablePackages.first(where: { $0.packageType == .annual })
             ?? offering.availablePackages.first(where: { $0.storeProduct.productIdentifier.lowercased().contains("yearly") || $0.storeProduct.productIdentifier.lowercased().contains("annual") })
+    }
+
+    var hasPurchaseInProgress: Bool {
+        purchaseLock.lock()
+        defer { purchaseLock.unlock() }
+        return isPurchaseInProgress
     }
 
     @MainActor

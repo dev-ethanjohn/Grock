@@ -6,6 +6,23 @@ import Foundation
 /// - Keep rules consistent across all entry points (vault, cart sheets, popovers).
 /// - Keep “duplicate checking” in one place so behavior is always the same.
 extension VaultService {
+    private func canUseStoreName(
+        _ storeName: String,
+        allowedLockedStoreNames: [String],
+        isPro: Bool = UserDefaults.standard.isPro
+    ) -> Bool {
+        let normalizedStore = storeName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let isAllowedLockedStore = allowedLockedStoreNames.contains {
+            $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == normalizedStore
+        }
+
+        if isAllowedLockedStore {
+            return true
+        }
+
+        return canUseStoreName(storeName, isPro: isPro)
+    }
+
     /// Returns true if another item exists with the same (name + store), case-insensitive.
     ///
     /// Parameters:
@@ -42,7 +59,12 @@ extension VaultService {
     /// Current rules:
     /// - Name must be non-empty.
     /// - (Name + Store) must be unique in the vault.
-    func validateItemName(_ name: String, store: String, excluding itemId: String? = nil) -> (isValid: Bool, errorMessage: String?) {
+    func validateItemName(
+        _ name: String,
+        store: String,
+        excluding itemId: String? = nil,
+        allowedLockedStoreNames: [String] = []
+    ) -> (isValid: Bool, errorMessage: String?) {
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedStore = store.trimmingCharacters(in: .whitespacesAndNewlines)
 
@@ -54,7 +76,7 @@ extension VaultService {
             return (false, "Store name cannot be empty")
         }
 
-        if !canUseStoreName(trimmedStore) {
+        if !canUseStoreName(trimmedStore, allowedLockedStoreNames: allowedLockedStoreNames) {
             return (false, storeLimitErrorMessage())
         }
 

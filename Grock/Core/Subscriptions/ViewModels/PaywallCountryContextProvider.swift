@@ -55,8 +55,8 @@ final class PaywallCountryContextProvider {
 
     private static func loadCatalog(from bundle: Bundle) -> PaywallCountryContextCatalog {
         guard let url = bundle.url(forResource: "PaywallCountryContext", withExtension: "json") else {
-            print("⚠️ [PaywallContext] Missing PaywallCountryContext.json. Using fallback templates.")
-            return fallbackCatalog
+            print("⚠️ [PaywallContext] Missing PaywallCountryContext.json. Leaving paywall context copy empty.")
+            return emptyCatalog
         }
 
         do {
@@ -66,8 +66,8 @@ final class PaywallCountryContextProvider {
             let sanitizedData = Data(sanitizedText.utf8)
             return try JSONDecoder().decode(PaywallCountryContextCatalog.self, from: sanitizedData)
         } catch {
-            print("⚠️ [PaywallContext] Could not decode PaywallCountryContext.json: \(error.localizedDescription). Using fallback templates.")
-            return fallbackCatalog
+            print("⚠️ [PaywallContext] Could not decode PaywallCountryContext.json: \(error.localizedDescription). Leaving paywall context copy empty.")
+            return emptyCatalog
         }
     }
 
@@ -88,13 +88,13 @@ final class PaywallCountryContextProvider {
         return result
     }
 
-    private static var fallbackCatalog: PaywallCountryContextCatalog {
+    private static var emptyCatalog: PaywallCountryContextCatalog {
         PaywallCountryContextCatalog(
             default: PaywallCountryContextTemplate(
-                yearlyPrimary: "Free trial, then just {{yearly_monthly}}/month ✨",
-                yearlySecondary: "About {{yearly_daily}}/day for a full year of smarter groceries.",
-                monthlyPrimary: "Cancel Anytime ✨",
-                monthlySecondary: "Save more on groceries every month"
+                yearlyPrimary: "",
+                yearlySecondary: "",
+                monthlyPrimary: "",
+                monthlySecondary: ""
             ),
             countries: [:]
         )

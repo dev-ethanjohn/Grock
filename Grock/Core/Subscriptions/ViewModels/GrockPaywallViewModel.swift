@@ -1,7 +1,6 @@
 import Foundation
 import Observation
 import RevenueCat
-import StoreKit
 
 @MainActor
 @Observable
@@ -18,7 +17,6 @@ final class GrockPaywallViewModel {
     private let subscriptionManager: SubscriptionManager
     private let countryContextProvider: PaywallCountryContextProvider
     private var lastLoggedStorefrontSignature: String?
-    private var liveStorefrontProductsByID: [String: StoreKit.Product] = [:]
 
     private static let chargeDateFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -198,16 +196,15 @@ final class GrockPaywallViewModel {
 
         logStorefrontSource(reason: "before-sticky-render")
         let template = contextTemplateForCurrentCountry
-        let rawTemplate: String
-
         switch selectedPlan {
         case .yearly:
-            rawTemplate = template.yearlyPrimary
+            guard let values = yearlyStickyContextValues else {
+                return "Loading App Store price..."
+            }
+            return renderTemplate(template.yearlyPrimary, values: values)
         case .monthly:
-            rawTemplate = template.monthlyPrimary
+            return renderTemplate(template.monthlyPrimary, values: monthlyStickyContextValues)
         }
-
-        return renderTemplate(rawTemplate, values: stickyContextValues)
     }
 
     var stickyPanelSecondaryLine: String {
@@ -217,58 +214,24 @@ final class GrockPaywallViewModel {
 
         logStorefrontSource(reason: "before-sticky-render")
         let template = contextTemplateForCurrentCountry
-        let rawTemplate: String
-
         switch selectedPlan {
         case .yearly:
-            if let computedYearlySecondary = yearlyDailyComparisonSecondaryText {
-                return computedYearlySecondary
+            guard let values = yearlyStickyContextValues else {
+                return "Checking your storefront currency."
             }
-            rawTemplate = template.yearlySecondary
+            return renderTemplate(template.yearlySecondary, values: values)
         case .monthly:
-            rawTemplate = template.monthlySecondary
+            return renderTemplate(template.monthlySecondary, values: monthlyStickyContextValues)
         }
-
-        return renderTemplate(rawTemplate, values: stickyContextValues)
     }
 
     var isProUser: Bool {
         subscriptionManager.isPro
     }
 
-    func refreshAll() async {
-        await subscriptionManager.refreshAll()
-        await refreshLiveStorefrontProducts()
+    func prepareForPresentation() {
         alignDefaultPlanToAvailability()
-        logStorefrontSource(reason: "refresh-all")
-    }
-
-    func refreshOfferingsForPaywall(reason: String) async {
-        await subscriptionManager.refreshOfferings()
-        await refreshLiveStorefrontProducts()
-        alignDefaultPlanToAvailability()
-        logStorefrontSource(reason: reason)
-    }
-
-    func refreshEntitlementForPaywallGate() async -> Bool {
-        await subscriptionManager.refreshCustomerInfo()
-        if subscriptionManager.isPro {
-            return true
-        }
-
-        await refreshLiveStorefrontProducts()
-        let hasActiveStoreKitEntitlement = await hasActiveStoreKitEntitlement()
-        guard hasActiveStoreKitEntitlement else {
-            return false
-        }
-
-        _ = await subscriptionManager.syncPurchases()
-        await subscriptionManager.refreshCustomerInfo()
-        return subscriptionManager.isPro
-    }
-
-    func retryOfferingsLoad() async {
-        await refreshAll()
+        logStorefrontSource(reason: "paywall-presented")
     }
 
     func purchaseSelectedPlan() async -> Bool {
@@ -451,52 +414,6 @@ final class GrockPaywallViewModel {
         return nil
     }
 
-    private var yearlyDailyComparisonSecondaryText: String? {
-        guard let yearlySnapshot = yearlyPriceSnapshot else {
-            return nil
-        }
-
-        let dailyCost = yearlySnapshot.priceDecimalNumber
-            .dividing(by: NSDecimalNumber(value: 365))
-            .doubleValue
-
-        guard dailyCost > 0 else {
-            return nil
-        }
-
-        let phrase: String
-        let displayAmount: Int
-
-        if dailyCost < 1 {
-            phrase = "Less than"
-            displayAmount = 1
-        } else {
-            let floored = floor(dailyCost)
-            let fractionalPart = dailyCost - floored
-
-            if fractionalPart < 0.10 {
-                phrase = "At"
-                displayAmount = Int(floored)
-            } else if fractionalPart < 0.50 {
-                phrase = "About"
-                displayAmount = Int(floored)
-            } else {
-                phrase = "Less than"
-                displayAmount = Int(floored) + 1
-            }
-        }
-
-        guard let formattedAmount = formattedWholeCurrencyAmount(
-            displayAmount,
-            formatter: yearlySnapshot.priceFormatter,
-            currencyCode: yearlySnapshot.currencyCode
-        ) else {
-            return nil
-        }
-
-        return "\(phrase) \(formattedAmount)/day for a full year of smarter groceries."
-    }
-
     private var yearlyDailyPesoWordText: String? {
         guard let yearlySnapshot = yearlyPriceSnapshot else {
             return nil
@@ -524,22 +441,36 @@ final class GrockPaywallViewModel {
             ?? Locale.autoupdatingCurrent.region?.identifier.uppercased()
     }
 
-    private var stickyContextValues: [String: String] {
+    private var monthlyStickyContextValues: [String: String] {
         let monthlyPrice = monthlyPriceSnapshot?.localizedPriceString ?? "--"
         let yearlyPrice = yearlyPriceSnapshot?.localizedPriceString ?? "--"
         let monthlyWeekly = monthlyWeeklyEquivalentText ?? monthlyPrice
-        let yearlyMonthly = yearlyMonthlyEquivalentText ?? yearlyPrice
-        let yearlyDaily = yearlyDailyCostText ?? yearlyMonthly
-        let yearlyDailyPesoWord = yearlyDailyPesoWordText ?? yearlyDaily
 
         return [
             "monthly_price": monthlyPrice,
             "monthly_weekly": monthlyWeekly,
-            "yearly_price": yearlyPrice,
-            "yearly_monthly": yearlyMonthly,
-            "yearly_daily": yearlyDaily,
-            "yearly_daily_peso_word": yearlyDailyPesoWord
+            "yearly_price": yearlyPrice
         ]
+    }
+
+    private var yearlyStickyContextValues: [String: String]? {
+        guard let yearlyPrice = yearlyPriceSnapshot?.localizedPriceString,
+              let yearlyMonthly = yearlyMonthlyEquivalentText,
+              let yearlyDaily = yearlyDailyCostText else {
+            return nil
+        }
+
+        var values: [String: String] = [
+            "yearly_price": yearlyPrice,
+            "monthly": yearlyMonthly,
+            "daily": yearlyDaily
+        ]
+
+        if let yearlyDailyPesoWord = yearlyDailyPesoWordText {
+            values["daily_peso_word"] = yearlyDailyPesoWord
+        }
+
+        return values
     }
 
     private func renderTemplate(_ template: String, values: [String: String]) -> String {
@@ -659,99 +590,129 @@ final class GrockPaywallViewModel {
         }
     }
 
-    private func refreshLiveStorefrontProducts() async {
-        let productIDs = Set([
-            subscriptionManager.monthlyPackage?.storeProduct.productIdentifier,
-            subscriptionManager.yearlyPackage?.storeProduct.productIdentifier
-        ].compactMap { $0 })
-
-        guard !productIDs.isEmpty else {
-            liveStorefrontProductsByID = [:]
-            return
-        }
-
-        liveStorefrontProductsByID = [:]
-
-        do {
-            let products = try await StoreKit.Product.products(for: Array(productIDs))
-            var mapped: [String: StoreKit.Product] = [:]
-            for product in products {
-                mapped[product.id] = product
-            }
-            liveStorefrontProductsByID = mapped
-        } catch {
-            liveStorefrontProductsByID = [:]
-            print("⚠️ [Paywall] Failed to refresh direct StoreKit products: \(error.localizedDescription)")
-        }
-    }
-
     private func directPriceSnapshot(for package: Package?) -> PriceSnapshot? {
         guard let package else { return nil }
-
-        let productID = package.storeProduct.productIdentifier
-        if let liveProduct = liveStorefrontProductsByID[productID] {
-            return priceSnapshot(from: liveProduct)
-        }
-
-        return nil
+        return priceSnapshot(from: package)
     }
 
-    private func hasActiveStoreKitEntitlement() async -> Bool {
-        let productIDs = Set([
-            subscriptionManager.monthlyPackage?.storeProduct.productIdentifier,
-            subscriptionManager.yearlyPackage?.storeProduct.productIdentifier
-        ].compactMap { $0 })
-
-        guard !productIDs.isEmpty else { return false }
-
-        let storeKitProducts: [StoreKit.Product]
-        if productIDs.allSatisfy({ liveStorefrontProductsByID[$0] != nil }) {
-            storeKitProducts = productIDs.compactMap { liveStorefrontProductsByID[$0] }
-        } else {
-            do {
-                storeKitProducts = try await StoreKit.Product.products(for: Array(productIDs))
-            } catch {
-                print("⚠️ [Paywall] Failed to fetch StoreKit products for entitlement check: \(error.localizedDescription)")
-                return false
-            }
-        }
-
-        for product in storeKitProducts {
-            guard let entitlement = await product.currentEntitlement else { continue }
-
-            switch entitlement {
-            case .verified(let transaction):
-                if transaction.revocationDate != nil {
-                    continue
-                }
-                if let expiration = transaction.expirationDate, expiration <= Date() {
-                    continue
-                }
-                return true
-            case .unverified:
-                continue
-            }
-        }
-
-        return false
-    }
-
-    private func priceSnapshot(from product: StoreKit.Product) -> PriceSnapshot {
-        let style = product.priceFormatStyle
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .currency
-        formatter.locale = style.locale
-        formatter.currencyCode = style.currencyCode
+    private func priceSnapshot(from package: Package) -> PriceSnapshot {
+        let storeProduct = package.storeProduct
+        // RevenueCat's StoreProduct is backed by App Store / StoreKit pricing data.
+        let formatter = makePriceFormatter(
+            currencyCode: storeProduct.currencyCode,
+            localizedPriceString: storeProduct.localizedPriceString
+        )
 
         return PriceSnapshot(
-            localizedPriceString: product.displayPrice,
-            priceDecimalNumber: NSDecimalNumber(decimal: product.price),
+            localizedPriceString: storeProduct.localizedPriceString,
+            priceDecimalNumber: NSDecimalNumber(decimal: storeProduct.price),
             priceFormatter: formatter,
-            currencyCode: style.currencyCode,
-            storefrontCountryCode: style.locale.region?.identifier.uppercased(),
-            localeIdentifier: style.locale.identifier,
-            source: "storekit-direct"
+            currencyCode: storeProduct.currencyCode,
+            storefrontCountryCode: formatter?.locale.region?.identifier.uppercased()
+                ?? Locale.autoupdatingCurrent.region?.identifier.uppercased(),
+            localeIdentifier: formatter?.locale.identifier ?? Locale.autoupdatingCurrent.identifier,
+            source: "storekit-backed-package"
         )
+    }
+
+    private func makePriceFormatter(
+        currencyCode: String?,
+        localizedPriceString: String
+    ) -> NumberFormatter? {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.locale = preferredLocale(
+            currencyCode: currencyCode,
+            localizedPriceString: localizedPriceString
+        )
+
+        if let currencyCode {
+            formatter.currencyCode = currencyCode
+        }
+
+        if let symbol = extractedCurrencySymbol(
+            from: localizedPriceString,
+            currencyCode: currencyCode
+        ) {
+            formatter.currencySymbol = symbol
+        }
+
+        return formatter
+    }
+
+    private func preferredLocale(
+        currencyCode: String?,
+        localizedPriceString: String
+    ) -> Locale {
+        guard let currencyCode, !currencyCode.isEmpty else {
+            return .autoupdatingCurrent
+        }
+
+        let extractedSymbol = extractedCurrencySymbol(
+            from: localizedPriceString,
+            currencyCode: currencyCode
+        )
+
+        let preferredCurrentLocales = [
+            Locale.autoupdatingCurrent,
+            Locale.current
+        ]
+
+        if let match = preferredCurrentLocales.first(where: { locale in
+            localeCurrencyIdentifier(locale)?.caseInsensitiveCompare(currencyCode) == .orderedSame
+            && (extractedSymbol == nil || locale.currencySymbol == extractedSymbol)
+        }) {
+            return match
+        }
+
+        if let extractedSymbol,
+           let symbolMatch = Locale.availableIdentifiers.lazy
+            .map(Locale.init(identifier:))
+            .first(where: { locale in
+                localeCurrencyIdentifier(locale)?.caseInsensitiveCompare(currencyCode) == .orderedSame
+                && locale.currencySymbol == extractedSymbol
+            }) {
+            return symbolMatch
+        }
+
+        if let currencyMatch = Locale.availableIdentifiers.lazy
+            .map(Locale.init(identifier:))
+            .first(where: { locale in
+                localeCurrencyIdentifier(locale)?.caseInsensitiveCompare(currencyCode) == .orderedSame
+            }) {
+            return currencyMatch
+        }
+
+        return .autoupdatingCurrent
+    }
+
+    private func localeCurrencyIdentifier(_ locale: Locale) -> String? {
+        locale.currency?.identifier
+    }
+
+    private func extractedCurrencySymbol(
+        from localizedPriceString: String,
+        currencyCode: String?
+    ) -> String? {
+        let removableScalars = CharacterSet.decimalDigits
+            .union(.whitespacesAndNewlines)
+            .union(.punctuationCharacters)
+            .union(.controlCharacters)
+
+        var symbol = String(
+            localizedPriceString.unicodeScalars.filter { scalar in
+                !removableScalars.contains(scalar)
+            }
+        )
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if let currencyCode, !currencyCode.isEmpty {
+            symbol = symbol.replacingOccurrences(of: currencyCode, with: "")
+            symbol = symbol.replacingOccurrences(of: currencyCode.lowercased(), with: "")
+        }
+
+        let trimmed = symbol.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 
     private struct PriceSnapshot {

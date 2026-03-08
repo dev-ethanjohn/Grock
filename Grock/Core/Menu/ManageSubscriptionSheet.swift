@@ -69,6 +69,11 @@ struct ManageSubscriptionSheet: View {
 
         if let expirationDate = entitlement.expirationDate {
             let formatted = Self.renewalDateFormatter.string(from: expirationDate)
+            if entitlement.periodType == .trial {
+                return entitlement.willRenew
+                    ? "Free trial ends on \(formatted)"
+                    : "Free trial ends on \(formatted)"
+            }
             return entitlement.willRenew
                 ? "Renews automatically on \(formatted)"
                 : "Access ends on \(formatted)"
@@ -80,6 +85,15 @@ struct ManageSubscriptionSheet: View {
     private var renewalSecondaryLine: String? {
         guard subscriptionManager.isPro else { return nil }
         guard let entitlement = activeProEntitlement else { return nil }
+
+        if entitlement.periodType == .trial {
+            if entitlement.willRenew, let currentPlanPriceLine, !currentPlanPriceLine.isEmpty {
+                return "Then starts at \(currentPlanPriceLine)."
+            }
+
+            return "Auto-renew: Off"
+        }
+
         return entitlement.willRenew ? nil : "Auto-renew: Off"
     }
 
@@ -126,6 +140,7 @@ struct ManageSubscriptionSheet: View {
                             isRestoringPurchases = true
 
                             Task {
+                                let wasProBeforeRestore = subscriptionManager.isPro
                                 let result = await subscriptionManager.restorePurchases()
                                 await subscriptionManager.refreshCustomerInfo()
 
@@ -133,8 +148,12 @@ struct ManageSubscriptionSheet: View {
                                     switch result {
                                     case .success:
                                         if subscriptionManager.isPro {
-                                            restoreResultMessage = "Subscription already active."
-                                            showRestoreResultAlert = true
+                                            if wasProBeforeRestore {
+                                                restoreResultMessage = "Subscription is already active."
+                                                showRestoreResultAlert = true
+                                            } else {
+                                                ProUnlockedCelebrationPresenter.shared.show()
+                                            }
                                         } else {
                                             presentRestoreWarningToast()
                                         }
